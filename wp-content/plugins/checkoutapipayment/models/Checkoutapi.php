@@ -140,8 +140,8 @@ abstract class models_Checkoutapi extends WC_Payment_Gateway implements models_I
 				  'woocommerce' ),
 			  'desc_tip'    =>    true,
 			  'options'     =>    array(
-								  'dev'     =>    'Development',
-								  'preprod' =>    'Preprod',
+								
+								  'sandbox' =>    'Sandbox',
 								  'live'    =>    'Live'
 				  )
 			)
