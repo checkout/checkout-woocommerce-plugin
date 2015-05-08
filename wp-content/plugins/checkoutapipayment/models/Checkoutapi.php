@@ -139,10 +139,12 @@ abstract class models_Checkoutapi extends WC_Payment_Gateway implements models_I
 			  'description' =>    __( 'This is the setting for identifying the API URL used (dev/preprod/live)',
 				  'woocommerce' ),
 			  'desc_tip'    =>    true,
+			  'default'     =>  'sandbox',
 			  'options'     =>    array(
 								
 								  'sandbox' =>    'Sandbox',
 								  'live'    =>    'Live'
+
 				  )
 			)
 

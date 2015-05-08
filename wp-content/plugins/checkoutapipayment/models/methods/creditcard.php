@@ -41,7 +41,11 @@ class models_methods_creditcard extends models_methods_Abstract
 
                             var script = document.createElement("script");
                             script.type = "text/javascript";
-                            script.src = "//checkout.com/cdn/js/Checkout.js";
+                            if('<?php echo CHECKOUTAPI_ENDPOINT?>' == 'live') {
+                                script.src = "//checkout.com/cdn/js/Checkout.js";
+                            }else {
+                                script.src = "//sandbox.checkout.com/js/v1/checkout.js";
+                            }
                             script.id = "cko-checkoutjs";
                             script.async = "true";
                             script.setAttribute("data-namespace","CheckoutIntegration");
