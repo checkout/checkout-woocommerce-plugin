@@ -55,6 +55,7 @@ class models_methods_creditcard extends models_methods_Abstract
                                     jQuery('body').trigger('update_checkout');
                                 });
 
+
                             });
                         }else{
                             if(typeof CheckoutIntegration !='undefined' && loaderJs<1) {
@@ -81,10 +82,14 @@ class models_methods_creditcard extends models_methods_Abstract
 
                             var d = jQuery.parseJSON(respondtxt);
                             error = (d.messages.indexOf('loadLight') < 0 );
+
                             jQuery('.woocommerce-error li div').hide();
 
                             if(jQuery('#payment_method_checkoutapipayment:checked').length
                                 && loaderJs < 1 && !error ) {
+                                if( jQuery('#terms').length) {
+                                    jQuery('#terms').attr('checked', 'checked');
+                                }
                                 CheckoutIntegration.open();
 
                                 loaderJs++;
@@ -205,14 +210,21 @@ class models_methods_creditcard extends models_methods_Abstract
                         if( jQuery('.checkout.woocommerce-checkout').is('.cko-processing')) {
                             jQuery('.checkout.woocommerce-checkout').removeClass('processing cko-processing');
                         }
+
                         if(reload) {
                             window.location.reload();
                         }
                         loaderJs = 0;
+
                     },
                     lightboxActivated: function() {
+
                         loaderJs =1;
                         CheckoutIntegration.setCustomerEmail(document.getElementById('billing_email').value);
+                        if( jQuery('#terms').length) {
+                            jQuery('#terms').attr('checked', 'checked');
+                        }
+
                     }
 
 
