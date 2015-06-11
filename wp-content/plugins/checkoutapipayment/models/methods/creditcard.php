@@ -146,6 +146,14 @@ class models_methods_creditcard extends models_methods_Abstract
         }
 
         $paymentToken = $this->getPaymentToken();
+
+        if (CHECKOUTAPI_LP == 'yes'){
+            $paymentMode = 'mixed';
+        } else {
+            $paymentMode = 'card';
+        }
+
+
         ?>
 
         <div style="" class="widget-container">
@@ -167,7 +175,12 @@ class models_methods_creditcard extends models_methods_Abstract
                     currency: '<?php echo get_woocommerce_currency() ?>',
                     customerEmail: customerEMail,
                     customerName: '<?php echo $name?>',
-                    paymentMode: 'mixed',
+                    paymentMode: '<?php echo $paymentMode ?>',
+                    logoUrl : '<?php echo CHECKOUTAPI_LOGOURL ?>',
+                    themeColor : '<?php echo CHECKOUTAPI_THEMECOLOR ?>',
+                    buttonColor : '<?php echo CHECKOUTAPI_BUTTONCOLOR ?>',
+                    iconColor: '<?php echo CHECKOUTAPI_ICONCOLOR ?>',
+                    useCurrencyCode: '<?php echo CHECKOUTAPI_CURRENCYCODE ?>',
                     title: '<?php  ?>',
                     subtitle: '<?php echo __('Please enter your credit card details') ?>',
                     widgetContainerSelector: '.widget-container',
