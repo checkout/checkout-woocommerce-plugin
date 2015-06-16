@@ -302,6 +302,7 @@ class models_methods_creditcard extends models_methods_Abstract
 
         $respondCharge = $Api->verifyChargePaymentToken($config);
 
+
         return parent::_validateChrage($order, $respondCharge);
     }
 
@@ -399,7 +400,7 @@ class models_methods_creditcard extends models_methods_Abstract
         $config = array_merge_recursive($extraConfig,$config);
 
         if($customer) {
-            $config['postedParam']['billingdetails'] = array (
+            $config['postedParam']['card']['billingdetails'] = array (
                 'addressline1'  =>    $customer->address,
                 'addressline2'  =>    $customer->address_2,
                 'city'          =>    $customer->city,
@@ -438,6 +439,8 @@ class models_methods_creditcard extends models_methods_Abstract
         }
 
         $paymentTokenCharge = $Api->getPaymentToken($config);
+
+       // CheckoutApi_Utility_Utilities::dump($config); die();
 
         $paymentToken    =   '';
         if($paymentTokenCharge->isValid()){
