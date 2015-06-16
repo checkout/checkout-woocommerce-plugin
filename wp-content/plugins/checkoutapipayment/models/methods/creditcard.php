@@ -440,8 +440,6 @@ class models_methods_creditcard extends models_methods_Abstract
 
         $paymentTokenCharge = $Api->getPaymentToken($config);
 
-       // CheckoutApi_Utility_Utilities::dump($config); die();
-
         $paymentToken    =   '';
         if($paymentTokenCharge->isValid()){
             $paymentToken = $paymentTokenCharge->getId();
