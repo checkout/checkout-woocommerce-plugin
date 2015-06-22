@@ -22,6 +22,13 @@ abstract class models_Checkoutapi extends WC_Payment_Gateway implements models_I
 		define("CHECKOUTAPI_TIMEOUT", $this->checkoutapipayment_timeout);
 		define("CHECKOUTAPI_ENDPOINT", $this->checkoutapipayment_endpoint);
 		define("CHECKOUTAPI_ISPCI", $this->checkoutapipayment_ispci);
+		define("CHECKOUTAPI_PCINO", $this->checkoutapipayment_pciNo);
+		define("CHECKOUTAPI_LOGOURL", $this->checkoutapipayment_logoUrl);
+		define("CHECKOUTAPI_THEMECOLOR", $this->checkoutapipayment_themeColor);
+		define("CHECKOUTAPI_BUTTONCOLOR", $this->checkoutapipayment_buttonColor);
+		define("CHECKOUTAPI_ICONCOLOR", $this->checkoutapipayment_iconColor);
+		define("CHECKOUTAPI_LP", $this->checkoutapipayment_lp);
+		define("CHECKOUTAPI_CURRENCYCODE", $this->checkoutapipayment_currencyCode);
 
 		$this->_setInstanceMethod();
 
@@ -50,19 +57,7 @@ abstract class models_Checkoutapi extends WC_Payment_Gateway implements models_I
 				'type'      =>    'checkbox',
 				'label'     =>    __( 'Enable Credit Card (Checkout.com) payment method', 'woocommerce' ),
 				'default'   =>   'yes'
-				),
-
-			'checkoutapipayment_ispci' => array(
-			    'title'         =>    __( 'Is PCI Compliance?', 'woocommerce' ),
-			    'type'          =>    'select',
-			    'description'   =>    __( 'Please select whether you are PCI Compliance', 'woocommerce' ),
-			    'desc_tip'      =>    true,
-			    'options'       =>    array(
-										   'yes'    =>    'YES',
-										   'no'     =>    'NO',
-				                        ),
-			     'default'     =>     'no'
-			  ),
+			 ),
 
 			'title'    =>    array(
 				  'title'       =>    __( 'Title', 'woocommerce' ),
@@ -74,13 +69,14 @@ abstract class models_Checkoutapi extends WC_Payment_Gateway implements models_I
 			  ),
 
 			'checkoutapipayment_secretkey' => array(
-			  'title' => __( 'Secret Key', 'woocommerce' ),
-			  'type' => 'text',
+			  'title'       => __( 'Secret Key', 'woocommerce' ),
+			  'type'        => 'text',
 			  'description' => __( 'This is the Secret Key where you could find on Checkout Hub Settings.', 'woocommerce' ),
-			  'default' => '',
-			  'desc_tip'      => true,
+			  'default'     => '',
+			  'desc_tip'    => true,
 			  'placeholder' => 'Your secret Key'
 			  ),
+
 			'checkoutapipayment_publickey' => array(
 			  'title' => __( 'Public Key', 'woocommerce' ),
 			  'type' => 'text',
@@ -89,6 +85,7 @@ abstract class models_Checkoutapi extends WC_Payment_Gateway implements models_I
 			  'desc_tip'      => true,
 			  'placeholder' => 'Your public Key'
 			  ),
+
 			'checkoutapipayment_paymentaction' => array(
 			  'title' => __( 'Payment Action', 'woocommerce' ),
 			  'type' => 'select',
@@ -99,6 +96,7 @@ abstract class models_Checkoutapi extends WC_Payment_Gateway implements models_I
 				  ),
 			  'default'     => 'Authorize &amp; Capture'
 			  ),
+
 			'checkoutapipayment_cardtype' => array(
 			  'title' => __( 'Credit Card Types', 'woocommerce' ),
 			  'type' => 'multiselect',
@@ -115,6 +113,7 @@ abstract class models_Checkoutapi extends WC_Payment_Gateway implements models_I
 				  'Other' => 'Other'
 				  )
 			  ),
+
 			'checkoutapipayment_autoCaptime' => array(
 			  'title'       =>    __( 'Auto Capture Time (Seconds)', 'woocommerce' ),
 			  'type'        =>    'text',
@@ -144,9 +143,87 @@ abstract class models_Checkoutapi extends WC_Payment_Gateway implements models_I
 								
 								  'sandbox' =>    'Sandbox',
 								  'live'    =>    'Live'
-
 				  )
-			)
+			 ),
+
+            'checkoutapipayment_lp' => array(
+                'title'         =>    __( 'Enable Local Payment?', 'woocommerce' ),
+                'type'          =>    'select',
+                'description'   =>    __( 'Please select whether to enable local payment', 'woocommerce' ),
+                'desc_tip'      =>    true,
+                'options'       =>    array(
+                    'yes'    =>    'YES',
+                    'no'     =>    'NO',
+                ),
+                'default'     =>     'no'
+            ),
+
+            'checkoutapipayment_ispci' => array(
+                'title'         =>    __( 'Is PCI Compliance?', 'woocommerce' ),
+                'type'          =>    'select',
+                'description'   =>    __( 'Please select whether you are PCI Compliance', 'woocommerce' ),
+                'desc_tip'      =>    true,
+                'options'       =>    array(
+                    'yes'    =>    'YES',
+                    'no'     =>    'NO',
+                ),
+                'default'     =>     'no'
+             ),
+
+            'advanced' => array(
+                'title'       => __( 'Advanced options for Checkout.js', 'woocommerce' ),
+                'type'        => 'title',
+                'description' => '',
+            ),
+
+            'checkoutapipayment_logoUrl' => array(
+             'title'       =>    __( 'Logo URL', 'woocommerce' ),
+             'type'        =>   'text',
+             'description' =>   __( 'This is the setting to display the logo on checkout.js',
+                'woocommerce' ),
+             'default'     =>  '',
+             'desc_tip'    =>  true
+            ),
+
+            'checkoutapipayment_themeColor' => array(
+                'title'       =>    __( 'Theme color', 'woocommerce' ),
+                'type'        =>   'text',
+                'description' =>   __( 'Set theme color for checkout.js',
+                    'woocommerce' ),
+                'default'     =>  '',
+                'desc_tip'    =>  true
+            ),
+
+            'checkoutapipayment_buttonColor' => array(
+                'title'       =>    __( 'Button color', 'woocommerce' ),
+                'type'        =>   'text',
+                'description' =>   __( 'Set color for Pay now button',
+                    'woocommerce' ),
+                'default'     =>  '',
+                'desc_tip'    =>  true
+            ),
+
+            'checkoutapipayment_iconColor' => array(
+                'title'       =>    __( 'Icon color', 'woocommerce' ),
+                'type'        =>   'text',
+                'description' =>   __( 'Set icon color for checkout.js',
+                    'woocommerce' ),
+                'default'     =>  '',
+                'desc_tip'    =>  true
+            ),
+
+
+            'checkoutapipayment_currencyCode' => array(
+                'title'         =>    __( 'Widget currency format', 'woocommerce' ),
+                'type'          =>    'select',
+                'description'   =>    __( 'Display currency code or currency symbol on the js', 'woocommerce' ),
+                'desc_tip'      =>    true,
+                'options'       =>    array(
+                    'true'    =>    'Code',
+                    'false'     =>    'Symbol',
+                ),
+                'default'     =>     'false'
+             )
 
 		);
 	}
@@ -192,18 +269,24 @@ abstract class models_Checkoutapi extends WC_Payment_Gateway implements models_I
     private function _init()
     {
 		$this->id               = 'checkoutapipayment';
-
 		$this->has_fields       = true;
 		$this->method_title     = __( 'Credit Card (Checkout.com)', 'woocommerce' );
 		$this->init_form_fields();
-		$this->title              	  = $this->get_option( 'title' );
-		$this->checkoutapipayment_secretkey    = $this->get_option( 'checkoutapipayment_secretkey' );
-		$this->checkoutapipayment_publickey  = $this->get_option( 'checkoutapipayment_publickey' );
+		$this->title            = $this->get_option( 'title' );
+		$this->checkoutapipayment_secretkey     = $this -> get_option ('checkoutapipayment_secretkey');
+		$this->checkoutapipayment_publickey     = $this -> get_option ('checkoutapipayment_publickey');
 		$this->checkoutapipayment_paymentaction = $this -> get_option ('checkoutapipayment_paymentaction');
-		$this->checkoutapipayment_cardtype = $this -> get_option ('checkoutapipayment_cardtype');
-		$this->checkoutapipayment_autoCaptime = $this -> get_option ('checkoutapipayment_autoCaptime');
-		$this->checkoutapipayment_timeout = $this -> get_option ('checkoutapipayment_timeout');
-		$this->checkoutapipayment_endpoint = $this -> get_option ('checkoutapipayment_endpoint');
-		$this->checkoutapipayment_ispci = $this -> get_option ('checkoutapipayment_ispci');
+		$this->checkoutapipayment_cardtype      = $this -> get_option ('checkoutapipayment_cardtype');
+		$this->checkoutapipayment_autoCaptime   = $this -> get_option ('checkoutapipayment_autoCaptime');
+		$this->checkoutapipayment_timeout       = $this -> get_option ('checkoutapipayment_timeout');
+		$this->checkoutapipayment_endpoint      = $this -> get_option ('checkoutapipayment_endpoint');
+        $this->checkoutapipayment_ispci         = $this -> get_option ('checkoutapipayment_ispci');
+        $this->checkoutapipayment_lp            = $this -> get_option ('checkoutapipayment_lp');
+        $this->checkoutapipayment_logoUrl       = $this -> get_option ('checkoutapipayment_logoUrl');
+        $this->checkoutapipayment_themeColor    = $this -> get_option ('checkoutapipayment_themeColor');
+        $this->checkoutapipayment_buttonColor   = $this -> get_option ('checkoutapipayment_buttonColor');
+        $this->checkoutapipayment_iconColor     = $this -> get_option ('checkoutapipayment_iconColor');
+        $this->checkoutapipayment_currencyCode  = $this -> get_option ('checkoutapipayment_currencyCode');
+
     }
 }
