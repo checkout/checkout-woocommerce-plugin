@@ -146,6 +146,14 @@ class models_methods_creditcard extends models_methods_Abstract
         }
 
         $paymentToken = $this->getPaymentToken();
+
+        if (CHECKOUTAPI_LP == 'yes'){
+            $paymentMode = 'mixed';
+        } else {
+            $paymentMode = 'card';
+        }
+
+
         ?>
 
         <div style="" class="widget-container">
@@ -166,12 +174,17 @@ class models_methods_creditcard extends models_methods_Abstract
                     value: '100',
                     currency: '<?php echo get_woocommerce_currency() ?>',
                     customerEmail: customerEMail,
-                    customerName: 'asdasdas<?php echo $name?>',
-                    paymentMode: 'mixed',
+
+                    customerName: '<?php echo $name?>',
+                    paymentMode: '<?php echo $paymentMode ?>',
+                    logoUrl : '<?php echo CHECKOUTAPI_LOGOURL ?>',
+                    themeColor : '<?php echo CHECKOUTAPI_THEMECOLOR ?>',
+                    buttonColor : '<?php echo CHECKOUTAPI_BUTTONCOLOR ?>',
+                    iconColor: '<?php echo CHECKOUTAPI_ICONCOLOR ?>',
+                    useCurrencyCode: '<?php echo CHECKOUTAPI_CURRENCYCODE ?>',
                     title: '<?php  ?>',
                     subtitle: '<?php echo __('Please enter your credit card details') ?>',
                     widgetContainerSelector: '.widget-container',
-
                     ready: function (event) {
                         var cssAdded = jQuery('.widget-container link');
                         if (!cssAdded.hasClass('checkoutAPiCss')) {
@@ -298,6 +311,7 @@ class models_methods_creditcard extends models_methods_Abstract
         $Api = CheckoutApi_Api::getApi(array('mode'=>CHECKOUTAPI_ENDPOINT));
 
         $respondCharge = $Api->verifyChargePaymentToken($config);
+
 
         return parent::_validateChrage($order, $respondCharge);
     }
