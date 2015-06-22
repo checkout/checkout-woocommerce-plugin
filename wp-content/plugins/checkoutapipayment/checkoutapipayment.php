@@ -2,7 +2,7 @@
 /*
 Plugin Name: Checkout.com Payment Gateway (GW 3.0) 
 Description: Add Checkout.com Payment Gateway (GW 3.0) for WooCommerce. 
-Version: 1.0.2
+Version: 1.0.3
 Author: Checkout Integration Team
 Author URI: http://www.checkout.com
 */

@@ -311,7 +311,10 @@ class models_methods_creditcard extends models_methods_Abstract
         $Api = CheckoutApi_Api::getApi(array('mode'=>CHECKOUTAPI_ENDPOINT));
 
         $respondCharge = $Api->verifyChargePaymentToken($config);
-
+        $customerConfig['authorization'] = CHECKOUTAPI_SECRET_KEY;
+        $customerConfig['customerId'] = $respondCharge->getCard()->getCustomerId() ;
+        $customerConfig['postedParam'] = array ('phone'=>array('number'=>$_POST['billing_phone']));
+        $customerCharge = $Api->updateCustomer($customerConfig);
 
         return parent::_validateChrage($order, $respondCharge);
     }
@@ -411,7 +414,7 @@ class models_methods_creditcard extends models_methods_Abstract
         $config = array_merge_recursive($extraConfig,$config);
 
         if($customer) {
-            $config['postedParam']['card']['billingdetails'] = array (
+            $config['postedParam']['card']['billingDetails'] = array (
                 'addressline1'  =>    $customer->address,
                 'addressline2'  =>    $customer->address_2,
                 'city'          =>    $customer->city,
