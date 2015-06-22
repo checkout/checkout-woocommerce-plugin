@@ -32,7 +32,11 @@ abstract class models_methods_Abstract extends WC_Payment_Gateway implements mod
 		    		'authorization' => CHECKOUTAPI_SECRET_KEY)
 		    	);
 		    
-		    $chargeUpdated = $Api->updateTrackId($respondCharge,$order->id);
+		    try {
+                $chargeUpdated = $Api->updateTrackId($respondCharge,$order->id);
+            }catch (Exception $e) {
+
+            }
 
 			if (preg_match('/^1[0-9]+$/', $respondCharge->getResponseCode())) {
 
@@ -70,6 +74,8 @@ abstract class models_methods_Abstract extends WC_Payment_Gateway implements mod
 			return;
 
 		}
+
+
     }
 
     protected function get_post( $name )

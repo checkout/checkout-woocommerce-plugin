@@ -51,7 +51,7 @@ class models_methods_creditcard extends models_methods_Abstract
                             script.setAttribute("data-namespace","CheckoutIntegration");
                             document.getElementsByTagName("head")[0].appendChild(script);
                             jQuery(function(){
-                                jQuery('#billing_email').blur(function() {
+                                jQuery('#billing_email,#billing_phone').blur(function() {
                                     jQuery('body').trigger('update_checkout');
                                 });
 
@@ -163,14 +163,15 @@ class models_methods_creditcard extends models_methods_Abstract
                     namespace: 'CheckoutIntegration',
                     publicKey: '<?php echo CHECKOUTAPI_PUBLIC_KEY ?>',
                     paymentToken: "<?php echo $paymentToken ?>",
-                    value: '<?php echo $amount ?>',
+                    value: '100',
                     currency: '<?php echo get_woocommerce_currency() ?>',
                     customerEmail: customerEMail,
-                    customerName: '<?php echo $name?>',
+                    customerName: 'asdasdas<?php echo $name?>',
                     paymentMode: 'mixed',
                     title: '<?php  ?>',
                     subtitle: '<?php echo __('Please enter your credit card details') ?>',
                     widgetContainerSelector: '.widget-container',
+
                     ready: function (event) {
                         var cssAdded = jQuery('.widget-container link');
                         if (!cssAdded.hasClass('checkoutAPiCss')) {
@@ -187,28 +188,31 @@ class models_methods_creditcard extends models_methods_Abstract
                     cardCharged: function (event) {
                         document.getElementById('cko-cc-paymenToken').value = event.data.paymentToken;
                         reload = false;
-                        jQuery('#place_order').removeAttr('disabled');
-                        if(jQuery('.checkout.woocommerce-checkout.wasActived').length<1) {
-                            jQuery('.checkout.woocommerce-checkout')
-                                .removeClass('processing')
-                                .addClass('wasActived')
-                                .trigger('submit');
+                        CheckoutIntegration.setCustomerEmail(document.getElementById('billing_email').value);
+                        if( jQuery('#terms').length) {
+                            jQuery('#terms').attr('checked', 'checked');
                         }
+                        jQuery('#place_order').removeAttr('disabled');
+                        if(jQuery('[name^=checkout].checkout.wasActived').length<1) {
+                            jQuery('#place_order').trigger('submit')
+                        }
+
+
                     },
                     paymentTokenExpired: function(){
 //                        alert('Your payment session has expired. We will reload you page thank you');
 //                        window.location.reload();
                         reload = true;
-                        if( jQuery('.checkout.woocommerce-checkout').is('.cko-processing')) {
-                            jQuery('.checkout.woocommerce-checkout').removeClass('processing cko-processing');
+                        if( jQuery('[name^=checkout].checkout').is('.cko-processing')) {
+                            jQuery('[name^=checkout].checkout').removeClass('processing cko-processing');
                         }
                         jQuery('#place_order').removeAttr('disabled');
                         loaderJs = 0;
                     },
                     lightboxDeactivated: function() {
                         jQuery('#place_order').removeAttr('disabled');
-                        if( jQuery('.checkout.woocommerce-checkout').is('.cko-processing')) {
-                            jQuery('.checkout.woocommerce-checkout').removeClass('processing cko-processing');
+                        if( jQuery('[name^=checkout].checkout').is('.cko-processing')) {
+                            jQuery('[name^=checkout].checkout').removeClass('processing cko-processing');
                         }
 
                         if(reload) {
@@ -225,34 +229,40 @@ class models_methods_creditcard extends models_methods_Abstract
                             jQuery('#terms').attr('checked', 'checked');
                         }
 
+                    },
+                    lightboxLoadFailed: function(event) {
+
+
                     }
 
 
                 };
 
 
-                jQuery('#place_order').click(function(event){
+                jQuery('#place_order').bind('click touchstart',function(event){
+                    event.stopPropagation();
                     wc_checkout_params.is_checkout = 0;
                     if(jQuery('#payment_method_checkoutapipayment:checked').length &&  jQuery('.woocommerce-invalid')
                             .length < 1) {
                         //   event.preventDefault();
-                        // jQuery('.checkout.woocommerce-checkout')[0].onsubmit();
+                        // jQuery('[name^=checkout].checkout')[0].onsubmit();
                         //  jQuery('#place_order').attr('disabled',true);
                     }else {
                         jQuery('#place_order').removeAttr('disabled');
-                        if( jQuery('.checkout.woocommerce-checkout').is('.cko-processing') && !jQuery('#payment_method_checkoutapipayment:checked').length) {
-                            jQuery('.checkout.woocommerce-checkout').removeClass('processing cko-processing');
+                        if( jQuery('[name^=checkout].checkout').is('.cko-processing') && !jQuery('#payment_method_checkoutapipayment:checked').length) {
+                            jQuery('[name^=checkout].checkout').removeClass('processing cko-processing');
                         }
                     }
                 });
 
-                jQuery('[name=payment_method]').click(function(event){
+                jQuery('[name=payment_method]').bind('click touchstart',function(event){
 
-                    if(!jQuery('#payment_method_checkoutapipayment:checked').length && jQuery('.checkout.woocommerce-checkout').is('.cko-processing')) {
+                    if(!jQuery('#payment_method_checkoutapipayment:checked').length && jQuery('[name^=checkout].checkout').is('.cko-processing')) {
                         jQuery('#place_order').removeAttr('disabled');
-                        jQuery('.checkout.woocommerce-checkout').removeClass('processing cko-processing');
+                        jQuery('[name^=checkout].checkout').removeClass('processing cko-processing');
                     }
                 });
+
 
 
             </script>
@@ -328,7 +338,6 @@ class models_methods_creditcard extends models_methods_Abstract
         $cart = WC()->cart;
         $customer = WC()->customer;
         $productCart = WC()->cart->cart_contents;
-
         $current_user = wp_get_current_user();
         $post = array();
         if(isset($_POST['post_data'])) {
@@ -367,11 +376,13 @@ class models_methods_creditcard extends models_methods_Abstract
         $config['authorization'] = CHECKOUTAPI_SECRET_KEY;
 
         $config['timeout'] = CHECKOUTAPI_TIMEOUT;
+        $serializeCart = serialize($cart);
+
 
         $config['postedParam'] = array(
             'email'       =>    $email,
             'value'       =>    $amount,
-
+            "metadata"  => array('cart'=>$serializeCart),
             'currency'    =>    get_woocommerce_currency()
         );
 
@@ -386,22 +397,29 @@ class models_methods_creditcard extends models_methods_Abstract
         $config = array_merge_recursive($extraConfig,$config);
 
         if($customer) {
-            $config['postedParam']['billingdetails'] = array (
+            $config['postedParam']['card']['billingdetails'] = array (
                 'addressline1'  =>    $customer->address,
                 'addressline2'  =>    $customer->address_2,
                 'city'          =>    $customer->city,
                 'country'       =>    $customer->country,
 
-                'state'         =>    $customer->country
+                'state'         =>    $customer->country,
+
             );
+
         }
         $products = null;
 
-
         foreach ($productCart as $item ) {
-
+            $variation = $item['variation'];
+            $extraTxt = '';
+            if(!empty($variation)) {
+               foreach($variation as $kv =>$vv) {
+                   $extraTxt .= $kv.': '.$vv.',';
+               }
+            }
             $products[] = array (
-                'name'       =>     $item['data']->post->post_title,
+                'name'       =>     $item['data']->post->post_title.' '.$extraTxt,
                 'sku'        =>     $item['product_id'],
                 'price'      =>     $item['line_total'],
                 'quantity'   =>     $item['quantity'],
