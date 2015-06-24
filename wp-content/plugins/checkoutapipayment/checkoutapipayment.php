@@ -86,11 +86,16 @@ function checkoutapipayment_init()
         {
 
                 if ( !session_id() )
-                    session_start();
+                session_start();
+                
                 global $woocommerce;
-                $order_id = $_SESSION['trackId'];
+                
+                $order_id = $_REQUEST['cko-track-id'];
                 $order = new WC_Order($order_id);
-                $paymentToken =  $_SESSION['cko_cc_paymenToken'];
+                $paymentToken =  $_REQUEST['cko-payment-token'];
+                
+                echo $paymentToken;
+                
                 $config['authorization'] = CHECKOUTAPI_SECRET_KEY;
 
                 $config['paymentToken'] = $paymentToken;
@@ -225,16 +230,23 @@ function checkoutapipayment_init()
 
     function woocommerce_checkoutapipayment_success_valid ()
     {
-        $urlvars = explode('/', $_SERVER['REQUEST_URI']);
-         $nextUrl = explode('?',$urlvars[1]);
 
-        if ( !empty( $nextUrl[0]) && $nextUrl[0] ==
-            'checkoutapipaymentSuccessValidate'
-        ) {
-
+         if (isset( $_GET[ 'checkoutapipaymentSuccessValidate' ] ))
+         {
             do_action ( 'valid-success-page' );
             die();
-        }
+         }
+         
+//         $urlvars = explode('/', $_SERVER['REQUEST_URI']);
+//         $nextUrl = explode('?',$urlvars[1]);
+         
+//        if ( !empty( $nextUrl[0]) && $nextUrl[0] ==
+//            'checkoutapipaymentSuccessValidate'
+//        ) {
+//
+//            do_action ( 'valid-success-page' );
+//            die();
+//        }
 
 
 
