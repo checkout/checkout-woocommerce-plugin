@@ -88,12 +88,23 @@ function checkoutapipayment_init()
                 if ( !session_id() )
                     session_start();
                 global $woocommerce;
-                $order_id = $_SESSION['trackId'];
+
+                if(isset($_GET['trackId']) && $_GET['trackId'] )    {
+                    $order_id = $_GET['trackId'];
+                }else {
+                    $order_id = $_SESSION['trackId'];
+                }
+
                 $order = new WC_Order($order_id);
                 $paymentToken =  $_SESSION['cko_cc_paymenToken'];
                 $config['authorization'] = CHECKOUTAPI_SECRET_KEY;
 
-                $config['paymentToken'] = $paymentToken;
+                if(isset($_GET['paymentToken']) && $_GET['paymentToken'] )    {
+                    $config['paymentToken'] = $_GET['paymentToken'];
+                }else {
+                    $config['paymentToken'] = $paymentToken;
+                }
+
                 $Api = CheckoutApi_Api::getApi(array('mode'=>CHECKOUTAPI_ENDPOINT));
 
                 $objectCharge = $Api->verifyChargePaymentToken($config);
