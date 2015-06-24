@@ -89,8 +89,8 @@ function checkoutapipayment_init()
                     session_start();
                 global $woocommerce;
 
-                if(isset($_GET['trackId']) && $_GET['trackId'] )    {
-                    $order_id = $_GET['trackId'];
+                if(isset($_POST['cko-track-id']) && $_POST['cko-track-id'] )    {
+                    $order_id = $_GET['cko-track-id'];
                 }else {
                     $order_id = $_SESSION['trackId'];
                 }
@@ -99,8 +99,8 @@ function checkoutapipayment_init()
                 $paymentToken =  $_SESSION['cko_cc_paymenToken'];
                 $config['authorization'] = CHECKOUTAPI_SECRET_KEY;
 
-                if(isset($_GET['paymentToken']) && $_GET['paymentToken'] )    {
-                    $config['paymentToken'] = $_GET['paymentToken'];
+                if(isset($_POST['cko-payment-token']) && $_POST['cko-payment-token'] )    {
+                    $config['paymentToken'] = $_POST['cko-payment-token'];
                 }else {
                     $config['paymentToken'] = $paymentToken;
                 }
