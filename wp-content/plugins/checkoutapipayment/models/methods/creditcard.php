@@ -42,7 +42,7 @@ class models_methods_creditcard extends models_methods_Abstract
                             var script = document.createElement("script");
                             script.type = "text/javascript";
                             if('<?php echo CHECKOUTAPI_ENDPOINT?>' == 'live') {
-                                script.src = "//checkout.com/cdn/js/checkout-live.js";
+                                script.src = "//checkout.com/cdn/js/checkout.js";
                             }else {
                                 script.src = "//sandbox.checkout.com/js/v1/checkout.js";
                             }
