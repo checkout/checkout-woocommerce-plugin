@@ -5,7 +5,7 @@ if ( ! class_exists( 'WC_Payment_Gateway' ) ) {
 };
 
 
-abstract class models_Checkoutapi extends WC_Payment_Gateway implements models_InterfacePayment{
+abstract class models_Checkoutapi extends WC_Payment_Gateway implements models_InterfacePayment {
     protected $_code;
     protected $_methodType;
     protected $_methodInstance;
@@ -14,21 +14,48 @@ abstract class models_Checkoutapi extends WC_Payment_Gateway implements models_I
     {
 
         $this->_init();
-        define("CHECKOUTAPI_SECRET_KEY", $this->checkoutapipayment_secretkey);
-		define("CHECKOUTAPI_PUBLIC_KEY", $this->checkoutapipayment_publickey);
-		define("CHECKOUTAPI_PAYMENTACTION", $this ->checkoutapipayment_paymentaction);
-
-		define("CHECKOUTAPI_AUTOCAPTIME", $this->checkoutapipayment_autoCaptime );
-		define("CHECKOUTAPI_TIMEOUT", $this->checkoutapipayment_timeout);
-		define("CHECKOUTAPI_ENDPOINT", $this->checkoutapipayment_endpoint);
-		define("CHECKOUTAPI_ISPCI", $this->checkoutapipayment_ispci);
-		define("CHECKOUTAPI_PCINO", $this->checkoutapipayment_pciNo);
-		define("CHECKOUTAPI_LOGOURL", $this->checkoutapipayment_logoUrl);
-		define("CHECKOUTAPI_THEMECOLOR", $this->checkoutapipayment_themeColor);
-		define("CHECKOUTAPI_BUTTONCOLOR", $this->checkoutapipayment_buttonColor);
-		define("CHECKOUTAPI_ICONCOLOR", $this->checkoutapipayment_iconColor);
-		define("CHECKOUTAPI_LP", $this->checkoutapipayment_lp);
-		define("CHECKOUTAPI_CURRENCYCODE", $this->checkoutapipayment_currencyCode);
+        if(!defined('CHECKOUTAPI_SECRET_KEY')) {
+            define("CHECKOUTAPI_SECRET_KEY", $this->checkoutapipayment_secretkey);
+        }
+        if(!defined('CHECKOUTAPI_PUBLIC_KEY')) {
+            define("CHECKOUTAPI_PUBLIC_KEY", $this->checkoutapipayment_publickey);
+        }
+        if(!defined('CHECKOUTAPI_PAYMENTACTION')) {
+            define("CHECKOUTAPI_PAYMENTACTION", $this->checkoutapipayment_paymentaction);
+        }
+        if(!defined('CHECKOUTAPI_AUTOCAPTIME')) {
+            define("CHECKOUTAPI_AUTOCAPTIME", $this->checkoutapipayment_autoCaptime);
+        }
+        if(!defined('CHECKOUTAPI_TIMEOUT')) {
+            define("CHECKOUTAPI_TIMEOUT", $this->checkoutapipayment_timeout);
+        }
+        if(!defined('CHECKOUTAPI_ENDPOINT')) {
+            define("CHECKOUTAPI_ENDPOINT", $this->checkoutapipayment_endpoint);
+        }
+        if(!defined('CHECKOUTAPI_ISPCI')) {
+            define("CHECKOUTAPI_ISPCI", $this->checkoutapipayment_ispci);
+        }
+        if(!defined('CHECKOUTAPI_PCINO')) {
+            define("CHECKOUTAPI_PCINO", !$this->checkoutapipayment_ispci);
+        }
+        if(!defined('CHECKOUTAPI_LOGOURL')) {
+            define("CHECKOUTAPI_LOGOURL", $this->checkoutapipayment_logoUrl);
+        }
+        if(!defined('CHECKOUTAPI_THEMECOLOR')) {
+            define("CHECKOUTAPI_THEMECOLOR", $this->checkoutapipayment_themeColor);
+        }
+        if(!defined('CHECKOUTAPI_BUTTONCOLOR')) {
+            define("CHECKOUTAPI_BUTTONCOLOR", $this->checkoutapipayment_buttonColor);
+        }
+        if(!defined('CHECKOUTAPI_ICONCOLOR')) {
+            define("CHECKOUTAPI_ICONCOLOR", $this->checkoutapipayment_iconColor);
+        }
+        if(!defined('CHECKOUTAPI_LP')) {
+            define("CHECKOUTAPI_LP", $this->checkoutapipayment_lp);
+        }
+        if(!defined('CHECKOUTAPI_CURRENCYCODE')) {
+            define("CHECKOUTAPI_CURRENCYCODE", $this->checkoutapipayment_currencyCode);
+        }
 
 		$this->_setInstanceMethod();
 

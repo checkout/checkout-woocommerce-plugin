@@ -31,14 +31,14 @@ class Datalayer_Sql_installer
 			}
 		}
 
-		return "CREATE TABLE {$wpdb->prefix}cko_users_to_customerId (
+		return "CREATE TABLE IF not EXISTS {$wpdb->prefix}cko_users_to_customerId (
 				  id bigint(20) NOT NULL auto_increment,
 				  user_id bigint(20) NOT NULL,
 				  customer_id varchar(200) NOT NULL,
 				  PRIMARY KEY  (id),
 				  KEY user_id (user_id)
 				) $collate;
-				CREATE TABLE {$wpdb->prefix}cko_customerId_to_cardId
+				CREATE TABLE IF not EXISTS  {$wpdb->prefix}cko_customerId_to_cardId
 				  (id bigint(20) NOT NULL auto_increment,
 				  card_id varchar(200) NOT NULL,
 				  last4 varchar(4) NOT NULL,
@@ -47,6 +47,16 @@ class Datalayer_Sql_installer
 				  PRIMARY KEY  (id),
 				  KEY card_id (card_id)
 				  ) $collate;
+
+				  CREATE TABLE IF not EXISTS {$wpdb->prefix}cart_cko_log (
+				  id bigint(20) NOT NULL auto_increment,
+
+				  cart TEXT  NOT NULL,
+				  timestamp TIMESTAMP,
+				  PRIMARY KEY  (id),
+
+				) $collate
+
 				";
 	}
 
@@ -69,4 +79,24 @@ class Datalayer_Sql_installer
 								'$user_ID','$customerId')";
 		$results = $wpdb->query( $insert );
 	}
+
+    public static function _saveChargeDetails ($respondCharge,$user_ID)
+    {
+        global $wpdb;
+        $cardId = $respondCharge->getCard()->getId();
+        $last4 = $respondCharge->getCard()->getLast4();
+        $expiryMonth = $respondCharge->getCard()->getExpiryMonth();
+        $customerId = $respondCharge->getCard()->getCustomerId();
+        $expiryYear = $respondCharge->getCard()->getExpiryYear();
+
+        $insert = "INSERT INTO {$wpdb->prefix}cko_customerId_to_cardId
+								(card_id, last4, expiryMonth, expiryYear) VALUES (
+								'$cardId','$last4','$expiryMonth','$expiryYear')";
+        $results = $wpdb->query( $insert );
+
+        $insert = "INSERT INTO {$wpdb->prefix}cko_users_to_customerId
+								(user_id, customer_id) VALUES (
+								'$user_ID','$customerId')";
+        $results = $wpdb->query( $insert );
+    }
 }

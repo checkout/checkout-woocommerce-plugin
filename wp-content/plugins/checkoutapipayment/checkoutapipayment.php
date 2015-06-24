@@ -44,7 +44,7 @@ function checkoutapipayment_init()
 		public function __construct ()
 		{
 			add_action ( 'valid-checkoutapipayment-webhook' , array ( $this , 'valid_webhook' ) );
-
+            add_action ( 'valid-success-page' , array ( $this , 'success_page' ) );
 			parent::__construct ();
 		}
 
@@ -81,6 +81,58 @@ function checkoutapipayment_init()
 		{
 			return parent::process_payment ( $order_id );
 		}
+
+        public function success_page()
+        {
+
+                if ( !session_id() )
+                    session_start();
+                global $woocommerce;
+                $order_id = $_SESSION['trackId'];
+                $order = new WC_Order($order_id);
+                $paymentToken =  $_SESSION['cko_cc_paymenToken'];
+                $config['authorization'] = CHECKOUTAPI_SECRET_KEY;
+
+                $config['paymentToken'] = $paymentToken;
+                $Api = CheckoutApi_Api::getApi(array('mode'=>CHECKOUTAPI_ENDPOINT));
+
+                $objectCharge = $Api->verifyChargePaymentToken($config);
+
+                if (preg_match('/^1[0-9]+$/', $objectCharge->getResponseCode())) {
+
+
+                    $modelOrder = wc_get_order ( $order_id );
+
+                    if ( $objectCharge->getStatus () =='Captured' ) {
+                        if($modelOrder->get_status() !='completed' && $modelOrder->get_status() !='cancel') {
+
+                            $modelOrder->update_status ( 'wc-completed' , __ ( 'Order status changed by webhook' , 'woocommerce'
+                            ) );
+
+                        }
+                        $returnURL = $this->get_return_url( $order );
+                        header('Location: '.$returnURL);
+
+                    } elseif ($objectCharge->getStatus() !='Authorised' ) {
+
+                        if( $modelOrder->get_status() !='cancel') {
+                            $modelOrder->update_status ( 'pending' , __ ( 'Order status changed by webhook:' , 'woocommerce' ) );
+                            header('Location: '.$woocommerce->cart->get_checkout_url());
+
+                        }
+
+                    }else {
+                        $returnURL = $this->get_return_url( $order );
+                        header('Location: '.$returnURL);
+                    }
+                }
+
+                $customerConfig['authorization'] = CHECKOUTAPI_SECRET_KEY;
+                $customerConfig['customerId'] = $objectCharge->getCard()->getCustomerId() ;
+                $customerConfig['postedParam'] = array ('phone'=>array('number'=>$order -> billing_phone));
+                $customerCharge = $Api->updateCustomer($customerConfig);
+
+        }
 
 		public function valid_webhook ()
 		{
@@ -168,6 +220,24 @@ function checkoutapipayment_init()
 		}
 	}
 
+    function woocommerce_checkoutapipayment_success_valid ()
+    {
+        $urlvars = explode('/', $_SERVER['REQUEST_URI']);
+         $nextUrl = explode('?',$urlvars[1]);
+
+        if ( !empty( $nextUrl[0]) && $nextUrl[0] ==
+            'checkoutapipaymentSuccessValidate'
+        ) {
+
+            do_action ( 'valid-success-page' );
+            die();
+        }
+
+
+
+    }
+
 	add_action ( 'init' , 'woocommerce_checkoutapipayment_webhook' );
+    add_action ( 'init' , 'woocommerce_checkoutapipayment_success_valid' );
 
 }

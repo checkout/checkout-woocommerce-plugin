@@ -42,7 +42,7 @@ class models_methods_creditcard extends models_methods_Abstract
                             var script = document.createElement("script");
                             script.type = "text/javascript";
                             if('<?php echo CHECKOUTAPI_ENDPOINT?>' == 'live') {
-                                script.src = "//checkout.com/cdn/js/Checkout.js";
+                                script.src = "//checkout.com/cdn/js/checkout-live.js";
                             }else {
                                 script.src = "//sandbox.checkout.com/js/v1/checkout.js";
                             }
@@ -53,6 +53,9 @@ class models_methods_creditcard extends models_methods_Abstract
                             jQuery(function(){
                                 jQuery('#billing_email,#billing_phone').blur(function() {
                                     jQuery('body').trigger('update_checkout');
+                                    document.getElementById('cko-cc-redirectUrl').value = CheckoutIntegration.getRedirectionUrl();
+                                    var transactionValue = CheckoutIntegration.getTransactionValue();
+                                    document.getElementById('cko-cc-paymenToken').value =transactionValue.paymentToken;
                                 });
 
 
@@ -60,6 +63,9 @@ class models_methods_creditcard extends models_methods_Abstract
                         }else{
                             if(typeof CheckoutIntegration !='undefined' && loaderJs<1) {
                                 CheckoutIntegration.render(window.CKOConfig);
+                                document.getElementById('cko-cc-redirectUrl').value = CheckoutIntegration.getRedirectionUrl();
+                                var transactionValue = CheckoutIntegration.getTransactionValue();
+                                document.getElementById('cko-cc-paymenToken').value =transactionValue.paymentToken;
                             }
                         }
                         // setTimeout(function(){CheckoutIntegration.render(window.CKOConfig)},3000);
@@ -90,7 +96,16 @@ class models_methods_creditcard extends models_methods_Abstract
                                 if( jQuery('#terms').length) {
                                     jQuery('#terms').attr('checked', 'checked');
                                 }
-                                CheckoutIntegration.open();
+                                if(!CheckoutIntegration.isMobile()) {
+                                    CheckoutIntegration.open();
+                                }else {
+                                    document.getElementById('cko-cc-redirectUrl').value = CheckoutIntegration.getRedirectionUrl();
+                                    var transactionValue = CheckoutIntegration.getTransactionValue();
+                                    document.getElementById('cko-cc-paymenToken').value =transactionValue.paymentToken;
+                                    jQuery('#place_order').trigger('submit');
+
+
+                                }
 
                                 loaderJs++;
                             }
@@ -159,6 +174,7 @@ class models_methods_creditcard extends models_methods_Abstract
         <div style="" class="widget-container">
 
             <input type="hidden" name="cko_cc_paymenToken" id="cko-cc-paymenToken" value="">
+            <input type="hidden" name="redirectUrl" id="cko-cc-redirectUrl" value="">
 
             <script type="text/javascript">
 
@@ -174,7 +190,7 @@ class models_methods_creditcard extends models_methods_Abstract
                     value: '100',
                     currency: '<?php echo get_woocommerce_currency() ?>',
                     customerEmail: customerEMail,
-
+                    forceMobileRedirect: true,
                     customerName: '<?php echo $name?>',
                     paymentMode: '<?php echo $paymentMode ?>',
                     logoUrl : '<?php echo CHECKOUTAPI_LOGOURL ?>',
@@ -290,11 +306,13 @@ class models_methods_creditcard extends models_methods_Abstract
 
     public function process_payment($order_id)
     {
+
         global $woocommerce;
         $order = new WC_Order( $order_id );
         $grand_total = $order->order_total;
         $amount = $grand_total*100;
         $config['authorization'] = CHECKOUTAPI_SECRET_KEY;
+
         if(!( parent::get_post('cko_cc_paymenToken'))) {
 
             $error_message =__ ('Please enter your credit card details');
@@ -307,6 +325,16 @@ class models_methods_creditcard extends models_methods_Abstract
 
             );
         }
+
+        if(parent::get_post('redirectUrl')!='' ) {
+            $urlRedirect = parent::get_post('redirectUrl').'&trackId='.$order_id;
+            if ( !session_id() )
+                session_start();
+            $_SESSION['trackId'] = $order_id;
+            $_SESSION['cko_cc_paymenToken'] = parent::get_post('cko_cc_paymenToken');
+            return array('result' => 'success', 'redirect' => parent::get_post('redirectUrl'), 'order_status'=>$order);
+        }
+
         $config['paymentToken'] = parent::get_post('cko_cc_paymenToken');
         $Api = CheckoutApi_Api::getApi(array('mode'=>CHECKOUTAPI_ENDPOINT));
 
@@ -315,6 +343,8 @@ class models_methods_creditcard extends models_methods_Abstract
         $customerConfig['customerId'] = $respondCharge->getCard()->getCustomerId() ;
         $customerConfig['postedParam'] = array ('phone'=>array('number'=>$_POST['billing_phone']));
         $customerCharge = $Api->updateCustomer($customerConfig);
+
+
 
         return parent::_validateChrage($order, $respondCharge);
     }
@@ -393,13 +423,13 @@ class models_methods_creditcard extends models_methods_Abstract
         $config['authorization'] = CHECKOUTAPI_SECRET_KEY;
 
         $config['timeout'] = CHECKOUTAPI_TIMEOUT;
-        $serializeCart = serialize($cart);
+
 
 
         $config['postedParam'] = array(
             'email'       =>    $email,
             'value'       =>    $amount,
-            "metadata"  => array('cart'=>$serializeCart),
+            "metadata"    =>    array('userAgent'=>$_SERVER['HTTP_USER_AGENT']),
             'currency'    =>    get_woocommerce_currency()
         );
 
@@ -449,7 +479,7 @@ class models_methods_creditcard extends models_methods_Abstract
         }
 
         if($customer) {
-            $config[ 'postedParam' ][ 'shippingdetails' ] = array (
+            $config[ 'postedParam' ][ 'shippingDetails' ] = array (
                 'addressline1'  =>    $customer->shipping_address ,
                 'addressline2'  =>    $customer->shipping_address_2 ,
                 'city'          =>    $customer->shipping_city ,
