@@ -332,7 +332,7 @@ class models_methods_creditcard extends models_methods_Abstract
                 session_start();
             $_SESSION['trackId'] = $order_id;
             $_SESSION['cko_cc_paymenToken'] = parent::get_post('cko_cc_paymenToken');
-            return array('result' => 'success', 'redirect' => parent::get_post('redirectUrl'), 'order_status'=>$order);
+            return array('result' => 'success', 'redirect' => parent::get_post('redirectUrl').'&trackId='.$order_id, 'order_status'=>$order);
         }
 
         $config['paymentToken'] = parent::get_post('cko_cc_paymenToken');
