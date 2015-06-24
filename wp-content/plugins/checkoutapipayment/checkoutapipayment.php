@@ -102,11 +102,13 @@ function checkoutapipayment_init()
 
 
                     $modelOrder = wc_get_order ( $order_id );
+                    $order->add_order_note ( sprintf ( __ ( 'Checkout.com Credit Card Payment Process by - ChargeID: %s with Response Code: %s' , 'woocommerce' ) ,
+                        $objectCharge->getId () , $objectCharge->getResponseCode () ) );
 
                     if ( $objectCharge->getStatus () =='Captured' ) {
                         if($modelOrder->get_status() !='completed' && $modelOrder->get_status() !='cancel') {
 
-                            $modelOrder->update_status ( 'wc-completed' , __ ( 'Order status changed by webhook' , 'woocommerce'
+                            $modelOrder->update_status ( 'wc-completed' , __ ( 'Order status changed by callback:' , 'woocommerce'
                             ) );
 
                         }
@@ -116,12 +118,13 @@ function checkoutapipayment_init()
                     } elseif ($objectCharge->getStatus() !='Authorised' ) {
 
                         if( $modelOrder->get_status() !='cancel') {
-                            $modelOrder->update_status ( 'pending' , __ ( 'Order status changed by webhook:' , 'woocommerce' ) );
+                            $modelOrder->update_status ( 'pending' , __ ( 'Order status changed by callback:' , 'woocommerce' ) );
                             header('Location: '.$woocommerce->cart->get_checkout_url());
 
                         }
 
                     }else {
+                        $modelOrder->update_status ( 'wc-processing' , __ ( 'Order status changed by callback:' , 'woocommerce' ) );
                         $returnURL = $this->get_return_url( $order );
                         header('Location: '.$returnURL);
                     }
