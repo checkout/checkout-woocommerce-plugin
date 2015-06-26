@@ -93,12 +93,8 @@ function checkoutapipayment_init()
                 echo $paymentToken;
                 
                 $config['authorization'] = CHECKOUTAPI_SECRET_KEY;
+                $config['paymentToken'] = $paymentToken;
 
-                if(isset($_POST['cko-payment-token']) && $_POST['cko-payment-token'] )    {
-                    $config['paymentToken'] = $_POST['cko-payment-token'];
-                }else {
-                    $config['paymentToken'] = $paymentToken;
-                }
 
                 $Api = CheckoutApi_Api::getApi(array('mode'=>CHECKOUTAPI_ENDPOINT));
 
