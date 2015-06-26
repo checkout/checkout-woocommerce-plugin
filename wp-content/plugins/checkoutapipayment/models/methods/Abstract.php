@@ -1,5 +1,4 @@
 <?php
-	
 abstract class models_methods_Abstract extends WC_Payment_Gateway implements models_InterfacePayment
 {
 
@@ -23,8 +22,6 @@ abstract class models_methods_Abstract extends WC_Payment_Gateway implements mod
 
     protected function _validateChrage($order,$respondCharge)
     {	
-
-
 	    if($respondCharge->isValid()){
 
 		    $Api = CheckoutApi_Api::getApi(

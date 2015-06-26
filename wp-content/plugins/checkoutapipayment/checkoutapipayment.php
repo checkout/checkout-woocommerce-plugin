@@ -9,9 +9,6 @@ Author URI: http://www.checkout.com
 
 require_once 'autoload.php';
 
-//include ("models/Checkoutapi.php");
-
-
 
 add_action( 'plugins_loaded', 'checkoutapipayment_init', 0);
 add_action( 'plugins_loaded', array( 'WC_Gateway_checkoutapipayment', 'get_instance' ) );
@@ -21,7 +18,6 @@ DEFINE ('PLUGIN_DIR', plugins_url( basename( plugin_dir_path( __FILE__ ) ), base
 
 define('PLUGIN_DIR_PATH', WP_PLUGIN_DIR . '/checkoutapipayment/checkoutapipayment.php');
 register_activation_hook( PLUGIN_DIR_PATH,array('Datalayer_Sql_installer','install'));
-//install();
 function checkoutapipayment_init()
 {
 
@@ -230,7 +226,7 @@ function checkoutapipayment_init()
 
     function woocommerce_checkoutapipayment_success_valid ()
     {
-
+      
          if (isset( $_GET[ 'checkoutapipaymentSuccessValidate' ] ))
          {
             do_action ( 'valid-success-page' );
