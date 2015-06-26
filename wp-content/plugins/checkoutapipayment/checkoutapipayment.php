@@ -90,7 +90,7 @@ function checkoutapipayment_init()
                 global $woocommerce;
 
                 if(isset($_POST['cko-track-id']) && $_POST['cko-track-id'] )    {
-                    $order_id = $_GET['cko-track-id'];
+                    $order_id = $_POST['cko-track-id'];
                 }else {
                     $order_id = $_SESSION['trackId'];
                 }
@@ -109,6 +109,18 @@ function checkoutapipayment_init()
 
                 $objectCharge = $Api->verifyChargePaymentToken($config);
 
+                $Api = CheckoutApi_Api::getApi(
+                    array('mode' 		=> CHECKOUTAPI_ENDPOINT,
+                        'authorization' => CHECKOUTAPI_SECRET_KEY)
+                );
+
+                try {
+                    $chargeUpdated = $Api->updateTrackId($objectCharge,$order_id);
+
+                }catch (Exception $e) {
+
+                }
+
                 if (preg_match('/^1[0-9]+$/', $objectCharge->getResponseCode())) {
 
 
@@ -119,7 +131,7 @@ function checkoutapipayment_init()
                     if ( $objectCharge->getStatus () =='Captured' ) {
                         if($modelOrder->get_status() !='completed' && $modelOrder->get_status() !='cancel') {
 
-                            $modelOrder->update_status ( 'wc-completed' , __ ( 'Order status changed by callback:' , 'woocommerce'
+                            $modelOrder->update_status ( 'wc-processing' , __ ( 'Order status changed by callback:' , 'woocommerce'
                             ) );
 
                         }
@@ -145,6 +157,8 @@ function checkoutapipayment_init()
                 $customerConfig['customerId'] = $objectCharge->getCard()->getCustomerId() ;
                 $customerConfig['postedParam'] = array ('phone'=>array('number'=>$order -> billing_phone));
                 $customerCharge = $Api->updateCustomer($customerConfig);
+
+
 
         }
 
@@ -240,7 +254,7 @@ function checkoutapipayment_init()
          $nextUrl = explode('?',$urlvars[1]);
 
         if ( !empty( $nextUrl[0]) && $nextUrl[0] ==
-            'checkoutapipaymentSuccessValidate'
+            'checkoutapipaymentSuccessValidate' || true
         ) {
 
             do_action ( 'valid-success-page' );

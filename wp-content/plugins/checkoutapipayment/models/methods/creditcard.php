@@ -53,9 +53,6 @@ class models_methods_creditcard extends models_methods_Abstract
                             jQuery(function(){
                                 jQuery('#billing_email,#billing_phone').blur(function() {
                                     jQuery('body').trigger('update_checkout');
-                                    document.getElementById('cko-cc-redirectUrl').value = CheckoutIntegration.getRedirectionUrl();
-                                    var transactionValue = CheckoutIntegration.getTransactionValue();
-                                    document.getElementById('cko-cc-paymenToken').value =transactionValue.paymentToken;
                                 });
 
 
@@ -63,10 +60,8 @@ class models_methods_creditcard extends models_methods_Abstract
                         }else{
                             if(typeof CheckoutIntegration !='undefined' && loaderJs<1) {
                                 CheckoutIntegration.render(window.CKOConfig);
-                                document.getElementById('cko-cc-redirectUrl').value = CheckoutIntegration.getRedirectionUrl();
-                                var transactionValue = CheckoutIntegration.getTransactionValue();
-                                document.getElementById('cko-cc-paymenToken').value =transactionValue.paymentToken;
-                            }
+
+                                }
                         }
                         // setTimeout(function(){CheckoutIntegration.render(window.CKOConfig)},3000);
 
@@ -169,6 +164,7 @@ class models_methods_creditcard extends models_methods_Abstract
         }
 
 
+
         ?>
 
         <div style="" class="widget-container">
@@ -187,7 +183,7 @@ class models_methods_creditcard extends models_methods_Abstract
                     namespace: 'CheckoutIntegration',
                     publicKey: '<?php echo CHECKOUTAPI_PUBLIC_KEY ?>',
                     paymentToken: "<?php echo $paymentToken ?>",
-                    value: '100',
+                    value: <?php echo $amount ?>,
                     currency: '<?php echo get_woocommerce_currency() ?>',
                     customerEmail: customerEMail,
                     forceMobileRedirect: true,
@@ -198,6 +194,7 @@ class models_methods_creditcard extends models_methods_Abstract
                     buttonColor : '<?php echo CHECKOUTAPI_BUTTONCOLOR ?>',
                     iconColor: '<?php echo CHECKOUTAPI_ICONCOLOR ?>',
                     useCurrencyCode: '<?php echo CHECKOUTAPI_CURRENCYCODE ?>',
+
                     title: '<?php  ?>',
                     subtitle: '<?php echo __('Please enter your credit card details') ?>',
                     widgetContainerSelector: '.widget-container',
@@ -212,6 +209,14 @@ class models_methods_creditcard extends models_methods_Abstract
                         },100);
 
                         jQuery('head').append(cssAdded);
+                        CheckoutIntegration.setBillingDetails( {
+                            'addressLine1'  :    "<?php echo $post['billing_address_1']?>",
+                                'addressLine2'  :    "<?php echo $post['billing_address_2'] ?>",
+                                'city'          :    "<?php echo $post['billing_city'] ?>",
+                                'country'       :    "<?php echo $post['billing_country'] ?>",
+                                'postcode'      :    "<?php echo $post['billing_postcode'] ?>",
+                                'state'         :    "<?php echo $post['billing_state'] ?>"
+                        });
 
                     },
                     cardCharged: function (event) {
@@ -445,10 +450,11 @@ class models_methods_creditcard extends models_methods_Abstract
 
         if($customer) {
             $config['postedParam']['card']['billingDetails'] = array (
-                'addressline1'  =>    $customer->address,
-                'addressline2'  =>    $customer->address_2,
+                'addressLine1'  =>    $customer->address,
+                'addressLine2'  =>    $customer->address_2,
                 'city'          =>    $customer->city,
                 'country'       =>    $customer->country,
+                'postcode'       =>    $customer->postcode,
 
                 'state'         =>    $customer->country,
 
@@ -480,14 +486,15 @@ class models_methods_creditcard extends models_methods_Abstract
 
         if($customer) {
             $config[ 'postedParam' ][ 'shippingDetails' ] = array (
-                'addressline1'  =>    $customer->shipping_address ,
-                'addressline2'  =>    $customer->shipping_address_2 ,
+                'addressLine1'  =>    $customer->shipping_address ,
+                'addressLine2'  =>    $customer->shipping_address_2 ,
                 'city'          =>    $customer->shipping_city ,
                 'country'       =>    $customer->shipping_country ,
                 'postcode'      =>    $customer->shipping_postcode ,
                 'state'         =>    $customer->shipping_state
             );
         }
+
 
         $paymentTokenCharge = $Api->getPaymentToken($config);
 
