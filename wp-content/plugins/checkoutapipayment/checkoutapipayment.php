@@ -9,9 +9,6 @@ Author URI: http://www.checkout.com
 
 require_once 'autoload.php';
 
-//include ("models/Checkoutapi.php");
-
-
 
 add_action( 'plugins_loaded', 'checkoutapipayment_init', 0);
 add_action( 'plugins_loaded', array( 'WC_Gateway_checkoutapipayment', 'get_instance' ) );
@@ -21,7 +18,6 @@ DEFINE ('PLUGIN_DIR', plugins_url( basename( plugin_dir_path( __FILE__ ) ), base
 
 define('PLUGIN_DIR_PATH', WP_PLUGIN_DIR . '/checkoutapipayment/checkoutapipayment.php');
 register_activation_hook( PLUGIN_DIR_PATH,array('Datalayer_Sql_installer','install'));
-//install();
 function checkoutapipayment_init()
 {
 
@@ -86,17 +82,16 @@ function checkoutapipayment_init()
         {
 
                 if ( !session_id() )
-                    session_start();
+                session_start();
+                
                 global $woocommerce;
 
-                if(isset($_POST['cko-track-id']) && $_POST['cko-track-id'] )    {
-                    $order_id = $_POST['cko-track-id'];
-                }else {
-                    $order_id = $_SESSION['trackId'];
-                }
-
+                $order_id = $_REQUEST['cko-track-id'];
                 $order = new WC_Order($order_id);
-                $paymentToken =  $_SESSION['cko_cc_paymenToken'];
+                $paymentToken =  $_REQUEST['cko-payment-token'];
+                
+                echo $paymentToken;
+                
                 $config['authorization'] = CHECKOUTAPI_SECRET_KEY;
 
                 if(isset($_POST['cko-payment-token']) && $_POST['cko-payment-token'] )    {
@@ -250,16 +245,15 @@ function checkoutapipayment_init()
 
     function woocommerce_checkoutapipayment_success_valid ()
     {
-        $urlvars = explode('/', $_SERVER['REQUEST_URI']);
-         $nextUrl = explode('?',$urlvars[1]);
 
-        if ( !empty( $nextUrl[0]) && $nextUrl[0] ==
-            'checkoutapipaymentSuccessValidate' || true
-        ) {
+      
+         if (isset( $_GET[ 'checkoutapipaymentSuccessValidate' ] ))
+         {
 
             do_action ( 'valid-success-page' );
             die();
-        }
+         }
+
 
 
 
