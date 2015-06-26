@@ -181,7 +181,7 @@ function checkoutapipayment_init()
 				if ( $objectCharge->getCaptured ()  ) {
 					if($modelOrder->get_status() !='completed' && $modelOrder->get_status() !='cancel') {
 
-					$modelOrder->update_status ( 'wc-completed' , __ ( 'Order status changed by webhook' , 'woocommerce'
+					$modelOrder->update_status ( 'wc-processing' , __ ( 'Order status changed by webhook' , 'woocommerce'
 					) );
 						echo "Order has been captured";
 					}else {
