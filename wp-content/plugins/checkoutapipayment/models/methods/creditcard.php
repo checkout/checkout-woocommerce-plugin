@@ -56,8 +56,14 @@ class models_methods_creditcard extends models_methods_Abstract
                       script.setAttribute("data-namespace", "CheckoutIntegration");
                       document.getElementsByTagName("head")[0].appendChild(script);
                       jQuery(function () {
-                          jQuery('#billing_email,#billing_phone').blur(function () {
-                              jQuery('body').trigger('update_checkout');
+                          jQuery('#billing_email').blur(function () {
+                              if(!jQuery('#billing_email_field').hasClass('woocommerce-invalid')
+                                  && !jQuery('#billing_email_field').hasClass(' woocommerce-invalid-email')
+                                  && !jQuery('#billing_email_field').hasClass(' woocommerce-invalid-required-field')) {
+
+                                  CheckoutIntegration.setCustomerEmail(jQuery('#billing_email').val());
+
+                              }
                           });
                       });
                   }
@@ -66,7 +72,9 @@ class models_methods_creditcard extends models_methods_Abstract
                       if(typeof CheckoutIntegration !='undefined') {
                           CheckoutIntegration.render(window.CKOConfig)
                       }else {
-                          Checkout.render(window.CKOConfig)
+                          if(typeof Checkout !='undefined') {
+                              Checkout.render(window.CKOConfig)
+                          }
                       }
                   }, 1000);
               }
@@ -181,7 +189,7 @@ class models_methods_creditcard extends models_methods_Abstract
               paymentToken: "<?php echo $paymentToken ?>",
               value: <?php echo $amount ?>,
               currency: '<?php echo get_woocommerce_currency() ?>',
-              customerEmail: '<?php echo $email ?>',
+
               forceMobileRedirect: true,
               customerName: '<?php echo $name ?>',
               paymentMode: '<?php echo $paymentMode ?>',
@@ -336,8 +344,10 @@ class models_methods_creditcard extends models_methods_Abstract
     $respondCharge = $Api->verifyChargePaymentToken($config);
     $customerConfig['authorization'] = CHECKOUTAPI_SECRET_KEY;
     $customerConfig['customerId'] = $respondCharge->getCard()->getCustomerId();
-    $customerConfig['postedParam'] = array('phone' => array('number' => $_POST['billing_phone']));
-    $customerCharge = $Api->updateCustomer($customerConfig);
+      if(strlen( $_POST['billing_phone'])>6) {
+          $customerConfig['postedParam'] = array('phone' => array('number' => $_POST['billing_phone']));
+          $customerCharge = $Api->updateCustomer($customerConfig);
+      }
 
 
 
