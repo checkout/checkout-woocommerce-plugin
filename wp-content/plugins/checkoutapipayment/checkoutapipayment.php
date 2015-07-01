@@ -89,9 +89,7 @@ function checkoutapipayment_init()
                 $order_id = $_REQUEST['cko-track-id'];
                 $order = new WC_Order($order_id);
                 $paymentToken =  $_REQUEST['cko-payment-token'];
-                
-                echo $paymentToken;
-                
+            
                 $config['authorization'] = CHECKOUTAPI_SECRET_KEY;
                 $config['paymentToken'] = $paymentToken;
 
