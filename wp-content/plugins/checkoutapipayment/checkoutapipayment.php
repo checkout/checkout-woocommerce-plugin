@@ -89,7 +89,7 @@ function checkoutapipayment_init()
                 $order_id = $_REQUEST['cko-track-id'];
                 $order = new WC_Order($order_id);
                 $paymentToken =  $_REQUEST['cko-payment-token'];
-            
+
                 $config['authorization'] = CHECKOUTAPI_SECRET_KEY;
                 $config['paymentToken'] = $paymentToken;
 
@@ -109,6 +109,7 @@ function checkoutapipayment_init()
                 }catch (Exception $e) {
 
                 }
+            if($objectCharge->isValid()){
 
                 if (preg_match('/^1[0-9]+$/', $objectCharge->getResponseCode())) {
 
@@ -140,12 +141,27 @@ function checkoutapipayment_init()
                         $returnURL = $this->get_return_url( $order );
                         header('Location: '.$returnURL);
                     }
+                }else {
+
+                    $order->add_order_note( sprintf(__('Checkout.com Credit Card Payment Declined - Error Code: %s, Decline Reason: %s', 'woocommerce'),
+                    $objectCharge->getId(), $objectCharge->getExceptionState()->getErrorMessage()));
+
+                    $error_message = 'The transaction was declined. Please check your Payment Details';
+                    wc_add_notice( __('Payment error: ', 'woothemes') . $error_message, 'error' );
+
                 }
 
                 $customerConfig['authorization'] = CHECKOUTAPI_SECRET_KEY;
                 $customerConfig['customerId'] = $objectCharge->getCard()->getCustomerId() ;
                 $customerConfig['postedParam'] = array ('phone'=>array('number'=>$order -> billing_phone));
                 $customerCharge = $Api->updateCustomer($customerConfig);
+
+                }else {
+                    $error_message = 'The transaction was declined. Please check your Payment Details and try again';
+                    wc_add_notice( __('Payment error: ', 'woothemes') . $error_message, 'error' );
+               }
+
+               header('Location: '.$woocommerce->cart->get_checkout_url());
 
 
 
@@ -161,7 +177,7 @@ function checkoutapipayment_init()
 			$Api = CheckoutApi_Api::getApi ( array ( 'mode' => $this->checkoutapipayment_endpoint ) );
 
 			$objectCharge = $Api->chargeToObj ( $stringCharge );
-			
+
 
 			if (preg_match('/^1[0-9]+$/', $objectCharge->getResponseCode())) {
 				//  $this->load->model('sale/order');
