@@ -89,9 +89,7 @@ function checkoutapipayment_init()
                 $order_id = $_REQUEST['cko-track-id'];
                 $order = new WC_Order($order_id);
                 $paymentToken =  $_REQUEST['cko-payment-token'];
-                
-                echo $paymentToken;
-                
+
                 $config['authorization'] = CHECKOUTAPI_SECRET_KEY;
                 $config['paymentToken'] = $paymentToken;
 
@@ -111,6 +109,7 @@ function checkoutapipayment_init()
                 }catch (Exception $e) {
 
                 }
+            if($objectCharge->isValid()){
 
                 if (preg_match('/^1[0-9]+$/', $objectCharge->getResponseCode())) {
 
@@ -142,12 +141,27 @@ function checkoutapipayment_init()
                         $returnURL = $this->get_return_url( $order );
                         header('Location: '.$returnURL);
                     }
+                }else {
+
+                    $order->add_order_note( sprintf(__('Checkout.com Credit Card Payment Declined - Error Code: %s, Decline Reason: %s', 'woocommerce'),
+                    $objectCharge->getId(), $objectCharge->getExceptionState()->getErrorMessage()));
+
+                    $error_message = 'The transaction was declined. Please check your Payment Details';
+                    wc_add_notice( __('Payment error: ', 'woothemes') . $error_message, 'error' );
+
                 }
 
                 $customerConfig['authorization'] = CHECKOUTAPI_SECRET_KEY;
                 $customerConfig['customerId'] = $objectCharge->getCard()->getCustomerId() ;
                 $customerConfig['postedParam'] = array ('phone'=>array('number'=>$order -> billing_phone));
                 $customerCharge = $Api->updateCustomer($customerConfig);
+
+                }else {
+                    $error_message = 'The transaction was declined. Please check your Payment Details and try again';
+                    wc_add_notice( __('Payment error: ', 'woothemes') . $error_message, 'error' );
+               }
+
+               header('Location: '.$woocommerce->cart->get_checkout_url());
 
 
 
@@ -163,51 +177,50 @@ function checkoutapipayment_init()
 			$Api = CheckoutApi_Api::getApi ( array ( 'mode' => $this->checkoutapipayment_endpoint ) );
 
 			$objectCharge = $Api->chargeToObj ( $stringCharge );
-			
-            $order_id = $objectCharge->getTrackId();
-            if($order_id) {
-              if (preg_match('/^1[0-9]+$/', $objectCharge->getResponseCode())) {
-                  //  $this->load->model('sale/order');
-                  /*
-                  * Need to get track id
-                  */
-
-                  $modelOrder = wc_get_order ( $order_id );
-
-                  if ( $objectCharge->getCaptured ()  ) {
-                      if($modelOrder->get_status() !='completed' && $modelOrder->get_status() !='cancel') {
-
-                      $modelOrder->update_status ( 'wc-processing' , __ ( 'Order status changed by webhook' , 'woocommerce'
-                      ) );
-                          echo "Order has been captured";
-                      }else {
-                          echo "Order has already been captured";
-                      }
-
-                  } elseif (  $objectCharge->getRefunded () ) {
-                      if( $modelOrder->get_status() !='cancel') {
-                          $modelOrder->update_status ( 'wc-refunded' , __ ( 'Order status changed by webhook' , 'woocommerce' ) );
-                          echo "Order has been refunded";
 
 
-                      }else {
-                          echo "Order has already been refunded";
-                      }
+			if ($objectCharge && preg_match('/^1[0-9]+$/', $objectCharge->getResponseCode())) {
+				//  $this->load->model('sale/order');
+				/*
+				* Need to get track id
+				*/
+				$order_id = $objectCharge->getTrackId();
 
-                  } elseif ( $objectCharge->getVoided() ) {
+				$modelOrder = wc_get_order ( $order_id );
 
-                      if( $modelOrder->get_status() !='cancel') {
-                          $modelOrder->update_status ( 'wc-cancelled' , __ ( 'Order status changed by webhook:' , 'woocommerce' ) );
-                          $modelOrder->cancel_order();
-                          echo "Order has been cancel";
-                      }
+				if ( $objectCharge->getCaptured ()  ) {
+					if($modelOrder->get_status() !='completed' && $modelOrder->get_status() !='cancel') {
 
-                  }else {
+                        $modelOrder->add_order_note (  __ ( 'Payment has been '. $objectCharge->getStatus ()  , 'woocommerce') );
+						echo "Order has been captured";
+					}else {
+						echo "Order has already been captured";
+					}
 
-                      $modelOrder->update_status ( $modelOrder->get_status() , __ ( 'webhook status : '.$objectCharge->getStatus() , 'woocommerce'));
-                  }
-              }
-            }
+				} elseif (  $objectCharge->getRefunded () ) {
+					if( $modelOrder->get_status() !='cancel') {
+						$modelOrder->update_status ( 'wc-refunded' , __ ( 'Order status changed by webhook' , 'woocommerce' ) );
+
+                        $modelOrder->add_order_note (  __ ( 'Payment has been '. $objectCharge->getStatus ()  , 'woocommerce') );
+                        echo "Order has been refunded";
+
+					}else {
+						echo "Order has already been refunded";
+					}
+
+				} elseif ( $objectCharge->getVoided() ) {
+
+					if( $modelOrder->get_status() !='cancel') {
+						$modelOrder->update_status ( 'wc-cancelled' , __ ( 'Order status changed by webhook:' , 'woocommerce' ) );
+						$modelOrder->cancel_order();
+                        $modelOrder->add_order_note (  __ ( 'Payment has been '. $objectCharge->getStatus ()  , 'woocommerce') );
+						echo "Order has been cancel";
+					}
+
+				}else {
+					echo "Payment status is still ".$objectCharge->getStatus();
+				}
+			}
 			exit();
 		}
 
