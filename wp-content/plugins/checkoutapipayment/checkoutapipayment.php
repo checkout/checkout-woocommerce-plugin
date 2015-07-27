@@ -159,11 +159,8 @@ function checkoutapipayment_init()
                 }else {
                     $error_message = 'The transaction was declined. Please check your Payment Details and try again';
                     wc_add_notice( __('Payment error: ', 'woothemes') . $error_message, 'error' );
+                    header('Location: '.$woocommerce->cart->get_checkout_url());
                }
-
-               header('Location: '.$woocommerce->cart->get_checkout_url());
-
-
 
         }
 
@@ -191,7 +188,8 @@ function checkoutapipayment_init()
 				if ( $objectCharge->getCaptured ()  ) {
 					if($modelOrder->get_status() !='completed' && $modelOrder->get_status() !='cancel') {
 
-                        $modelOrder->add_order_note (  __ ( 'Payment has been '. $objectCharge->getStatus ()  , 'woocommerce') );
+                        $modelOrder->add_order_note (  __ ( 'Payment has been '. $objectCharge->getStatus ()  , 'woocommerce'
+                        ) );
 						echo "Order has been captured";
 					}else {
 						echo "Order has already been captured";
@@ -201,7 +199,8 @@ function checkoutapipayment_init()
 					if( $modelOrder->get_status() !='cancel') {
 						$modelOrder->update_status ( 'wc-refunded' , __ ( 'Order status changed by webhook' , 'woocommerce' ) );
 
-                        $modelOrder->add_order_note (  __ ( 'Payment has been '. $objectCharge->getStatus ()  , 'woocommerce') );
+                        $modelOrder->add_order_note (  __ ( 'Payment has been '. $objectCharge->getStatus ()  , 'woocommerce'
+                        ) );
                         echo "Order has been refunded";
 
 					}else {
@@ -213,7 +212,8 @@ function checkoutapipayment_init()
 					if( $modelOrder->get_status() !='cancel') {
 						$modelOrder->update_status ( 'wc-cancelled' , __ ( 'Order status changed by webhook:' , 'woocommerce' ) );
 						$modelOrder->cancel_order();
-                        $modelOrder->add_order_note (  __ ( 'Payment has been '. $objectCharge->getStatus ()  , 'woocommerce') );
+                        $modelOrder->add_order_note (  __ ( 'Payment has been '. $objectCharge->getStatus ()  , 'woocommerce'
+                        ) );
 						echo "Order has been cancel";
 					}
 
