@@ -109,6 +109,8 @@ function checkoutapipayment_init()
                 }catch (Exception $e) {
 
                 }
+            try {
+                $returnURL = null;
             if($objectCharge->isValid()){
 
                 if (preg_match('/^1[0-9]+$/', $objectCharge->getResponseCode())) {
@@ -141,6 +143,7 @@ function checkoutapipayment_init()
                         $returnURL = $this->get_return_url( $order );
                         header('Location: '.$returnURL);
                     }
+                    exit();
                 }else {
 
                     $order->add_order_note( sprintf(__('Checkout.com Credit Card Payment Declined - Error Code: %s, Decline Reason: %s', 'woocommerce'),
@@ -162,7 +165,16 @@ function checkoutapipayment_init()
                }
 
                header('Location: '.$woocommerce->cart->get_checkout_url());
+               exit();
+            }catch (Exception $e) {
+                if($returnURL) {
+                    header('Location: '.$returnURL);
+                }else {
+                    header('Location: '.$woocommerce->cart->get_checkout_url());
+                }
 
+                exit();
+            }
 
 
         }
@@ -191,8 +203,7 @@ function checkoutapipayment_init()
 				if ( $objectCharge->getCaptured ()  ) {
 					if($modelOrder->get_status() !='completed' && $modelOrder->get_status() !='cancel') {
 
-                        $modelOrder->add_order_note (  __ ( 'Payment has been '. $objectCharge->getStatus ()  , 'woocommerce'
-                        ) );
+                        $modelOrder->add_order_note (  __ ( 'Payment has been '. $objectCharge->getStatus ()  , 'woocommerce') );
 						echo "Order has been captured";
 					}else {
 						echo "Order has already been captured";
@@ -202,8 +213,7 @@ function checkoutapipayment_init()
 					if( $modelOrder->get_status() !='cancel') {
 						$modelOrder->update_status ( 'wc-refunded' , __ ( 'Order status changed by webhook' , 'woocommerce' ) );
 
-                        $modelOrder->add_order_note (  __ ( 'Payment has been '. $objectCharge->getStatus ()  , 'woocommerce'
-                        ) );
+                        $modelOrder->add_order_note (  __ ( 'Payment has been '. $objectCharge->getStatus ()  , 'woocommerce') );
                         echo "Order has been refunded";
 
 					}else {
@@ -215,8 +225,7 @@ function checkoutapipayment_init()
 					if( $modelOrder->get_status() !='cancel') {
 						$modelOrder->update_status ( 'wc-cancelled' , __ ( 'Order status changed by webhook:' , 'woocommerce' ) );
 						$modelOrder->cancel_order();
-                        $modelOrder->add_order_note (  __ ( 'Payment has been '. $objectCharge->getStatus ()  , 'woocommerce'
-                        ) );
+                        $modelOrder->add_order_note (  __ ( 'Payment has been '. $objectCharge->getStatus ()  , 'woocommerce') );
 						echo "Order has been cancel";
 					}
 
