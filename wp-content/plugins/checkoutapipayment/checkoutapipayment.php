@@ -80,24 +80,44 @@ function checkoutapipayment_init() {
       $paymentToken = $_REQUEST['cko-payment-token'];
       $config['authorization'] = CHECKOUTAPI_SECRET_KEY;
       $config['paymentToken'] = $paymentToken;
-      $Api = CheckoutApi_Api::getApi(array('mode' => CHECKOUTAPI_ENDPOINT));
-      $objectCharge = $Api->verifyChargePaymentToken($config);
       $Api = CheckoutApi_Api::getApi(
-                      array('mode' => CHECKOUTAPI_ENDPOINT,
-                          'authorization' => CHECKOUTAPI_SECRET_KEY)
+              array('mode' => CHECKOUTAPI_ENDPOINT,
+                    'authorization' => CHECKOUTAPI_SECRET_KEY)
       );
+      $objectCharge = $Api->verifyChargePaymentToken($config);
+
       try {
         $chargeUpdated = $Api->updateTrackId($objectCharge, $order_id);
       }
       catch (Exception $e) {
         
       }
+      $grand_total = $order->order_total;
+      $amount = $grand_total * 100;
+      $toValidate = array(
+        'currency' => $order->order_currency,
+        'value' => $amount,
+        'trackId' => $order->id,
+        );
+      $validateRequest = $Api::validateRequest($toValidate,$objectCharge);
+      
       try {
         $returnURL = null;
         if ($objectCharge->isValid()) {
           if (preg_match('/^1[0-9]+$/', $objectCharge->getResponseCode())) {
+            
+            if($validateRequest['status']){  
+              $message = sprintf(__('Checkout.com Credit Card Payment Process by - ChargeID: %s with Response Code: %s', 'woocommerce'), $objectCharge->getId(), $objectCharge->getResponseCode());
+            }
+            else {  
+              $message = '';
+              foreach($validateRequest['message'] as $errormessage){
+                $message .= $errormessage . '. ';
+              }
+              $message .= 'Please contact your merchant.';
+            }
             $modelOrder = wc_get_order($order_id);
-            $order->add_order_note(sprintf(__('Checkout.com Credit Card Payment Process by - ChargeID: %s with Response Code: %s', 'woocommerce'), $objectCharge->getId(), $objectCharge->getResponseCode()));
+            $order->add_order_note($message);
             if ($objectCharge->getStatus() == 'Captured') {
               if ($modelOrder->get_status() != 'completed' && $modelOrder->get_status() != 'cancel') {
                 $modelOrder->update_status('wc-processing', __('Order status changed by callback:', 'woocommerce'
@@ -170,7 +190,7 @@ function checkoutapipayment_init() {
 
         if ($objectCharge->getCaptured()) {
           if ($modelOrder->get_status() != 'completed' && $modelOrder->get_status() != 'cancel') {
-
+            $modelOrder->update_status('wc-processing',__( 'Order status changed by webhook', 'woocommerce' ));
             $modelOrder->add_order_note(__('Payment has been ' . $objectCharge->getStatus(), 'woocommerce'));
             echo "Order has been captured";
           }

@@ -34,13 +34,26 @@ abstract class models_methods_Abstract extends WC_Payment_Gateway implements mod
             }catch (Exception $e) {
 
             }
+            $grand_total = $order->order_total;
+            $amount = $grand_total * 100;
+            $toValidate = array(
+              'currency' => $order->order_currency,
+              'value' => $amount,
+              'trackId' => $order->id,
+              );
+
+            $validateRequest = $Api::validateRequest($toValidate,$respondCharge);
 
 			if (preg_match('/^1[0-9]+$/', $respondCharge->getResponseCode())) {
-
+              $message = sprintf ( __ ( 'Checkout.com Credit Card Payment Approved - ChargeID: %s with Response Code: %s' , 'woocommerce' ) , $respondCharge->getId () , $respondCharge->getResponseCode () );
+                if($validateRequest['status']){  
+                      foreach($validateRequest['message'] as $errormessage){
+                        $message .= $errormessage . '. ';
+                      }
+                }
 				$order->payment_complete ( $respondCharge->getId () );
 
-				$order->add_order_note ( sprintf ( __ ( 'Checkout.com Credit Card Payment Approved - ChargeID: %s with Response Code: %s' , 'woocommerce' ) ,
-					$respondCharge->getId () , $respondCharge->getResponseCode () ) );
+				$order->add_order_note ( $message );
 
 				if (is_user_logged_in()) {
 
