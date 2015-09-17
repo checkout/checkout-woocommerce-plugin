@@ -75,23 +75,15 @@ function checkoutapipayment_init() {
       if (!session_id())
         session_start();
       global $woocommerce;
-      $order_id = $_REQUEST['cko-track-id'];
-      $order = new WC_Order($order_id);
+      
       $paymentToken = $_REQUEST['cko-payment-token'];
       $config['authorization'] = CHECKOUTAPI_SECRET_KEY;
       $config['paymentToken'] = $paymentToken;
-      $Api = CheckoutApi_Api::getApi(
-              array('mode' => CHECKOUTAPI_ENDPOINT,
-                    'authorization' => CHECKOUTAPI_SECRET_KEY)
-      );
+      $Api = CheckoutApi_Api::getApi(array('mode' => CHECKOUTAPI_ENDPOINT));
       $objectCharge = $Api->verifyChargePaymentToken($config);
-
-      try {
-        $chargeUpdated = $Api->updateTrackId($objectCharge, $order_id);
-      }
-      catch (Exception $e) {
-        
-      }
+      $order_id = $objectCharge->getTrackId();
+      $order = new WC_Order($order_id);
+      
       $grand_total = $order->order_total;
       $amount = $grand_total * 100;
       $toValidate = array(
@@ -105,16 +97,11 @@ function checkoutapipayment_init() {
         $returnURL = null;
         if ($objectCharge->isValid()) {
           if (preg_match('/^1[0-9]+$/', $objectCharge->getResponseCode())) {
-            
-            if($validateRequest['status']){  
-              $message = sprintf(__('Checkout.com Credit Card Payment Process by - ChargeID: %s with Response Code: %s', 'woocommerce'), $objectCharge->getId(), $objectCharge->getResponseCode());
-            }
-            else {  
-              $message = '';
+            $message = sprintf(__('Checkout.com Credit Card Payment Process by - ChargeID: %s with Response Code: %s', 'woocommerce'), $objectCharge->getId(), $objectCharge->getResponseCode());
+            if($validateRequest['status']){
               foreach($validateRequest['message'] as $errormessage){
                 $message .= $errormessage . '. ';
               }
-              $message .= 'Please contact your merchant.';
             }
             $modelOrder = wc_get_order($order_id);
             $order->add_order_note($message);

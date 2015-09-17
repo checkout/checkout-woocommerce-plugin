@@ -11,8 +11,6 @@ class models_methods_creditcard extends models_methods_Abstract
     $this->has_fields = true;
     $this->checkoutapipayment_ispci = 'no';
 
-    global $loaded;
-
     //load method once
     if (!$loaded) {
       add_action('woocommerce_checkout_order_review', array($this, 'setJsInit'));
@@ -22,7 +20,7 @@ class models_methods_creditcard extends models_methods_Abstract
   }
 
   public function _initCode() {
-    
+    global $loaded;    
   }
 
   public function setJsInit() {
@@ -81,16 +79,19 @@ class models_methods_creditcard extends models_methods_Abstract
               }
           }
 
-          if (typeof settings.url != 'undefined' && settings.url.indexOf('woocommerce_checkout') > -1) {
+          if (typeof settings.url != 'undefined') {
 
               var respondtxt = request.responseText, error = false;
 
-//              if (respondtxt.indexOf('<!--WC_START-->') >= 0 &&
-//                      (respondtxt = respondtxt.split('<!--WC_START-->') [1])) {
-//
-//                  if (respondtxt.indexOf('<!--WC_END-->') >= 0
-//                          && (respondtxt = respondtxt.split('<!--WC_END-->')[0])) {
-                      jQuery('.woocommerce-error li div').hide();
+              if (respondtxt.indexOf('<!--WC_START-->') >= 0) {
+              
+                  respondtxt = respondtxt.split('<!--WC_START-->')[1];
+              }
+              if (respondtxt.indexOf('<!--WC_END-->') >= 0) {
+              
+                  respondtxt = respondtxt.split('<!--WC_END-->')[0];
+              }
+              jQuery('.woocommerce-error li div').hide();
                       
                       // get error message
                       var d = jQuery.parseJSON(respondtxt);
@@ -274,8 +275,7 @@ class models_methods_creditcard extends models_methods_Abstract
 
               },
               lpCharged: function (event){
-                
-                document.getElementById('cko-cc-redirectUrl').value = event.data.url;
+                document.getElementById('cko-cc-redirectUrl').value = event.data.redirectUrl;
                 document.getElementById('cko-cc-lpName').value = event.data.lpName;
                 jQuery('#place_order').trigger('submit');
                 event.preventDefault();
@@ -312,7 +312,7 @@ class models_methods_creditcard extends models_methods_Abstract
       }
     }
     if (parent::get_post('redirectUrl') != '') {
-      $paymentToken = $this->getPaymentToken($order_id);  
+      $paymentToken = $this->getPaymentToken($order_id);      
       $urlRedirect = parent::get_post('redirectUrl') . '&trackId=' . $order_id;
       $urlRedirect = $this->replace_between($urlRedirect, 'paymentToken=', '&', $paymentToken);
       if (!session_id())
@@ -488,7 +488,7 @@ class models_methods_creditcard extends models_methods_Abstract
     
     return $this->_paymentToken;
   }
-
+  
   public function replace_between($str, $needle_start, $needle_end, $replacement) {
     $pos = strpos($str, $needle_start);
     $start = $pos === false ? 0 : $pos + strlen($needle_start);
