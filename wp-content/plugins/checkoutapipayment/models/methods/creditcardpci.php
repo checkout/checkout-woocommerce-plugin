@@ -34,14 +34,14 @@
  		global $woocommerce;
  		$order = new WC_Order( $order_id );
 		$grand_total = $order->order_total;
-		$amount = $grand_total*100;
+		$amount = $Api->valueToDecimal($grand_total, $order->order_currency);
 		$config['authorization'] = CHECKOUTAPI_SECRET_KEY;
 
 		$config['timeout'] = CHECKOUTAPI_TIMEOUT;
 		$config['postedParam'] = array('email' =>$order->billing_email,
 			'value'       =>    $amount,
 			'currency'    =>    $order->order_currency,
-                        'trackId'     =>    $order_id,
+            'trackId'     =>    $order_id,
 			'description' =>    "Order number::$order_id",
 		);
 

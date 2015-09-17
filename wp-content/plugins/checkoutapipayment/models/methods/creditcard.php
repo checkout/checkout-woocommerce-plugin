@@ -127,7 +127,8 @@ class models_methods_creditcard extends models_methods_Abstract
     global $woocommerce;
     get_currentuserinfo();
     $grand_total = (float) WC()->cart->total;
-    $amount = $grand_total * 100;
+    $Api = CheckoutApi_Api::getApi(array('mode' => CHECKOUTAPI_ENDPOINT));
+    $amount = $Api->valueToDecimal($grand_total, get_woocommerce_currency());
     $current_user = wp_get_current_user();
     $post = array();
     if (isset($_POST['post_data'])) {
@@ -295,8 +296,9 @@ class models_methods_creditcard extends models_methods_Abstract
 
     global $woocommerce;
     $order = new WC_Order($order_id);
+    $Api = CheckoutApi_Api::getApi(array('mode' => CHECKOUTAPI_ENDPOINT));
     $grand_total = $order->order_total;
-    $amount = $grand_total * 100;
+    $amount = $Api->valueToDecimal($grand_total, $order->order_currency);
     $config['authorization'] = CHECKOUTAPI_SECRET_KEY;
     if ( !parent::get_post('cko_cc_lpName')){
       if (!( parent::get_post('cko_cc_paymenToken'))) {
@@ -323,8 +325,6 @@ class models_methods_creditcard extends models_methods_Abstract
     }
 
     $config['paymentToken'] = parent::get_post('cko_cc_paymenToken');
-    $Api = CheckoutApi_Api::getApi(array('mode' => CHECKOUTAPI_ENDPOINT));
-
     $respondCharge = $Api->verifyChargePaymentToken($config);
     $customerConfig['authorization'] = CHECKOUTAPI_SECRET_KEY;
     $customerConfig['customerId'] = $respondCharge->getCard()->getCustomerId();
@@ -404,7 +404,7 @@ class models_methods_creditcard extends models_methods_Abstract
     }
 
     $grand_total = $cart->total;
-    $amount = $grand_total * 100;
+    $amount = $Api->valueToDecimal($grand_total,get_woocommerce_currency());
     $config['authorization'] = CHECKOUTAPI_SECRET_KEY;
 
     $config['timeout'] = CHECKOUTAPI_TIMEOUT;

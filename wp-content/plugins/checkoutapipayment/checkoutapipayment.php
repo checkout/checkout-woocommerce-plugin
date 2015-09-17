@@ -85,7 +85,7 @@ function checkoutapipayment_init() {
       $order = new WC_Order($order_id);
       
       $grand_total = $order->order_total;
-      $amount = $grand_total * 100;
+      $amount = $Api->valueToDecimal($grand_total, $order->order_currency);
       $toValidate = array(
         'currency' => $order->order_currency,
         'value' => $amount,
