@@ -11,8 +11,6 @@ class models_methods_creditcard extends models_methods_Abstract
     $this->has_fields = true;
     $this->checkoutapipayment_ispci = 'no';
 
-    global $loaded;
-
     //load method once
     if (!$loaded) {
       add_action('woocommerce_checkout_order_review', array($this, 'setJsInit'));
@@ -22,7 +20,7 @@ class models_methods_creditcard extends models_methods_Abstract
   }
 
   public function _initCode() {
-    
+    global $loaded;    
   }
 
   public function setJsInit() {
@@ -47,15 +45,16 @@ class models_methods_creditcard extends models_methods_Abstract
                       var script = document.createElement("script");
                       script.type = "text/javascript";
                       if ('<?php echo CHECKOUTAPI_ENDPOINT ?>' == 'live') {
-                          script.src = "//checkout.com/cdn/js/checkout.js";
+                          script.src = "https://checkout.com/cdn/js/checkout.js";
                       } else {
-                          script.src = "//sandbox.checkout.com/js/v1/checkout.js";
+                          script.src = "https://sandbox.checkout.com/js/v1/checkout.js";
                       }
                       script.id = "cko-checkoutjs";
                       script.async = true;
                       script.setAttribute("data-namespace", "CheckoutIntegration");
                       document.getElementsByTagName("head")[0].appendChild(script);
                       jQuery(function () {
+                        
                           jQuery('#billing_email').blur(function () {
                               if(!jQuery('#billing_email_field').hasClass('woocommerce-invalid')
                                   && !jQuery('#billing_email_field').hasClass(' woocommerce-invalid-email')
@@ -80,16 +79,19 @@ class models_methods_creditcard extends models_methods_Abstract
               }
           }
 
-          if (typeof settings.url != 'undefined' && settings.url.indexOf('woocommerce_checkout') > -1) {
+          if (typeof settings.url != 'undefined') {
 
               var respondtxt = request.responseText, error = false;
 
-              if (respondtxt.indexOf('<!--WC_START-->') >= 0 &&
-                      (respondtxt = respondtxt.split('<!--WC_START-->') [1])) {
-
-                  if (respondtxt.indexOf('<!--WC_END-->') >= 0
-                          && (respondtxt = respondtxt.split('<!--WC_END-->')[0])) {
-                      jQuery('.woocommerce-error li div').hide();
+              if (respondtxt.indexOf('<!--WC_START-->') >= 0) {
+              
+                  respondtxt = respondtxt.split('<!--WC_START-->')[1];
+              }
+              if (respondtxt.indexOf('<!--WC_END-->') >= 0) {
+              
+                  respondtxt = respondtxt.split('<!--WC_END-->')[0];
+              }
+              jQuery('.woocommerce-error li div').hide();
                       
                       // get error message
                       var d = jQuery.parseJSON(respondtxt);
@@ -102,7 +104,7 @@ class models_methods_creditcard extends models_methods_Abstract
                           }
                           // verify useragent mobile or desktop
                           if (!CheckoutIntegration.isMobile()) {
-
+                              CheckoutIntegration.setCustomerEmail(document.getElementById('billing_email').value);
                               CheckoutIntegration.open();
 
                           } else {
@@ -113,8 +115,8 @@ class models_methods_creditcard extends models_methods_Abstract
                               jQuery('#place_order').trigger('submit');
                           }
                       }
-                  }
-              }
+//                  }
+//              }
           }
       });
     </script>
@@ -125,7 +127,8 @@ class models_methods_creditcard extends models_methods_Abstract
     global $woocommerce;
     get_currentuserinfo();
     $grand_total = (float) WC()->cart->total;
-    $amount = $grand_total * 100;
+    $Api = CheckoutApi_Api::getApi(array('mode' => CHECKOUTAPI_ENDPOINT));
+    $amount = $Api->valueToDecimal($grand_total, get_woocommerce_currency());
     $current_user = wp_get_current_user();
     $post = array();
     if (isset($_POST['post_data'])) {
@@ -161,7 +164,7 @@ class models_methods_creditcard extends models_methods_Abstract
       $email = $post['billing_email'];
     }
 
-    $paymentToken = $this->getPaymentToken();
+    $paymentToken = $this->getPaymentToken($order_id = null);
 
     if (CHECKOUTAPI_LP == 'yes') {
       $paymentMode = 'mixed';
@@ -175,6 +178,7 @@ class models_methods_creditcard extends models_methods_Abstract
 
         <input type="hidden" name="cko_cc_paymenToken" id="cko-cc-paymenToken" value="">
         <input type="hidden" name="redirectUrl" id="cko-cc-redirectUrl" value="">
+        <input type="hidden" name="cko_cc_lpName" id="cko-cc-lpName" value=""  class="input-text "/>
 
         <script type="text/javascript">
 
@@ -189,7 +193,7 @@ class models_methods_creditcard extends models_methods_Abstract
               paymentToken: "<?php echo $paymentToken ?>",
               value: <?php echo $amount ?>,
               currency: '<?php echo get_woocommerce_currency() ?>',
-
+              customerEmail: '<?php echo $email ?>',
               forceMobileRedirect: true,
               customerName: '<?php echo $name ?>',
               paymentMode: '<?php echo $paymentMode ?>',
@@ -270,36 +274,15 @@ class models_methods_creditcard extends models_methods_Abstract
               lightboxLoadFailed: function (event) {
 
 
+              },
+              lpCharged: function (event){
+                document.getElementById('cko-cc-redirectUrl').value = event.data.redirectUrl;
+                document.getElementById('cko-cc-lpName').value = event.data.lpName;
+                jQuery('#place_order').trigger('submit');
+                event.preventDefault();
               }
 
           };
-
-
-          jQuery('#place_order').bind('click touchstart', function (event) {
-              event.stopPropagation();
-              wc_checkout_params.is_checkout = 0;
-              if (jQuery('#payment_method_checkoutapipayment:checked').length && jQuery('.woocommerce-invalid')
-                      .length < 1) {
-                  //   event.preventDefault();
-                  // jQuery('[name^=checkout].checkout')[0].onsubmit();
-                  //  jQuery('#place_order').attr('disabled',true);
-              } else {
-                  jQuery('#place_order').removeAttr('disabled');
-                  if (jQuery('[name^=checkout].checkout').is('.cko-processing') && !jQuery('#payment_method_checkoutapipayment:checked').length) {
-                      jQuery('[name^=checkout].checkout').removeClass('processing cko-processing');
-                  }
-              }
-          });
-
-          jQuery('[name=payment_method]').bind('click touchstart', function (event) {
-
-              if (!jQuery('#payment_method_checkoutapipayment:checked').length && jQuery('[name^=checkout].checkout').is('.cko-processing')) {
-                  jQuery('#place_order').removeAttr('disabled');
-                  jQuery('[name^=checkout].checkout').removeClass('processing cko-processing');
-              }
-          });
-
-
 
         </script>
 
@@ -313,34 +296,35 @@ class models_methods_creditcard extends models_methods_Abstract
 
     global $woocommerce;
     $order = new WC_Order($order_id);
+    $Api = CheckoutApi_Api::getApi(array('mode' => CHECKOUTAPI_ENDPOINT));
     $grand_total = $order->order_total;
-    $amount = $grand_total * 100;
+    $amount = $Api->valueToDecimal($grand_total, $order->order_currency);
     $config['authorization'] = CHECKOUTAPI_SECRET_KEY;
+    if ( !parent::get_post('cko_cc_lpName')){
+      if (!( parent::get_post('cko_cc_paymenToken'))) {
 
-    if (!( parent::get_post('cko_cc_paymenToken'))) {
+        $error_message = __('Please enter your credit card details');
 
-      $error_message = __('Please enter your credit card details');
-
-      return array(
-          'result' => 'failure',
-          'messages' => '<div style="display:none">loadLight</div>',
-          'reload' => false,
-          'loadLight' => true,
-      );
+        return array(
+            'result' => 'failure',
+            'messages' => '<div style="display:none">loadLight</div>',
+            'reload' => false,
+            'loadLight' => true,
+        );
+      }
     }
-
     if (parent::get_post('redirectUrl') != '') {
+      $paymentToken = $this->getPaymentToken($order_id);      
       $urlRedirect = parent::get_post('redirectUrl') . '&trackId=' . $order_id;
+      $urlRedirect = $this->replace_between($urlRedirect, 'paymentToken=', '&', $paymentToken);
       if (!session_id())
         session_start();
       $_SESSION['trackId'] = $order_id;
       $_SESSION['cko_cc_paymenToken'] = parent::get_post('cko_cc_paymenToken');
-      return array('result' => 'success', 'redirect' => parent::get_post('redirectUrl') . '&trackId=' . $order_id, 'order_status' => $order);
+      return array('result' => 'success', 'redirect' => $urlRedirect, 'order_status' => $order);
     }
 
     $config['paymentToken'] = parent::get_post('cko_cc_paymenToken');
-    $Api = CheckoutApi_Api::getApi(array('mode' => CHECKOUTAPI_ENDPOINT));
-
     $respondCharge = $Api->verifyChargePaymentToken($config);
     $customerConfig['authorization'] = CHECKOUTAPI_SECRET_KEY;
     $customerConfig['customerId'] = $respondCharge->getCard()->getCustomerId();
@@ -355,23 +339,27 @@ class models_methods_creditcard extends models_methods_Abstract
   }
 
   public function validateToken() {
-    if (!( parent::get_post('cko_cc_paymenToken')) && parent::get_post('payment_method') == 'checkoutapipayment' &&
-            wc_notice_count('error') == 0) {
 
-      $error_message = __('Please enter your credit card details');
-      wc_add_notice(__('Payment Notice: ', 'woothemes') . $error_message . '<div
-            style="display:none">loadLight</div>', 'error');
+    if(!( parent::get_post('cko_cc_lpName'))){
+      if (!( parent::get_post('cko_cc_paymenToken')) && parent::get_post('payment_method') == 'checkoutapipayment' &&
+              wc_notice_count('error') == 0) {
+        $error_message = __('Please enter your credit card details');
+        wc_add_notice(__('Payment Notice: ', 'woothemes') . $error_message . '<div
+              style="display:none">loadLight</div>', 'error');
 
-      return array(
-          'result' => 'failure',
-          'messages' => '<div style="display:none">loadLight</div>',
-          'reload' => false,
-          'loadLight' => true,
-      );
+        return array(
+            'result' => 'failure',
+            'messages' => '<div style="display:none">loadLight</div>',
+            'reload' => false,
+            'loadLight' => true,
+        );
+      }
+    } else {
+      return true;
     }
   }
 
-  public function setPaymentToken() {
+  public function setPaymentToken($orderId = null) {
 
     if (!WC()->cart) {
       return false;
@@ -416,11 +404,12 @@ class models_methods_creditcard extends models_methods_Abstract
     }
 
     $grand_total = $cart->total;
-    $amount = $grand_total * 100;
+    $amount = $Api->valueToDecimal($grand_total,get_woocommerce_currency());
     $config['authorization'] = CHECKOUTAPI_SECRET_KEY;
 
     $config['timeout'] = CHECKOUTAPI_TIMEOUT;
       $config['postedParam'] = array(
+          'trackId'     =>    $orderId,
           'email'       =>    $email,
           'value'       =>    $amount,
           "metadata"    =>    array('userAgent'=>$_SERVER['HTTP_USER_AGENT']),
@@ -488,21 +477,25 @@ class models_methods_creditcard extends models_methods_Abstract
       $paymentToken = $paymentTokenCharge->getId();
     }
 
-    if (!$paymentToken) {
-
-      $error_message = $paymentTokenCharge->getExceptionState()->getErrorMessage() .
-              ' ( ' . $paymentTokenCharge->getEventId() . ')';
-      wc_add_notice(__('Payment error: ', 'woothemes') . $error_message, 'error');
-    }
-
     $this->_paymentToken = $paymentToken;
   }
 
-  public function getPaymentToken() {
+  public function getPaymentToken($orderId) {
+    
     if (!$this->_paymentToken) {
-      $this->setPaymentToken();
+      $this->setPaymentToken($orderId);
     }
+    
     return $this->_paymentToken;
   }
+  
+  public function replace_between($str, $needle_start, $needle_end, $replacement) {
+    $pos = strpos($str, $needle_start);
+    $start = $pos === false ? 0 : $pos + strlen($needle_start);
 
+    $pos = strpos($str, $needle_end, $start);
+    $end = $start === false ? strlen($str) : $pos;
+ 
+    return substr_replace($str,$replacement,  $start, $end - $start);
+  }
 }
