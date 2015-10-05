@@ -197,10 +197,6 @@ class models_methods_creditcard extends models_methods_Abstract
               forceMobileRedirect: true,
               customerName: '<?php echo $name ?>',
               paymentMode: '<?php echo $paymentMode ?>',
-              logoUrl: '<?php echo CHECKOUTAPI_LOGOURL ?>',
-              themeColor: '<?php echo CHECKOUTAPI_THEMECOLOR ?>',
-              buttonColor: '<?php echo CHECKOUTAPI_BUTTONCOLOR ?>',
-              iconColor: '<?php echo CHECKOUTAPI_ICONCOLOR ?>',
               useCurrencyCode: '<?php echo CHECKOUTAPI_CURRENCYCODE ?>',
               billingDetails: {
                   'addressLine1'  :    "<?php echo $post['billing_address_1']?>",
@@ -213,6 +209,12 @@ class models_methods_creditcard extends models_methods_Abstract
               title: '<?php ?>',
               subtitle: '<?php echo __('Please enter your credit card details') ?>',
               widgetContainerSelector: '.widget-container',
+              styling: {
+                  themeColor: '<?php echo CHECKOUTAPI_THEMECOLOR ?>',
+                  buttonColor: '<?php echo CHECKOUTAPI_BUTTONCOLOR ?>',
+                  logoUrl: '<?php echo CHECKOUTAPI_LOGOURL ?>',
+                  iconColor: '<?php echo CHECKOUTAPI_ICONCOLOR ?>',
+               }
               ready: function (event) {
                   var cssAdded = jQuery('.widget-container link');
                   if (!cssAdded.hasClass('checkoutAPiCss')) {
