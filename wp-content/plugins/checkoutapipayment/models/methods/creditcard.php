@@ -214,7 +214,7 @@ class models_methods_creditcard extends models_methods_Abstract
                   buttonColor: '<?php echo CHECKOUTAPI_BUTTONCOLOR ?>',
                   logoUrl: '<?php echo CHECKOUTAPI_LOGOURL ?>',
                   iconColor: '<?php echo CHECKOUTAPI_ICONCOLOR ?>',
-               }
+               },
               ready: function (event) {
                   var cssAdded = jQuery('.widget-container link');
                   if (!cssAdded.hasClass('checkoutAPiCss')) {
