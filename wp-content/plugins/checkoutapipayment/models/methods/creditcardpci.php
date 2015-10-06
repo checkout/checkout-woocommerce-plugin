@@ -34,6 +34,7 @@
  		global $woocommerce;
  		$order = new WC_Order( $order_id );
 		$grand_total = $order->order_total;
+        $Api = CheckoutApi_Api::getApi(array('mode' => CHECKOUTAPI_ENDPOINT));
 		$amount = $Api->valueToDecimal($grand_total, $order->order_currency);
 		$config['authorization'] = CHECKOUTAPI_SECRET_KEY;
 
