@@ -5,12 +5,13 @@ class models_methods_creditcard extends models_methods_Abstract
 
   protected $_code = 'creditcard';
   private $_paymentToken = '';
-
+  
   public function __construct() {
     $this->id = 'checkoutapipayment';
     $this->has_fields = true;
     $this->checkoutapipayment_ispci = 'no';
-
+    global $loaded;
+    
     //load method once
     if (!$loaded) {
       add_action('woocommerce_checkout_order_review', array($this, 'setJsInit'));
@@ -20,7 +21,7 @@ class models_methods_creditcard extends models_methods_Abstract
   }
 
   public function _initCode() {
-    global $loaded;    
+    //global $loaded;    
   }
 
   public function setJsInit() {
@@ -59,9 +60,9 @@ class models_methods_creditcard extends models_methods_Abstract
                               if(!jQuery('#billing_email_field').hasClass('woocommerce-invalid')
                                   && !jQuery('#billing_email_field').hasClass(' woocommerce-invalid-email')
                                   && !jQuery('#billing_email_field').hasClass(' woocommerce-invalid-required-field')) {
-
-                                  CheckoutIntegration.setCustomerEmail(jQuery('#billing_email').val());
-
+                                  if(typeof CheckoutIntegration !='undefined') {
+                                    CheckoutIntegration.setCustomerEmail(jQuery('#billing_email').val());
+                                  }
                               }
                           });
                       });
@@ -95,7 +96,9 @@ class models_methods_creditcard extends models_methods_Abstract
                       
                       // get error message
                       var d = jQuery.parseJSON(respondtxt);
-                      error = (d.messages.indexOf('loadLight') < 0);
+                      if( typeof(d.messages) != 'undefined') {
+                         error = (d.messages.indexOf('loadLight') < 0);
+                      }
                       
                       //verify if payment method is selected and no error on page
                       if (jQuery('#payment_method_checkoutapipayment:checked').length && !error) {
@@ -103,17 +106,19 @@ class models_methods_creditcard extends models_methods_Abstract
                               jQuery('#terms').attr('checked', 'checked');
                           }
                           // verify useragent mobile or desktop
-                          if (!CheckoutIntegration.isMobile()) {
-                              CheckoutIntegration.setCustomerEmail(document.getElementById('billing_email').value);
-                              CheckoutIntegration.open();
+                          if(typeof CheckoutIntegration !='undefined') {
+                              if (!CheckoutIntegration.isMobile()) {
+                                  CheckoutIntegration.setCustomerEmail(document.getElementById('billing_email').value);
+                                  CheckoutIntegration.open();
 
-                          } else {
+                              } else {
 
-                              document.getElementById('cko-cc-redirectUrl').value = CheckoutIntegration.getRedirectionUrl();
-                              var transactionValue = CheckoutIntegration.getTransactionValue();
-                              document.getElementById('cko-cc-paymenToken').value = transactionValue.paymentToken;
-                              jQuery('#place_order').trigger('submit');
-                          }
+                                  document.getElementById('cko-cc-redirectUrl').value = CheckoutIntegration.getRedirectionUrl();
+                                  var transactionValue = CheckoutIntegration.getTransactionValue();
+                                  document.getElementById('cko-cc-paymenToken').value = transactionValue.paymentToken;
+                                  jQuery('#place_order').trigger('submit');
+                              }
+                        }
                       }
 //                  }
 //              }
@@ -197,10 +202,6 @@ class models_methods_creditcard extends models_methods_Abstract
               forceMobileRedirect: true,
               customerName: '<?php echo $name ?>',
               paymentMode: '<?php echo $paymentMode ?>',
-              logoUrl: '<?php echo CHECKOUTAPI_LOGOURL ?>',
-              themeColor: '<?php echo CHECKOUTAPI_THEMECOLOR ?>',
-              buttonColor: '<?php echo CHECKOUTAPI_BUTTONCOLOR ?>',
-              iconColor: '<?php echo CHECKOUTAPI_ICONCOLOR ?>',
               useCurrencyCode: '<?php echo CHECKOUTAPI_CURRENCYCODE ?>',
               billingDetails: {
                   'addressLine1'  :    "<?php echo $post['billing_address_1']?>",
@@ -213,6 +214,12 @@ class models_methods_creditcard extends models_methods_Abstract
               title: '<?php ?>',
               subtitle: '<?php echo __('Please enter your credit card details') ?>',
               widgetContainerSelector: '.widget-container',
+              styling: {
+                  themeColor: '<?php echo CHECKOUTAPI_THEMECOLOR ?>',
+                  buttonColor: '<?php echo CHECKOUTAPI_BUTTONCOLOR ?>',
+                  logoUrl: '<?php echo CHECKOUTAPI_LOGOURL ?>',
+                  iconColor: '<?php echo CHECKOUTAPI_ICONCOLOR ?>',
+               },
               ready: function (event) {
                   var cssAdded = jQuery('.widget-container link');
                   if (!cssAdded.hasClass('checkoutAPiCss')) {
