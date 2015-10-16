@@ -96,9 +96,7 @@ class models_methods_creditcard extends models_methods_Abstract
                       
                       // get error message
                       var d = jQuery.parseJSON(respondtxt);
-                      if( typeof(d.messages) != 'undefined') {
                          error = (d.messages.indexOf('loadLight') < 0);
-                      }
                       
                       //verify if payment method is selected and no error on page
                       if (jQuery('#payment_method_checkoutapipayment:checked').length && !error) {
@@ -120,8 +118,6 @@ class models_methods_creditcard extends models_methods_Abstract
                               }
                         }
                       }
-//                  }
-//              }
           }
       });
     </script>
