@@ -304,7 +304,7 @@ class models_methods_creditcard extends models_methods_Abstract
     $grand_total = $order->order_total;
     $amount = $Api->valueToDecimal($grand_total, $order->order_currency);
     $config['authorization'] = CHECKOUTAPI_SECRET_KEY;
-    if ( !parent::get_post('cko_lp_redirectUrl')){
+    if ( !parent::get_post('cko_lp_redirectUrl')) {
       if (!( parent::get_post('cko_cc_paymenToken'))) {
 
         $error_message = __('Please enter your credit card details');
