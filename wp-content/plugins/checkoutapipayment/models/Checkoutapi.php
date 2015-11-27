@@ -192,7 +192,7 @@ abstract class models_Checkoutapi extends WC_Payment_Gateway implements models_I
             ),
 
             'checkoutapipayment_ispci' => array(
-                'title'         =>    __( 'Is PCI Compliance?', 'woocommerce' ),
+                'title'         =>    __( 'Are you PCI compliant?', 'woocommerce' ),
                 'type'          =>    'select',
                 'description'   =>    __( 'Please select whether you are PCI Compliance', 'woocommerce' ),
                 'desc_tip'      =>    true,
