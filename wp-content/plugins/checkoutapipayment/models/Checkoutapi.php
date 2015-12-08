@@ -56,6 +56,12 @@ abstract class models_Checkoutapi extends WC_Payment_Gateway implements models_I
         if(!defined('CHECKOUTAPI_CURRENCYCODE')) {
             define("CHECKOUTAPI_CURRENCYCODE", $this->checkoutapipayment_currencyCode);
         }
+        if(!defined('CHECKOUTAPI_CARDTYPE')) {
+            define("CHECKOUTAPI_CARDTYPE", $this->checkoutapipayment_cardtype);
+        }
+        if(!defined('CHECKOUTAPI_MINAMOUNT')) {
+            define("CHECKOUTAPI_MINAMOUNT", $this->checkoutapipayment_minamount);
+        }
 
 		$this->_setInstanceMethod();
 
@@ -186,7 +192,7 @@ abstract class models_Checkoutapi extends WC_Payment_Gateway implements models_I
             ),
 
             'checkoutapipayment_ispci' => array(
-                'title'         =>    __( 'Is PCI Compliance?', 'woocommerce' ),
+                'title'         =>    __( 'Are you PCI compliant?', 'woocommerce' ),
                 'type'          =>    'select',
                 'description'   =>    __( 'Please select whether you are PCI Compliance', 'woocommerce' ),
                 'desc_tip'      =>    true,
@@ -202,7 +208,25 @@ abstract class models_Checkoutapi extends WC_Payment_Gateway implements models_I
                 'type'        => 'title',
                 'description' => '',
             ),
+             'checkoutapipayment_cardtype' => array(
+                'title'         =>    __( 'Is 3D?', 'woocommerce' ),
+                'type'          =>    'select',
+                'description'   =>    __( 'This is the setting to do 3D secure transaction', 'woocommerce' ),
+                'desc_tip'      =>    true,
+                'options'       =>    array(
+                    'yes'    =>    'YES',
+                    'no'     =>    'NO',
+                ),
+                'default'     =>     'no'
+             ),
+             'checkoutapipayment_minamount' => array(
+                'title'       =>    __( '3D Minimum amount (integer value)', 'woocommerce' ),
+                'type'        =>   'text',
+                'description'   =>    __( 'Applicable if Is 3D? set to YES', 'woocommerce' ),
+                'default'     =>  '',
+                'desc_tip'      =>    true,
 
+            ),
             'checkoutapipayment_logoUrl' => array(
              'title'       =>    __( 'Logo URL', 'woocommerce' ),
              'type'        =>   'text',
@@ -247,10 +271,11 @@ abstract class models_Checkoutapi extends WC_Payment_Gateway implements models_I
                 'desc_tip'      =>    true,
                 'options'       =>    array(
                     'true'    =>    'Code',
-                    'false'     =>    'Symbol',
+                    'false'     =>  'Symbol',
                 ),
                 'default'     =>     'false'
-             )
+             ),
+
 
 		);
 	}
@@ -314,6 +339,8 @@ abstract class models_Checkoutapi extends WC_Payment_Gateway implements models_I
         $this->checkoutapipayment_buttonColor   = $this -> get_option ('checkoutapipayment_buttonColor');
         $this->checkoutapipayment_iconColor     = $this -> get_option ('checkoutapipayment_iconColor');
         $this->checkoutapipayment_currencyCode  = $this -> get_option ('checkoutapipayment_currencyCode');
+        $this->checkoutapipayment_cardtype      = $this -> get_option ('checkoutapipayment_cardtype');
+        $this->checkoutapipayment_minamount     = $this -> get_option ('checkoutapipayment_minamount');
 
     }
 }

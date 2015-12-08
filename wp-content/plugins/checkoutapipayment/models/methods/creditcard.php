@@ -15,6 +15,7 @@ class models_methods_creditcard extends models_methods_Abstract
     //load method once
     if (!$loaded) {
       add_action('woocommerce_checkout_order_review', array($this, 'setJsInit'));
+      add_action('before_woocommerce_pay', array($this, 'invoiceCkoPay'));
       add_action('woocommerce_after_checkout_validation', array($this, 'validateToken'));
       $loaded = true;
     }
@@ -23,8 +24,111 @@ class models_methods_creditcard extends models_methods_Abstract
   public function _initCode() {
     //global $loaded;    
   }
+  
+  public function invoiceCkoPay(){
+    $orderid =  get_query_var('order-pay');
+    $paymentToken = $this->getInvoicePaymentToken($orderid);
+    if (CHECKOUTAPI_LP == 'yes') {
+     $paymentMode = 'mixed';
+    }
+    else {
+     $paymentMode = 'card';
+    }
+    if (CHECKOUTAPI_ENDPOINT  == 'live') {
+        $src = "https://checkout.com/cdn/js/checkout.js";
+    } else {
+        $src = "https://sandbox.checkout.com/js/v1/checkout.js";
+    }
+  ?>
+  <script type="text/javascript">
+    
+    var reload = false;
+    window.CKOConfig = {
+        debugMode: true,
+        renderMode: 2,
+        namespace: 'CheckoutIntegration',
+        publicKey: '<?php echo CHECKOUTAPI_PUBLIC_KEY ?>',
+        paymentToken: "<?php echo $paymentToken['token'] ?>",
+        value: <?php echo $paymentToken['value'] ?>,
+        currency: '<?php echo $paymentToken['currency'] ?>',
+        customerEmail: '<?php echo $paymentToken['email'] ?>',
+        forceMobileRedirect: true,
+        customerName: '<?php echo $paymentToken['name']?>',
+        paymentMode: '<?php echo $paymentMode ?>',
+        useCurrencyCode: '<?php echo CHECKOUTAPI_CURRENCYCODE ?>',
+        subtitle: '<?php echo __('Please enter your credit card details') ?>',
+        widgetContainerSelector: '.payment_box .payment_method_checkoutapipayment',
+        styling: {
+            themeColor: '<?php echo CHECKOUTAPI_THEMECOLOR ?>',
+            buttonColor: '<?php echo CHECKOUTAPI_BUTTONCOLOR ?>',
+            logoUrl: '<?php echo CHECKOUTAPI_LOGOURL ?>',
+            iconColor: '<?php echo CHECKOUTAPI_ICONCOLOR ?>',
+         },
+        ready: function (event) {
+          jQuery('<input>').attr({
+              type: 'hidden',
+              id: 'cko-cc-paymenToken',
+              name: 'cko_cc_paymenToken'
+          }).appendTo('form#order_review .form-row');
+          jQuery('<input>').attr({
+              type: 'hidden',
+              id: 'cko-inv-redirectUrl',
+              name: 'inv_redirectUrl'
+          }).appendTo('form#order_review .form-row');
+          jQuery('<input>').attr({
+              type: 'hidden',
+              id: 'cko-lp-redirectUrl',
+              name: 'cko_lp_redirectUrl'
+          }).appendTo('form#order_review .form-row');
+          
+          jQuery('#place_order').click(function(ev){
+              if(jQuery("input:radio[id='payment_method_checkoutapipayment']").is(":checked")) {
+                if (!CheckoutIntegration.isMobile()) {
+                  ev.preventDefault();
+                  CheckoutIntegration.open();
+                } 
+                else {
+                  document.getElementById('cko-inv-redirectUrl').value = CheckoutIntegration.getRedirectionUrl();
+                  var transactionValue = CheckoutIntegration.getTransactionValue();
+                  document.getElementById('cko-cc-paymenToken').value = transactionValue.paymentToken;
+                  jQuery('#order_review').submit();
+                }
+              }
+          });
+
+        },
+        cardCharged: function (event) {
+            document.getElementById('cko-cc-paymenToken').value = event.data.paymentToken;
+            jQuery('#order_review').submit();
+
+
+        },
+        paymentTokenExpired: function () {
+            reload = true;
+            jQuery('#place_order').removeAttr('disabled');
+        },
+        lightboxDeactivated: function () {
+            jQuery('#place_order').removeAttr('disabled');
+            if (reload) {
+                window.location.reload();
+            }
+
+        },
+        lpCharged: function (event){
+          document.getElementById('cko-lp-redirectUrl').value = event.data.redirectUrl;
+          jQuery('#order_review').submit();
+        }
+
+    };
+
+  </script>
+  <script src="<?php echo $src ?>" async ></script>
+  
+  <?php
+  }
 
   public function setJsInit() {
+
     ?>
     <script type="text/javascript">
       var loaderJs = 0;
@@ -79,8 +183,9 @@ class models_methods_creditcard extends models_methods_Abstract
                   }, 1000);
               }
           }
-
+          //check if settings url exist
           if (typeof settings.url != 'undefined') {
+              if ( settings.url.indexOf('woocommerce_checkout') > -1 || settings.url.indexOf('checkout') > -1){
 
               var respondtxt = request.responseText, error = false;
 
@@ -118,6 +223,7 @@ class models_methods_creditcard extends models_methods_Abstract
                               }
                         }
                       }
+              }
           }
       });
     </script>
@@ -125,6 +231,8 @@ class models_methods_creditcard extends models_methods_Abstract
   }
 
   public function payment_fields() {
+    $orderpay =  get_query_var('order-pay');
+
     global $woocommerce;
     get_currentuserinfo();
     $grand_total = (float) WC()->cart->total;
@@ -173,13 +281,14 @@ class models_methods_creditcard extends models_methods_Abstract
     else {
       $paymentMode = 'card';
     }
+    if(empty($orderpay)){
     ?>
 
     <div style="" class="widget-container">
 
         <input type="hidden" name="cko_cc_paymenToken" id="cko-cc-paymenToken" value="">
         <input type="hidden" name="redirectUrl" id="cko-cc-redirectUrl" value="">
-        <input type="hidden" name="cko_cc_lpName" id="cko-cc-lpName" value=""  class="input-text "/>
+        <input type="hidden" name="cko_lp_redirectUrl" id="cko-lp-redirectUrl" value=""  class="input-text "/>
 
         <script type="text/javascript">
 
@@ -279,10 +388,8 @@ class models_methods_creditcard extends models_methods_Abstract
 
               },
               lpCharged: function (event){
-                document.getElementById('cko-cc-redirectUrl').value = event.data.redirectUrl;
-                document.getElementById('cko-cc-lpName').value = event.data.lpName;
+                document.getElementById('cko-lp-redirectUrl').value = event.data.redirectUrl;
                 jQuery('#place_order').trigger('submit');
-                event.preventDefault();
               }
 
           };
@@ -291,11 +398,11 @@ class models_methods_creditcard extends models_methods_Abstract
 
     </div>
   <?php
+    }
   }
 
 
   public function process_payment($order_id) {
-
 
     global $woocommerce;
     $order = new WC_Order($order_id);
@@ -303,7 +410,8 @@ class models_methods_creditcard extends models_methods_Abstract
     $grand_total = $order->order_total;
     $amount = $Api->valueToDecimal($grand_total, $order->order_currency);
     $config['authorization'] = CHECKOUTAPI_SECRET_KEY;
-    if ( !parent::get_post('cko_cc_lpName')){
+
+    if ( !parent::get_post('cko_lp_redirectUrl')) {
       if (!( parent::get_post('cko_cc_paymenToken'))) {
 
         $error_message = __('Please enter your credit card details');
@@ -315,19 +423,34 @@ class models_methods_creditcard extends models_methods_Abstract
             'loadLight' => true,
         );
       }
+    } 
+    if (parent::get_post('cko_lp_redirectUrl')){
+      $urlArray = explode("=",parent::get_post('cko_lp_redirectUrl'));
+      $paymentToken = $urlArray[1];
+      $config['paymentToken'] = $paymentToken;
+      $chargeResponse  = $Api->verifyChargePaymentToken($config);
+      $chargeUpdated = $Api->updateTrackId($chargeResponse, $order_id);
+      return array('result' => 'success', 'redirect' => parent::get_post('cko_lp_redirectUrl'), 'order_status' => $order);
     }
     if (parent::get_post('redirectUrl') != '') {
       $paymentToken = $this->getPaymentToken($order_id);      
       $urlRedirect = parent::get_post('redirectUrl') . '&trackId=' . $order_id;
       $urlRedirect = $this->replace_between($urlRedirect, 'paymentToken=', '&', $paymentToken);
-      if (!session_id())
-        session_start();
-      $_SESSION['trackId'] = $order_id;
-      $_SESSION['cko_cc_paymenToken'] = parent::get_post('cko_cc_paymenToken');
+      return array('result' => 'success', 'redirect' => $urlRedirect, 'order_status' => $order);
+    }
+    if (parent::get_post('inv_redirectUrl') != '') {
+      $urlRedirect = parent::get_post('inv_redirectUrl') . '&trackId=' . $order_id;
       return array('result' => 'success', 'redirect' => $urlRedirect, 'order_status' => $order);
     }
 
-    $config['paymentToken'] = parent::get_post('cko_cc_paymenToken');
+    $paymentToken = parent::get_post('cko_cc_paymenToken');
+    
+    $tok = 'pay_tok';
+    $pos = strpos($paymentToken, $tok);
+    if($pos === false){
+      $paymentToken = 'pay_tok_' . parent::get_post('cko_cc_paymenToken');
+    }
+    $config['paymentToken'] = $paymentToken;
     $respondCharge = $Api->verifyChargePaymentToken($config);
     $customerConfig['authorization'] = CHECKOUTAPI_SECRET_KEY;
     $customerConfig['customerId'] = $respondCharge->getCard()->getCustomerId();
@@ -343,7 +466,7 @@ class models_methods_creditcard extends models_methods_Abstract
 
   public function validateToken() {
 
-    if(!( parent::get_post('cko_cc_lpName'))){
+    if(!( parent::get_post('cko_lp_redirectUrl'))){
       if (!( parent::get_post('cko_cc_paymenToken')) && parent::get_post('payment_method') == 'checkoutapipayment' &&
               wc_notice_count('error') == 0) {
         $error_message = __('Please enter your credit card details');
@@ -385,7 +508,7 @@ class models_methods_creditcard extends models_methods_Abstract
     $email = "Email@youremail.com";
 
     $name = 'Your card holder name';
-
+    
     if (isset($current_user->user_email) && $current_user->user_email) {
       $email = $current_user->user_email;
     }
@@ -408,14 +531,23 @@ class models_methods_creditcard extends models_methods_Abstract
 
     $grand_total = $cart->total;
     $amount = $Api->valueToDecimal($grand_total,get_woocommerce_currency());
+    $minAmount3D = $Api->valueToDecimal(CHECKOUTAPI_MINAMOUNT,get_woocommerce_currency());
+    $chargeMode = CHECKOUTAPI_CARDTYPE;
+    $chargeModeValue = 1;
+    if($chargeMode == 'yes') {
+        if($amount > $minAmount3D){
+          $chargeModeValue = 2;
+        }
+    }
     $config['authorization'] = CHECKOUTAPI_SECRET_KEY;
 
     $config['timeout'] = CHECKOUTAPI_TIMEOUT;
       $config['postedParam'] = array(
+          'chargeMode'  =>    $chargeModeValue,
           'trackId'     =>    $orderId,
           'email'       =>    $email,
           'value'       =>    $amount,
-          "metadata"    =>    array('userAgent'=>$_SERVER['HTTP_USER_AGENT']),
+          'metadata'    =>    array('userAgent'=>$_SERVER['HTTP_USER_AGENT']),
           'currency'    =>    get_woocommerce_currency()
       );
 
@@ -435,7 +567,7 @@ class models_methods_creditcard extends models_methods_Abstract
           'addressLine2' => $customer->address_2,
           'city' => $customer->city,
           'country' => $customer->country,
-          'state' => $customer->country,
+          'state' => $customer->state,
       );
     }
     $products = null;
@@ -474,7 +606,6 @@ class models_methods_creditcard extends models_methods_Abstract
 
     $paymentTokenCharge = $Api->getPaymentToken($config);
 
-
     $paymentToken = '';
     if ($paymentTokenCharge->isValid()) {
       $paymentToken = $paymentTokenCharge->getId();
@@ -500,5 +631,104 @@ class models_methods_creditcard extends models_methods_Abstract
     $end = $start === false ? strlen($str) : $pos;
  
     return substr_replace($str,$replacement,  $start, $end - $start);
+  }
+  
+   public function getInvoicePaymentToken($orderid) {
+
+    $Api = CheckoutApi_Api::getApi(array('mode' => CHECKOUTAPI_ENDPOINT));
+    $order   = wc_get_order( $orderid );
+
+    $email = $order->billing_email;
+    $name = $order->billing_first_name . ' ' . $order->billing_last_name;
+
+    $grand_total = $order->order_total;
+    $currency = $order->order_currency;
+    $amount = $Api->valueToDecimal($grand_total,$currency);
+    $minAmount3D = $Api->valueToDecimal(CHECKOUTAPI_MINAMOUNT,$currency);
+    $chargeMode = CHECKOUTAPI_CARDTYPE;
+    $chargeModeValue = 1;
+    if($chargeMode == 'yes') {
+        if($amount > $minAmount3D){
+          $chargeModeValue = 2;
+        }
+    }
+    $config['authorization'] = CHECKOUTAPI_SECRET_KEY;
+
+    $config['timeout'] = CHECKOUTAPI_TIMEOUT;
+      $config['postedParam'] = array(
+          'chargeMode'  =>    $chargeModeValue,
+          'trackId'     =>    $orderid,
+          'email'       =>    $email,
+          'value'       =>    $amount,
+          'metadata'    =>    array('userAgent'=>$_SERVER['HTTP_USER_AGENT']),
+          'currency'    =>    $currency
+      );
+
+    $extraConfig = array();
+    if (CHECKOUTAPI_PAYMENTACTION == 'Capture') {
+      $extraConfig = parent::_captureConfig();
+    }
+    else {
+      $extraConfig = parent::_authorizeConfig();
+    }
+
+    $config = array_merge_recursive($extraConfig, $config);
+
+    $config['postedParam']['card']['billingDetails'] = array(
+        'addressLine1' => $order->billing_address_1,
+        'addressLine2' => $order->billing_address_2,
+        'city' => $order->billing_city,
+        'state' => $order->billing_state,
+        'postcode' => $order->billing_postcode,
+    );
+    
+    if(!empty($order->billing_country)){
+      $config['postedParam']['card']['billingDetails'] = array_merge_recursive($config['postedParam']['card']['billingDetails'],  array (
+          'country' => $order->billing_country
+          )
+      );
+    }
+
+    $products = null;
+
+    foreach ($order->get_items() as $item) {
+      $products[] = array(
+          'name' => $item['name'],
+          'sku' => $item['product_id'],
+          'price' => $item['line_total'],
+          'quantity' => $item['qty'],
+      );
+    }
+
+    if ($products) {
+      $config['postedParam']['products'] = $products;
+    }
+
+    $config['postedParam']['shippingDetails'] = array(
+        'addressLine1' => $order->shipping_address_1,
+        'addressLine2' => $order->shipping_address_2,
+        'city' => $order->shipping_city,
+        'postcode' => $order->shipping_postcode,
+        'state' => $order->shipping_state
+    );
+    
+    if(!empty($order->shipping_country)){
+      $config['postedParam']['shippingDetails'] = array_merge_recursive($config['postedParam']['shippingDetails'],  array (
+          'country' => $order->shipping_country
+          )
+      );
+    }
+
+    $paymentTokenCharge = $Api->getPaymentToken($config);
+    $paymentToken = array();
+    if ($paymentTokenCharge->isValid()) {
+      $paymentToken['token'] = $paymentTokenCharge->getId();
+      $paymentToken['value'] =  $amount;
+      $paymentToken['currency'] = $currency;
+      $paymentToken['email'] = $email;
+      $paymentToken['name'] = $name;
+    }
+
+    return $paymentToken;
   }
 }

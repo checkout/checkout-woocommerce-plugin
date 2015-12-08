@@ -72,6 +72,7 @@ function checkoutapipayment_init() {
     }
 
     public function success_page() {
+
       if (!session_id())
         session_start();
       global $woocommerce;
@@ -92,7 +93,7 @@ function checkoutapipayment_init() {
         'trackId' => $order->id,
         );
       $validateRequest = $Api::validateRequest($toValidate,$objectCharge);
-      
+
       try {
         $returnURL = null;
         if ($objectCharge->isValid()) {
@@ -116,7 +117,13 @@ function checkoutapipayment_init() {
             elseif ($objectCharge->getStatus() != 'Authorised') {
               if ($modelOrder->get_status() != 'cancel') {
                 $modelOrder->update_status('pending', __('Order status changed by callback:', 'woocommerce'));
-                header('Location: ' . $woocommerce->cart->get_checkout_url());
+                if($objectCharge->getChargeMode() == 3){
+                  $returnURL = $this->get_return_url($order);
+                  header('Location: ' . $returnURL);
+                }
+                else {
+                  header('Location: ' . $woocommerce->cart->get_checkout_url());
+                }
               }
             }
             else {
