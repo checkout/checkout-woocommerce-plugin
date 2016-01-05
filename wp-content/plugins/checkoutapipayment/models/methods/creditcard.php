@@ -35,7 +35,7 @@ class models_methods_creditcard extends models_methods_Abstract
      $paymentMode = 'card';
     }
     if (CHECKOUTAPI_ENDPOINT  == 'live') {
-        $src = "https://checkout.com/cdn/js/checkout.js";
+        $src = "https://cdn.checkout.com/js/checkout.js";
     } else {
         $src = "https://sandbox.checkout.com/js/v1/checkout.js";
     }
@@ -150,7 +150,7 @@ class models_methods_creditcard extends models_methods_Abstract
                       var script = document.createElement("script");
                       script.type = "text/javascript";
                       if ('<?php echo CHECKOUTAPI_ENDPOINT ?>' == 'live') {
-                          script.src = "https://checkout.com/cdn/js/checkout.js";
+                          script.src = "https://cdn.checkout.com/js/checkout.js";
                       } else {
                           script.src = "https://sandbox.checkout.com/js/v1/checkout.js";
                       }
@@ -211,7 +211,7 @@ class models_methods_creditcard extends models_methods_Abstract
                           // verify useragent mobile or desktop
                           if(typeof CheckoutIntegration !='undefined') {
                               if (!CheckoutIntegration.isMobile()) {
-                                  CheckoutIntegration.setCustomerEmail(document.getElementById('billing_email').value);
+                                CheckoutIntegration.setCustomerEmail(document.getElementById('billing_email').value);
                                   CheckoutIntegration.open();
 
                               } else {
