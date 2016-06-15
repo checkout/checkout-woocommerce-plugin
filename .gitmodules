@@ -1,4 +1,0 @@
-[submodule "wp-content/plugins/checkoutapipayment/CheckoutApi"]
-	path = wp-content/plugins/checkoutapipayment/CheckoutApi
-	url = https://github.com/CKOTech/checkout-php-library.git
-	branch = CheckoutApi
