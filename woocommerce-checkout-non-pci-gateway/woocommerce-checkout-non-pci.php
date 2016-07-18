@@ -13,7 +13,7 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
     const PAYMENT_ACTION_AUTHORIZE  = 'authorize';
     const PAYMENT_ACTION_CAPTURE    = 'authorize_capture';
     const AUTO_CAPTURE_TIME         = 0;
-    const RENDER_MODE               = 2;
+    const RENDER_MODE               = 1;
     const VERSION                   = '2.3.1';
     const RENDER_NAMESPACE          = 'Checkout';
     const CARD_FORM_MODE            = 'cardTokenisation';
@@ -176,12 +176,6 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
                 'type'		=> 'text',
                 'desc_tip'	=> __('The title of your payment form.', 'woocommerce-checkout-non-pci'),
             ),
-            'widget_color' => array(
-                'title'		=> __('Widget Color', 'woocommerce-checkout-non-pci'),
-                'type'		=> 'text',
-                'desc_tip'	=> __('#HEX value of your chosen widget color.', 'woocommerce-checkout-non-pci'),
-                'default'	=> __('#333', 'woocommerce-checkout-non-pci' ),
-            ),
             'form_button_color' => array(
                 'title'		=> __('Form Button Color', 'woocommerce-checkout-non-pci'),
                 'type'		=> 'text',
@@ -273,6 +267,7 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
             $result         = $request->verifyChargePaymentToken($order, $paymentToken);
 
             if (!empty($result['error'])) {
+                WC()->session->refresh_totals = true;
                 WC_Checkout_Non_Pci_Validator::wc_add_notice_self($this->gerProcessErrorMessage($result['error']), 'error');
                 return;
             }
@@ -294,13 +289,14 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
         }
 
         if (empty($cardToken)) {
-            WC_Checkout_Non_Pci_Validator::wc_add_notice_self($this->gerProcessErrorMessage('Payment error: Please check your card data.'), 'error');
+            WC_Checkout_Non_Pci_Validator::wc_add_notice_self($this->gerProcessErrorMessage('Please use the "Add Card" button to complete your payment.'), 'error');
             return;
         }
 
         $result = $request->createCharge($order, $cardToken);
 
         if (!empty($result['error'])) {
+            WC()->session->refresh_totals = true;
             WC_Checkout_Non_Pci_Validator::wc_add_notice_self($this->gerProcessErrorMessage($result['error']), 'error');
             return;
         }
@@ -390,9 +386,8 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
 
         $requestModel   = new WC_Checkout_Non_Pci_Request($this);
         $paymentToken   = $requestModel->createPaymentToken($orderTotal, get_woocommerce_currency());
-        $checkoutFields = !$isPayOrder ? json_encode($woocommerce->checkout->checkout_fields,JSON_HEX_APOS) : json_encode(array());
         ?>
-        <fieldset id="<?php echo $this->id; ?>-cc-form">
+        <fieldset id="<?php echo $this->id; ?>-cc-form" class="checkout-widget">
             <?php do_action( 'woocommerce_credit_card_form_start', $this->id ); ?>
                 <?php if(!empty($paymentToken)):?>
                     <?php if($isPayOrder):?>
@@ -405,9 +400,9 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
                     <input type="hidden" id="cko-lp-lpName" name="<?php echo esc_attr( $this->id ) ?>-lp-name" value=""/>
                     <div id="checkout-api-js-hover" style="display: none; z-index: 100; position: fixed; width: 100%; height: 100%; top: 0;left: 0; background-color: <?php echo $this->get_option('overlay_shade') === 'dark' ? '#000' : '#fff' ?>; opacity:<?php echo $this->get_option('overlay_opacity') ?>;"></div>
                     <script type="text/javascript">
-                        window.CheckoutApiJsConfig = {
+                        window.checkoutIntegrationCurrentConfig = {
                             debugMode:                  'false',
-                            renderMode:                 '<?php echo self::RENDER_MODE ?>',
+                            renderMode:                 <?php echo self::RENDER_MODE ?>,
                             namespace:                  '<?php echo self::RENDER_NAMESPACE ?>',
                             publicKey:                  '<?php echo $this->get_option('public_key') ?>',
                             paymentToken:               '<?php echo $paymentToken['token'] ?>',
@@ -419,7 +414,6 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
                             themeColor:                 '<?php echo $this->get_option('theme_color') ?>',
                             useCurrencyCode:            '<?php echo $this->get_option('use_currency_code') != 'no' ? 'true' : 'false';?>',
                             title:                      '<?php echo $this->get_option('form_title') ?>',
-                            widgetColor:                '<?php echo $this->get_option('widget_color') ?>',
                             styling:                    {
                                 formButtonColor:        '<?php echo $this->get_option('form_button_color') ?>',
                                 formButtonColorLabel:   '<?php echo $this->get_option('form_button_color_label') ?>',
@@ -429,37 +423,70 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
                                 widgetIconSize:         '<?php echo $this->get_option('widget_icon_size') ?>'
                             },
                             cardFormMode:               '<?php echo self::CARD_FORM_MODE ?>',
-                            lightboxDeactivated: function(event) {
-                                if (jQuery('#checkout-api-js-hover').length > 0) jQuery('#checkout-api-js-hover').hide();
-                            },
+                            enableIframePreloading:     false,
                             lpCharged: function (event){
                                 if (document.getElementById('cko-lp-redirectUrl').value.length === 0) {
                                     document.getElementById('cko-card-token').value = event.data.lpName;
                                     document.getElementById('cko-lp-redirectUrl').value = event.data.redirectUrl;
                                     document.getElementById('cko-lp-lpName').value = event.data.lpName;
 
-                                    jQuery('#place_order').trigger('click');
+                                    if (jQuery('#place_order').length > 0) {
+                                        jQuery('#place_order').trigger('click');
+                                    }
                                 }
                             },
                             cardTokenised: function(event){
                                 if (document.getElementById('cko-card-token').value.length === 0 || document.getElementById('cko-card-token').value != event.data.cardToken) {
                                     document.getElementById('cko-card-token').value = event.data.cardToken;
 
-                                    jQuery('#place_order').trigger('click');
-
-                                    document.getElementById("cko-card-token").value = "";
-
-                                    if (Checkout.isMobile()) {
-                                        jQuery('#checkout-api-js-hover').hide();
+                                    if (jQuery('#place_order').length > 0) {
+                                        jQuery('#place_order').trigger('click');
                                     }
                                 }
                             }
                         };
 
-                        window.checkoutFields = '<?php echo $checkoutFields?>';
+                        if (document.getElementById('billing_email').value.length > 0) {
+                            window.checkoutIntegrationCurrentConfig.customerEmail = document.getElementById('billing_email').value;
+                        }
+
+                        if (document.getElementById('billing_first_name').value.length > 0 && document.getElementById('billing_last_name').value.length > 0) {
+                            window.checkoutIntegrationCurrentConfig.customerName = document.getElementById('billing_first_name').value
+                                + ' ' + document.getElementById('billing_last_name').value;
+                        }
+
+                        window.checkoutIntegrationIsReady = window.checkoutIntegrationIsReady || false;
+                        if (!window.checkoutIntegrationIsReady) {
+                            window.CKOConfig = {
+                                ready: function () {
+                                    if (window.checkoutIntegrationIsReady) {
+                                        return false;
+                                    }
+
+                                    if (typeof Checkout == 'undefined') {
+                                        return false;
+                                    }
+
+                                    Checkout.render(window.checkoutIntegrationCurrentConfig);
+
+                                    window.checkoutIntegrationIsReady = true;
+                                }
+                            };
+
+                            var script = document.createElement('script');
+                            script.src = '<?php echo $this->getJsLibUrl();?>';
+                            script.async = true;
+                            document.head.appendChild(script);
+
+                            var link    = document.createElement('link');
+                            link.type   = 'text/css';
+                            link.rel    = 'stylesheet';
+                            link.href   = '<?php echo $this->getCssLink() ?>';
+                            document.head.appendChild(link);
+                        } else {
+                            Checkout.render(window.checkoutIntegrationCurrentConfig);
+                        }
                     </script>
-                    <script type="text/javascript" src="<?php echo $this->get_option('mode') == 'sandbox' ? self::JS_PATH_CARD_TOKEN : self::JS_PATH_CARD_TOKEN_LIVE?>"></script>
-                    <script type="text/javascript" src="<?php echo plugins_url() . '/woocommerce-checkout-non-pci-gateway/view/js/' . 'checkout_api.js'?>"></script>
                 <?php else:?>
                     <p><?php echo __('Error creating Payment Token.', 'woocommerce-checkout-non-pci')?></p>
                 <?php endif?>
@@ -467,6 +494,24 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
             <div class="clear"></div>
         </fieldset>
         <?php
+    }
+
+    /**
+     * Get js lib URL
+     *
+     * @return string
+     */
+    public function getJsLibUrl() {
+        return $this->get_option('mode') == 'sandbox' ? self::JS_PATH_CARD_TOKEN : self::JS_PATH_CARD_TOKEN_LIVE;
+    }
+
+    /**
+     * Get css file URL
+     *
+     * @return string
+     */
+    public function getCssLink() {
+        return plugins_url() . '/woocommerce-checkout-non-pci-gateway/view/css/checkout-styles.css';
     }
 
     /**
