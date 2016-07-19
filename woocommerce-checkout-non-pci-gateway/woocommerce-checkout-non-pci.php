@@ -276,11 +276,11 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
 
             $order->update_status($request->getOrderStatus(), __("Checkout.com Charge Approved (Transaction ID - {$entityId}", 'woocommerce-checkout-non-pci'));
             $order->reduce_order_stock();
-            $woocommerce->cart->empty_cart();
 
             update_post_meta($order_id, '_transaction_id', $entityId);
 
             $_SESSION['checkout_local_payment_token'] = strtolower($paymentToken);
+            WC()->session->order_awaiting_payment = 1;
 
             return array(
                 'result'        => 'success',

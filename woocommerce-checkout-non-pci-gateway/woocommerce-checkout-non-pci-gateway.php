@@ -28,6 +28,16 @@ function checkout_non_pci_init() {
 
 /* START: Add settings link */
 add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), 'checkout_non_pci_action_links' );
+add_filter( 'woocommerce_thankyou_order_received_text', 'checkout_non_pci_thankyou' );
+
+function checkout_non_pci_thankyou($message) {
+    if (!empty($_SESSION['checkout_local_payment_order_message'])) {
+        $message = $_SESSION['checkout_local_payment_order_message'];
+        unset($_SESSION['checkout_local_payment_order_message']);
+    }
+
+    return $message;
+}
 
 function checkout_non_pci_action_links($links) {
     $plugin_links = array(

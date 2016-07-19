@@ -12,11 +12,22 @@ $paymentToken       = !empty($_GET['cko-payment-token']) ? $_GET['cko-payment-to
 $localPaymentToken  = !empty($_SESSION['checkout_local_payment_token']) ? $_SESSION['checkout_local_payment_token'] : '';
 
 if (!empty($paymentToken) && $paymentToken == $localPaymentToken) {
+    $responseCode   = $_GET['responseCode'];
     unset($_SESSION['checkout_local_payment_token']);
 
-    WC_Checkout_Non_Pci_Validator::wc_add_notice_self('Thank you for your purchase! Thanks you for completing the payment. Once we confirm the we have successfully received the payment, you will be notified by email.', 'notice');
-    wp_redirect(WC_Cart::get_checkout_url());
-    exit();
+    if ($responseCode == 10000) {
+        $order_id       = $_GET['trackId'];
+        $order          = new WC_Order($order_id);
+
+        $_SESSION['checkout_local_payment_order_message'] = 'Thank you for your purchase! Thanks you for completing the payment. Once we confirm the we have successfully received the payment, you will be notified by email.';
+
+        wp_redirect($order->get_checkout_order_received_url());
+        exit();
+    } else {
+        WC_Checkout_Non_Pci_Validator::wc_add_notice_self('Please check you card details and try again. Thank you.', 'error');
+        wp_redirect(WC_Cart::get_checkout_url());
+        exit();
+    }
 }
 
 if (empty($paymentToken) || empty($_SESSION['checkout_payment_token']) || $_SESSION['checkout_payment_token'] !== $paymentToken) {
