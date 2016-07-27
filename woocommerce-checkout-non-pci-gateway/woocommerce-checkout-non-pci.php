@@ -205,25 +205,6 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
                 'desc_tip'	=> __('A number between 0.7 and 1', 'woocommerce-checkout-non-pci'),
                 'default'	=> __('0.8', 'woocommerce-checkout-non-pci' ),
             ),
-            'show_mobile_icons' => array(
-                'title'		=> __( 'Enable / Disable', 'woocommerce-checkout-non-pci' ),
-                'label'		=> __( 'Show Mobile Icons', 'woocommerce-checkout-non-pci' ),
-                'type'		=> 'checkbox',
-                'default'	=> 'no',
-                'desc_tip'  => __('Show widget icons on mobile.', 'woocommerce-checkout-non-pci'),
-            ),
-            'widget_icon_size' => array(
-                'title'       => __('Widget Icon Size', 'woocommerce-checkout-non-pci'),
-                'type'        => 'select',
-                'class'       => 'wc-enhanced-select',
-                'default'     => 'small',
-                'desc_tip'    => true,
-                'options'     => array(
-                    'small'     => __('Small', 'woocommerce-checkout-non-pci'),
-                    'medium'    => __('Medium', 'woocommerce-checkout-non-pci'),
-                    'large'     => __('Large', 'woocommerce-checkout-non-pci'),
-                )
-            ),
             'payment_mode' => array(
                 'title'       => __('Payment Mode', 'woocommerce-checkout-non-pci'),
                 'type'        => 'select',
@@ -418,9 +399,7 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
                                 formButtonColor:        '<?php echo $this->get_option('form_button_color') ?>',
                                 formButtonColorLabel:   '<?php echo $this->get_option('form_button_color_label') ?>',
                                 overlayShade:           '<?php echo $this->get_option('overlay_shade') ?>',
-                                overlayOpacity:         '<?php echo $this->get_option('overlay_opacity') ;?>',
-                                showMobileIcons:        '<?php echo $this->get_option('show_mobile_icons') != 'no' ? 'true' : 'false'?>',
-                                widgetIconSize:         '<?php echo $this->get_option('widget_icon_size') ?>'
+                                overlayOpacity:         '<?php echo $this->get_option('overlay_opacity') ;?>'
                             },
                             cardFormMode:               '<?php echo self::CARD_FORM_MODE ?>',
                             enableIframePreloading:     false,
