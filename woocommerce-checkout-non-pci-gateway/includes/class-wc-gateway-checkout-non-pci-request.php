@@ -500,15 +500,16 @@ class WC_Checkout_Non_Pci_Request
      *
      * @param WC_Order $order
      * @param $chargeToken
+     * @param $savedCardData
      * @return array
      *
      * @version 20160323
      */
-    public function createCharge(WC_Order $order, $chargeToken) {
+    public function createCharge(WC_Order $order, $chargeToken, $savedCardData) {
         $amount     = $order->get_total();
         $Api        = CheckoutApi_Api::getApi(array('mode' => $this->_getEndpointMode()));
         $amount     = $Api->valueToDecimal($amount, $this->getOrderCurrency($order));
-        $chargeData = $this->_getChargeData($order, $chargeToken, $amount);
+        $chargeData = $this->_getChargeData($order, $chargeToken, $amount, $savedCardData);
         $result     = $Api->createCharge($chargeData);
 
         if ($Api->getExceptionState()->hasError()) {
@@ -570,11 +571,12 @@ class WC_Checkout_Non_Pci_Request
      * @param WC_Order $order
      * @param $chargeToken
      * @param $amount
+     * @param $savedCardData
      * @return mixed
      *
      * @version 20160323
      */
-    private function _getChargeData(WC_Order $order, $chargeToken, $amount) {
+    private function _getChargeData(WC_Order $order, $chargeToken, $amount, $savedCardData) {
         global $woocommerce;
         $cart = WC()->cart;
         $secretKey = $this->getSecretKey();
@@ -621,7 +623,13 @@ class WC_Checkout_Non_Pci_Request
         $config['customerName']         = $order->billing_first_name . ' ' . $order->billing_last_name;
         $config['transactionIndicator'] = WC_Checkout_Non_Pci::TRANSACTION_INDICATOR_REGULAR;
         $config['customerIp']           = $this->get_ip_address();
-        $config['cardToken']            = $chargeToken;
+
+        if (!empty($savedCardData)) {
+            $config['cardId'] = $savedCardData->card_id;
+        } else {
+            $config['cardToken'] = $chargeToken;
+        }
+
         $config['shippingDetails']  = $billingAddressConfig;
         $config['products']         = $products;
 
