@@ -242,6 +242,13 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
                     'localpayment'  => __('Local Payment', 'woocommerce-checkout-non-pci'),
                 )
             ),
+            'saved_cards' => array(
+                'title'       => __( 'Saved Cards', 'woocommerce-checkout-non-pci' ),
+                'label'       => __( 'Enable Payment via Saved Cards', 'woocommerce-checkout-non-pci' ),
+                'type'        => 'checkbox',
+                'description' => __( 'If enabled, users will be able to pay with a saved card during checkout.', 'woocommerce-checkout-non-pci' ),
+                'default'     => 'no'
+            ),
         );
     }
 
