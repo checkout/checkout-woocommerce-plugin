@@ -195,4 +195,4 @@ function checkout_non_pci_customer_cards_content() {
 
     return true;
 }
-/* END: Show customer card list */ 
+/* END: Show customer card list */
