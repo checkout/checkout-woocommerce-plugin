@@ -308,11 +308,6 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
             );
         }
 
-        if (empty($cardToken)) {
-            WC_Checkout_Non_Pci_Validator::wc_add_notice_self($this->gerProcessErrorMessage('Payment error: Please check your card data.'), 'error');
-            return;
-        }
-
         if ($savedCard !== self::PAYMENT_CARD_NEW_CARD) {
             $savedCardData = WC_Checkout_Non_Pci_Customer_Card::getCustomerCardData($savedCard, $order->user_id);
 
