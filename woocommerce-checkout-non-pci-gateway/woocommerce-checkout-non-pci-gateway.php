@@ -140,3 +140,59 @@ function checkout_non_pci_admin_notice_success() {
 
 add_action('admin_notices', 'checkout_non_pci_admin_notice_success');
 /* END: Admin messages */
+
+/* START: Create table script */
+register_activation_hook(__FILE__, 'checkout_non_pci_customer_cards_table_install');
+
+global $checkoutDbVersion;
+$checkoutDbVersion = "1.0";
+
+function checkout_non_pci_customer_cards_table_install() {
+    global $wpdb;
+    global $checkoutDbVersion;
+
+    $tableName = $wpdb->prefix . "checkout_customer_cards";
+
+    if($wpdb->get_var("show tables like '$tableName'") != $tableName) {
+        $sql = "CREATE TABLE {$tableName} (
+	        `entity_id` INT(10) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'ID',
+	        `customer_id` INT(11) NOT NULL COMMENT 'Customer ID from Woo',
+	        `card_id` VARCHAR(100) NOT NULL COMMENT 'Card ID from Checkout API',
+	        `card_number` VARCHAR(4) NOT NULL COMMENT 'Short Customer Credit Card Number',
+	        `card_type` VARCHAR(20) NOT NULL COMMENT 'Credit Card Type',
+	        PRIMARY KEY (`entity_id`),
+	        UNIQUE INDEX `UNQ_CHECKOUT_CUSTOMER_CARDS_CUSTOMER_ID_CARD_ID_CARD_TYPE` (`customer_id`, `card_id`, `card_type`)
+	    )
+        COMMENT='Table for store data about customer card id from Checkout.com'
+        COLLATE='utf8_general_ci'
+        ENGINE=InnoDB
+        AUTO_INCREMENT=3
+	    ;";
+
+        require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+        dbDelta($sql);
+
+        add_option('checkoutDbVersion', $checkoutDbVersion);
+    }
+}
+/* END: Create table script */
+
+/* START: Show customer card list */
+add_action('woocommerce_after_my_account', 'checkout_non_pci_customer_cards_content');
+
+function checkout_non_pci_customer_cards_content() {
+    include_once('includes/class-wc-gateway-checkout-non-pci-customer-card.php');
+
+    $result = false;
+
+    if (!is_user_logged_in()) {
+        return $result;
+    }
+
+    $result = WC_Checkout_Non_Pci_Customer_Card::getCustomerCardListHtml(get_current_user_id());
+
+    echo $result;
+
+    return true;
+}
+/* END: Show customer card list */ 
