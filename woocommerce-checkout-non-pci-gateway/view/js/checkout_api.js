@@ -1,4 +1,5 @@
 jQuery(document).ready(function() {
+    var _cko = window.CKOMagento = window.CKOMagento || {};
     setTimeout(function(){
         if (window.hasOwnProperty('CheckoutApiJsConfig') && typeof Checkout != 'undefined') {
             Checkout.render(window.CheckoutApiJsConfig);
@@ -7,40 +8,49 @@ jQuery(document).ready(function() {
         }
 
         jQuery(document).ready(function() {
-            jQuery('form.checkout').bind('#place_order, checkout_place_order', function (e) {
-                if(jQuery('input[name=payment_method]:checked').val() != 'woocommerce_checkout_non_pci' || document.getElementById('cko-card-token').value.length > 0){
-                    return true;
-                }
 
-                return false;
-            });
+            createBindings();
 
-            jQuery('form#order_review').bind('#place_order, checkout_place_order', function (e) {
-                if(jQuery('input[name=payment_method]:checked').val() != 'woocommerce_checkout_non_pci' || document.getElementById('cko-card-token').value.length > 0){
-                    return true;
-                }
-
-                return false;
-            });
-
-            jQuery('#place_order').on('click', function(e){
-                if(jQuery('input[name=payment_method]:checked').val() != 'woocommerce_checkout_non_pci' || document.getElementById('cko-card-token').value.length > 0){
-                    return true;
-                }
-
-                if (isValidFormField(window.checkoutFields)) {
-                    Checkout.setCustomerEmail(document.getElementById('billing_email').value);
-                    Checkout.setCustomerName(document.getElementById('billing_first_name').value + ' ' + document.getElementById('billing_last_name').value);
-
-                    if (Checkout.isMobile()) {
-                        jQuery('#checkout-api-js-hover').show();
+            function createBindings() {
+                jQuery('form.checkout').bind('#place_order, checkout_place_order', function (e) {
+                    if(jQuery('input[name=payment_method]:checked').val() != 'woocommerce_checkout_non_pci' || document.getElementById('cko-card-token').value.length > 0){
+                        return true;
                     }
 
-                    Checkout.open();
-                }
+                    return false;
+                });
 
-                return false;
-            });
+                jQuery('form#order_review').bind('#place_order, checkout_place_order', function (e) {
+                    if(jQuery('input[name=payment_method]:checked').val() != 'woocommerce_checkout_non_pci' || document.getElementById('cko-card-token').value.length > 0){
+                        return true;
+                    }
+
+                    return false;
+                });
+
+                jQuery('#place_order').on('click', function(e){
+                    if(jQuery('input[name=payment_method]:checked').val() != 'woocommerce_checkout_non_pci' || document.getElementById('cko-card-token').value.length > 0){
+                        return true;
+                    }
+
+                    if (isValidFormField(window.checkoutFields)) {
+                        Checkout.setCustomerEmail(document.getElementById('billing_email').value);
+                        Checkout.setCustomerName(document.getElementById('billing_first_name').value + ' ' + document.getElementById('billing_last_name').value);
+
+                        if (Checkout.isMobile()) {
+                            jQuery('#checkout-api-js-hover').show();
+                        }
+
+                        Checkout.open();
+                    }
+
+                    return false;
+                });
+            }
+
+            // Make createBindings function public so it can be called when user
+            // decides to add a new card again after choosing to use saved card
+            _cko.createBindings = createBindings;
 
             function isValidFormField(fieldList) {
                 var result = {error: false, messages: []};
