@@ -33,7 +33,7 @@ class WC_Checkout_Pci_Web_Hook extends WC_Checkout_Pci_Request
         $responseStatus = $response->message->status;
 
         // transactionIndicator available only in Auth webhook
-        if ($transactionIndicator == 2) {
+        if ($transactionIndicator == 2 && !is_null($previousRecurringDate)) {
             if(preg_match('/^1[0-9]+$/', $responseCode) && $responseStatus == 'Authorised' || $responseStatus == 'flagged' ){
                 $recurringCountLeft = $response->message->customerPaymentPlans[0]->recurringCountLeft;
                 if($recurringCountLeft == 0){
@@ -55,6 +55,45 @@ class WC_Checkout_Pci_Web_Hook extends WC_Checkout_Pci_Request
         return true;
     }
 
+    /**
+     * Fail order from web hook
+     *
+     * @param WC_Order $response
+     * @return bool
+     *
+     * @version 20160902
+     */
+    public function failOrder($response){
+        $orderId        = (string)$response->message->trackId;
+
+        $order = new WC_Order($orderId);
+
+        if(empty($order->post)){
+            WC_Checkout_Non_Pci::log('Missing order id : '.$orderId);
+            WC_Checkout_Non_Pci::log($response);
+            return false;
+        }
+
+        $transactionId  = (string)$response->message->id;
+        $transactionIndicator = $response->message->transactionIndicator;
+        $responseCode = $response->message->responseCode;
+        $responseStatus = $response->message->status;
+        $responseMessage = $response->message->responseMessage;
+
+
+        if ($transactionIndicator == 2) {
+
+            $message = 'Webhook received, subscription payment for initial OrderID: ' . $orderId. '. Charge Status :'.$responseStatus.'. Charge ID: '.$transactionId. '. ResponseCode : '.$responseCode.
+             ' Response message :'.$responseMessage;
+
+            $order->add_order_note(__($message, 'woocommerce-subscriptions'));
+            WC_Subscriptions_Manager::process_subscription_payment_failure_on_order($order);
+
+        }
+
+        return true;
+
+    }
 
     /**
      * Capture order from web hook
