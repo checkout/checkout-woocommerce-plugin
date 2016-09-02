@@ -177,8 +177,7 @@ class WC_Checkout_Non_Pci_Web_Hook extends WC_Checkout_Non_Pci_Request
 
         $amountDecimal          = $response->message->value;
         $Api                    = CheckoutApi_Api::getApi(array('mode' => $this->_getEndpointMode()));
-        $modelRequest           = new WC_Checkout_Non_Pci_Request();
-        $amount                 = $Api->decimalToValue($amountDecimal, $modelRequest->getOrderCurrency($order));
+        $amount                 = $Api->decimalToValue($amountDecimal, $this->getOrderCurrency($order));
 
         wc_create_refund(array(
             'amount'    => $amount,
