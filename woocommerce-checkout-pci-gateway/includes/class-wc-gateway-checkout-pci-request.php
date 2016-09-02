@@ -170,7 +170,7 @@ class WC_Checkout_Pci_Request
                     'value' => $recurringAmount,
                     'cycle' => $interval . '' . $intervalType,
                     'recurringCount' => $recurringCount,
-                    'autoCapTime' => WC_Checkout_Non_Pci::AUTO_CAPTURE_TIME,
+                    'autoCapTime' => WC_Checkout_Pci::AUTO_CAPTURE_TIME,
                     'startDate' => $recurringStartDate //Next day of initial payment
                 ));
             }
