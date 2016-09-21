@@ -74,6 +74,9 @@ switch ($eventType) {
     case WC_Checkout_Non_Pci_Web_Hook::EVENT_TYPE_CHARGE_SUCCEEDED:
         $result = $webHook->authorisedOrder($data);
         break;
+    case WC_Checkout_Non_Pci_Web_Hook::EVENT_TYPE_CHARGE_FAILED:
+        $result = $webHook->failOrder($data);
+        break;
     default:
         http_response_code(500);
         return;
