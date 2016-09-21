@@ -14,11 +14,11 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
     const PAYMENT_ACTION_CAPTURE    = 'authorize_capture';
     const AUTO_CAPTURE_TIME         = 0;
     const RENDER_MODE               = 2;
-    const VERSION                   = '2.3.1';
+    const VERSION                   = '2.3.2';
     const RENDER_NAMESPACE          = 'Checkout';
     const CARD_FORM_MODE            = 'cardTokenisation';
-    const JS_PATH_CARD_TOKEN        = 'https://cdn3.checkout.com/sandbox/js/checkout.js';
-    const JS_PATH_CARD_TOKEN_LIVE   = 'https://cdn3.checkout.com/js/checkout.js';
+    const JS_PATH_CARD_TOKEN        = 'https://cdn.checkout.com/sandbox/js/checkout.js';
+    const JS_PATH_CARD_TOKEN_LIVE   = 'https://cdn.checkout.com/js/checkout.js';
 
     const TRANSACTION_INDICATOR_REGULAR = 1;
 
