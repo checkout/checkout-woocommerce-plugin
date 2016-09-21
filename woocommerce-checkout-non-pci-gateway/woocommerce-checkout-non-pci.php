@@ -12,6 +12,7 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
     const PAYMENT_METHOD_CODE       = 'woocommerce_checkout_non_pci';
     const PAYMENT_ACTION_AUTHORIZE  = 'authorize';
     const PAYMENT_ACTION_CAPTURE    = 'authorize_capture';
+    const PAYMENT_CARD_NEW_CARD     = 'new_card';
     const AUTO_CAPTURE_TIME         = 0;
     const RENDER_MODE               = 2;
     const VERSION                   = '2.3.2';
@@ -53,6 +54,9 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
         foreach ( $this->settings as $setting_key => $value ) {
             $this->$setting_key = $value;
         }
+
+        // Check if saved cards is enabled from backend
+        $this->saved_cards = $this->get_option( 'saved_cards' ) === "yes" ? true : false;
 
         // Save settings
         if (is_admin()) {
@@ -242,6 +246,13 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
                     'localpayment'  => __('Local Payment', 'woocommerce-checkout-non-pci'),
                 )
             ),
+            'saved_cards' => array(
+                'title'       => __( 'Saved Cards', 'woocommerce-checkout-non-pci' ),
+                'label'       => __( 'Enable Payment via Saved Cards', 'woocommerce-checkout-non-pci' ),
+                'type'        => 'checkbox',
+                'description' => __( 'If enabled, users will be able to pay with a saved card during checkout.', 'woocommerce-checkout-non-pci' ),
+                'default'     => 'no'
+            ),
         );
     }
 
@@ -256,6 +267,7 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
     public function process_payment($order_id) {
         include_once( 'includes/class-wc-gateway-checkout-non-pci-request.php');
         include_once( 'includes/class-wc-gateway-checkout-non-pci-validator.php');
+        include_once( 'includes/class-wc-gateway-checkout-non-pci-customer-card.php');
 
         global $woocommerce;
 
@@ -264,6 +276,9 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
         $cardToken      = !empty($_POST["{$request->gateway->id}-card-token"]) ? $_POST["{$request->gateway->id}-card-token"] : '';
         $lpRedirectUrl  = !empty($_POST["{$request->gateway->id}-lp-redirect-url"]) ? $_POST["{$request->gateway->id}-lp-redirect-url"] : NULL;
         $lpName         = !empty($_POST["{$request->gateway->id}-lp-name"]) ? $_POST["{$request->gateway->id}-lp-name"] : NULL;
+        $savedCardData  = array();
+        $savedCard      = !empty($_POST["{$request->gateway->id}-saved-card"]) ? $_POST["{$request->gateway->id}-saved-card"] : '';
+
 
         if (!is_null($lpRedirectUrl) && !is_null($lpName)) {
             $parts = parse_url($lpRedirectUrl);
@@ -293,12 +308,20 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
             );
         }
 
-        if (empty($cardToken)) {
+        if ($savedCard !== self::PAYMENT_CARD_NEW_CARD) {
+            $savedCardData = WC_Checkout_Non_Pci_Customer_Card::getCustomerCardData($savedCard, $order->user_id);
+
+            if (!$savedCardData) {
+                WC_Checkout_Non_Pci_Validator::wc_add_notice_self('Payment error: Please check your card data.', 'error' );
+                return;
+            }
+        }
+        else if (empty($cardToken)) {
             WC_Checkout_Non_Pci_Validator::wc_add_notice_self($this->gerProcessErrorMessage('Payment error: Please check your card data.'), 'error');
             return;
         }
 
-        $result = $request->createCharge($order, $cardToken);
+        $result = $request->createCharge($order, $cardToken, $savedCardData);
 
         if (!empty($result['error'])) {
             WC_Checkout_Non_Pci_Validator::wc_add_notice_self($this->gerProcessErrorMessage($result['error']), 'error');
@@ -322,6 +345,10 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
         $order->update_status($request->getOrderStatus(), __("Checkout.com Charge Approved (Transaction ID - {$entityId}", 'woocommerce-checkout-non-pci'));
         $order->reduce_order_stock();
         $woocommerce->cart->empty_cart();
+
+        if (is_user_logged_in() && $this->saved_cards) {
+            WC_Checkout_Non_Pci_Customer_Card::saveCard($result, $order->user_id);
+        }
 
         return array(
             'result'        => 'success',
@@ -351,6 +378,7 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
      */
     public function credit_card_form($args = array(), $fields = array()) {
         include_once( 'includes/class-wc-gateway-checkout-non-pci-request.php');
+        include_once( 'includes/class-wc-gateway-checkout-non-pci-customer-card.php');
         global $woocommerce;
 
         wp_enqueue_script( 'wc-credit-card-form' );
@@ -391,9 +419,31 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
         $requestModel   = new WC_Checkout_Non_Pci_Request($this);
         $paymentToken   = $requestModel->createPaymentToken($orderTotal, get_woocommerce_currency());
         $checkoutFields = !$isPayOrder ? json_encode($woocommerce->checkout->checkout_fields,JSON_HEX_APOS) : json_encode(array());
+        $cardList = (is_user_logged_in() && $this->saved_cards) ? WC_Checkout_Non_Pci_Customer_Card::getCustomerCardList(get_current_user_id()) : array();
         ?>
         <fieldset id="<?php echo $this->id; ?>-cc-form">
             <?php do_action( 'woocommerce_credit_card_form_start', $this->id ); ?>
+            <?php if(!empty($cardList)): ?>
+                <ul class="wc_payment_methods payment_methods">
+                    <?php foreach($cardList as $index => $card):?>
+                        <li>
+                            <p>
+                                <input id="checkout-saved-card-<?php echo $index?>" class="checkout-saved-card-radio" type="radio" name="<?php echo $this->id . '-saved-card'?>" value="<?php echo md5($card->entity_id . '_' . $card->card_number . '_' . $card->card_type)?>"/>
+                                <label for="checkout-saved-card-<?php echo $index?>"><?php echo sprintf('xxxx-%s', $card->card_number) . ' ' . $card->card_type?></label>
+                            </p>
+                        </li>
+                    <?php endforeach?>
+                    <li>
+                        <p>
+                            <input id="checkout-new-card" class="checkout-new-card-radio" type="radio" name="<?php echo $this->id . '-saved-card'?>" value="<?php echo self::PAYMENT_CARD_NEW_CARD?>"/>
+                            <label for="checkout-new-card"><?php echo __('Use New Card', 'woocommerce') ?></label>
+                        </p>
+                    </li>
+                </ul>
+            <?php else:?>
+                <input id="checkout-new-card" class="checkout-new-card-input" type="hidden" name="<?php echo $this->id . '-saved-card'?>" value="<?php echo self::PAYMENT_CARD_NEW_CARD?>"/>
+            <?php endif?>
+            <p class="form-row form-row-wide checkout-non-pci-new-card-row">
                 <?php if(!empty($paymentToken)):?>
                     <?php if($isPayOrder):?>
                         <input type="hidden" id="billing_email" value="<?php echo $billingEmail?>"/>
@@ -413,7 +463,7 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
                             paymentToken:               '<?php echo $paymentToken['token'] ?>',
                             value:                      '<?php echo $paymentToken['amount'] ?>',
                             currency:                   '<?php echo $paymentToken['currency'] ?>',
-                            widgetContainerSelector:    '#<?php echo $this->id ?>-cc-form',
+                            widgetContainerSelector:    '.checkout-non-pci-new-card-row',
                             paymentMode:                '<?php echo $this->get_option('payment_mode') ?>',
                             logoUrl:                    '<?php echo $this->get_option('icon_url') ?>',
                             themeColor:                 '<?php echo $this->get_option('theme_color') ?>',
@@ -463,9 +513,35 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
                 <?php else:?>
                     <p><?php echo __('Error creating Payment Token.', 'woocommerce-checkout-non-pci')?></p>
                 <?php endif?>
+            </p>
 			<?php do_action( 'woocommerce_credit_card_form_end', $this->id ); ?>
             <div class="clear"></div>
         </fieldset>
+        <?php if(!empty($cardList)): ?>
+            <script type="application/javascript">
+                checkoutHideNewNoPciCard();
+
+                function checkoutHideNewNoPciCard() {
+                    jQuery('.checkout-non-pci-new-card-row').hide();
+                    jQuery('form.checkout').unbind();
+                    jQuery('form#order_review').unbind();
+                    jQuery('#place_order').unbind();
+                }
+
+                function checkoutShowNewNoPciCard() {
+                    jQuery('.checkout-non-pci-new-card-row').show();
+                    CKOMagento.createBindings();
+                }
+
+                jQuery('.checkout-saved-card-radio').on("change", function() {
+                    checkoutHideNewNoPciCard();
+                });
+
+                jQuery('.checkout-new-card-radio').on("change", function() {
+                    checkoutShowNewNoPciCard();
+                });
+            </script>
+        <?php endif?>
         <?php
     }
 
