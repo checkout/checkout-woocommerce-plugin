@@ -3,7 +3,7 @@
 Plugin Name: Checkout Non PCI - WooCommerce Gateway
 Plugin URI: https://www.checkout.com/
 Description: Extends WooCommerce by Adding the Checkout Non PCI Gateway.
-Version: 1.0.0
+Version: 2.3.2
 Author: Checkout.com
 Author URI: https://www.checkout.com/
 */
