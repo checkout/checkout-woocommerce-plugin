@@ -523,9 +523,6 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
 
                 function checkoutHideNewNoPciCard() {
                     jQuery('.checkout-non-pci-new-card-row').hide();
-                    jQuery('form.checkout').unbind();
-                    jQuery('form#order_review').unbind();
-                    jQuery('#place_order').unbind();
                 }
 
                 function checkoutShowNewNoPciCard() {
@@ -534,6 +531,9 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
                 }
 
                 jQuery('.checkout-saved-card-radio').on("change", function() {
+                    jQuery('form.checkout').unbind();
+                    jQuery('form#order_review').unbind();
+                    jQuery('#place_order').unbind();
                     checkoutHideNewNoPciCard();
                 });
 
