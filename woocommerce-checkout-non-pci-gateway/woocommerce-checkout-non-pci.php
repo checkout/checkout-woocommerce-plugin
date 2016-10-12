@@ -15,7 +15,7 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
     const PAYMENT_CARD_NEW_CARD     = 'new_card';
     const AUTO_CAPTURE_TIME         = 0;
     const RENDER_MODE               = 2;
-    const VERSION                   = '2.3.2';
+    const VERSION                   = '2.3.3';
     const RENDER_NAMESPACE          = 'Checkout';
     const CARD_FORM_MODE            = 'cardTokenisation';
     const JS_PATH_CARD_TOKEN        = 'https://cdn.checkout.com/sandbox/js/checkout.js';
@@ -523,9 +523,6 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
 
                 function checkoutHideNewNoPciCard() {
                     jQuery('.checkout-non-pci-new-card-row').hide();
-                    jQuery('form.checkout').unbind();
-                    jQuery('form#order_review').unbind();
-                    jQuery('#place_order').unbind();
                 }
 
                 function checkoutShowNewNoPciCard() {
@@ -534,6 +531,9 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
                 }
 
                 jQuery('.checkout-saved-card-radio').on("change", function() {
+                    jQuery('form.checkout').unbind();
+                    jQuery('form#order_review').unbind();
+                    jQuery('#place_order').unbind();
                     checkoutHideNewNoPciCard();
                 });
 
