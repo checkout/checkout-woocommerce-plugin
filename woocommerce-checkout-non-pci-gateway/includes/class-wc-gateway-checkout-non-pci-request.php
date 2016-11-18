@@ -439,7 +439,7 @@ class WC_Checkout_Non_Pci_Request
      *
      * @version 20160322
      */
-    public function createPaymentToken($amount, $currency) {
+    public function createPaymentToken($amount, $currency) { 
         $Api            = CheckoutApi_Api::getApi(array('mode' => $this->_getEndpointMode()));
         $amount         = $Api->valueToDecimal($amount, $currency);;
         $autoCapture    = $this->_isAutoCapture();
@@ -484,7 +484,7 @@ class WC_Checkout_Non_Pci_Request
             WC_Checkout_Non_Pci::log($Api->getExceptionState());
 
             return $result;
-        }
+        } 
 
         $result = array(
             'token'     => $paymentTokenCharge->getId(),
@@ -505,11 +505,13 @@ class WC_Checkout_Non_Pci_Request
      *
      * @version 20160323
      */
-    public function createCharge(WC_Order $order, $chargeToken, $savedCardData) {
+    public function createCharge(WC_Order $order, $chargeToken, $savedCardData) { 
+
         $amount     = $order->get_total();
         $Api        = CheckoutApi_Api::getApi(array('mode' => $this->_getEndpointMode()));
         $amount     = $Api->valueToDecimal($amount, $this->getOrderCurrency($order));
         $chargeData = $this->_getChargeData($order, $chargeToken, $amount, $savedCardData);
+
         $result     = $Api->createCharge($chargeData);
 
         if ($Api->getExceptionState()->hasError()) {
@@ -524,7 +526,6 @@ class WC_Checkout_Non_Pci_Request
 
         if (!$result->isValid() || !WC_Checkout_Non_Pci_Validator::responseValidation($result)) {
             $errorMessage = "Please check you card details and try again. Thank you. Response Code - {$result->getResponseCode()}";
-
             WC_Checkout_Non_Pci::log($errorMessage);
             return array('error' => $errorMessage);
         }
@@ -576,11 +577,11 @@ class WC_Checkout_Non_Pci_Request
      *
      * @version 20160323
      */
-    private function _getChargeData(WC_Order $order, $chargeToken, $amount, $savedCardData) {
+    private function _getChargeData(WC_Order $order, $chargeToken, $amount, $savedCardData) { 
         global $woocommerce;
         $cart = WC()->cart;
-        $secretKey = $this->getSecretKey();
 
+        $secretKey = $this->getSecretKey();
         $Api        = CheckoutApi_Api::getApi(array('mode' => $this->_getEndpointMode()));
         $config         = array();
         $autoCapture    = $this->_isAutoCapture();
@@ -680,6 +681,28 @@ class WC_Checkout_Non_Pci_Request
         $intervalType = WC_Subscriptions_Cart::get_cart_subscription_period();
         $interval = WC_Subscriptions_Cart::get_cart_subscription_interval();
         $subscriptionLength = WC_Subscriptions_Cart::get_cart_subscription_length();
+
+        if($subscriptionLength == 0){
+            switch($intervalType)
+            {
+                case 'month';
+                    $subscriptionLength = 83;
+                    break;
+
+                case 'day';
+                    $subscriptionLength = 6993;
+                    break;
+
+                case 'week';
+                     $subscriptionLength = 999;
+                     break;
+
+                case 'year';
+                     $subscriptionLength = 19;
+                     break;
+            }
+        }
+
         $recurringCount = $subscriptionLength - 1;
         // Get trial Info
         $trialLength = WC_Subscriptions_Cart::get_cart_subscription_trial_length();
