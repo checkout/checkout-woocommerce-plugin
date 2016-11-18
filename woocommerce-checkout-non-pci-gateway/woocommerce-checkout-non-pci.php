@@ -423,11 +423,18 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
         $amount     = $order->get_total();
         $mode       =  $checkout->settings['mode'];
         $hppUrl     = $mode == 'sandbox' ? self::HOSTED_URL_SANDOX : self::HOSTED_URL_LIVE;
+        $paymentMode = $checkout->settings['payment_mode'];
+
+        if (class_exists('WC_Subscriptions_Order')) {
+            if(WC_Subscriptions_Cart::cart_contains_subscription()){
+                $paymentMode = 'cards';
+            }
+        }
 
         $Api            = CheckoutApi_Api::getApi(array('mode' => $mode));
         $orderTotal     = $Api->valueToDecimal($amount, get_woocommerce_currency());
         $requestModel   = new WC_Checkout_Non_Pci_Request($this);
-        $paymentToken   = $requestModel->createPaymentToken($orderTotal, get_woocommerce_currency());
+        $paymentToken   = $requestModel->createPaymentToken($amount, get_woocommerce_currency());
         $redirectUrl    = get_home_url(). self::REDIRECTION_URL;
         $imageUrl       = get_home_url().'/wp-content/plugins/woocommerce-checkout-non-pci-gateway/view/image/load.gif';
 
@@ -451,7 +458,7 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
         echo '<input name="value" value="'.$orderTotal.'"/>';
         echo '<input name="currency" value="'.get_woocommerce_currency().'"/>';
         echo '<input name="cardFormMode" value="'.self::CARD_FORM_MODE.'"/></input>';
-        echo '<input name="paymentMode" value="'.$checkout->settings["payment_mode"].'"/>';
+        echo '<input name="paymentMode" value="'.$paymentMode.'"/>';
         echo '<input name="environment" value="'.$checkout->settings["mode"].'"/>';
         echo '<input name="redirectUrl" value="'.$redirectUrl.'"/>';
         echo '<input name="cancelUrl" value="'.$redirectUrl.'"/>';
@@ -514,6 +521,12 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
         }
 
         $paymentMode = $this->get_option('payment_mode');
+
+        if (class_exists('WC_Subscriptions_Order')) {
+              if(WC_Subscriptions_Cart::cart_contains_subscription()){
+                $paymentMode = 'cards';
+              }
+        }
 
         $isHosted = $this->get_option('is_hosted');
         $redirectUrl = get_home_url(). self::REDIRECTION_URL;
