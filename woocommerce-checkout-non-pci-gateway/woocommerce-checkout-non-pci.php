@@ -407,7 +407,8 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
 
     public function callback(){
         include_once( 'includes/class-wc-gateway-checkout-non-pci-request.php');
-
+        include_once('includes/class-wc-gateway-checkout-non-pci-validator.php');
+        
         global $woocommerce;
         $orderId    = $woocommerce->session->order_awaiting_payment;
 
