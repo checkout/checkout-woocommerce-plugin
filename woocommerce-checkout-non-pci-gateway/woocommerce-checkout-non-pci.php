@@ -15,12 +15,14 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
     const PAYMENT_CARD_NEW_CARD     = 'new_card';
     const AUTO_CAPTURE_TIME         = 0;
     const RENDER_MODE               = 2;
-    const VERSION                   = '2.3.3';
+    const VERSION                   = '2.4.0';
     const RENDER_NAMESPACE          = 'Checkout';
     const CARD_FORM_MODE            = 'cardTokenisation';
     const JS_PATH_CARD_TOKEN        = 'https://cdn.checkout.com/sandbox/js/checkout.js';
-    const JS_PATH_CARD_TOKEN_LIVE   = 'https://cdn.checkout.com/js/checkout.js';
-
+    const JS_PATH_CARD_TOKEN_LIVE   = 'https://cdn1.checkout.com/js/checkout.js';
+    const REDIRECTION_URL           = '/wp-content/plugins/woocommerce-checkout-non-pci-gateway/controllers/api/3dsecure.php';
+    const HOSTED_URL_SANDOX         = 'https://secure.checkout.com/sandbox/payment/';
+    const HOSTED_URL_LIVE         = 'https://secure.checkout.com/payment/';
     const TRANSACTION_INDICATOR_REGULAR = 1;
 
     public static $log = false;
@@ -62,6 +64,11 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
         if (is_admin()) {
             add_action('woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'process_admin_options'));
         }
+
+        $this->notify_url        = str_replace( 'https:', 'http:', add_query_arg( 'wc-api', 'WC_Checkout_Non_Pci', home_url( '/' ) ) );
+        // Payment listener/API hook
+        add_action( 'woocommerce_api_wc_checkout_non_pci', array( $this, 'callback' ) );
+
     }
 
     /**
@@ -242,7 +249,7 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
                 'desc_tip'    => 'Customise the payment mode: mixed , card, localpayment.',
                 'options'     => array(
                     'mixed'         => __('Mixed', 'woocommerce-checkout-non-pci'),
-                    'card'          => __('Card', 'woocommerce-checkout-non-pci'),
+                    'cards'          => __('Cards', 'woocommerce-checkout-non-pci'),
                     'localpayment'  => __('Local Payment', 'woocommerce-checkout-non-pci'),
                 )
             ),
@@ -253,8 +260,17 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
                 'description' => __( 'If enabled, users will be able to pay with a saved card during checkout.', 'woocommerce-checkout-non-pci' ),
                 'default'     => 'no'
             ),
+            'is_hosted' => array(
+                'title'       => __( 'Hosted solution', 'woocommerce-checkout-non-pci' ),
+                'label'       => __( 'Enable Hosted Js solution', 'woocommerce-checkout-non-pci' ),
+                'type'        => 'checkbox',
+                'description' => __( 'If enabled, users will be redirected to checkout.com hosted payment page to complete the payment.', 'woocommerce-checkout-non-pci' ),
+                'default'     => 'no'
+            ),
         );
     }
+
+
 
     /**
      * Create Charge on Checkout.com
@@ -279,6 +295,26 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
         $savedCardData  = array();
         $savedCard      = !empty($_POST["{$request->gateway->id}-saved-card"]) ? $_POST["{$request->gateway->id}-saved-card"] : '';
 
+        $mobileRedirectUrl  = !empty($_POST["{$request->gateway->id}-mobile-redirectUrl"]) ? $_POST["{$request->gateway->id}-mobile-redirectUrl"] : NULL;
+
+
+        $isHosted = $this->get_option('is_hosted');
+
+        if($isHosted == 'yes' && $savedCard == self::PAYMENT_CARD_NEW_CARD){
+
+            return array(
+                'result'        => 'success',
+                'redirect'      => $this->notify_url
+            );
+
+        }
+
+        if(!is_null($mobileRedirectUrl) && $savedCard == self::PAYMENT_CARD_NEW_CARD){ 
+            return array(
+                'result'        => 'success',
+                'redirect'      => $mobileRedirectUrl.'&customerEmail='.$_POST['billing_email'].'&contextId='.$order_id,
+            );
+        }
 
         if (!is_null($lpRedirectUrl) && !is_null($lpName)) {
             $parts = parse_url($lpRedirectUrl);
@@ -369,6 +405,75 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
         $this->credit_card_form();
     }
 
+    public function callback(){
+        include_once( 'includes/class-wc-gateway-checkout-non-pci-request.php');
+        include_once('includes/class-wc-gateway-checkout-non-pci-validator.php');
+        
+        global $woocommerce;
+        $orderId    = $woocommerce->session->order_awaiting_payment;
+
+        if (empty($orderId)) {
+            WC_Checkout_Non_Pci::log('Empty OrderId');
+            WC_Checkout_Non_Pci_Validator::wc_add_notice_self('An error has occured while processing your transaction.', 'error');
+            wp_redirect(WC_Cart::get_checkout_url());
+            exit();
+        }
+
+        $order      = new WC_Order( $orderId );
+        $checkout   = new WC_Checkout_Non_Pci();
+        $amount     = $order->get_total();
+        $mode       =  $checkout->settings['mode'];
+        $hppUrl     = $mode == 'sandbox' ? self::HOSTED_URL_SANDOX : self::HOSTED_URL_LIVE;
+        $paymentMode = $checkout->settings['payment_mode'];
+
+        if (class_exists('WC_Subscriptions_Order')) {
+            if(WC_Subscriptions_Cart::cart_contains_subscription()){
+                $paymentMode = 'cards';
+            }
+        }
+
+        $Api            = CheckoutApi_Api::getApi(array('mode' => $mode));
+        $orderTotal     = $Api->valueToDecimal($amount, get_woocommerce_currency());
+        $requestModel   = new WC_Checkout_Non_Pci_Request($this);
+        $paymentToken   = $requestModel->createPaymentToken($amount, get_woocommerce_currency());
+        $redirectUrl    = get_home_url(). self::REDIRECTION_URL;
+        $imageUrl       = get_home_url().'/wp-content/plugins/woocommerce-checkout-non-pci-gateway/view/image/load.gif';
+
+        $billingDetails = array (
+            'addressLine1'  => $order->billing_address_1,
+            'addressLine2'  => $order->billing_address_2,
+            'postcode'      => $order->billing_postcode,
+            'country'       => $order->billing_country,
+            'city'          => $order->billing_city,
+            'state'         => $order->billing_state,
+            'phone'         => array('number' => $order->billing_phone)
+        );
+       
+        echo '<p><center>You will be redirected to the payment gateway.</center></p>';
+        echo '<p><center><img src="'.$imageUrl.'" /></center></p>';
+
+        echo'<form id="payment-form" style="display:none" action="'.$hppUrl.'" method="POST">';
+        echo '<input name="publicKey" value="'.$checkout->settings["public_key"].'"/>';
+        echo '<input name="paymentToken" value="'.$paymentToken["token"].'"/>';
+        echo '<input name="customerEmail" value="'.$order->billing_email.'"/>';
+        echo '<input name="value" value="'.$orderTotal.'"/>';
+        echo '<input name="currency" value="'.get_woocommerce_currency().'"/>';
+        echo '<input name="cardFormMode" value="'.self::CARD_FORM_MODE.'"/></input>';
+        echo '<input name="paymentMode" value="'.$paymentMode.'"/>';
+        echo '<input name="environment" value="'.$checkout->settings["mode"].'"/>';
+        echo '<input name="redirectUrl" value="'.$redirectUrl.'"/>';
+        echo '<input name="cancelUrl" value="'.$redirectUrl.'"/>';
+        echo '<input name="contextId" id="contextId" value="'.$orderId.'"/>';
+        echo '<input name="billingDetails" id="billingDetails" value="'.$billingDetails.'"/>';
+        echo'</form>';
+
+        echo'<script>';
+        echo'document.getElementById("payment-form").submit()';
+        echo'</script>';
+
+        exit();
+    }
+
     /**
      * Custom credit card form
      *
@@ -416,6 +521,16 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
             $orderTotal = $woocommerce->cart->total;
         }
 
+        $paymentMode = $this->get_option('payment_mode');
+
+        if (class_exists('WC_Subscriptions_Order')) {
+              if(WC_Subscriptions_Cart::cart_contains_subscription()){
+                $paymentMode = 'cards';
+              }
+        }
+
+        $isHosted = $this->get_option('is_hosted');
+        $redirectUrl = get_home_url(). self::REDIRECTION_URL;
         $requestModel   = new WC_Checkout_Non_Pci_Request($this);
         $paymentToken   = $requestModel->createPaymentToken($orderTotal, get_woocommerce_currency());
         $checkoutFields = !$isPayOrder ? json_encode($woocommerce->checkout->checkout_fields,JSON_HEX_APOS) : json_encode(array());
@@ -450,7 +565,11 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
                         <input type="hidden" id="billing_first_name" value="<?php echo $customerName?>"/>
                         <input type="hidden" id="billing_last_name" value="<?php echo $customerLastName?>"/>
                     <?php endif?>
+                    <input type="hidden" id="cko-hosted-url" name="<?php echo esc_attr( $this->id ) ?>-hosted-url" value="<?php echo $isHosted ?>"/>
                     <input type="hidden" id="cko-card-token" name="<?php echo esc_attr( $this->id ) ?>-card-token" value=""/>
+                    <input type="hidden" id="cko-is-mobile" name="<?php echo esc_attr( $this->id ) ?>-is-mobile" value=""/>
+                    <input type="hidden" id="cko-mobile-redirectUrl" name="<?php echo esc_attr( $this->id ) ?>-mobile-redirectUrl" value=""/>
+                    <input type="hidden" id="cko-inv-redirectUrl" name="cko-inv-redirectUrl" value=""/>
                     <input type="hidden" id="cko-lp-redirectUrl" name="<?php echo esc_attr( $this->id ) ?>-lp-redirect-url" value=""/>
                     <input type="hidden" id="cko-lp-lpName" name="<?php echo esc_attr( $this->id ) ?>-lp-name" value=""/>
                     <div id="checkout-api-js-hover" style="display: none; z-index: 100; position: fixed; width: 100%; height: 100%; top: 0;left: 0; background-color: <?php echo $this->get_option('overlay_shade') === 'dark' ? '#000' : '#fff' ?>; opacity:<?php echo $this->get_option('overlay_opacity') ?>;"></div>
@@ -464,12 +583,14 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
                             value:                      '<?php echo $paymentToken['amount'] ?>',
                             currency:                   '<?php echo $paymentToken['currency'] ?>',
                             widgetContainerSelector:    '.checkout-non-pci-new-card-row',
-                            paymentMode:                '<?php echo $this->get_option('payment_mode') ?>',
+                            paymentMode:                '<?php echo $paymentMode ?>',
                             logoUrl:                    '<?php echo $this->get_option('icon_url') ?>',
                             themeColor:                 '<?php echo $this->get_option('theme_color') ?>',
                             useCurrencyCode:            '<?php echo $this->get_option('use_currency_code') != 'no' ? 'true' : 'false';?>',
                             title:                      '<?php echo $this->get_option('form_title') ?>',
                             widgetColor:                '<?php echo $this->get_option('widget_color') ?>',
+                            forceMobileRedirect:        true,
+                            redirectUrl:                '<?php echo $redirectUrl ?>',
                             styling:                    {
                                 formButtonColor:        '<?php echo $this->get_option('form_button_color') ?>',
                                 formButtonColorLabel:   '<?php echo $this->get_option('form_button_color_label') ?>',
@@ -527,7 +648,7 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
 
                 function checkoutShowNewNoPciCard() {
                     jQuery('.checkout-non-pci-new-card-row').show();
-                    CKOMagento.createBindings();
+                    CKOWoocommerce.createBindings();
                 }
 
                 jQuery('.checkout-saved-card-radio').on("change", function() {
@@ -582,4 +703,5 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
 
         return true;
     }
+
 }
