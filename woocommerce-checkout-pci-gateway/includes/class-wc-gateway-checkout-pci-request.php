@@ -188,6 +188,28 @@ class WC_Checkout_Pci_Request
         $intervalType = WC_Subscriptions_Cart::get_cart_subscription_period();
         $interval = WC_Subscriptions_Cart::get_cart_subscription_interval();
         $subscriptionLength = WC_Subscriptions_Cart::get_cart_subscription_length();
+
+        if($subscriptionLength == 0){
+            switch($intervalType)
+            {
+                case 'month';
+                    $subscriptionLength = 83;
+                    break;
+
+                case 'day';
+                    $subscriptionLength = 6993;
+                    break;
+
+                case 'week';
+                     $subscriptionLength = 999;
+                     break;
+
+                case 'year';
+                     $subscriptionLength = 19;
+                     break;
+            }
+        }
+        
         $recurringCount = $subscriptionLength - 1;
 
         // Get trial Info
