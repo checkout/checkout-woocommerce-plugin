@@ -311,7 +311,10 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
 
         }
 
-        if(!is_null($mobileRedirectUrl) && $savedCard == self::PAYMENT_CARD_NEW_CARD){ 
+        if(!is_null($mobileRedirectUrl) && $savedCard == self::PAYMENT_CARD_NEW_CARD){
+
+            $_SESSION['checkout_save_card_checked'] = isset($_POST['save-card-checkbox']);
+            
             return array(
                 'result'        => 'success',
                 'redirect'      => $mobileRedirectUrl.'&customerEmail='.$_POST['billing_email'].'&contextId='.$order_id,

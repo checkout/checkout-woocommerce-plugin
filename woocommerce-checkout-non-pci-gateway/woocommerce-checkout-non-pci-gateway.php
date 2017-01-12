@@ -174,14 +174,14 @@ function checkout_non_pci_customer_cards_table_install() {
         dbDelta($sql);
 
         add_option('checkoutDbVersion', $checkoutDbVersion);
+    }
 
-        /* Add card_enabled column if not present when updating the plugin */
-        $row = $wpdb->get_results("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+    /* Add card_enabled column if not present when updating the plugin */
+    $row = $wpdb->get_results("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
                                  WHERE table_name = '$tableName' AND column_name = 'card_enabled'");
 
-        if(empty($row)){
-            $wpdb->query("ALTER TABLE '$tableName' ADD `card_enabled` BIT NOT NULL DEFAULT 1 COMMENT 'Credit Card Enabled'");
-        }
+    if(empty($row)){
+        $wpdb->query("ALTER TABLE {$tableName} ADD `card_enabled` BIT NOT NULL DEFAULT 1 COMMENT 'Credit Card Enabled'");
     }
 }
 /* END: Create table script */
