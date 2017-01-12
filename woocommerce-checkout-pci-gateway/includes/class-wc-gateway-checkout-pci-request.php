@@ -498,6 +498,9 @@ class WC_Checkout_Pci_Request
         $response = array('status' => 'ok', 'message' => __('Checkout.com your transaction has been successfully refunded', 'woocommerce-checkout-pci'));
 
         $Api    = CheckoutApi_Api::getApi(array('mode' => $this->_getEndpointMode()));
+        $totalAmount = $order->get_total();
+        $totalAmount = $Api->valueToDecimal($totalAmount, $this->getOrderCurrency($order));
+
         $amount = empty($amount) ? $order->get_total() : $amount;
         $amount = $Api->valueToDecimal($amount, $this->getOrderCurrency($order));
 
@@ -544,8 +547,12 @@ class WC_Checkout_Pci_Request
 
         $successMessage = __("Checkout.com Refund Charge Approved (Transaction ID - {$entityId}, Parent ID - {$config['chargeId']})", 'woocommerce-checkout-pci');
 
-        $order->update_status('refunded', $successMessage);
-
+        if($totalAmount == $amount){
+            $order->update_status('refunded', $successMessage);
+        } else {
+            $order->add_order_note( sprintf($successMessage) );
+        }
+        
         return $response;
     }
 

@@ -14,7 +14,7 @@ class WC_Checkout_Pci extends WC_Payment_Gateway {
     const PAYMENT_ACTION_CAPTURE    = 'authorize_capture';
     const PAYMENT_CARD_NEW_CARD     = 'new_card';
     const AUTO_CAPTURE_TIME         = 0;
-    const VERSION                   = '2.4.0';
+    const VERSION                   = '2.4.1';
 
     const CREDIT_CARD_CHARGE_MODE_NOT_3D    = 1;
     const TRANSACTION_INDICATOR_REGULAR     = 1;
