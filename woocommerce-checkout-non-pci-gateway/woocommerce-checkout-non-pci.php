@@ -15,11 +15,11 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
     const PAYMENT_CARD_NEW_CARD     = 'new_card';
     const AUTO_CAPTURE_TIME         = 0;
     const RENDER_MODE               = 2;
-    const VERSION                   = '2.4.0';
+    const VERSION                   = '2.4.1';
     const RENDER_NAMESPACE          = 'Checkout';
     const CARD_FORM_MODE            = 'cardTokenisation';
     const JS_PATH_CARD_TOKEN        = 'https://cdn.checkout.com/sandbox/js/checkout.js';
-    const JS_PATH_CARD_TOKEN_LIVE   = 'https://cdn1.checkout.com/js/checkout.js';
+    const JS_PATH_CARD_TOKEN_LIVE   = 'https://cdn.checkout.com/js/checkout.js';
     const REDIRECTION_URL           = '/wp-content/plugins/woocommerce-checkout-non-pci-gateway/controllers/api/3dsecure.php';
     const HOSTED_URL_SANDOX         = 'https://secure.checkout.com/sandbox/payment/';
     const HOSTED_URL_LIVE         = 'https://secure.checkout.com/payment/';
