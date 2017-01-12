@@ -175,8 +175,10 @@ class WC_Checkout_Non_Pci_Web_Hook extends WC_Checkout_Non_Pci_Request
             return false;
         }
 
+        $Api         = CheckoutApi_Api::getApi(array('mode' => $this->_getEndpointMode()));
+        $totalAmount = $order->get_total();
+
         $amountDecimal          = $response->message->value;
-        $Api                    = CheckoutApi_Api::getApi(array('mode' => $this->_getEndpointMode()));
         $amount                 = $Api->decimalToValue($amountDecimal, $this->getOrderCurrency($order));
 
         wc_create_refund(array(
@@ -186,7 +188,13 @@ class WC_Checkout_Non_Pci_Web_Hook extends WC_Checkout_Non_Pci_Request
 
         update_post_meta($orderId, '_transaction_id', $transactionId);
         $successMessage = __("Checkout.com Refund Charge Approved (Transaction ID - {$transactionId}, Parent ID - {$storedTransactionId})", 'woocommerce-checkout-non-pci');
-        $order->update_status('refunded', $successMessage);
+        
+        if($totalAmount == $amount || $order->get_total_refunded() == $totalAmount){
+            $order->update_status('refunded', $successMessage);
+        } else {
+            $order->add_order_note( sprintf($successMessage) );
+        }
+
 
         return true;
     }
