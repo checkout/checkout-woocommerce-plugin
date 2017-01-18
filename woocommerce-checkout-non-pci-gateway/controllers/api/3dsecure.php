@@ -59,7 +59,7 @@ if($_REQUEST['cko-card-token']){
         $woocommerce->cart->empty_cart();
 
         if (is_user_logged_in() && $checkout->saved_cards) {
-            $cardRequest->saveCard($result, $order->user_id);
+            $cardRequest->saveCard($result, $order->user_id, $_SESSION['checkout_save_card_checked']);
         }
 
         $url = $checkout->get_return_url($order);

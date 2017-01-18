@@ -302,6 +302,8 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
 
         if($isHosted == 'yes' && $savedCard == self::PAYMENT_CARD_NEW_CARD){
 
+            $_SESSION['checkout_save_card_checked'] = isset($_POST['save-card-checkbox']);
+
             return array(
                 'result'        => 'success',
                 'redirect'      => $this->notify_url
@@ -309,7 +311,10 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
 
         }
 
-        if(!is_null($mobileRedirectUrl) && $savedCard == self::PAYMENT_CARD_NEW_CARD){ 
+        if(!is_null($mobileRedirectUrl) && $savedCard == self::PAYMENT_CARD_NEW_CARD){
+
+            $_SESSION['checkout_save_card_checked'] = isset($_POST['save-card-checkbox']);
+
             return array(
                 'result'        => 'success',
                 'redirect'      => $mobileRedirectUrl.'&customerEmail='.$_POST['billing_email'].'&contextId='.$order_id,
@@ -383,7 +388,7 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
         $woocommerce->cart->empty_cart();
 
         if (is_user_logged_in() && $this->saved_cards) {
-            WC_Checkout_Non_Pci_Customer_Card::saveCard($result, $order->user_id);
+            WC_Checkout_Non_Pci_Customer_Card::saveCard($result, $order->user_id, isset($_POST['save-card-checkbox']));
         }
 
         return array(
@@ -559,6 +564,10 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
                 <input id="checkout-new-card" class="checkout-new-card-input" type="hidden" name="<?php echo $this->id . '-saved-card'?>" value="<?php echo self::PAYMENT_CARD_NEW_CARD?>"/>
             <?php endif?>
             <p class="form-row form-row-wide checkout-non-pci-new-card-row">
+                <?php if($this->saved_cards):?>
+                    <input type="checkbox" name="save-card-checkbox" id="save-card-checkbox" value="1">
+                    <label for="save-card-checkbox" style="position:relative; display:inline-block; margin-bottom: 10px; margin-top: 10px">Save card for future payments</label>
+                <?php endif?>
                 <?php if(!empty($paymentToken)):?>
                     <?php if($isPayOrder):?>
                         <input type="hidden" id="billing_email" value="<?php echo $billingEmail?>"/>

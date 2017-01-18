@@ -19,7 +19,7 @@ class WC_Checkout_Non_Pci_Customer_Card
      *
      * @version 20160317
      */
-    public static function saveCard($response, $customerId) {
+    public static function saveCard($response, $customerId, $saveCardChecked) {
         global $wpdb;
 
         if (empty($response) || !is_object($response) || !$customerId) {
@@ -35,7 +35,15 @@ class WC_Checkout_Non_Pci_Customer_Card
         }
 
         if (self::isExists($customerId, $cardId, $cardType)) {
-            return false;
+            $wpdb->update(self::getCustomerCardsTableName(),
+                array(
+                    'card_enabled'  => esc_sql($saveCardChecked)
+                ),
+                array(
+                    'customer_id'   => esc_sql($customerId),
+                    'card_id'       => esc_sql($cardId),
+                )
+            );
         }
 
         $wpdb->insert(self::getCustomerCardsTableName(),
@@ -44,6 +52,7 @@ class WC_Checkout_Non_Pci_Customer_Card
                 'card_id'       => esc_sql($cardId),
                 'card_number'   => esc_sql($last4),
                 'card_type'     => esc_sql($cardType),
+                'card_enabled'  => esc_sql($saveCardChecked),
             )
         );
 
@@ -167,7 +176,7 @@ class WC_Checkout_Non_Pci_Customer_Card
         global $wpdb;
 
         $tableName  = self::getCustomerCardsTableName();
-        $sql        = $wpdb->prepare("SELECT * FROM {$tableName} WHERE customer_id = '%s';", $customerId);
+        $sql        = $wpdb->prepare("SELECT * FROM {$tableName} WHERE customer_id = '%s' AND card_enabled = 1;", $customerId);
 
         $result = $wpdb->get_results($sql);
 
