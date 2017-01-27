@@ -3,7 +3,7 @@
 Plugin Name: Checkout Non PCI - WooCommerce Gateway
 Plugin URI: https://www.checkout.com/
 Description: Extends WooCommerce by Adding the Checkout Non PCI Gateway.
-Version:2.4.0
+Version:2.4.1
 Author: Checkout.com
 Author URI: https://www.checkout.com/
 */
@@ -160,6 +160,7 @@ function checkout_non_pci_customer_cards_table_install() {
 	        `card_id` VARCHAR(100) NOT NULL COMMENT 'Card ID from Checkout API',
 	        `card_number` VARCHAR(4) NOT NULL COMMENT 'Short Customer Credit Card Number',
 	        `card_type` VARCHAR(20) NOT NULL COMMENT 'Credit Card Type',
+	        `card_enabled` BIT NOT NULL DEFAULT 1 COMMENT 'Credit Card Enabled',
 	        PRIMARY KEY (`entity_id`),
 	        UNIQUE INDEX `UNQ_CHECKOUT_CUSTOMER_CARDS_CUSTOMER_ID_CARD_ID_CARD_TYPE` (`customer_id`, `card_id`, `card_type`)
 	    )
@@ -173,6 +174,14 @@ function checkout_non_pci_customer_cards_table_install() {
         dbDelta($sql);
 
         add_option('checkoutDbVersion', $checkoutDbVersion);
+    }
+
+    /* Add card_enabled column if not present when updating the plugin */
+    $row = $wpdb->get_results("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+                                 WHERE table_name = '$tableName' AND column_name = 'card_enabled'");
+
+    if(empty($row)){
+        $wpdb->query("ALTER TABLE {$tableName} ADD `card_enabled` BIT NOT NULL DEFAULT 1 COMMENT 'Credit Card Enabled'");
     }
 }
 /* END: Create table script */

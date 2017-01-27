@@ -14,7 +14,7 @@ class WC_Checkout_Pci extends WC_Payment_Gateway {
     const PAYMENT_ACTION_CAPTURE    = 'authorize_capture';
     const PAYMENT_CARD_NEW_CARD     = 'new_card';
     const AUTO_CAPTURE_TIME         = 0;
-    const VERSION                   = '2.4.0';
+    const VERSION                   = '2.4.1';
 
     const CREDIT_CARD_CHARGE_MODE_NOT_3D    = 1;
     const TRANSACTION_INDICATOR_REGULAR     = 1;
@@ -165,6 +165,9 @@ class WC_Checkout_Pci extends WC_Payment_Gateway {
                 return;
             }
         } else {
+
+            $_SESSION['checkout_save_card_checked'] = isset($_POST['save-card-checkbox']);
+
             $ccDate = $request->getCcExpiryDate($_POST["{$request->gateway->id}-card-expiry"]);
 
             $ccParams['ccNumber']   = preg_replace('/\D/', '', $_POST["{$request->gateway->id}-card-number"]);
@@ -207,7 +210,7 @@ class WC_Checkout_Pci extends WC_Payment_Gateway {
         update_post_meta($order_id, '_transaction_id', $entityId);
 
         if (is_user_logged_in()) {
-            WC_Checkout_Pci_Customer_Card::saveCard($result, $order->user_id);
+            WC_Checkout_Pci_Customer_Card::saveCard($result, $order->user_id, isset($_POST['save-card-checkbox']));
         }
 
         return array(
@@ -305,6 +308,10 @@ class WC_Checkout_Pci extends WC_Payment_Gateway {
             <p class="form-row form-row-wide checkout-pci-new-card-row">
                 <?php echo '<label for="' . esc_attr( $this->id ) . '-card-cvc">' . __( 'Card Code', 'woocommerce' ) . ' <span class="required">*</span></label>'?>
                 <?php echo '<input id="' . esc_attr( $this->id ) . '-card-cvc" class="input-text wc-credit-card-form-card-cvc" type="text" autocomplete="off" placeholder="' . esc_attr__( 'CVC', 'woocommerce' ) . '" name="' . $this->id . '-card-cvc' . '" />'?>
+            </p>
+            <p class="form-row form-row-wide checkout-pci-new-card-row">
+                <input type="checkbox" name="save-card-checkbox" id="save-card-checkbox" value="1">
+                <label for="save-card-checkbox" style="position:relative; display:inline-block; margin-bottom: 10px; margin-top: 10px">Save card for future payments</label>
             </p>
 			<?php do_action( 'woocommerce_credit_card_form_end', $this->id ); ?>
             <div class="clear"></div>
