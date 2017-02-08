@@ -3,7 +3,7 @@
 Plugin Name: Checkout PCI - WooCommerce Gateway
 Plugin URI: https://www.checkout.com/
 Description: Extends WooCommerce by Adding the Checkout PCI Gateway.
-Version:2.4.1
+Version:2.4.2
 Author: Checkout.com
 Author URI: https://www.checkout.com/
 */
