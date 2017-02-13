@@ -34,7 +34,7 @@ class WC_Checkout_Pci_Customer_Card
             return false;
         }
 
-        if (self::isExists($customerId, $cardId, $cardType)) {
+        if (self::isExists($customerId, $cardId, $cardType) && $saveCardChecked) {
             $wpdb->update(self::getCustomerCardsTableName(),
                 array(
                     'card_enabled'  => esc_sql($saveCardChecked)
