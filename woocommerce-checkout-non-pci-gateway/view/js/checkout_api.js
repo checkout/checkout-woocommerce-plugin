@@ -71,7 +71,7 @@ jQuery(document).ready(function() {
                 var result = {error: false, messages: []};
                 var fields = JSON.parse(fieldList);
 
-                if(jQuery('#terms:checked').length === 0){ 
+                if(jQuery('#terms').length === 1 && jQuery('#terms:checked').length === 0){ 
                     result.error = true;
                     result.messages.push({target: 'terms', message : 'You must accept our Terms & Conditions.'});
                 }

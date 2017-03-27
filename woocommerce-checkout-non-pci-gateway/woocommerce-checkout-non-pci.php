@@ -15,14 +15,14 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
     const PAYMENT_CARD_NEW_CARD     = 'new_card';
     const AUTO_CAPTURE_TIME         = 0;
     const RENDER_MODE               = 2;
-    const VERSION                   = '2.4.2';
+    const VERSION                   = '2.4.3';
     const RENDER_NAMESPACE          = 'Checkout';
     const CARD_FORM_MODE            = 'cardTokenisation';
     const JS_PATH_CARD_TOKEN        = 'https://cdn.checkout.com/sandbox/js/checkout.js';
     const JS_PATH_CARD_TOKEN_LIVE   = 'https://cdn.checkout.com/js/checkout.js';
     const REDIRECTION_URL           = '/wp-content/plugins/woocommerce-checkout-non-pci-gateway/controllers/api/3dsecure.php';
     const HOSTED_URL_SANDOX         = 'https://secure.checkout.com/sandbox/payment/';
-    const HOSTED_URL_LIVE         = 'https://secure.checkout.com/payment/';
+    const HOSTED_URL_LIVE           = 'https://secure.checkout.com/payment/';
     const TRANSACTION_INDICATOR_REGULAR = 1;
 
     public static $log = false;
@@ -164,7 +164,7 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
                 'desc_tip'	=> __('The timeout value for a request to the gateway. Default is 60 seconds. Please notify checkout.com support team before increasing the value.', 'woocommerce-checkout-non-pci'),
                 'default'	=> __( '60', 'woocommerce-checkout-non-pci' ),
             ),
-            'icon_url' => array(
+            'logo_url' => array(
                 'title'		=> __('Lightbox logo url', 'woocommerce-checkout-non-pci'),
                 'type'		=> 'text',
                 'desc_tip'	=> __('The URL of your company logo. Must be 180 x 36 pixels. Default: Checkout logo.', 'woocommerce-checkout-non-pci'),
@@ -183,7 +183,7 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
                 'desc_tip'  => __('Use ISO3 currency code (e.g. GBP) instead of the currency symbol (e.g. £)', 'woocommerce-checkout-non-pci'),
             ),
             'form_title' => array(
-                'title'		=> __('Title', 'woocommerce-checkout-non-pci'),
+                'title'		=> __('Js Title', 'woocommerce-checkout-non-pci'),
                 'type'		=> 'text',
                 'desc_tip'	=> __('The title of your payment form.', 'woocommerce-checkout-non-pci'),
             ),
@@ -469,6 +469,9 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
         echo '<input name="redirectUrl" value="'.$redirectUrl.'"/>';
         echo '<input name="cancelUrl" value="'.$redirectUrl.'"/>';
         echo '<input name="contextId" id="contextId" value="'.$orderId.'"/>';
+        echo '<input name="logoUrl" value="'.$checkout->settings["logo_url"].'"/>';
+        echo '<input name="title" value="'.$checkout->settings["form_title"].'"/>';
+        echo '<input name="themeColor" value="'.$checkout->settings["theme_color"].'"/>';
         echo '<input name="billingDetails" id="billingDetails" value="'.$billingDetails.'"/>';
         echo'</form>';
 
@@ -593,7 +596,7 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
                             currency:                   '<?php echo $paymentToken['currency'] ?>',
                             widgetContainerSelector:    '.checkout-non-pci-new-card-row',
                             paymentMode:                '<?php echo $paymentMode ?>',
-                            logoUrl:                    '<?php echo $this->get_option('icon_url') ?>',
+                            logoUrl:                    '<?php echo $this->get_option('logo_url') ?>',
                             themeColor:                 '<?php echo $this->get_option('theme_color') ?>',
                             useCurrencyCode:            '<?php echo $this->get_option('use_currency_code') != 'no' ? 'true' : 'false';?>',
                             title:                      '<?php echo $this->get_option('form_title') ?>',
