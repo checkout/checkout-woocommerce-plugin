@@ -10,6 +10,8 @@ class WC_Checkout_Pci_Web_Hook extends WC_Checkout_Pci_Request
     const EVENT_TYPE_CHARGE_CAPTURED    = 'charge.captured';
     const EVENT_TYPE_CHARGE_REFUNDED    = 'charge.refunded';
     const EVENT_TYPE_CHARGE_VOIDED      = 'charge.voided';
+    const EVENT_TYPE_CHARGE_FAILED      = 'charge.failed';
+    const EVENT_TYPE_INVOICE_CANCELLED  = 'invoice.cancelled';
 
     /**
      * Constructor
@@ -93,6 +95,29 @@ class WC_Checkout_Pci_Web_Hook extends WC_Checkout_Pci_Request
 
         return true;
 
+    }
+	
+	/**
+     * Cancel order from web hook
+     *
+     * @version 20170317
+     *
+     */
+    public function invoiceCancelOrder($response){
+        $orderId        = (string)$response->message->trackId;
+        $order          = new WC_Order($orderId);
+        $transactionId  = (string)$response->message->id;
+
+        if (!is_object($order)) {
+            WC_Checkout_Non_Pci::log("Cannot cancel order. Order ID - {$orderId}");
+            return false;
+        }
+        
+        $successMessage = __("Checkout.com charge expired (Transaction ID - {$transactionId})", 'woocommerce-checkout-non-pci');
+
+        $order->update_status('cancelled', $successMessage);
+        
+        return true;
     }
 
     /**
