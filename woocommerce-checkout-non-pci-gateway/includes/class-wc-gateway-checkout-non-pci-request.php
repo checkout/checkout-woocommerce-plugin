@@ -534,6 +534,7 @@ class WC_Checkout_Non_Pci_Request
         if (!$result->isValid() || !WC_Checkout_Non_Pci_Validator::responseValidation($result)) {
             $errorMessage = "Please check you card details and try again. Thank you. Response Code - {$result->getResponseCode()}";
             WC_Checkout_Non_Pci::log($errorMessage);
+
             return array('error' => $errorMessage);
         }
 
@@ -589,9 +590,10 @@ class WC_Checkout_Non_Pci_Request
         $cart = WC()->cart;
 
         $secretKey = $this->getSecretKey();
-        $Api        = CheckoutApi_Api::getApi(array('mode' => $this->_getEndpointMode()));
-        $config         = array();
-        $autoCapture    = $this->_isAutoCapture();
+        $Api = CheckoutApi_Api::getApi(array('mode' => $this->_getEndpointMode()));
+        $config = array();
+        $autoCapture = $this->_isAutoCapture();
+        $integrationType = $this->gateway->get_option('integration_type');
 
         /* START: Prepare data */
         $billingAddressConfig = array (
@@ -648,7 +650,7 @@ class WC_Checkout_Non_Pci_Request
             'woo_version'       => property_exists($woocommerce, 'version') ? $woocommerce->version : '2.0',
             'plugin_version'    => WC_Checkout_Non_Pci::VERSION,
             'lib_version'       => CheckoutApi_Client_Constant::LIB_VERSION,
-            'integration_type'  => 'JS',
+            'integration_type'  => $integrationType,
             'time'              => date('Y-m-d H:i:s')
         );
 
