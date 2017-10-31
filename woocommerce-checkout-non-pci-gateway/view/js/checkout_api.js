@@ -2,6 +2,7 @@ jQuery(document).ready(function() {
     var _cko = window.CKOWoocommerce = window.CKOWoocommerce || {};
     setTimeout(function(){
         if (window.hasOwnProperty('CheckoutApiJsConfig') && typeof Checkout != 'undefined') {
+            window.CheckoutApiJsConfig.styling.overlayOpacity = parseFloat(window.CheckoutApiJsConfig.styling.overlayOpacity);
             Checkout.render(window.CheckoutApiJsConfig);
 
             if (Checkout.isMobile()){
