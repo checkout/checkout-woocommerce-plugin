@@ -437,6 +437,18 @@ class WC_Checkout_Non_Pci_Request
         return $this->gateway->get_option('is_3d');
     }
 
+     /**
+     * Get stored autoCapTime
+     *
+     * @return mixed
+     *
+     * @version 20171127
+     */
+    public function getAutoCapTime() {
+        return $this->gateway->get_option('auto_cap_time');
+    }
+
+
     /**
      * Create Payment Token
      *
@@ -460,7 +472,7 @@ class WC_Checkout_Non_Pci_Request
                 'chargeMode'            => $this->getChargeMode(),
                 'transactionIndicator'  => WC_Checkout_Non_Pci::TRANSACTION_INDICATOR_REGULAR,
                 'customerIp'            => $this->get_ip_address(),
-                'autoCapTime'           => WC_Checkout_Non_Pci::AUTO_CAPTURE_TIME,
+                'autoCapTime'           => (float)$this->getAutoCapTime(),
                 'autoCapture'           => $autoCapture ? CheckoutApi_Client_Constant::AUTOCAPUTURE_CAPTURE : CheckoutApi_Client_Constant::AUTOCAPUTURE_AUTH
             )
         );
@@ -525,16 +537,18 @@ class WC_Checkout_Non_Pci_Request
             WC_Checkout_Non_Pci::log('-Your payment was not completed.');
             WC_Checkout_Non_Pci::log($Api->getExceptionState());
 
-            $errorMessage = '-Your payment was not completed.'. $Api->getExceptionState()->getErrorMessage(). ' and try again or contact customer support.';
+            $errorMessage = '-Your payment was not completed. Try again or contact customer support.';
 
-            WC_Checkout_Non_Pci::log($errorMessage);
+            WC_Checkout_Non_Pci::log($errorMessage. '-'.$errorCode);
+            WC_Checkout_Non_Pci::log($Api->getExceptionState()->getErrorMessage());
             return array('error' => $errorMessage);
         }
 
         if (!$result->isValid() || !WC_Checkout_Non_Pci_Validator::responseValidation($result)) {
-            $errorMessage = "Please check you card details and try again. Thank you. Response Code - {$result->getResponseCode()}";
-            WC_Checkout_Non_Pci::log($errorMessage);
-
+            $errorMessage = "Please check you card details and try again. Thank you.";
+            
+            WC_Checkout_Non_Pci::log($errorMessage. '-' .$responseCode);
+            WC_Checkout_Non_Pci::log($result->getResponseCode());
             return array('error' => $errorMessage);
         }
 
@@ -548,7 +562,8 @@ class WC_Checkout_Non_Pci_Request
      * @param $paymentToken
      * @return array
      */
-    public function verifyChargePaymentToken(WC_Order $order, $paymentToken) {
+    public function verifyChargePaymentToken(WC_Order $order, $paymentToken) { 
+        
         $Api            = CheckoutApi_Api::getApi(array('mode' => $this->_getEndpointMode()));
         $verifyParams   = array('paymentToken' => $paymentToken, 'authorization' => $this->getSecretKey());
         $result         = $Api->verifyChargePaymentToken($verifyParams);
@@ -623,7 +638,7 @@ class WC_Checkout_Non_Pci_Request
 
         /* END: Prepare data */
 
-        $config['autoCapTime']  = WC_Checkout_Non_Pci::AUTO_CAPTURE_TIME;
+        $config['autoCapTime']  = (float)$this->getAutoCapTime();
         $config['autoCapture']  = $autoCapture ? CheckoutApi_Client_Constant::AUTOCAPUTURE_CAPTURE : CheckoutApi_Client_Constant::AUTOCAPUTURE_AUTH;
         $config['chargeMode']   = $this->getChargeMode();
         $config['email']        = $order->billing_email;
@@ -672,7 +687,7 @@ class WC_Checkout_Non_Pci_Request
                     'value' => $recurringAmount,
                     'cycle' => $interval . '' . $intervalType,
                     'recurringCount' => $recurringCount,
-                    'autoCapTime' => WC_Checkout_Non_Pci::AUTO_CAPTURE_TIME,
+                    'autoCapTime' => (float)$this->getAutoCapTime(),
                     'startDate' => $recurringStartDate //Next day of initial payment
                 ));
             }

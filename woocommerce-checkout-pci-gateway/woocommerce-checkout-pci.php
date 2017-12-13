@@ -14,7 +14,7 @@ class WC_Checkout_Pci extends WC_Payment_Gateway {
     const PAYMENT_ACTION_CAPTURE    = 'authorize_capture';
     const PAYMENT_CARD_NEW_CARD     = 'new_card';
     const AUTO_CAPTURE_TIME         = 0;
-    const VERSION                   = '2.4.3';
+    const VERSION                   = '2.5.2';
 
     const CREDIT_CARD_CHARGE_MODE_NOT_3D    = 1;
     const TRANSACTION_INDICATOR_REGULAR     = 1;
@@ -50,6 +50,9 @@ class WC_Checkout_Pci extends WC_Payment_Gateway {
         foreach ( $this->settings as $setting_key => $value ) {
             $this->$setting_key = $value;
         }
+
+        // Check if saved cards is enabled from backend
+        $this->saved_cards = $this->get_option( 'saved_cards' ) === "yes" ? true : false;
 
         // Save settings
         if (is_admin()) {
@@ -104,6 +107,12 @@ class WC_Checkout_Pci extends WC_Payment_Gateway {
                     self::PAYMENT_ACTION_AUTHORIZE  => __('Authorize Only', 'woocommerce-checkout-pci')
                 )
             ),
+            'auto_cap_time' => array(
+                'title'     => __('Auto Capture Time', 'woocommerce-checkout-pci'),
+                'type'      => 'text',
+                'desc_tip'  => __('Time to automatically capture charge', 'woocommerce-checkout-pci'),
+                'default'   => __( '0', 'woocommerce-checkout-pci' ),
+            ),
             'order_status' => array(
                 'title'       => __('New Order Status', 'woocommerce-checkout-pci'),
                 'type'        => 'select',
@@ -127,6 +136,25 @@ class WC_Checkout_Pci extends WC_Payment_Gateway {
                     'live'      => __('Live', 'woocommerce-checkout-pci')
                 )
             ),
+            'is_3d' => array(
+                'title'       => __('Is 3D', 'woocommerce-checkout-pci'),
+                'type'        => 'select',
+                'class'       => 'wc-enhanced-select',
+                'description' => __('3D Secure Card Validation.', 'woocommerce-checkout-pci'),
+                'default'     => '1',
+                'desc_tip'    => true,
+                'options'     => array(
+                    '1' => __('No', 'woocommerce-checkout-pci'),
+                    '2' => __('Yes', 'woocommerce-checkout-pci')
+                )
+            ),
+            'saved_cards' => array(
+                'title'       => __( 'Saved Cards', 'woocommerce-checkout-pci' ),
+                'label'       => __( 'Enable Payment via Saved Cards', 'woocommerce-checkout-pci' ),
+                'type'        => 'checkbox',
+                'description' => __( 'If enabled, users will be able to pay with a saved card during checkout.', 'woocommerce-checkout-pci' ),
+                'default'     => 'no'
+            ),
         );
     }
 
@@ -149,8 +177,8 @@ class WC_Checkout_Pci extends WC_Payment_Gateway {
         $request        = new WC_Checkout_Pci_Request($this);
         $savedCardData  = array();
         $ccParams       = array();
-
         $savedCard      = !empty($_POST["{$request->gateway->id}-saved-card"]) ? $_POST["{$request->gateway->id}-saved-card"] : '';
+
 
         if (empty($savedCard)) {
             WC_Checkout_Pci_Validator::wc_add_notice_self('Payment error: Please check your card data.', 'error');
@@ -209,7 +237,7 @@ class WC_Checkout_Pci extends WC_Payment_Gateway {
 
         update_post_meta($order_id, '_transaction_id', $entityId);
 
-        if (is_user_logged_in()) {
+        if (is_user_logged_in() && $this->saved_cards) {
             WC_Checkout_Pci_Customer_Card::saveCard($result, $order->user_id, isset($_POST['save-card-checkbox']));
         }
 
@@ -268,7 +296,8 @@ class WC_Checkout_Pci extends WC_Payment_Gateway {
             }
         }
 
-        $cardList = is_user_logged_in() ? WC_Checkout_Pci_Customer_Card::getCustomerCardList(get_current_user_id()) : array();
+        $checkoutFields = !$isPayOrder ? json_encode($woocommerce->checkout->checkout_fields,JSON_HEX_APOS) : json_encode(array());
+        $cardList = (is_user_logged_in() && $this->saved_cards)? WC_Checkout_Pci_Customer_Card::getCustomerCardList(get_current_user_id()) : array();
 
         ?>
         <fieldset id="<?php echo $this->id; ?>-cc-form">
@@ -310,8 +339,15 @@ class WC_Checkout_Pci extends WC_Payment_Gateway {
                 <?php echo '<input id="' . esc_attr( $this->id ) . '-card-cvc" class="input-text wc-credit-card-form-card-cvc" type="text" autocomplete="off" placeholder="' . esc_attr__( 'CVC', 'woocommerce' ) . '" name="' . $this->id . '-card-cvc' . '" />'?>
             </p>
             <p class="form-row form-row-wide checkout-pci-new-card-row">
-                <input type="checkbox" name="save-card-checkbox" id="save-card-checkbox" value="1">
-                <label for="save-card-checkbox" style="position:relative; display:inline-block; margin-bottom: 10px; margin-top: 10px">Save card for future payments</label>
+                <?php if($this->saved_cards): ?>
+                        
+                            <div class="card-save-checkbox" style="display: none">
+                                <input type="checkbox" name="save-card-checkbox" id="save-card-checkbox" value="1">
+                                <label for="save-card-checkbox" style="position:relative; display:inline-block; margin-bottom: 10px; margin-top: 10px">Save card for future payments</label>
+                            </div>
+                                
+                        
+                <?php endif?>
             </p>
 			<?php do_action( 'woocommerce_credit_card_form_end', $this->id ); ?>
             <div class="clear"></div>
@@ -322,10 +358,12 @@ class WC_Checkout_Pci extends WC_Payment_Gateway {
 
                 function checkoutHideNewCard() {
                     jQuery('.checkout-pci-new-card-row').hide();
+                    jQuery('.card-save-checkbox').hide();
                 }
 
                 function checkoutShowNewCard() {
                     jQuery('.checkout-pci-new-card-row').show();
+                    jQuery('.card-save-checkbox').show();
                 }
 
                 jQuery('.checkout-saved-card-radio').on("change", function() {
@@ -335,8 +373,55 @@ class WC_Checkout_Pci extends WC_Payment_Gateway {
                 jQuery('.checkout-new-card-radio').on("change", function() {
                     checkoutShowNewCard();
                 });
+
             </script>
+
+            <script type="application/javascript">
+                jQuery('#place_order').click(function(e){
+                    if(jQuery('#payment_method_woocommerce_checkout_pci').is(':checked')){
+                        if(jQuery('.checkout-new-card-radio').is(':checked') == false && jQuery('.checkout-saved-card-radio').is(':checked') == false ){
+                            e.preventDefault();
+
+                            window.checkoutFields = '<?php echo $checkoutFields?>';
+                            var result = {error: false, messages: []};
+                            var fields = JSON.parse(window.checkoutFields);
+                            result.error = true;
+                            result.messages.push({target: 'payment_box payment_method_woocommerce_checkout_pci', message : 'Please select a payment method.'});
+
+                            jQuery('.woocommerce-error, .woocommerce-message').remove();
+
+                            jQuery.each(result.messages, function(index, value) {
+                                jQuery('form.checkout').prepend('<div class="woocommerce-error">' + value.message + '</div>');
+                            });
+
+                            jQuery('html, body').animate({
+                                scrollTop: (jQuery('form.checkout').offset().top - 100 )
+                            }, 1000 );
+
+                            jQuery(document.body).trigger('checkout_error');
+                        }
+                    }
+                })
+            </script>
+            
         <?php endif?>
+
+        <script type="text/javascript">
+            if(jQuery('#createaccount').length === 1){
+                var checkbox = document.querySelector("input[name=createaccount]");
+                checkbox.addEventListener( 'change', function() {
+                    if(this.checked) {
+                        jQuery('.card-save-checkbox').show();
+                    } else {s
+                        jQuery('.card-save-checkbox').hide();
+                    }
+                });
+
+                if( jQuery('#createaccount:checked').length === 1){
+                    jQuery('.card-save-checkbox').show();
+                }
+            }
+        </script>
         <?php
     }
 
