@@ -33,13 +33,15 @@ jQuery(document).ready(function() {
                 }
             }
 
-            function createBindings() {
+            function createBindings() { console.log('createBindings');
                 document.getElementById('cko-is-mobile').value = false;
                 var integrationType = document.getElementById('cko-hosted-url').value;
 
                 if (!Checkout.isMobile() && integrationType =="checkoutjs"){
+
                     jQuery('form.checkout').bind('#place_order, checkout_place_order', function (e) {
-                        if(jQuery('input[name=payment_method]:checked').val() != 'woocommerce_checkout_non_pci' || document.getElementById('cko-card-token').value.length > 0){
+                        if(jQuery('input[name=payment_method]:checked').val() != 'woocommerce_checkout_non_pci' || document.getElementById('cko-card-token').value.length > 0 ){
+                            
                             return true;
                         }
 
@@ -55,9 +57,37 @@ jQuery(document).ready(function() {
                     });
 
                     jQuery('#place_order').on('click', function(e){
+
+                       
                         if(jQuery('input[name=payment_method]:checked').val() != 'woocommerce_checkout_non_pci' || document.getElementById('cko-card-token').value.length > 0){
                             return true;
                         }
+
+                         if(jQuery('#payment_method_woocommerce_checkout_non_pci').is(':checked')){
+                            if(jQuery('.checkout-saved-card-radio').length >0){
+                                if(jQuery('.checkout-new-card-radio').is(':checked') == false && jQuery('.checkout-saved-card-radio').is(':checked') == false ){
+                                    e.preventDefault();
+                                    var result = {error: false, messages: []};
+                                    result.error = true;
+                                    result.messages.push({target: false, message : 'Please select a payment method.'});
+
+                                    jQuery('.woocommerce-error, .woocommerce-message').remove();
+
+                                    jQuery.each(result.messages, function(index, value) {
+                                        jQuery('form.checkout').prepend('<div class="woocommerce-error">' + value.message + '</div>');
+                                    });
+
+                                    jQuery('html, body').animate({
+                                        scrollTop: (jQuery('form.checkout').offset().top - 100 )
+                                    }, 1000 );
+
+                                    jQuery(document.body).trigger('checkout_error');
+
+                                    return false;
+                                }
+                            }
+                        }
+
 
                         if (isValidFormField(window.checkoutFields)) {
                             Checkout.setCustomerEmail(document.getElementById('billing_email').value);
@@ -68,7 +98,10 @@ jQuery(document).ready(function() {
 
                             }
 
-                            Checkout.open();
+                            if(jQuery('.checkout-new-card-radio').is(':checked')== true){
+                                Checkout.open();
+                            } 
+
                         }
 
                         return false;
