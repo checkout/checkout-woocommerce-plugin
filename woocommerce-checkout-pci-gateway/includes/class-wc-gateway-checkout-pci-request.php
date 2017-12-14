@@ -38,7 +38,13 @@ class WC_Checkout_Pci_Request
      * @version 20171127
      */
     public function getAutoCapTime() {
-        return $this->gateway->get_option('auto_cap_time');
+        $autoCapTime = $this->gateway->get_option('auto_cap_time');
+        
+        if (strpos($autoCapTime, ',') !== false) {
+            str_replace(',', '.', $autoCapTime);
+        }
+
+        return $autoCapTime;
     }
 
     /**
@@ -144,7 +150,7 @@ class WC_Checkout_Pci_Request
         $config['transactionIndicator'] = WC_Checkout_Pci::TRANSACTION_INDICATOR_REGULAR;
         $config['customerIp']           = $this->get_ip_address();
         $config['chargeMode']           = $this->getChargeMode();
-        $config['autoCapTime']          = (float)$this->getAutoCapTime();
+        $config['autoCapTime']          = $this->getAutoCapTime();
 
         if (!empty($savedCardData)) {
             $config['cardId'] = $savedCardData->card_id;

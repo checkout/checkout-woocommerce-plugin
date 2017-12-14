@@ -445,7 +445,14 @@ class WC_Checkout_Non_Pci_Request
      * @version 20171127
      */
     public function getAutoCapTime() {
-        return $this->gateway->get_option('auto_cap_time');
+
+        $autoCapTime = $this->gateway->get_option('auto_cap_time');
+        
+        if (strpos($autoCapTime, ',') !== false) {
+            str_replace(',', '.', $autoCapTime);
+        }
+
+        return $autoCapTime;
     }
 
 
@@ -472,7 +479,7 @@ class WC_Checkout_Non_Pci_Request
                 'chargeMode'            => $this->getChargeMode(),
                 'transactionIndicator'  => WC_Checkout_Non_Pci::TRANSACTION_INDICATOR_REGULAR,
                 'customerIp'            => $this->get_ip_address(),
-                'autoCapTime'           => (float)$this->getAutoCapTime(),
+                'autoCapTime'           => $this->getAutoCapTime(),
                 'autoCapture'           => $autoCapture ? CheckoutApi_Client_Constant::AUTOCAPUTURE_CAPTURE : CheckoutApi_Client_Constant::AUTOCAPUTURE_AUTH
             )
         );
@@ -638,7 +645,7 @@ class WC_Checkout_Non_Pci_Request
 
         /* END: Prepare data */
 
-        $config['autoCapTime']  = (float)$this->getAutoCapTime();
+        $config['autoCapTime']  = $this->getAutoCapTime();
         $config['autoCapture']  = $autoCapture ? CheckoutApi_Client_Constant::AUTOCAPUTURE_CAPTURE : CheckoutApi_Client_Constant::AUTOCAPUTURE_AUTH;
         $config['chargeMode']   = $this->getChargeMode();
         $config['email']        = $order->billing_email;
@@ -687,7 +694,7 @@ class WC_Checkout_Non_Pci_Request
                     'value' => $recurringAmount,
                     'cycle' => $interval . '' . $intervalType,
                     'recurringCount' => $recurringCount,
-                    'autoCapTime' => (float)$this->getAutoCapTime(),
+                    'autoCapTime' => $this->getAutoCapTime(),
                     'startDate' => $recurringStartDate //Next day of initial payment
                 ));
             }
