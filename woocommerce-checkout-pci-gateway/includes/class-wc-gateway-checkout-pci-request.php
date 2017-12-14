@@ -20,6 +20,34 @@ class WC_Checkout_Pci_Request
     }
 
     /**
+     * Get stored 3d mode
+     *
+     * @return mixed
+     *
+     * @version 20171127
+     */
+    public function getChargeMode() {
+        return $this->gateway->get_option('is_3d');
+    }
+
+     /**
+     * Get stored autoCapTime
+     *
+     * @return mixed
+     *
+     * @version 20171127
+     */
+    public function getAutoCapTime() {
+        $autoCapTime = $this->gateway->get_option('auto_cap_time');
+        
+        if (strpos($autoCapTime, ',') !== false) {
+            str_replace(',', '.', $autoCapTime);
+        }
+
+        return $autoCapTime;
+    }
+
+    /**
      * Create Charge
      *
      * @param WC_Order $order
@@ -39,7 +67,7 @@ class WC_Checkout_Pci_Request
         $result     = $Api->createCharge($chargeData);
 
         if ($Api->getExceptionState()->hasError()) {
-            $errorMessage = 'Your payment was not completed.'. $Api->getExceptionState()->getErrorMessage(). ' and try again or contact customer support.';
+            $errorMessage = 'Your payment was not completed. Try again or contact customer support.';
 
             WC_Checkout_Pci::log($errorMessage);
             WC_Checkout_Pci::log($Api->getExceptionState());
@@ -104,7 +132,6 @@ class WC_Checkout_Pci_Request
             $product        = $productFactory->get_product($item['product_id']);
 
             $products[] = array(
-                'description'   => (string)$product->post->post_content,
                 'name'          => $item['name'],
                 'price'         => $product->get_price(),
                 'quantity'      => $item['qty'],
@@ -114,10 +141,7 @@ class WC_Checkout_Pci_Request
 
         /* END: Prepare data */
 
-        $config['autoCapTime']  = WC_Checkout_Pci::AUTO_CAPTURE_TIME;
         $config['autoCapture']  = $autoCapture ? CheckoutApi_Client_Constant::AUTOCAPUTURE_CAPTURE : CheckoutApi_Client_Constant::AUTOCAPUTURE_AUTH;
-        $config['chargeMode']   = $this->_getChargeMode();
-
         $config['email']        = $order->billing_email;
 
         $config['value']                = $amount;
@@ -125,6 +149,8 @@ class WC_Checkout_Pci_Request
         $config['trackId']              = $order->id;
         $config['transactionIndicator'] = WC_Checkout_Pci::TRANSACTION_INDICATOR_REGULAR;
         $config['customerIp']           = $this->get_ip_address();
+        $config['chargeMode']           = $this->getChargeMode();
+        $config['autoCapTime']          = $this->getAutoCapTime();
 
         if (!empty($savedCardData)) {
             $config['cardId'] = $savedCardData->card_id;

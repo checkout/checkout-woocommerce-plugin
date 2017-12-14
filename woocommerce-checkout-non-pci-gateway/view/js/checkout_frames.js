@@ -1,13 +1,13 @@
 jQuery(document).ready(function() {
-    var _ckoEmbedded = window.CKOConfig = window.CKOConfig || {};
+    var _ckoFRAMES = window.CKOConfig = window.CKOConfig || {};
     setTimeout(function(){
-
-        if (window.hasOwnProperty('CheckoutApiEmbConfig') && typeof Checkout != 'undefined') {
-            Checkout.init(window.CheckoutApiEmbConfig);
+        
+        if (window.hasOwnProperty('CheckoutApiEmbConfig') && typeof Frames != 'undefined') {
+            Frames.init(window.CheckoutApiEmbConfig);
         }
 
         jQuery(document).ready(function() {
-            Checkout.init(window.CheckoutApiEmbConfig);
+            Frames.init(window.CheckoutApiEmbConfig);
             createBindings();
 
             if(jQuery('#createaccount').length === 1){
@@ -53,11 +53,37 @@ jQuery(document).ready(function() {
                             return true;
                         }
 
-                        if (isValidFormField(window.checkoutFields)) {
-                            Checkout.setCustomerEmail(document.getElementById('billing_email').value);
-                            Checkout.setCustomerName(document.getElementById('billing_first_name').value + ' ' + document.getElementById('billing_last_name').value);
+                        if(jQuery('#payment_method_woocommerce_checkout_non_pci').is(':checked')){
+                            if(jQuery('.checkout-saved-card-radio').length >0){
+                                if(jQuery('.checkout-new-card-radio').is(':checked') == false && jQuery('.checkout-saved-card-radio').is(':checked') == false ){
+                                    e.preventDefault();
+                                    var result = {error: false, messages: []};
+                                    result.error = true;
+                                    result.messages.push({target: false, message : 'Please select a payment method.'});
 
-                            if (Checkout.isCardFormValid()) Checkout.submitCardForm();
+                                    jQuery('.woocommerce-error, .woocommerce-message').remove();
+
+                                    jQuery.each(result.messages, function(index, value) {
+                                        jQuery('form.checkout').prepend('<div class="woocommerce-error">' + value.message + '</div>');
+                                    });
+
+                                    jQuery('html, body').animate({
+                                        scrollTop: (jQuery('form.checkout').offset().top - 100 )
+                                    }, 1000 );
+
+                                    jQuery(document.body).trigger('checkout_error');
+
+                                    return false;
+                                }
+                            }
+                        }
+
+                        
+
+                        if (isValidFormField(window.checkoutFields)) {
+                            if (Frames.isCardValid()){
+                                Frames.submitCard();
+                            } 
                             
                         }
 
@@ -68,7 +94,7 @@ jQuery(document).ready(function() {
 
             // Make createBindings function public so it can be called when user
             // decides to add a new card again after choosing to use saved card
-            _ckoEmbedded.createBindings = createBindings;
+            _ckoFRAMES.createBindings = createBindings;
 
             function isValidFormField(fieldList) {
                 var result = {error: false, messages: []};
@@ -151,5 +177,5 @@ jQuery(document).ready(function() {
                 return false;
             }
         });
-    }, 1000);
+    }, 3000);
 });
