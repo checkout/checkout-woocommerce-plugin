@@ -40,8 +40,12 @@ class WC_Checkout_Pci_Request
     public function getAutoCapTime() {
         $autoCapTime = $this->gateway->get_option('auto_cap_time');
         
+        if(empty($autoCapTime)){
+            $autoCapTime = 0;
+        }
+
         if (strpos($autoCapTime, ',') !== false) {
-            str_replace(',', '.', $autoCapTime);
+             $autoCapTime = str_replace(',', '.', $autoCapTime);
         }
 
         return $autoCapTime;
