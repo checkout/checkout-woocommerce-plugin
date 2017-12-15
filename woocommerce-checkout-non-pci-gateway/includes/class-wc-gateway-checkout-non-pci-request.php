@@ -445,11 +445,14 @@ class WC_Checkout_Non_Pci_Request
      * @version 20171127
      */
     public function getAutoCapTime() {
-
         $autoCapTime = $this->gateway->get_option('auto_cap_time');
         
-        if (strpos($autoCapTime, ',') !== false) {
-            str_replace(',', '.', $autoCapTime);
+        if(empty($autoCapTime)){
+            $autoCapTime = 0;
+        }
+
+        if (strpos($autoCapTime, ',') !== false) { 
+           $autoCapTime = str_replace(',', '.', $autoCapTime);
         }
 
         return $autoCapTime;
