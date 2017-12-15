@@ -15,7 +15,7 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
     const PAYMENT_CARD_NEW_CARD     = 'new_card';
     const AUTO_CAPTURE_TIME         = 0;
     const RENDER_MODE               = 2;
-    const VERSION                   = '2.5.2';
+    const VERSION                   = '2.5.3';
     const RENDER_NAMESPACE          = 'Checkout';
     const CARD_FORM_MODE            = 'cardTokenisation';
     const JS_PATH_CARD_TOKEN        = 'https://cdn.checkout.com/sandbox/js/checkout.js';
