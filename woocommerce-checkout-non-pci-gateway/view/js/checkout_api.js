@@ -98,10 +98,7 @@ jQuery(document).ready(function() {
 
                             }
 
-                            if(jQuery('.checkout-new-card-radio').is(':checked')== true){
-                                Checkout.open();
-                            } 
-
+                            Checkout.open();
                         }
 
                         return false;
