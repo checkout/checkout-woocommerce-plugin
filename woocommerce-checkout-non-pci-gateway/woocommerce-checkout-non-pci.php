@@ -15,7 +15,7 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
     const PAYMENT_CARD_NEW_CARD     = 'new_card';
     const AUTO_CAPTURE_TIME         = 0;
     const RENDER_MODE               = 2;
-    const VERSION                   = '2.5.4';
+    const VERSION                   = '2.5.5';
     const RENDER_NAMESPACE          = 'Checkout';
     const CARD_FORM_MODE            = 'cardTokenisation';
     const JS_PATH_CARD_TOKEN        = 'https://cdn.checkout.com/sandbox/js/checkout.js';
@@ -128,8 +128,8 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
             'auto_cap_time' => array(
                 'title'     => __('Auto Capture Time', 'woocommerce-checkout-non-pci'),
                 'type'      => 'text',
-                'desc_tip'  => __('Time to automatically capture charge', 'woocommerce-checkout-non-pci'),
-                'default'   => __( '0', 'woocommerce-checkout-non-pci' ),
+                'desc_tip'  => __('Time to automatically capture charge. It is recommended to set it to a minimun of 0.02', 'woocommerce-checkout-non-pci'),
+                'default'   => __( '0.02', 'woocommerce-checkout-non-pci' ),
             ),
             'order_status' => array(
                 'title'       => __('New Order Status', 'woocommerce-checkout-non-pci'),
@@ -310,6 +310,12 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
                     'standard'         => __('Standard', 'woocommerce-checkout-non-pci'),
                     'simple'          => __('Simple', 'woocommerce-checkout-non-pci'),
                 )
+            ),
+
+            'custom_css' => array(
+                'title'     => __('Custom Css', 'woocommerce-checkout-non-pci'),
+                'type'      => 'textarea',
+                'desc_tip'  => __('Custom css to customise FramesJs layout', 'woocommerce-checkout-non-pci'),
             ),
         );
     }
@@ -764,81 +770,81 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
                             <script type="text/javascript" src="<?php echo plugins_url() . '/woocommerce-checkout-non-pci-gateway/view/js/' . 'checkout_api.js'?>"></script>
                      <?php else:?>
                                 <script type="text/javascript">
-                                    
-                                        window.CheckoutApiEmbConfig = {
-                                            debug: false,
-                                            publicKey: "<?php echo $this->get_option('public_key') ?>",
-                                            theme: "<?php echo $this->get_option('frames_theme') ?>",
-                                            themeOverride: "<?php echo $this->get_option('custom_css')?>",
-                                            lightboxActivated: function(){
-                                                 document.getElementById("cko-iframe-id").setAttribute("style","border-left-width: 0px;border-top-width: 0px;   border-right-width: 0px;border-bottom-width: 0px;");
-                                                 jQuery('.cko-md-overlay').remove();
-                                                 document.getElementById("cko-iframe-id").style.position="relative";
+                                    var style = {<?php echo $this->get_option('custom_css');?>}
+                                    window.CheckoutApiEmbConfig = {
+                                        debug: false,
+                                        publicKey: "<?php echo $this->get_option('public_key') ?>",
+                                        theme: "<?php echo $this->get_option('frames_theme') ?>",
+                                        style: style,
+                                        lightboxActivated: function(){
+                                             document.getElementById("cko-iframe-id").setAttribute("style","border-left-width: 0px;border-top-width: 0px;   border-right-width: 0px;border-bottom-width: 0px;");
+                                             jQuery('.cko-md-overlay').remove();
+                                             document.getElementById("cko-iframe-id").style.position="relative";
 
-                                            },
-                                            cardTokenised: function(event) {
+                                        },
+                                        cardTokenised: function(event) {
+                                            
+                                            if (document.getElementById('cko-card-token').value.length === 0 || document.getElementById('cko-card-token').value != event.data.cardToken) {
+                                               document.getElementById('cko-card-token').value = event.data.cardToken;
+                                               jQuery('#place_order').trigger('click');
                                                 
-                                                if (document.getElementById('cko-card-token').value.length === 0 || document.getElementById('cko-card-token').value != event.data.cardToken) {
-                                                   document.getElementById('cko-card-token').value = event.data.cardToken;
-                                                   jQuery('#place_order').trigger('click');
-                                                    
-                                                }
-                                            },
-                                            cardValidationChanged: function (event) {
-                                                document.getElementById("place_order").disabled = !Frames.isCardValid()
-                                            },
-                                            ready: function(event){
-
-                                                if(jQuery('#woocommerce_checkout_non_pci-cc-form').children("ul").length>0 && jQuery('#checkout-new-card').is(':checked')== false){
-
-                                                    checkoutHideNewNoPciCard();
-
-                                                    function checkoutHideNewNoPciCard() {
-                                                        jQuery('.checkout-non-pci-new-card-row').hide();
-                                                        document.getElementById("place_order").disabled = false;
-                                                    }
-
-                                                    function checkoutShowNewNoPciCard() {
-                                                        jQuery('.checkout-non-pci-new-card-row').show();
-                                                        document.getElementById("place_order").disabled = true;
-                                                        CKOConfig.createBindings();
-                                                    }
-
-                                                    jQuery('.checkout-saved-card-radio').on("change", function() {
-                                                        jQuery('form.checkout').unbind('#place_order, checkout_place_order');
-                                                        jQuery('form#order_review').unbind();
-                                                        jQuery('#place_order').unbind();
-                                                        checkoutHideNewNoPciCard();
-                                                    });
-
-                                                    jQuery('.checkout-new-card-radio').on("change", function() {
-                                                        checkoutShowNewNoPciCard();
-                                                    });
-                                               } else {
-
-                                                    function checkoutShowNewNoPciCard() {
-                                                        jQuery('.checkout-non-pci-new-card-row').show();
-                                                        document.getElementById("place_order").disabled = true;
-                                                        CKOConfig.createBindings();
-                                                    }
-
-                                                    function checkoutHideNewNoPciCard() {
-                                                        jQuery('.checkout-non-pci-new-card-row').hide();
-                                                        document.getElementById("place_order").disabled = false;
-                                                    }
-                                                     jQuery('.checkout-saved-card-radio').on("change", function() {
-                                                        jQuery('form.checkout').unbind('#place_order, checkout_place_order');
-                                                        jQuery('form#order_review').unbind();
-                                                        jQuery('#place_order').unbind();
-                                                        checkoutHideNewNoPciCard();
-                                                    });
-
-                                                      jQuery('.checkout-new-card-radio').on("change", function() {
-                                                        checkoutShowNewNoPciCard();
-                                                    });
-                                               }
                                             }
-                                        };
+                                        },
+                                        cardValidationChanged: function (event) {
+                                            document.getElementById("place_order").disabled = !Frames.isCardValid()
+                                        },
+                                        ready: function(event){
+
+                                            if(jQuery('#woocommerce_checkout_non_pci-cc-form').children("ul").length>0 && jQuery('#checkout-new-card').is(':checked')== false){
+
+                                                checkoutHideNewNoPciCard();
+
+                                                function checkoutHideNewNoPciCard() {
+                                                    jQuery('.checkout-non-pci-new-card-row').hide();
+                                                    document.getElementById("place_order").disabled = false;
+                                                }
+
+                                                function checkoutShowNewNoPciCard() {
+                                                    jQuery('.checkout-non-pci-new-card-row').show();
+                                                    document.getElementById("place_order").disabled = true;
+                                                    CKOConfig.createBindings();
+                                                }
+
+                                                jQuery('.checkout-saved-card-radio').on("change", function() {
+                                                    jQuery('form.checkout').unbind('#place_order, checkout_place_order');
+                                                    jQuery('form#order_review').unbind();
+                                                    jQuery('#place_order').unbind();
+                                                    checkoutHideNewNoPciCard();
+                                                });
+
+                                                jQuery('.checkout-new-card-radio').on("change", function() {
+                                                    checkoutShowNewNoPciCard();
+                                                });
+                                           } else {
+
+                                                function checkoutShowNewNoPciCard() {
+                                                    jQuery('.checkout-non-pci-new-card-row').show();
+                                                    document.getElementById("place_order").disabled = true;
+                                                    CKOConfig.createBindings();
+                                                }
+
+                                                function checkoutHideNewNoPciCard() {
+                                                    jQuery('.checkout-non-pci-new-card-row').hide();
+                                                    document.getElementById("place_order").disabled = false;
+                                                }
+                                                 jQuery('.checkout-saved-card-radio').on("change", function() {
+                                                    jQuery('form.checkout').unbind('#place_order, checkout_place_order');
+                                                    jQuery('form#order_review').unbind();
+                                                    jQuery('#place_order').unbind();
+                                                    checkoutHideNewNoPciCard();
+                                                });
+
+                                                  jQuery('.checkout-new-card-radio').on("change", function() {
+                                                    checkoutShowNewNoPciCard();
+                                                });
+                                           }
+                                        }
+                                    };
                                     window.checkoutFields = '<?php echo $checkoutFields?>';
                                 </script>
                                 <script type="text/javascript">

@@ -41,7 +41,7 @@ class WC_Checkout_Pci_Request
         $autoCapTime = $this->gateway->get_option('auto_cap_time');
         
         if(empty($autoCapTime)){
-            $autoCapTime = 0;
+            $autoCapTime = 0.02;
         }
 
         if (strpos($autoCapTime, ',') !== false) {
@@ -146,8 +146,6 @@ class WC_Checkout_Pci_Request
         /* END: Prepare data */
 
         $config['autoCapture']  = $autoCapture ? CheckoutApi_Client_Constant::AUTOCAPUTURE_CAPTURE : CheckoutApi_Client_Constant::AUTOCAPUTURE_AUTH;
-        $config['email']        = $order->billing_email;
-
         $config['value']                = $amount;
         $config['currency']             = $this->getOrderCurrency($order);
         $config['trackId']              = $order->id;
@@ -158,7 +156,25 @@ class WC_Checkout_Pci_Request
 
         if (!empty($savedCardData)) {
             $config['cardId'] = $savedCardData->card_id;
+
+            global $wpdb;
+            $tableName = $wpdb->prefix. 'checkout_customer_cards';
+            $sql        = $wpdb->prepare("SELECT * FROM {$tableName} WHERE card_id = '%s';", $savedCardData->card_id);
+
+            $result = $wpdb->get_results($sql);
+
+            foreach ($result as $row) {
+                $results = $row;
+            }
+
+            if($results->cko_customer_id){
+                $config['customerId'] = $results->cko_customer_id;
+            } else {
+                $config['email'] = $order->billing_email;
+            }
+
         } else {
+            $config['email'] = $order->billing_email;
             $config['card'] = array(
                 'name'              => $ccParams['ccName'],
                 'number'            => $ccParams['ccNumber'],

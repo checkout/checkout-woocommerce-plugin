@@ -14,7 +14,7 @@ class WC_Checkout_Pci extends WC_Payment_Gateway {
     const PAYMENT_ACTION_CAPTURE    = 'authorize_capture';
     const PAYMENT_CARD_NEW_CARD     = 'new_card';
     const AUTO_CAPTURE_TIME         = 0;
-    const VERSION                   = '2.5.4';
+    const VERSION                   = '2.5.5';
 
     const CREDIT_CARD_CHARGE_MODE_NOT_3D    = 1;
     const TRANSACTION_INDICATOR_REGULAR     = 1;
@@ -110,8 +110,8 @@ class WC_Checkout_Pci extends WC_Payment_Gateway {
             'auto_cap_time' => array(
                 'title'     => __('Auto Capture Time', 'woocommerce-checkout-pci'),
                 'type'      => 'text',
-                'desc_tip'  => __('Time to automatically capture charge', 'woocommerce-checkout-pci'),
-                'default'   => __( '0', 'woocommerce-checkout-pci' ),
+                'desc_tip'  => __('Time to automatically capture charge. It is recommended to set it to a minimun of 0.02', 'woocommerce-checkout-pci'),
+                'default'   => __( '0.02', 'woocommerce-checkout-pci' ),
             ),
             'order_status' => array(
                 'title'       => __('New Order Status', 'woocommerce-checkout-pci'),
