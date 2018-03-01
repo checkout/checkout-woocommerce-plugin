@@ -12,6 +12,8 @@ export default {
       order_path_2: '&action=edit',
       product_path: '/?product=test',
       woocommerce: 'http://localhost/wordpress/wp-admin/index.php?page=wc-setup',
+      non_pci: '/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_non_pci',
+      pci: '/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_pci'
     },
     admin: {
       username: 'checkout',
@@ -154,7 +156,7 @@ export default {
       admin_password: '#user_pass',
       admin_sign_in: '#wp-submit',
       dashboard: '#menu-dashboard',
-      activate_woocomerce: 'tr.inactive:nth-child(5) > td:nth-child(2) > div:nth-child(2) > span:nth-child(1) > a:nth-child(1)',
+      activate_woocomerce: 'tr.inactive:nth-child(6) > td:nth-child(2) > div:nth-child(2) > span:nth-child(1) > a:nth-child(1)',
       woo_adress: '#store_address',
       woo_next: '.button-primary',
       woo_postcode: '#store_postcode',
@@ -174,7 +176,7 @@ export default {
         non_pci: {
           enable_plugin: '#woocommerce_woocommerce_checkout_non_pci_enabled',
           settings_non_pci: 'tr.active:nth-child(2) > td:nth-child(2) > div:nth-child(2) > span:nth-child(1) > a:nth-child(1)',
-          activate_non_pci: 'tr.inactive:nth-child(2) > td:nth-child(2) > div:nth-child(2) > span:nth-child(1) > a:nth-child(1)',
+          activate_non_pci: 'tr.inactive:nth-child(3) > td:nth-child(2) > div:nth-child(2) > span:nth-child(1) > a:nth-child(1)',
           secret_key: '#woocommerce_woocommerce_checkout_non_pci_secret_key',
           private_shared_key: '#woocommerce_woocommerce_checkout_non_pci_private_shared_key',
           public_key: '#woocommerce_woocommerce_checkout_non_pci_public_key',
@@ -206,8 +208,8 @@ export default {
         },
         pci: {
           enable_plugin: '#woocommerce_woocommerce_checkout_pci_enabled',
-          activate_pci: 'tr.inactive:nth-child(3) > td:nth-child(2) > div:nth-child(2) > span:nth-child(1) > a:nth-child(1)',
-          settings_pci: 'tr.active:nth-child(3) > td:nth-child(2) > div:nth-child(2) > span:nth-child(1) > a:nth-child(1)',
+          activate_pci: 'tr.inactive:nth-child(4) > td:nth-child(2) > div:nth-child(2) > span:nth-child(1) > a:nth-child(1)',
+          settings_pci: 'tr.active:nth-child(4) > td:nth-child(2) > div:nth-child(2) > span:nth-child(1) > a:nth-child(1)',
           secret_key: '#woocommerce_woocommerce_checkout_pci_secret_key',
           private_shared_key: '#woocommerce_woocommerce_checkout_pci_public_key',
           cancel_status_on_void: '#woocommerce_woocommerce_checkout_pci_void_status',
