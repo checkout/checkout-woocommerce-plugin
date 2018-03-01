@@ -10,6 +10,8 @@ class WC_Checkout_Non_Pci_Web_Hook extends WC_Checkout_Non_Pci_Request
     const EVENT_TYPE_CHARGE_CAPTURED    = 'charge.captured';
     const EVENT_TYPE_CHARGE_REFUNDED    = 'charge.refunded';
     const EVENT_TYPE_CHARGE_VOIDED      = 'charge.voided';
+    const EVENT_TYPE_CHARGE_FAILED      = 'charge.failed';
+    const EVENT_TYPE_INVOICE_CANCELLED  = 'invoice.cancelled';
 
     /**
      * Constructor
@@ -39,9 +41,10 @@ class WC_Checkout_Non_Pci_Web_Hook extends WC_Checkout_Non_Pci_Request
         $transactionIndicator = $response->message->transactionIndicator;
         $responseCode = $response->message->responseCode;
         $responseStatus = $response->message->status;
-
+        $Api = CheckoutApi_Api::getApi(array('mode' => $this->_getEndpointMode()));
+   
         // transactionIndicator available only in Auth webhook
-        if ($transactionIndicator == 2 && !is_null($previousRecurringDate)) {
+        if ($transactionIndicator == 2 && !is_null($response->message->customerPaymentPlans[0]->previousRecurringDate) { 
             if(preg_match('/^1[0-9]+$/', $responseCode) && $responseStatus == 'Authorised' || $responseStatus == 'flagged' ){
                 $recurringCountLeft = $response->message->customerPaymentPlans[0]->recurringCountLeft;
                 if($recurringCountLeft == 0){
@@ -50,8 +53,26 @@ class WC_Checkout_Non_Pci_Web_Hook extends WC_Checkout_Non_Pci_Request
                     WC_Subscriptions_Manager::expire_subscriptions_for_order( $order );
                 } else {
                     $message = 'Webhook received, subscription payment for initial OrderID: ' . $orderId. '. Charge Status :'.$responseStatus.'. Charge ID: '.$transactionId;
-                    $order->add_order_note(__($message, 'woocommerce-subscriptions'));
+
                     WC_Subscriptions_Manager::process_subscription_payments_on_order($order);
+
+                    $subscriptions_ids = wcs_get_subscriptions_for_order( $orderId );
+                    
+                    foreach( $subscriptions_ids as $subscription_id => $subscription_obj )
+                        if($subscription_obj->order->id == $order_id) break; // Stop the loop
+
+                    $subOrder = new WC_Order($subscription_id);
+
+                    $renewal = wcs_create_renewal_order($subOrder);
+                    $renewal->add_order_note(__($message,'woocommerce-subscriptions'));
+                    $renewalOrderId = wcs_get_objects_property( $renewal, 'id' );
+                    update_post_meta($renewalOrderId, '_transaction_id', $transactionId);
+
+                    $verifyParams   = array('chargeId' => $response->message->id, 'authorization' => $this->getSecretKey());
+                    $result         = $Api->getCharge($verifyParams);
+                    
+                    $Api->updateTrackId($result, $renewalOrderId);
+
                 }
             } else {
                 $message = 'Webhook received, subscription payment for initial OrderID: ' . $orderId. '. Charge Status :'.$responseStatus.'. Charge ID: '.$transactionId. '. ResponseCode : '.$responseCode;
@@ -87,7 +108,7 @@ class WC_Checkout_Non_Pci_Web_Hook extends WC_Checkout_Non_Pci_Request
         $responseCode = $response->message->responseCode;
         $responseStatus = $response->message->status;
         $responseMessage = $response->message->responseMessage;
-
+        $Api = CheckoutApi_Api::getApi(array('mode' => $this->_getEndpointMode()));
 
         if ($transactionIndicator == 2) {
 
@@ -96,6 +117,24 @@ class WC_Checkout_Non_Pci_Web_Hook extends WC_Checkout_Non_Pci_Request
 
             $order->add_order_note(__($message, 'woocommerce-subscriptions'));
             WC_Subscriptions_Manager::process_subscription_payment_failure_on_order($order);
+
+            $subscriptions_ids = wcs_get_subscriptions_for_order( $orderId );
+            
+            foreach( $subscriptions_ids as $subscription_id => $subscription_obj )
+                if($subscription_obj->order->id == $order_id) break; // Stop the loop
+
+            $subOrder = new WC_Order($subscription_id);
+
+            $renewal = wcs_create_renewal_order($subOrder);
+            $renewal->add_order_note(__($message,'woocommerce-subscriptions'));
+            
+            $renewalOrderId = wcs_get_objects_property( $renewal, 'id' );
+            update_post_meta($renewalOrderId, '_transaction_id', $transactionId);
+
+            $verifyParams   = array('chargeId' => $response->message->id, 'authorization' => $this->getSecretKey());
+            $result         = $Api->getCharge($verifyParams);
+            
+            $Api->updateTrackId($result, $renewalOrderId);
 
         }
 

@@ -14,7 +14,7 @@ class WC_Checkout_Pci extends WC_Payment_Gateway {
     const PAYMENT_ACTION_CAPTURE    = 'authorize_capture';
     const PAYMENT_CARD_NEW_CARD     = 'new_card';
     const AUTO_CAPTURE_TIME         = 0;
-    const VERSION                   = '2.5.4';
+    const VERSION                   = '2.5.5';
 
     const CREDIT_CARD_CHARGE_MODE_NOT_3D    = 1;
     const TRANSACTION_INDICATOR_REGULAR     = 1;
@@ -38,7 +38,10 @@ class WC_Checkout_Pci extends WC_Payment_Gateway {
         $this->supports     = array(
             'products',
             'refunds',
-            'subscriptions'
+            'subscriptions',
+            'subscription_suspension',
+            'subscription_reactivation',
+            'subscription_cancellation'
         );
         $this->has_fields   = true;
 
@@ -58,6 +61,10 @@ class WC_Checkout_Pci extends WC_Payment_Gateway {
         if (is_admin()) {
             add_action('woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'process_admin_options'));
         }
+
+        add_action('woocommerce_subscription_status_on-hold',array($this, 'updatePlan'));
+        add_action('woocommerce_subscription_status_active',array($this, 'updatePlan'));
+        add_action('woocommerce_subscription_status_cancelled',array($this, 'updatePlan'));
     }
 
     /**
@@ -110,8 +117,8 @@ class WC_Checkout_Pci extends WC_Payment_Gateway {
             'auto_cap_time' => array(
                 'title'     => __('Auto Capture Time', 'woocommerce-checkout-pci'),
                 'type'      => 'text',
-                'desc_tip'  => __('Time to automatically capture charge', 'woocommerce-checkout-pci'),
-                'default'   => __( '0', 'woocommerce-checkout-pci' ),
+                'desc_tip'  => __('Time to automatically capture charge. It is recommended to set it to a minimun of 0.02', 'woocommerce-checkout-pci'),
+                'default'   => __( '0.02', 'woocommerce-checkout-pci' ),
             ),
             'order_status' => array(
                 'title'       => __('New Order Status', 'woocommerce-checkout-pci'),
@@ -154,6 +161,17 @@ class WC_Checkout_Pci extends WC_Payment_Gateway {
                 'type'        => 'checkbox',
                 'description' => __( 'If enabled, users will be able to pay with a saved card during checkout.', 'woocommerce-checkout-pci' ),
                 'default'     => 'no'
+            ),
+            'adv_setting_subscription' => array(
+                'title'       => __( 'Advance option for Subscription', 'woocommerce' ),
+                'type'        => 'title',
+            ),
+            'reactivate_cancel' => array(
+                'title'     => __( 'Enable / Disable', 'woocommerce-checkout-pci' ),
+                'label'     => __( 'Allow customer to reactivate or cancel subscription from his/her Account', 'woocommerce-checkout-pci' ),
+                'type'      => 'checkbox',
+                'default'   => 'no',
+                'desc_tip'  => __('Allow customer to reactivate or cancel subscription from his/her Account', 'woocommerce-checkout-pci'),
             ),
         );
     }
@@ -463,5 +481,80 @@ class WC_Checkout_Pci extends WC_Payment_Gateway {
         return true;
     }
 
+    //Activate, suspend or cancel recurring payment plan
+    public function updatePlan($subscription){ 
+        $subscriptionParentId = $subscription->parent_id;
 
+        if(!$subscriptionParentId){
+            return false;
+        }
+
+        $order          = new WC_Order($subscriptionParentId);
+        $transactionId = $order->transaction_id;
+
+        $checkout   = new WC_Checkout_Pci();
+        $mode       =  $checkout->settings['mode'];
+
+        //Api call getChargeHistory in order to get the auth chargeId
+        $Api            = CheckoutApi_Api::getApi(array('mode' => $checkout->settings['mode']));
+        $verifyParamsHistory   = array('chargeId' => $transactionId, 'authorization' => $checkout->settings['secret_key']);
+        $resultHistory         = $Api->getChargeHistory($verifyParamsHistory);
+        $charges = $resultHistory->getCharges();
+
+        if(!empty($charges)) {
+            $chargesArray = $charges->toArray();
+
+            foreach ($chargesArray as $key=> $charge) {
+                if (in_array('Authorised', $charge)) {
+                    $authChargeId = $charge['id'];
+                    break;
+                }
+            }
+
+            //Api Call getCharge in order to get the recurring planId
+            $verifyParamsCharge   = array('chargeId' => $authChargeId, 'authorization' => $checkout->settings['secret_key']);
+            $resultCharge         = $Api->getCharge($verifyParamsCharge);
+
+            if(!empty($resultCharge)){
+                if($subscription->status == 'cancelled'){
+                    $customerPlanId = $resultCharge['customerPaymentPlans'][0]['customerPlanId'];
+                    $param   = array('customerPlanId' => $customerPlanId, 'authorization' => $checkout->settings['secret_key']);
+
+                    //Api call to delete customer plan
+                    $resultCancel = $Api->cancelCustomerPaymentPlan($param);
+
+                    if($resultCancel['message'] != 'ok'){
+                        WC_Checkout_Pci::log('Failed to cancel Customer PlanId :'.$customerPlanId. ' for orderId:'.$subscriptionParentId);
+                    } else {
+                         WC_Checkout_Pci::log('Customer plan cancelled successfully. Customer PlanId:'.$customerPlanId. ' for orderId:'.$subscriptionParentId);
+                    }
+
+                }else{
+
+                    $recPlanId = $resultCharge['customerPaymentPlans'][0]['planId'];
+
+                    if($subscription->status == 'active'){
+                        $postedParam['status'] = 1;
+                        $failMessage = 'Failed to activate Recuring PlanId ';
+                        $successMessage = 'Account successfully activated. Recuring PlanId ';
+                    } elseif ($subscription->status == 'on-hold') {
+                        $postedParam['status'] = 4;
+                        $failMessage = 'Failed to suspend Recurring PlanId ';
+                        $successMessage = 'Account successfully suspended. Recurring PlanId ';
+                    }
+                    
+                    $param   = array('planId' => $recPlanId, 'postedParam' =>$postedParam, 'authorization' => $checkout->settings['secret_key']);
+
+                    //Api call to update payment plan and set status to 4(Suspended) or 1(Activate)
+                    $resultRec = $Api->updatePaymentPlan($param);
+
+                    if($resultRec['message'] != 'ok'){
+                        WC_Checkout_Pci::log($failMessage.':'.$recPlanId. ' for orderId:'.$subscriptionParentId);
+                    } else {
+                        WC_Checkout_Pci::log($successMessage.':'.$recPlanId. ' for orderId:'.$subscriptionParentId);
+                    }
+                }
+            }
+        }
+    }
 }
