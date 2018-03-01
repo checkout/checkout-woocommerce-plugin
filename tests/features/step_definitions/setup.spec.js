@@ -33,13 +33,13 @@ export default function () {
   this.Given(/^I open the (.*) settings$/, (option) => {
     switch (option) {
       case 'non-pci':
-        browser.click(BACKEND.plugin.non_pci.settings_non_pci);
+        browser.url(URL.wordpress_base + URL.non_pci);
         browser.waitUntil(function () {
           return browser.isVisible(BACKEND.plugin.non_pci.public_key);
         }, VAL.timeout_out, 'settings should be loaded');
         break;
       case 'pci':
-        browser.click(BACKEND.plugin.pci.settings_pci);
+        browser.url(URL.wordpress_base + URL.pci);
         browser.waitUntil(function () {
           return browser.isVisible(BACKEND.plugin.pci.secret_key);
         }, VAL.timeout_out, 'settings should be loaded');
@@ -70,7 +70,7 @@ export default function () {
     browser.url(URL.wordpress_base);
   });
   this.Given(/^I enable the 2 checkout plugins$/, () => {
-    browser.click(BACKEND.plugin.non_pci.settings_non_pci);
+    browser.url(URL.wordpress_base + URL.non_pci);
     browser.waitUntil(function () {
       return browser.isVisible(BACKEND.plugin.non_pci.public_key);
     }, VAL.timeout_out, 'settings should be loaded');
