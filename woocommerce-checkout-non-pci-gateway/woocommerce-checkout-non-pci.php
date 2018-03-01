@@ -15,7 +15,7 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
     const PAYMENT_CARD_NEW_CARD     = 'new_card';
     const AUTO_CAPTURE_TIME         = 0;
     const RENDER_MODE               = 2;
-    const VERSION                   = '2.5.4';
+    const VERSION                   = '2.5.5';
     const RENDER_NAMESPACE          = 'Checkout';
     const CARD_FORM_MODE            = 'cardTokenisation';
     const JS_PATH_CARD_TOKEN        = 'https://cdn.checkout.com/sandbox/js/checkout.js';
@@ -46,7 +46,10 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
         $this->supports     = array(
             'products',
             'refunds',
-            'subscriptions'
+            'subscriptions',
+            'subscription_suspension',
+            'subscription_reactivation',
+            'subscription_cancellation'
         );
         $this->has_fields   = true;
 
@@ -71,6 +74,9 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
         // Payment listener/API hook
         add_action( 'woocommerce_api_wc_checkout_non_pci', array( $this, 'callback' ) );
    
+        add_action('woocommerce_subscription_status_on-hold',array($this, 'updatePlan'));
+        add_action('woocommerce_subscription_status_active',array($this, 'updatePlan'));
+        add_action('woocommerce_subscription_status_cancelled',array($this, 'updatePlan'));
     }
 
     /**
@@ -128,8 +134,8 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
             'auto_cap_time' => array(
                 'title'     => __('Auto Capture Time', 'woocommerce-checkout-non-pci'),
                 'type'      => 'text',
-                'desc_tip'  => __('Time to automatically capture charge', 'woocommerce-checkout-non-pci'),
-                'default'   => __( '0', 'woocommerce-checkout-non-pci' ),
+                'desc_tip'  => __('Time to automatically capture charge. It is recommended to set it to a minimun of 0.02', 'woocommerce-checkout-non-pci'),
+                'default'   => __( '0.02', 'woocommerce-checkout-non-pci' ),
             ),
             'order_status' => array(
                 'title'       => __('New Order Status', 'woocommerce-checkout-non-pci'),
@@ -310,6 +316,25 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
                     'standard'         => __('Standard', 'woocommerce-checkout-non-pci'),
                     'simple'          => __('Simple', 'woocommerce-checkout-non-pci'),
                 )
+            ),
+
+            'custom_css' => array(
+                'title'     => __('Custom Css', 'woocommerce-checkout-non-pci'),
+                'type'      => 'textarea',
+                'desc_tip'  => __('Custom css to customise FramesJs layout', 'woocommerce-checkout-non-pci'),
+            ),
+
+            'adv_setting_subscription' => array(
+                'title'       => __( 'Advance option for Subscription', 'woocommerce' ),
+                'type'        => 'title',
+            ),
+
+            'reactivate_cancel' => array(
+                'title'     => __( 'Enable / Disable', 'woocommerce-checkout-non-pci' ),
+                'label'     => __( 'Allow customer to reactivate or cancel subscription from his/her Account', 'woocommerce-checkout-non-pci' ),
+                'type'      => 'checkbox',
+                'default'   => 'no',
+                'desc_tip'  => __('Allow customer to reactivate or cancel subscription from his/her Account', 'woocommerce-checkout-non-pci'),
             ),
         );
     }
@@ -764,81 +789,81 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
                             <script type="text/javascript" src="<?php echo plugins_url() . '/woocommerce-checkout-non-pci-gateway/view/js/' . 'checkout_api.js'?>"></script>
                      <?php else:?>
                                 <script type="text/javascript">
-                                    
-                                        window.CheckoutApiEmbConfig = {
-                                            debug: false,
-                                            publicKey: "<?php echo $this->get_option('public_key') ?>",
-                                            theme: "<?php echo $this->get_option('frames_theme') ?>",
-                                            themeOverride: "<?php echo $this->get_option('custom_css')?>",
-                                            lightboxActivated: function(){
-                                                 document.getElementById("cko-iframe-id").setAttribute("style","border-left-width: 0px;border-top-width: 0px;   border-right-width: 0px;border-bottom-width: 0px;");
-                                                 jQuery('.cko-md-overlay').remove();
-                                                 document.getElementById("cko-iframe-id").style.position="relative";
+                                    var style = {<?php echo $this->get_option('custom_css');?>}
+                                    window.CheckoutApiEmbConfig = {
+                                        debug: false,
+                                        publicKey: "<?php echo $this->get_option('public_key') ?>",
+                                        theme: "<?php echo $this->get_option('frames_theme') ?>",
+                                        style: style,
+                                        lightboxActivated: function(){
+                                             document.getElementById("cko-iframe-id").setAttribute("style","border-left-width: 0px;border-top-width: 0px;   border-right-width: 0px;border-bottom-width: 0px;");
+                                             jQuery('.cko-md-overlay').remove();
+                                             document.getElementById("cko-iframe-id").style.position="relative";
 
-                                            },
-                                            cardTokenised: function(event) {
+                                        },
+                                        cardTokenised: function(event) {
+                                            
+                                            if (document.getElementById('cko-card-token').value.length === 0 || document.getElementById('cko-card-token').value != event.data.cardToken) {
+                                               document.getElementById('cko-card-token').value = event.data.cardToken;
+                                               jQuery('#place_order').trigger('click');
                                                 
-                                                if (document.getElementById('cko-card-token').value.length === 0 || document.getElementById('cko-card-token').value != event.data.cardToken) {
-                                                   document.getElementById('cko-card-token').value = event.data.cardToken;
-                                                   jQuery('#place_order').trigger('click');
-                                                    
-                                                }
-                                            },
-                                            cardValidationChanged: function (event) {
-                                                document.getElementById("place_order").disabled = !Frames.isCardValid()
-                                            },
-                                            ready: function(event){
-
-                                                if(jQuery('#woocommerce_checkout_non_pci-cc-form').children("ul").length>0 && jQuery('#checkout-new-card').is(':checked')== false){
-
-                                                    checkoutHideNewNoPciCard();
-
-                                                    function checkoutHideNewNoPciCard() {
-                                                        jQuery('.checkout-non-pci-new-card-row').hide();
-                                                        document.getElementById("place_order").disabled = false;
-                                                    }
-
-                                                    function checkoutShowNewNoPciCard() {
-                                                        jQuery('.checkout-non-pci-new-card-row').show();
-                                                        document.getElementById("place_order").disabled = true;
-                                                        CKOConfig.createBindings();
-                                                    }
-
-                                                    jQuery('.checkout-saved-card-radio').on("change", function() {
-                                                        jQuery('form.checkout').unbind('#place_order, checkout_place_order');
-                                                        jQuery('form#order_review').unbind();
-                                                        jQuery('#place_order').unbind();
-                                                        checkoutHideNewNoPciCard();
-                                                    });
-
-                                                    jQuery('.checkout-new-card-radio').on("change", function() {
-                                                        checkoutShowNewNoPciCard();
-                                                    });
-                                               } else {
-
-                                                    function checkoutShowNewNoPciCard() {
-                                                        jQuery('.checkout-non-pci-new-card-row').show();
-                                                        document.getElementById("place_order").disabled = true;
-                                                        CKOConfig.createBindings();
-                                                    }
-
-                                                    function checkoutHideNewNoPciCard() {
-                                                        jQuery('.checkout-non-pci-new-card-row').hide();
-                                                        document.getElementById("place_order").disabled = false;
-                                                    }
-                                                     jQuery('.checkout-saved-card-radio').on("change", function() {
-                                                        jQuery('form.checkout').unbind('#place_order, checkout_place_order');
-                                                        jQuery('form#order_review').unbind();
-                                                        jQuery('#place_order').unbind();
-                                                        checkoutHideNewNoPciCard();
-                                                    });
-
-                                                      jQuery('.checkout-new-card-radio').on("change", function() {
-                                                        checkoutShowNewNoPciCard();
-                                                    });
-                                               }
                                             }
-                                        };
+                                        },
+                                        cardValidationChanged: function (event) {
+                                            document.getElementById("place_order").disabled = !Frames.isCardValid()
+                                        },
+                                        ready: function(event){
+
+                                            if(jQuery('#woocommerce_checkout_non_pci-cc-form').children("ul").length>0 && jQuery('#checkout-new-card').is(':checked')== false){
+
+                                                checkoutHideNewNoPciCard();
+
+                                                function checkoutHideNewNoPciCard() {
+                                                    jQuery('.checkout-non-pci-new-card-row').hide();
+                                                    document.getElementById("place_order").disabled = false;
+                                                }
+
+                                                function checkoutShowNewNoPciCard() {
+                                                    jQuery('.checkout-non-pci-new-card-row').show();
+                                                    document.getElementById("place_order").disabled = true;
+                                                    CKOConfig.createBindings();
+                                                }
+
+                                                jQuery('.checkout-saved-card-radio').on("change", function() {
+                                                    jQuery('form.checkout').unbind('#place_order, checkout_place_order');
+                                                    jQuery('form#order_review').unbind();
+                                                    jQuery('#place_order').unbind();
+                                                    checkoutHideNewNoPciCard();
+                                                });
+
+                                                jQuery('.checkout-new-card-radio').on("change", function() {
+                                                    checkoutShowNewNoPciCard();
+                                                });
+                                           } else {
+
+                                                function checkoutShowNewNoPciCard() {
+                                                    jQuery('.checkout-non-pci-new-card-row').show();
+                                                    document.getElementById("place_order").disabled = true;
+                                                    CKOConfig.createBindings();
+                                                }
+
+                                                function checkoutHideNewNoPciCard() {
+                                                    jQuery('.checkout-non-pci-new-card-row').hide();
+                                                    document.getElementById("place_order").disabled = false;
+                                                }
+                                                 jQuery('.checkout-saved-card-radio').on("change", function() {
+                                                    jQuery('form.checkout').unbind('#place_order, checkout_place_order');
+                                                    jQuery('form#order_review').unbind();
+                                                    jQuery('#place_order').unbind();
+                                                    checkoutHideNewNoPciCard();
+                                                });
+
+                                                  jQuery('.checkout-new-card-radio').on("change", function() {
+                                                    checkoutShowNewNoPciCard();
+                                                });
+                                           }
+                                        }
+                                    };
                                     window.checkoutFields = '<?php echo $checkoutFields?>';
                                 </script>
                                 <script type="text/javascript">
@@ -922,6 +947,83 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
         }
 
         return true;
+    }
+
+    //Activate, suspend or cancel recurring payment plan
+    public function updatePlan($subscription){
+        $subscriptionParentId = $subscription->parent_id;
+
+        if(!$subscriptionParentId){
+            return false;
+        }
+        
+        $order          = new WC_Order($subscriptionParentId);
+        $transactionId = $order->transaction_id;
+
+        $checkout   = new WC_Checkout_Non_Pci();
+        $mode       =  $checkout->settings['mode'];
+
+        //Api call getChargeHistory in order to get the auth chargeId
+        $Api            = CheckoutApi_Api::getApi(array('mode' => $checkout->settings['mode']));
+        $verifyParamsHistory   = array('chargeId' => $transactionId, 'authorization' => $checkout->settings['secret_key']);
+        $resultHistory         = $Api->getChargeHistory($verifyParamsHistory);
+        $charges = $resultHistory->getCharges();
+
+        if(!empty($charges)) {
+            $chargesArray = $charges->toArray();
+
+            foreach ($chargesArray as $key=> $charge) {
+                if (in_array('Authorised', $charge)) {
+                    $authChargeId = $charge['id'];
+                    break;
+                }
+            }
+
+            //Api Call getCharge in order to get the recurring planId
+            $verifyParamsCharge   = array('chargeId' => $authChargeId, 'authorization' => $checkout->settings['secret_key']);
+            $resultCharge         = $Api->getCharge($verifyParamsCharge);
+
+            if(!empty($resultCharge)){
+                if($subscription->status == 'cancelled'){
+                    $customerPlanId = $resultCharge['customerPaymentPlans'][0]['customerPlanId'];
+                    $param   = array('customerPlanId' => $customerPlanId, 'authorization' => $checkout->settings['secret_key']);
+
+                    //Api call to delete customer plan
+                    $resultCancel = $Api->cancelCustomerPaymentPlan($param);
+
+                    if($resultCancel['message'] != 'ok'){
+                        WC_Checkout_Non_Pci::log('Failed to cancel Customer PlanId :'.$customerPlanId. ' for orderId:'.$subscriptionParentId);
+                    } else {
+                         WC_Checkout_Non_Pci::log('Customer plan cancelled successfully. Customer PlanId:'.$customerPlanId. ' for orderId:'.$subscriptionParentId);
+                    }
+
+                }else{
+
+                    $recPlanId = $resultCharge['customerPaymentPlans'][0]['planId'];
+
+                    if($subscription->status == 'active'){
+                        $postedParam['status'] = 1;
+                        $failMessage = 'Failed to activate Recuring PlanId ';
+                        $successMessage = 'Account successfully activated. Recuring PlanId ';
+                    } elseif ($subscription->status == 'on-hold') {
+                        $postedParam['status'] = 4;
+                        $failMessage = 'Failed to suspend Recurring PlanId ';
+                        $successMessage = 'Account successfully suspended. Recurring PlanId ';
+                    }
+                    
+                    $param   = array('planId' => $recPlanId, 'postedParam' =>$postedParam, 'authorization' => $checkout->settings['secret_key']);
+
+                    //Api call to update payment plan and set status to 4(Suspended) or 1(Activate)
+                    $resultRec = $Api->updatePaymentPlan($param);
+
+                    if($resultRec['message'] != 'ok'){
+                        WC_Checkout_Non_Pci::log($failMessage.':'.$recPlanId. ' for orderId:'.$subscriptionParentId);
+                    } else {
+                        WC_Checkout_Non_Pci::log($successMessage.':'.$recPlanId. ' for orderId:'.$subscriptionParentId);
+                    }
+                }
+            }
+        }
     }
 
 }
