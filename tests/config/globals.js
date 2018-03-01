@@ -176,7 +176,7 @@ export default {
         non_pci: {
           enable_plugin: '#woocommerce_woocommerce_checkout_non_pci_enabled',
           settings_non_pci: 'tr.active:nth-child(2) > td:nth-child(2) > div:nth-child(2) > span:nth-child(1) > a:nth-child(1)',
-          activate_non_pci: 'tr.inactive:nth-child(2) > td:nth-child(2) > div:nth-child(2) > span:nth-child(1) > a:nth-child(1)',
+          activate_non_pci: 'tr.inactive:nth-child(3) > td:nth-child(2) > div:nth-child(2) > span:nth-child(1) > a:nth-child(1)',
           secret_key: '#woocommerce_woocommerce_checkout_non_pci_secret_key',
           private_shared_key: '#woocommerce_woocommerce_checkout_non_pci_private_shared_key',
           public_key: '#woocommerce_woocommerce_checkout_non_pci_public_key',
