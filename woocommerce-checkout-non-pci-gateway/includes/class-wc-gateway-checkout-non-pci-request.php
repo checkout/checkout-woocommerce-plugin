@@ -458,6 +458,17 @@ class WC_Checkout_Non_Pci_Request
         return $autoCapTime;
     }
 
+    /**
+     * Get stored reactivate_cancel
+     *
+     * @return mixed
+     *
+     * @version 20180221
+     */
+    public function getRecurringSetting() {
+        return $this->gateway->get_option('reactivate_cancel');
+    }
+
 
     /**
      * Create Payment Token

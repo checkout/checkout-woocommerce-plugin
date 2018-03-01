@@ -52,6 +52,17 @@ class WC_Checkout_Pci_Request
     }
 
     /**
+     * Get stored reactivate_cancel
+     *
+     * @return mixed
+     *
+     * @version 20180221
+     */
+    public function getRecurringSetting() {
+        return $this->gateway->get_option('reactivate_cancel');
+    }
+
+    /**
      * Create Charge
      *
      * @param WC_Order $order

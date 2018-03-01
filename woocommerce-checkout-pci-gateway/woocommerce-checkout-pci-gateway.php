@@ -214,7 +214,7 @@ function checkout_customer_cards_content() {
 /* END: Show customer card list */
 
 // define the woocommerce_save_account_details callback 
-function action_woocommerce_save_account_details( $user_id ) { 
+function checkout_pci_woocommerce_save_account_details( $user_id ) { 
 
     $currentUserInfo = get_currentuserinfo();
     $currentUserEmail = $currentUserInfo->data->user_email;
@@ -246,4 +246,30 @@ function action_woocommerce_save_account_details( $user_id ) {
 }; 
          
 // add the action 
-add_action( 'woocommerce_save_account_details', 'action_woocommerce_save_account_details', 10, 1 ); 
+add_action( 'woocommerce_save_account_details', 'checkout_pci_woocommerce_save_account_details', 10, 1 ); 
+
+//Remove subscriptions button for customer
+function checkout_pci_remove_subscriptions_button( $actions, $subscription ) {
+
+    include_once( 'includes/class-wc-gateway-checkout-pci-request.php');
+    $request = new WC_Checkout_Pci_Request(new WC_Checkout_Pci());
+
+     foreach ( $actions as $action_key => $action ) {
+            switch ( $action_key ) {
+                case 'reactivate':          // Hide "Reactive" button on subscriptions that are "on-hold"?
+                case 'cancel':              // Hide "Cancel" button on subscriptions that are "active" or "on-hold"?
+
+                    if($request->getRecurringSetting() == 'no'){
+                        unset( $actions[ $action_key ] );
+                    }
+                    
+                    break;
+                default: 
+                    error_log( '-- $action = ' . print_r( $action, true ) );
+                    break;
+            }
+        }
+        return $actions;
+}
+
+add_filter( 'wcs_view_subscription_actions', 'checkout_pci_remove_subscriptions_button', 100, 2 );

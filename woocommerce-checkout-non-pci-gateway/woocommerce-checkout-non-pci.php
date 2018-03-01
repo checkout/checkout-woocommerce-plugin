@@ -46,7 +46,10 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
         $this->supports     = array(
             'products',
             'refunds',
-            'subscriptions'
+            'subscriptions',
+            'subscription_suspension',
+            'subscription_reactivation',
+            'subscription_cancellation'
         );
         $this->has_fields   = true;
 
@@ -71,6 +74,9 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
         // Payment listener/API hook
         add_action( 'woocommerce_api_wc_checkout_non_pci', array( $this, 'callback' ) );
    
+        add_action('woocommerce_subscription_status_on-hold',array($this, 'updatePlan'));
+        add_action('woocommerce_subscription_status_active',array($this, 'updatePlan'));
+        add_action('woocommerce_subscription_status_cancelled',array($this, 'updatePlan'));
     }
 
     /**
@@ -316,6 +322,19 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
                 'title'     => __('Custom Css', 'woocommerce-checkout-non-pci'),
                 'type'      => 'textarea',
                 'desc_tip'  => __('Custom css to customise FramesJs layout', 'woocommerce-checkout-non-pci'),
+            ),
+
+            'adv_setting_subscription' => array(
+                'title'       => __( 'Advance option for Subscription', 'woocommerce' ),
+                'type'        => 'title',
+            ),
+
+            'reactivate_cancel' => array(
+                'title'     => __( 'Enable / Disable', 'woocommerce-checkout-non-pci' ),
+                'label'     => __( 'Allow customer to reactivate or cancel subscription from his/her Account', 'woocommerce-checkout-non-pci' ),
+                'type'      => 'checkbox',
+                'default'   => 'no',
+                'desc_tip'  => __('Allow customer to reactivate or cancel subscription from his/her Account', 'woocommerce-checkout-non-pci'),
             ),
         );
     }
@@ -928,6 +947,83 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
         }
 
         return true;
+    }
+
+    //Activate, suspend or cancel recurring payment plan
+    public function updatePlan($subscription){
+        $subscriptionParentId = $subscription->parent_id;
+
+        if(!$subscriptionParentId){
+            return false;
+        }
+        
+        $order          = new WC_Order($subscriptionParentId);
+        $transactionId = $order->transaction_id;
+
+        $checkout   = new WC_Checkout_Non_Pci();
+        $mode       =  $checkout->settings['mode'];
+
+        //Api call getChargeHistory in order to get the auth chargeId
+        $Api            = CheckoutApi_Api::getApi(array('mode' => $checkout->settings['mode']));
+        $verifyParamsHistory   = array('chargeId' => $transactionId, 'authorization' => $checkout->settings['secret_key']);
+        $resultHistory         = $Api->getChargeHistory($verifyParamsHistory);
+        $charges = $resultHistory->getCharges();
+
+        if(!empty($charges)) {
+            $chargesArray = $charges->toArray();
+
+            foreach ($chargesArray as $key=> $charge) {
+                if (in_array('Authorised', $charge)) {
+                    $authChargeId = $charge['id'];
+                    break;
+                }
+            }
+
+            //Api Call getCharge in order to get the recurring planId
+            $verifyParamsCharge   = array('chargeId' => $authChargeId, 'authorization' => $checkout->settings['secret_key']);
+            $resultCharge         = $Api->getCharge($verifyParamsCharge);
+
+            if(!empty($resultCharge)){
+                if($subscription->status == 'cancelled'){
+                    $customerPlanId = $resultCharge['customerPaymentPlans'][0]['customerPlanId'];
+                    $param   = array('customerPlanId' => $customerPlanId, 'authorization' => $checkout->settings['secret_key']);
+
+                    //Api call to delete customer plan
+                    $resultCancel = $Api->cancelCustomerPaymentPlan($param);
+
+                    if($resultCancel['message'] != 'ok'){
+                        WC_Checkout_Non_Pci::log('Failed to cancel Customer PlanId :'.$customerPlanId. ' for orderId:'.$subscriptionParentId);
+                    } else {
+                         WC_Checkout_Non_Pci::log('Customer plan cancelled successfully. Customer PlanId:'.$customerPlanId. ' for orderId:'.$subscriptionParentId);
+                    }
+
+                }else{
+
+                    $recPlanId = $resultCharge['customerPaymentPlans'][0]['planId'];
+
+                    if($subscription->status == 'active'){
+                        $postedParam['status'] = 1;
+                        $failMessage = 'Failed to activate Recuring PlanId ';
+                        $successMessage = 'Account successfully activated. Recuring PlanId ';
+                    } elseif ($subscription->status == 'on-hold') {
+                        $postedParam['status'] = 4;
+                        $failMessage = 'Failed to suspend Recurring PlanId ';
+                        $successMessage = 'Account successfully suspended. Recurring PlanId ';
+                    }
+                    
+                    $param   = array('planId' => $recPlanId, 'postedParam' =>$postedParam, 'authorization' => $checkout->settings['secret_key']);
+
+                    //Api call to update payment plan and set status to 4(Suspended) or 1(Activate)
+                    $resultRec = $Api->updatePaymentPlan($param);
+
+                    if($resultRec['message'] != 'ok'){
+                        WC_Checkout_Non_Pci::log($failMessage.':'.$recPlanId. ' for orderId:'.$subscriptionParentId);
+                    } else {
+                        WC_Checkout_Non_Pci::log($successMessage.':'.$recPlanId. ' for orderId:'.$subscriptionParentId);
+                    }
+                }
+            }
+        }
     }
 
 }
