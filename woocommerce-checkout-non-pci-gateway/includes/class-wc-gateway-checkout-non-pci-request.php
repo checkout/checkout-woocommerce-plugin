@@ -646,12 +646,17 @@ class WC_Checkout_Non_Pci_Request
         $productFactory = new WC_Product_Factory();
 
         foreach ($order->get_items() as $item) {
-            $product        = $productFactory->get_product($item['product_id']);;
+            $product        = $productFactory->get_product($item['product_id']);
+
+            $productPrice = $product->get_price();
+            if(is_null($productPrice)){
+                $productPrice = 0;
+            }
 
             $products[] = array(
                 'description'   => (string)$product->post->post_content,
                 'name'          => $item['name'],
-                'price'         => $product->get_price(),
+                'price'         => $productPrice,
                 'quantity'      => $item['qty'],
                 'sku'           => $product->get_sku()
             );
