@@ -301,9 +301,12 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
             ),
 
             'custom_css' => array(
-                'title'     => __('Custom Css Url', 'woocommerce-checkout-non-pci'),
-                'type'      => 'text',
-                'desc_tip'  => __('Custom css link', 'woocommerce-checkout-non-pci'),
+                'title'     => __('Custom Css', 'woocommerce-checkout-non-pci'),
+                'type'      => 'textarea',
+                'desc_tip'  => __('Custom css to customise FramesJs layout', 'woocommerce-checkout-non-pci'),
+                'placeholder' => "'.embedded .card-form .input-group': {
+    borderRadius: '5px'
+}", 
             ),
 
             'frames_theme' => array(

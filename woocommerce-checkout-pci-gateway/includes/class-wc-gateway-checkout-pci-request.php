@@ -721,6 +721,7 @@ class WC_Checkout_Pci_Request
         }
 
         $response['object'] = $order;
+        $response['orderId'] = $orderId;
 
         return $response;
     }
