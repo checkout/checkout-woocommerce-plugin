@@ -29,15 +29,28 @@ class WC_Checkout_Non_Pci_Customer_Card
         $last4      = $response->getCard()->getLast4();
         $cardId     = $response->getCard()->getId();
         $cardType   = $response->getCard()->getPaymentMethod();
+        $ckoCustomerId = $response->getCard()->getCustomerId();
 
-        if (empty($last4) || empty($cardId) || empty($cardType)) {
+        if (empty($last4) || empty($cardId) || empty($cardType) || empty($ckoCustomerId)) {
             return false;
         }
 
-        if (self::isExists($customerId, $cardId, $cardType) && $saveCardChecked) {
+        if (self::isExists($customerId, $cardId, $cardType) && $saveCardChecked ) {
             $wpdb->update(self::getCustomerCardsTableName(),
                 array(
                     'card_enabled'  => esc_sql($saveCardChecked)
+                ),
+                array(
+                    'customer_id'   => esc_sql($customerId),
+                    'card_id'       => esc_sql($cardId),
+                )
+            );
+        }
+
+        if(self::isCkoCustomerIdExists($customerId, $cardId)){
+            $wpdb->update(self::getCustomerCardsTableName(),
+                array(
+                    'cko_customer_id'  => esc_sql($ckoCustomerId),
                 ),
                 array(
                     'customer_id'   => esc_sql($customerId),
@@ -57,6 +70,26 @@ class WC_Checkout_Non_Pci_Customer_Card
         );
 
         return true;
+    }
+
+     /**
+    * Return true if cko_customer_id does not exist
+    *
+    * @param $customerId
+    * @param $cardId
+    * @return bool
+    *
+    * @version 20180214
+    */
+    public static function isCkoCustomerIdExists($customerId, $cardId) {
+        global $wpdb;
+
+        $tableName  = self::getCustomerCardsTableName();
+        $sql        = $wpdb->prepare("SELECT * FROM {$tableName} WHERE customer_id = '%s' AND card_id = '%s' AND cko_customer_id = '';", $customerId, $cardId);
+
+        $result = $wpdb->get_results($sql);
+
+        return empty($result) ? false : true;
     }
 
     /**

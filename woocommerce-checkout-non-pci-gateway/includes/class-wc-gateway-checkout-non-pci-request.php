@@ -390,6 +390,7 @@ class WC_Checkout_Non_Pci_Request
         add_post_meta($orderId, '_transaction_id', $entityId, true);
 
         $response['object'] = $order;
+        $response['orderId'] = $orderId;
 
         return $response;
     }
@@ -448,7 +449,7 @@ class WC_Checkout_Non_Pci_Request
         $autoCapTime = $this->gateway->get_option('auto_cap_time');
         
         if(empty($autoCapTime)){
-            $autoCapTime = 0;
+            $autoCapTime = 0.02;
         }
 
         if (strpos($autoCapTime, ',') !== false) { 
@@ -456,6 +457,17 @@ class WC_Checkout_Non_Pci_Request
         }
 
         return $autoCapTime;
+    }
+
+    /**
+     * Get stored reactivate_cancel
+     *
+     * @return mixed
+     *
+     * @version 20180221
+     */
+    public function getRecurringSetting() {
+        return $this->gateway->get_option('reactivate_cancel');
     }
 
 
@@ -635,12 +647,17 @@ class WC_Checkout_Non_Pci_Request
         $productFactory = new WC_Product_Factory();
 
         foreach ($order->get_items() as $item) {
-            $product        = $productFactory->get_product($item['product_id']);;
+            $product        = $productFactory->get_product($item['product_id']);
+
+            $productPrice = $product->get_price();
+            if(is_null($productPrice)){
+                $productPrice = 0;
+            }
 
             $products[] = array(
                 'description'   => (string)$product->post->post_content,
                 'name'          => $item['name'],
-                'price'         => $product->get_price(),
+                'price'         => $productPrice,
                 'quantity'      => $item['qty'],
                 'sku'           => $product->get_sku()
             );
@@ -651,7 +668,6 @@ class WC_Checkout_Non_Pci_Request
         $config['autoCapTime']  = $this->getAutoCapTime();
         $config['autoCapture']  = $autoCapture ? CheckoutApi_Client_Constant::AUTOCAPUTURE_CAPTURE : CheckoutApi_Client_Constant::AUTOCAPUTURE_AUTH;
         $config['chargeMode']   = $this->getChargeMode();
-        $config['email']        = $order->billing_email;
         $config['value']                = $amount;
         $config['currency']             = $this->getOrderCurrency($order);
         $config['trackId']              = $order->id;
@@ -661,8 +677,25 @@ class WC_Checkout_Non_Pci_Request
 
         if (!empty($savedCardData)) {
             $config['cardId'] = $savedCardData->card_id;
+
+            global $wpdb;
+            $tableName = $wpdb->prefix. 'checkout_customer_cards';
+            $sql        = $wpdb->prepare("SELECT * FROM {$tableName} WHERE card_id = '%s';", $savedCardData->card_id);
+
+            $result = $wpdb->get_results($sql);
+
+            foreach ($result as $row) {
+                $results = $row;
+            }
+
+            if($results->cko_customer_id){
+                $config['customerId'] = $results->cko_customer_id;
+            } else {
+                $config['email'] = $order->billing_email;
+            }
         } else {
             $config['cardToken'] = $chargeToken;
+            $config['email'] = $order->billing_email;
         }
 
         $config['shippingDetails']  = $billingAddressConfig;

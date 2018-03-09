@@ -3,7 +3,7 @@
 Plugin Name: Checkout Non PCI - WooCommerce Gateway
 Plugin URI: https://www.checkout.com/
 Description: Extends WooCommerce by Adding the Checkout Non PCI Gateway.
-Version:2.5.4
+Version:2.5.5
 Author: Checkout.com
 Author URI: https://www.checkout.com/
 */
@@ -183,6 +183,14 @@ function checkout_non_pci_customer_cards_table_install() {
     if(empty($row)){
         $wpdb->query("ALTER TABLE {$tableName} ADD `card_enabled` BIT NOT NULL DEFAULT 1 COMMENT 'Credit Card Enabled'");
     }
+
+     /* Add cko_customer_id column if not present when updating the plugin */
+    $row2 = $wpdb->get_results("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+                                 WHERE table_name = '$tableName' AND column_name = 'cko_customer_id'");
+
+    if(empty($row2)){
+        $wpdb->query("ALTER TABLE {$tableName} ADD `cko_customer_id` VARCHAR(100) NOT NULL COMMENT 'Customer ID from Checkout API'");
+    }
 }
 /* END: Create table script */
 
@@ -205,3 +213,64 @@ function checkout_non_pci_customer_cards_content() {
     return true;
 }
 /* END: Show customer card list */
+
+// define the woocommerce_save_account_details callback 
+function checkout_non_pci_woocommerce_save_account_details( $user_id ) { 
+
+    $currentUserInfo = get_currentuserinfo();
+    $currentUserEmail = $currentUserInfo->data->user_email;
+
+    $user_info = get_userdata($user_id);
+    $userEmail = $user_info->user_email;
+
+    if($currentUserEmail != $userEmail){
+        global $wpdb;
+
+        $tableName = $wpdb->prefix . "checkout_customer_cards";
+        $sql        = $wpdb->prepare("SELECT * FROM {$tableName} WHERE customer_id = '%s' AND card_enabled = 1 AND cko_customer_id = '';", $user_id);
+
+        $result = $wpdb->get_results($sql);
+
+        foreach( $result as $key){
+
+            if($key->card_enabled == 1){ 
+                $wpdb->update( 
+                    $tableName, 
+                    array('card_enabled' => false ), 
+                    array('customer_id' => $user_id, 
+                          'card_id'=> $key->card_id )
+                );
+                break;
+            }
+        }
+    }
+}; 
+         
+// add the action 
+add_action( 'woocommerce_save_account_details', 'checkout_non_pci_woocommerce_save_account_details', 10, 1 ); 
+
+//Remove subscriptions button for customer
+function checkout_non_pci_remove_subscriptions_button( $actions, $subscription ) {
+
+    include_once( 'includes/class-wc-gateway-checkout-non-pci-request.php');
+    $request = new WC_Checkout_Non_Pci_Request(new WC_Checkout_Non_Pci());
+
+     foreach ( $actions as $action_key => $action ) {
+            switch ( $action_key ) {
+                case 'reactivate':          // Hide "Reactive" button on subscriptions that are "on-hold"?
+                case 'cancel':              // Hide "Cancel" button on subscriptions that are "active" or "on-hold"?
+
+                    if($request->getRecurringSetting() == 'no'){
+                        unset( $actions[ $action_key ] );
+                    }
+                    
+                    break;
+                default: 
+                    error_log( '-- $action = ' . print_r( $action, true ) );
+                    break;
+            }
+        }
+        return $actions;
+}
+
+add_filter( 'wcs_view_subscription_actions', 'checkout_non_pci_remove_subscriptions_button', 100, 2 );
