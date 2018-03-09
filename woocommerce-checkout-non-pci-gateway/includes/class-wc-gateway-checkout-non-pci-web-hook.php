@@ -44,7 +44,7 @@ class WC_Checkout_Non_Pci_Web_Hook extends WC_Checkout_Non_Pci_Request
         $Api = CheckoutApi_Api::getApi(array('mode' => $this->_getEndpointMode()));
    
         // transactionIndicator available only in Auth webhook
-        if ($transactionIndicator == 2 && !is_null($response->message->customerPaymentPlans[0]->previousRecurringDate) { 
+        if ($transactionIndicator == 2 && !is_null($response->message->customerPaymentPlans[0]->previousRecurringDate)) { 
             if(preg_match('/^1[0-9]+$/', $responseCode) && $responseStatus == 'Authorised' || $responseStatus == 'flagged' ){
                 $recurringCountLeft = $response->message->customerPaymentPlans[0]->recurringCountLeft;
                 if($recurringCountLeft == 0){

@@ -390,6 +390,7 @@ class WC_Checkout_Non_Pci_Request
         add_post_meta($orderId, '_transaction_id', $entityId, true);
 
         $response['object'] = $order;
+        $response['orderId'] = $orderId;
 
         return $response;
     }

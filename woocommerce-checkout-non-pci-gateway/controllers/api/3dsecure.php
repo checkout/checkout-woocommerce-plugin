@@ -86,6 +86,7 @@ if($_REQUEST['cko-card-token']){
     $request    = new WC_Checkout_Non_Pci_Request($checkout);
     $result     = $request->verifyCharge($paymentToken);
 
+    $order      = new WC_Order( $result['orderId'] );
 
     if ($result['status'] === 'error') {
         WC_Checkout_Non_Pci_Validator::wc_add_notice_self($result['message'], 'error');
@@ -95,7 +96,7 @@ if($_REQUEST['cko-card-token']){
 
     unset($_SESSION['checkout_payment_token']);
 
-    $url = $checkout->get_return_url($order);
+    $url = $order->get_checkout_order_received_url();
     wp_redirect($url);
 }
 

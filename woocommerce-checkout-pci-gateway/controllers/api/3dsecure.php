@@ -20,6 +20,8 @@ $checkout   = new WC_Checkout_Pci();
 $request    = new WC_Checkout_Pci_Request($checkout);
 $result     = $request->verifyCharge($paymentToken);
 
+$order      = new WC_Order( $result['orderId'] );
+
 if ($result['status'] === 'error') {
     WC_Checkout_Pci_Validator::wc_add_notice_self($result['message'], 'error');
     wp_redirect(WC_Cart::get_checkout_url());
@@ -28,6 +30,6 @@ if ($result['status'] === 'error') {
 
 unset($_SESSION['checkout_payment_token']);
 
-$url = $checkout->get_return_url($order);
+$url = $order->get_checkout_order_received_url();
 wp_redirect($url);
 die();
