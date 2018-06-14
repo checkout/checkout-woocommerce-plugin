@@ -480,7 +480,9 @@ class WC_Checkout_Non_Pci_Request
      *
      * @version 20160322
      */
-    public function createPaymentToken($amount, $currency) { 
+    public function createPaymentToken($amount, $currency, $order=null) { 
+        global $woocommerce;
+
         $Api            = CheckoutApi_Api::getApi(array('mode' => $this->_getEndpointMode()));
         $amount         = $Api->valueToDecimal($amount, $currency);;
         $autoCapture    = $this->_isAutoCapture();
@@ -498,6 +500,74 @@ class WC_Checkout_Non_Pci_Request
                 'autoCapture'           => $autoCapture ? CheckoutApi_Client_Constant::AUTOCAPUTURE_CAPTURE : CheckoutApi_Client_Constant::AUTOCAPUTURE_AUTH
             )
         );
+
+        if(isset($order)){ 
+            $billingAddressConfig = array (
+                'addressLine1'  => $order->billing_address_1,
+                'addressLine2'  => $order->billing_address_2,
+                'postcode'      => $order->billing_postcode,
+                'country'       => $order->billing_country,
+                'city'          => $order->billing_city,
+                'state'         => $order->billing_state,
+                'phone'         => array('number' => $order->billing_phone)
+            );
+
+            $shippingAddressConfig = array (
+                'recipientName'=> $order->shipping_first_name.' '.$order->shipping_last_name,
+                'addressLine1'  => $order->shipping_address_1,
+                'addressLine2'  => $order->shipping_address_2,
+                'postcode'      => $order->shipping_postcode,
+                'country'       => $order->shipping_country,
+                'city'          => $order->shipping_city,
+                'state'         => $order->shipping_state,
+                'phone'         => array('number' => $order->billing_phone)
+            );
+
+            $products       = array();
+            $productFactory = new WC_Product_Factory();
+
+            foreach ($order->get_items() as $item) {
+                $product        = $productFactory->get_product($item['product_id']);
+
+                $productPrice = $product->get_price();
+
+                if(empty($productPrice)){
+                    $productPrice = 0;
+                }
+
+                $products[] = array(
+                    'description'   => (string)$product->post->post_content,
+                    'name'          => $item['name'],
+                    'price'         => $productPrice,
+                    'quantity'      => $item['qty'],
+                    'sku'           => $product->get_sku()
+                );
+
+                $totalProductPrice += $productPrice*$item['qty'];
+            }
+
+            $integrationType = $this->gateway->get_option('integration_type');
+            
+            $arrayOrder['postedParam'] = array(
+                'trackId' => $order->id,
+                'shippingDetails' => $shippingAddressConfig,
+                'billingDetails' => $billingAddressConfig,
+                'products' => $products,
+                'metadata' => array(
+                                'server'            => get_site_url(),
+                                'quote_id'          => $order->id,
+                                'woo_version'       => property_exists($woocommerce, 'version') ? $woocommerce->version : '2.0',
+                                'plugin_version'    => WC_Checkout_Non_Pci::VERSION,
+                                'lib_version'       => CheckoutApi_Client_Constant::LIB_VERSION,
+                                'integration_type'  => $integrationType,
+                                'time'              => date('Y-m-d H:i:s'),
+                                'paypal_shippingAmount' => $order->shipping_total,
+                                'paypal_productAmount' => $totalProductPrice,
+                            )
+            );
+
+            $tokenParams = array_merge_recursive($tokenParams,$arrayOrder);
+        }
 
         $paymentTokenCharge = $Api->getPaymentToken($tokenParams);
 
@@ -534,6 +604,162 @@ class WC_Checkout_Non_Pci_Request
         );
 
         return $result;
+    }
+
+    /**
+    *
+    * Get APM Providers
+    *
+    **/
+    public function getLocalPaymentProvider($paymentToken){
+        $Api = CheckoutApi_Api::getApi(array('mode' => $this->_getEndpointMode()));
+        $paymentToken = array('paymentToken' => $paymentToken['token'], 'authorization' => $this->getPublicKey());
+
+        $result = $Api->getLocalPaymentProviderByPayTok($paymentToken);
+        
+        $data = $result->getData();
+
+        foreach ((array)$data as &$value) { 
+            return $value;
+        }
+
+    }
+
+    /**
+    *
+    * Get Bank info for Ideal
+    *
+    **/
+    public function getLocalPaymentInformation($lpId){
+        $secretKey = $this->getSecretKey();
+        $mode = $this->_getEndpointMode();
+        $url = "https://sandbox.checkout.com/api2/v2/lookups/localpayments/{$lpId}/tags/issuerid";
+        
+        if($mode == 'live'){
+            $url = "https://api2.checkout.com/v2/lookups/localpayments/{$lpId}/tags/issuerid";
+        }
+
+        $curl = curl_init();
+
+        curl_setopt_array($curl, array(
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_ENCODING => "",
+            CURLOPT_MAXREDIRS => 10,
+            CURLOPT_TIMEOUT => 30,
+            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+            CURLOPT_CUSTOMREQUEST => "GET",
+            CURLOPT_SSL_VERIFYPEER=>  false,
+            CURLOPT_HTTPHEADER => array(
+              "authorization: ".$secretKey,
+              "cache-control: no-cache",
+            ),
+        ));
+
+        $response = curl_exec($curl);
+        $err = curl_error($curl);
+
+        curl_close($curl);
+
+        if ($err) {
+          echo "cURL Error #:" . $err;
+          WC_Checkout_Non_Pci::log("cURL Error #:" . $err);
+        } else {
+
+            $test = json_decode($response);
+
+            foreach ((array)$test as &$value) { 
+                foreach ($value as $i=>$item){
+                    foreach ($item as  $is=>$items) {
+                       
+                        return $item->values;
+                       
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Create APM Charge on Checkout.com
+     *
+    **/
+    public function createLPCharge($order){
+
+        $amount = $order->get_total();
+        $currency = $this->getOrderCurrency($order);
+        $paymentToken = $this->createPaymentToken($amount,$currency,$order);
+        $secretKey = $this->getSecretKey();
+
+        $localpayment = $this->getLocalPaymentProvider($paymentToken);
+
+        foreach ($localpayment as $i=>$item) {
+           $lpName = strtolower(preg_replace('/\s+/', '', $item['name']));
+           if($lpName == $_POST['woocommerce_checkout_non_pci-lp-name']){
+                $lppId = $item['id'];
+           }
+        }
+
+        $config = array();
+        $config['authorization']    = $secretKey;
+        $config['postedParam']['email'] = $order->billing_email;
+        $config['postedParam']['paymentToken'] = $paymentToken['token'];
+
+        if($_POST['woocommerce_checkout_non_pci-lp-name'] == 'ideal'){
+            $config['postedParam']['localPayment'] = array(
+                                        "lppId" => $lppId,
+                                        "userData" => array(
+                                                        "issuerId" => $_POST['woocommerce_checkout_non_pci-lp-issuerId']
+                                        )
+            );
+        } elseif($_POST['woocommerce_checkout_non_pci-lp-name'] == 'boleto'){
+            $config['postedParam']['localPayment'] = array(
+                                        "lppId" => $lppId,
+                                        "userData" => array(
+                                                        "birthDate" => $_POST['woocommerce_checkout_non_pci-lp-boletoDate'],
+                                                        "cpf" => $_POST['woocommerce_checkout_non_pci-lp-cpf'],
+                                                        "customerName" => $_POST['woocommerce_checkout_non_pci-lp-custName']
+                                        )
+            );
+        } elseif($_POST['woocommerce_checkout_non_pci-lp-name'] == 'qiwi'){
+
+            $config['postedParam']['localPayment'] = array(
+                                        "lppId" => $lppId,
+                                        "userData" => array(
+                                                        "walletId" => $_POST['woocommerce_checkout_non_pci-lp-walletId'],
+                                        )
+            );
+        } else {
+            $config['postedParam']['localPayment'] = array(
+                                        "lppId" => $lppId,
+            );
+        }
+
+        $Api = CheckoutApi_Api::getApi(array('mode' => $this->_getEndpointMode()));
+        $result = $Api->createLocalPaymentCharge($config);
+
+
+        if ($Api->getExceptionState()->hasError()) {
+            WC_Checkout_Non_Pci::log('-Your alternative payment was not completed.');
+            WC_Checkout_Non_Pci::log($Api->getExceptionState());
+
+            $errorMessage = '-Your alternative payment was not completed. Try again or contact customer support.';
+
+            WC_Checkout_Non_Pci::log($errorMessage. '-'.$errorCode);
+            WC_Checkout_Non_Pci::log($Api->getExceptionState()->getErrorMessage());
+            return array('error' => $errorMessage);
+        }
+
+        if (!$result->isValid()) {
+            $errorMessage = "Please check your payment details and try again. Thank you.";
+            
+            WC_Checkout_Non_Pci::log($errorMessage. '-' .$responseCode);
+            WC_Checkout_Non_Pci::log($result->getResponseCode());
+            return array('error' => $errorMessage);
+        }
+
+        return $result; 
+
     }
 
     /**

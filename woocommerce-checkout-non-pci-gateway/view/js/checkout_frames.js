@@ -6,8 +6,8 @@ jQuery(document).ready(function() {
             Frames.init(window.CheckoutApiEmbConfig);
         }
 
-        jQuery(document).ready(function() {
-            Frames.init(window.CheckoutApiEmbConfig);
+        // jQuery(document).ready(function() {
+        //     Frames.init(window.CheckoutApiEmbConfig);
             createBindings();
 
             if(jQuery('#createaccount').length === 1){
@@ -54,8 +54,88 @@ jQuery(document).ready(function() {
                         }
 
                         if(jQuery('#payment_method_woocommerce_checkout_non_pci').is(':checked')){
+                            if(jQuery('.checkout-alternative-payment-radio').length >0){
+                                if(jQuery('input[name=woocommerce_checkout_non_pci-saved-card]:checked').val() == "ideal" 
+                                    || jQuery('input[name=woocommerce_checkout_non_pci-saved-card]:checked').val() == "boleto"
+                                    || jQuery('input[name=woocommerce_checkout_non_pci-saved-card]:checked').val() == "qiwi"){
+                                        
+                                    e.preventDefault();
+                                    //Get selected LP name
+                                    var selectedLpName = jQuery('input[name=woocommerce_checkout_non_pci-saved-card]:checked').val();
+                                    jQuery("#lpName").text("Pay with "+selectedLpName.toUpperCase());
+
+                                    // Open modal
+                                    var modal = document.getElementById('myModal');
+                                    modal.style.display = "block";
+
+                                    if(selectedLpName == 'ideal'){
+                                        jQuery('#selectIssuer').show();
+                                        jQuery('#boletoInfo').hide();
+                                        jQuery('#qiwiInfo').hide();
+                                    } else if(selectedLpName == 'boleto'){
+                                        jQuery('#selectIssuer').hide();
+                                        jQuery('#boletoInfo').show();
+                                        jQuery('#qiwiInfo').hide();
+                                    } else if(selectedLpName == 'qiwi'){
+                                        jQuery('#qiwiInfo').show();
+                                        jQuery('#boletoInfo').hide();
+                                        jQuery('#selectIssuer').hide();
+                                    }
+
+                                    // continue button
+                                    jQuery('#mybtn').on('click', function(e) {
+                                        modal.style.display = "none";
+
+                                        if(selectedLpName == 'ideal'){
+                                            var e = document.getElementById("issuer");
+                                            var value = e.options[e.selectedIndex].value;
+                                            var text = e.options[e.selectedIndex].text;
+
+                                            document.getElementById('cko-lp-issuerId').value = value;
+                                        } else if(selectedLpName == 'boleto'){
+                                            if(document.getElementById('boletoDate').value == ""){
+                                                alert('Please enter correct date');
+                                                return false;
+                                            } else {
+                                                document.getElementById('cko-lp-boletoDate').value = document.getElementById('boletoDate').value;
+                                            }
+
+                                            if(document.getElementById('cpf').value == ""){
+                                                alert('Please enter your CPF');
+                                                return false;
+                                            } else {
+                                                document.getElementById('cko-lp-cpf').value = document.getElementById('cpf').value;
+                                            }
+
+                                            if(document.getElementById('custName').value == ""){
+                                                alert('Please enter your customer name');
+                                                return false;
+                                            } else {
+                                                document.getElementById('cko-lp-custName').value = document.getElementById('custName').value;
+                                            }
+
+                                        } else if(selectedLpName == 'qiwi'){
+                                            if(document.getElementById('walletId').value == ""){
+                                                alert('Please enter your Wallet Id');
+                                                return false;
+                                            } else {
+                                                document.getElementById('cko-lp-walletId').value = document.getElementById('walletId').value;
+                                            }
+                                        }
+
+                                        document.getElementById('cko-lp-lpName').value = selectedLpName;
+
+                                        jQuery('form.checkout').unbind('#place_order, checkout_place_order');
+                                        jQuery('form#order_review').unbind();
+                                        jQuery('#place_order').unbind();
+                                        jQuery('#place_order').trigger('click');
+                                    });
+                                } 
+                            }
+
                             if(jQuery('.checkout-saved-card-radio').length >0){
-                                if(jQuery('.checkout-new-card-radio').is(':checked') == false && jQuery('.checkout-saved-card-radio').is(':checked') == false ){
+                                if(jQuery('.checkout-new-card-radio').is(':checked') == false && jQuery('.checkout-saved-card-radio').is(':checked') == false &&
+                                    jQuery('.checkout-alternative-payment-radio').is(':checked') == false){
                                     e.preventDefault();
                                     var result = {error: false, messages: []};
                                     result.error = true;
@@ -77,8 +157,6 @@ jQuery(document).ready(function() {
                                 }
                             }
                         }
-
-                        
 
                         if (isValidFormField(window.checkoutFields)) {
                             if (Frames.isCardValid()){
@@ -176,6 +254,6 @@ jQuery(document).ready(function() {
 
                 return false;
             }
-        });
+        // });
     }, 3000);
 });
