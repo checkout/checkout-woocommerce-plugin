@@ -619,7 +619,7 @@ class WC_Checkout_Non_Pci_Request
         
         $data = $result->getData();
 
-        foreach ((array)$data as &$value) { 
+        foreach ((array)$data as $value) { 
             return $value;
         }
 
@@ -668,7 +668,7 @@ class WC_Checkout_Non_Pci_Request
 
             $test = json_decode($response);
 
-            foreach ((array)$test as &$value) { 
+            foreach ((array)$test as $value) { 
                 foreach ($value as $i=>$item){
                     foreach ($item as  $is=>$items) {
                        
