@@ -9,7 +9,7 @@ See the [installation guide](https://github.com/checkout/checkout-woocommerce-pl
 Webhook
 =======
 
-Url - Non PCI : example.com/?wc-api=WC_Checkout_Non_Pci_Callback
+Url - Non PCI : example.com/?wc-api=WC_Checkout_Non_Pci_Webhook
 
 Url - PCI : example.com/wp-content/plugins/woocommerce-checkout-pci-gateway/controllers/api/webhook.php
 
@@ -17,6 +17,6 @@ Url - PCI : example.com/wp-content/plugins/woocommerce-checkout-pci-gateway/cont
 Redirect Url
 ============
 
-Url - Non PCI : example.com/?wc-api=WC_Checkout_Non_Pci_Webhook
+Url - Non PCI : example.com/?wc-api=WC_Checkout_Non_Pci_Callback
 
 Url - PCI : example.com/wp-content/plugins/woocommerce-checkout-pci-gateway/controllers/api/3dsecure.php
