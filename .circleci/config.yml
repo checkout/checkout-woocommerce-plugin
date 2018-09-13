@@ -3,7 +3,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: integrationcheckout/ecommerce:wordpress4.9.2.wocommerce3.2.6
+      - image: integrationcheckout/ecommerce:temp
     working_directory: ~/cko_wp
     steps:
       - checkout
