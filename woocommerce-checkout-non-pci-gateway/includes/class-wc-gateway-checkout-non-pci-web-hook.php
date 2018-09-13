@@ -164,6 +164,7 @@ class WC_Checkout_Non_Pci_Web_Hook extends WC_Checkout_Non_Pci_Request
         $storedTransactionId    = end($trackIdList);
 
         if ($storedTransactionId === $transactionId) {
+            WC_Checkout_Non_Pci::log("storedTransactionId === transactionId");
             return false;
         }
 
@@ -233,7 +234,6 @@ class WC_Checkout_Non_Pci_Web_Hook extends WC_Checkout_Non_Pci_Request
         } else {
             $order->add_order_note( sprintf($successMessage) );
         }
-
 
         return true;
     }
