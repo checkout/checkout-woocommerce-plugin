@@ -6,6 +6,8 @@ jQuery(document).ready(function() {
             Frames.init(window.CheckoutApiEmbConfig);
         }
 
+        delete window.CheckoutApiEmbConfig;
+
         createBindings();
 
         if(jQuery('#createaccount').length === 1){
@@ -52,7 +54,7 @@ jQuery(document).ready(function() {
                     }
 
                     if(jQuery('#payment_method_woocommerce_checkout_non_pci').is(':checked')){
-                        if(jQuery('.checkout-alternative-payment-radio').length >0){
+                        if(jQuery('.checkout-alternative-payment-radio').length >0 && jQuery('input[name=woocommerce_checkout_non_pci-saved-card]:checked')){
                             if(jQuery('input[name=woocommerce_checkout_non_pci-saved-card]:checked').val() == "ideal" 
                                 || jQuery('input[name=woocommerce_checkout_non_pci-saved-card]:checked').val() == "boleto"
                                 || jQuery('input[name=woocommerce_checkout_non_pci-saved-card]:checked').val() == "qiwi"){
@@ -128,42 +130,53 @@ jQuery(document).ready(function() {
                                     jQuery('#place_order').unbind();
                                     jQuery('#place_order').trigger('click');
                                 });
-                            } 
-                        }
+                            } else if(jQuery('.checkout-new-card-radio').is(':checked')){
+                                    if (isValidFormField(window.checkoutFields)) {
+                                        if (Frames.isCardValid()){
+                                            Frames.submitCard();
+                                        } 
+                                    }
+                            }
+                        } else { 
+                            if(jQuery('.checkout-saved-card-radio').length >0){
+                                if(jQuery('.checkout-new-card-radio').is(':checked') == false && jQuery('.checkout-saved-card-radio').is(':checked') == false &&
+                                    jQuery('.checkout-alternative-payment-radio').is(':checked') == false){
+                                    e.preventDefault();
+                                    var result = {error: false, messages: []};
+                                    result.error = true;
+                                    result.messages.push({target: false, message : 'Please select a payment method.'});
 
-                        if(jQuery('.checkout-saved-card-radio').length >0){
-                            if(jQuery('.checkout-new-card-radio').is(':checked') == false && jQuery('.checkout-saved-card-radio').is(':checked') == false &&
-                                jQuery('.checkout-alternative-payment-radio').is(':checked') == false){
-                                e.preventDefault();
-                                var result = {error: false, messages: []};
-                                result.error = true;
-                                result.messages.push({target: false, message : 'Please select a payment method.'});
+                                    jQuery('.woocommerce-error, .woocommerce-message').remove();
 
-                                jQuery('.woocommerce-error, .woocommerce-message').remove();
+                                    jQuery.each(result.messages, function(index, value) {
+                                        jQuery('form.checkout').prepend('<div class="woocommerce-error">' + value.message + '</div>');
+                                    });
 
-                                jQuery.each(result.messages, function(index, value) {
-                                    jQuery('form.checkout').prepend('<div class="woocommerce-error">' + value.message + '</div>');
-                                });
+                                    jQuery('html, body').animate({
+                                        scrollTop: (jQuery('form.checkout').offset().top - 100 )
+                                    }, 1000 );
 
-                                jQuery('html, body').animate({
-                                    scrollTop: (jQuery('form.checkout').offset().top - 100 )
-                                }, 1000 );
+                                    jQuery(document.body).trigger('checkout_error');
 
-                                jQuery(document.body).trigger('checkout_error');
-
-                                return false;
+                                    return false;
+                                } else {
+                                     if (isValidFormField(window.checkoutFields)) {
+                                        if (Frames.isCardValid()){
+                                            Frames.submitCard();
+                                        } 
+                                    }
+                                }
+                            } else { 
+                                 if (isValidFormField(window.checkoutFields)) {
+                                    if (Frames.isCardValid()){
+                                        Frames.submitCard();
+                                    } 
+                                }
                             }
                         }
                     }
 
-                    if (isValidFormField(window.checkoutFields)) {
-                        if (Frames.isCardValid()){
-                            Frames.submitCard();
-                        } 
-                        
-                    }
-
-                    return true;
+                    return false;
                 });                   
             
         }

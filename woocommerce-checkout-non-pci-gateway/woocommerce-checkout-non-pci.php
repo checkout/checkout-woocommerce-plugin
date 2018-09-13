@@ -15,7 +15,7 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
     const PAYMENT_CARD_NEW_CARD     = 'new_card';
     const AUTO_CAPTURE_TIME         = 0;
     const RENDER_MODE               = 2;
-    const VERSION                   = '3.1.0';
+    const VERSION                   = '3.2.0';
     const RENDER_NAMESPACE          = 'Checkout';
     const CARD_FORM_MODE            = 'cardTokenisation';
     const JS_PATH_CARD_TOKEN        = 'https://cdn.checkout.com/sandbox/js/checkout.js';
@@ -284,8 +284,15 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
                 'title'     => __( 'Enable / Disable', 'woocommerce-checkout-non-pci' ),
                 'label'     => __( 'Show Mobile Icons', 'woocommerce-checkout-non-pci' ),
                 'type'      => 'checkbox',
-                'default'   => 'no',
+                'default'   => 'yes',
                 'desc_tip'  => __('Show widget icons on mobile.', 'woocommerce-checkout-non-pci'),
+            ),
+            'force_mobile_redirect' => array(
+                'title'     => __( 'Force mobile redirect', 'woocommerce-checkout-non-pci' ),
+                'label'     => __( 'If disabled, a new tab will be opened on mobile instead of redirecting.', 'woocommerce-checkout-non-pci' ),
+                'type'      => 'checkbox',
+                'default'   => 'yes',
+                'desc_tip'  => __('If disabled, a new tab will be opened on mobile instead of redirecting.', 'woocommerce-checkout-non-pci'),
             ),
             'widget_icon_size' => array(
                 'title'       => __('Widget Icon Size', 'woocommerce-checkout-non-pci'),
@@ -474,8 +481,8 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
             $request    = new WC_Checkout_Non_Pci_Request($checkout);
             $cardRequest = new WC_Checkout_Non_Pci_Customer_Card();
             $order_status = $order->get_status();
-            if($order_status == 'pending'){   
 
+            if($order_status == 'pending'){   
                 $result     = $request->createCharge($order,$cardToken,$savedCardData);
 
                 if (!empty($result['error'])) {
@@ -772,6 +779,8 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
         $paymentToken   = $requestModel->createPaymentToken($orderTotal, get_woocommerce_currency());
         $checkoutFields = !$isPayOrder ? json_encode($woocommerce->checkout->checkout_fields,JSON_HEX_APOS) : json_encode(array());
         $cardList = (is_user_logged_in() && $this->saved_cards) ? WC_Checkout_Non_Pci_Customer_Card::getCustomerCardList(get_current_user_id()) : array();
+        $forceMobileRedirect = $this->get_option( 'force_mobile_redirect' ) === "yes" ? true : false;
+
         ?>
         
         <fieldset id="<?php echo esc_attr($this->id); ?>-cc-form">
@@ -848,7 +857,7 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
                                     useCurrencyCode:            '<?php echo esc_html($this->get_option('use_currency_code')) != 'no' ? 'true' : 'false';?>',
                                     title:                      '<?php echo esc_html($this->get_option('form_title')) ?>',
                                     widgetColor:                '<?php echo esc_html($this->get_option('widget_color')) ?>',
-                                    forceMobileRedirect:        true,
+                                    forceMobileRedirect:        '<?php echo esc_html($forceMobileRedirect)?>',
                                     redirectUrl:                '<?php echo $redirectUrl ?>',
                                     styling:                    {
                                         formButtonColor:        '<?php echo esc_html($this->get_option('form_button_color')) ?>',
@@ -877,10 +886,6 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
                                             jQuery('#place_order').trigger('click');
 
                                             document.getElementById("cko-card-token").value = "";
-
-                                            if (Checkout.isMobile()) {
-                                                jQuery('#checkout-api-js-hover').hide();
-                                            }
                                         }
                                     }
                                 };
@@ -892,7 +897,13 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
                             <script type="text/javascript" src="<?php echo esc_url(plugins_url('/view/js/checkout_api.js',__FILE__))?>"></script>
                             
                      <?php else:?>
+                            <div align="left" class="cko-load">
+                                <img src="<?php echo esc_url(plugins_url('/view/image/load.gif',__FILE__))?>" style="float: left;"/>
+                            </div>
+
                                 <script type="text/javascript">
+                                    console.log(2);
+
                                     var style = {<?php echo $this->get_option('custom_css');?>}
                                     window.CheckoutApiEmbConfig = {
                                         debug: false,
@@ -906,15 +917,17 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
 
                                         },
                                         cardTokenised: function(event) {
-                                            
                                             if (document.getElementById('cko-card-token').value.length === 0 || document.getElementById('cko-card-token').value != event.data.cardToken) {
                                                document.getElementById('cko-card-token').value = event.data.cardToken;
+                                               
                                                jQuery('#place_order').trigger('click');
-                                                
                                             }
                                         },
                                         cardValidationChanged: function (event) {
                                             document.getElementById("place_order").disabled = !Frames.isCardValid()
+                                        },
+                                        frameActivated: function(){
+                                            jQuery('.cko-load').hide();
                                         },
                                         ready: function(event){
 
@@ -924,12 +937,10 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
 
                                                 function checkoutHideNewNoPciCard() {
                                                     jQuery('.checkout-non-pci-new-card-row').hide();
-                                                    //document.getElementById("place_order").disabled = false;
                                                 }
 
                                                 function checkoutShowNewNoPciCard() {
                                                     jQuery('.checkout-non-pci-new-card-row').show();
-                                                    //document.getElementById("place_order").disabled = true;
                                                     CKOConfig.createBindings();
                                                 }
 
@@ -949,13 +960,11 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
 
                                                 function checkoutShowNewNoPciCard() {
                                                     jQuery('.checkout-non-pci-new-card-row').show();
-                                                    //document.getElementById("place_order").disabled = true;
                                                     CKOConfig.createBindings();
                                                 }
 
                                                 function checkoutHideNewNoPciCard() {
                                                     jQuery('.checkout-non-pci-new-card-row').hide();
-                                                    //document.getElementById("place_order").disabled = false;
                                                 }
                                                  jQuery('.checkout-saved-card-radio').on("change", function() {
                                                     jQuery('.apmSelected ').removeClass('apmLab');
@@ -965,7 +974,7 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
                                                     checkoutHideNewNoPciCard();
                                                 });
 
-                                                  jQuery('.checkout-new-card-radio').on("change", function() {
+                                                jQuery('.checkout-new-card-radio').on("change", function() {
                                                     jQuery('.apmSelected ').removeClass('apmLab');
                                                     checkoutShowNewNoPciCard();
                                                 });
@@ -1012,6 +1021,9 @@ class WC_Checkout_Non_Pci extends WC_Payment_Gateway {
                         });
 
                         jQuery('.checkout-new-card-radio').on("change", function() {
+                            jQuery('form.checkout').unbind('#place_order, checkout_place_order');
+                             jQuery('form#order_review').unbind();
+                            jQuery('#place_order').unbind();
                             checkoutShowNewNoPciCard();
                         });
                     </script>

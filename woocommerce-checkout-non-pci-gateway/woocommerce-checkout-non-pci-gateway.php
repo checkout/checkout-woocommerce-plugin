@@ -3,7 +3,7 @@
 Plugin Name: Checkout Non PCI - WooCommerce Gateway
 Plugin URI: https://www.checkout.com/
 Description: Extends WooCommerce by Adding the Checkout Non PCI Gateway.
-Version:3.1.0
+Version:3.2.0
 Author: Checkout.com
 Author URI: https://www.checkout.com/
 */
@@ -15,12 +15,16 @@ function checkout_non_pci_init() {
 
     // If we made it this far, then include our Gateway Class
     include_once('woocommerce-checkout-non-pci.php');
+    include_once('woocommerce-checkout-google-pay.php');
+    include_once('woocommerce-checkout-apple-pay.php');
 
     // Now that we have successfully included our class,
     // Lets add it too WooCommerce
     add_filter( 'woocommerce_payment_gateways', 'checkout_add_non_pci_gateway' );
     function checkout_add_non_pci_gateway( $methods ) {
         $methods[] = 'WC_Checkout_Non_Pci';
+        $methods[] = 'WC_Checkout_Google_Pay';
+        $methods[] = 'WC_Checkout_Apple_Pay';
         return $methods;
     }
 }
