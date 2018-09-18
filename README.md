@@ -15,7 +15,7 @@ This extension allows shop owners to process online payments (card / alternative
 You can find a full installation guide [here](https://github.com/checkout/checkout-woocommerce-plugin/wiki/Installation)
 
 # Initial Setup
-If you do not have an account already, simply go to [checkout.com](https://checkout.com/ "checkout.com") and click the "Get Test Account" button.
+If you do not have an account yet, simply go to [checkout.com](https://checkout.com/ "checkout.com") and hit the "Get Test Account" button.
 
 # Keys
 There are 3 keys that you need to configure in the NON-PCI extension, while for the PCI version you just need 2:
@@ -26,9 +26,9 @@ There are 3 keys that you need to configure in the NON-PCI extension, while for 
 > The Private Shared Key is generated when you [configure the Webhook URL](https://docs.checkout.com/docs/business-level-administration#section-manage-webhook-url "configure the Webhook URL") in the Checkout HUB.
 
 # URLs
-In order to successfully complete 3D Secure transactions, and to keep Woocommerce order statuses in sync you need to configure the following URLs in your Checkout HUB in the following form:
+In order to successfully complete 3D Secure transactions, and to keep Woocommerce order statuses in sync you need to configure the following URLs in your Checkout HUB as follows:
 
-> The following URL formats target plugins versions 3.X or newer; click  [here](https://github.com/checkout/checkout-woocommerce-plugin/wiki/URLs--2.x) to get the URLs for an older plugin version
+> The following URL formats are for plugins versions 3.X or newer; click [here](https://docs.checkout.com"here") to get the URLs for older plugin versions
 
 For the **NON-PCI** extension:
 
@@ -48,11 +48,11 @@ For the **PCI** extension:
 
 # Going LIVE
 
-Upon receiving your live credentials from your account manager, here are the steps needed to start processing live transactions:
+Upon receiving your live credentials from your account manager, here are the required steps to start processing live transactions:
 
 - In the plugin settings, place your **live** keys
 - Switch the _Endpoint URL mode_ to **live**.
-- Make sure you have configured the Redirection URLs and Webhook correctly in your **live** Checkout.com HUB
+- Make sure you have configured the Redirection and Webhook URLs correctly in your **live** Checkout.com HUB
 
 
 # Reference 
