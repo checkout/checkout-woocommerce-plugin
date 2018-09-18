@@ -28,7 +28,7 @@ There are 3 keys that you need to configure in the NON-PCI extension, while for 
 # URLs
 In order to successfully complete 3D Secure transactions, and to keep Woocommerce order statuses in sync you need to configure the following URLs in your Checkout HUB as follows:
 
-> The following URL formats are for plugins versions 3.X or newer; click [here](https://docs.checkout.com"here") to get the URLs for older plugin versions
+> The following URL formats are for plugins versions 3.X or newer; click [here](https://docs.checkout.com) to get the URLs for older plugin versions
 
 For the **NON-PCI** extension:
 
