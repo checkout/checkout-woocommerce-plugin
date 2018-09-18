@@ -137,7 +137,7 @@ class WC_Checkout_Non_Pci_Customer_Card
      */
     public static function getCustomerCardListHtml($customerId) {
         $cardList   = self::getCustomerCardList($customerId);
-        $actionUrl  = get_site_url() . '/wp-content/plugins/woocommerce-checkout-non-pci-gateway/controllers/customer/card/delete.php';
+        $actionUrl  = site_url().'/?wc-api=WC_Checkout_Non_Pci_Delete_Card';
         $result     = '';
 
         if (empty($cardList)) {
@@ -180,7 +180,7 @@ class WC_Checkout_Non_Pci_Customer_Card
                 return false;
             }
 
-            jQuery.post('{$actionUrl}?card=' + id, function(data) {
+            jQuery.post('{$actionUrl}&card=' + id, function(data) {
                 var response = jQuery.parseJSON(data);
 
                 if (response.status == 'error') {
@@ -188,7 +188,8 @@ class WC_Checkout_Non_Pci_Customer_Card
                     return false;
                 }
 
-                jQuery('#checkout-card-list').html(response.message);
+                location.reload();
+                // jQuery('#checkout-card-list').html(response.message);
             });
         }";
         $result .= "</script>";

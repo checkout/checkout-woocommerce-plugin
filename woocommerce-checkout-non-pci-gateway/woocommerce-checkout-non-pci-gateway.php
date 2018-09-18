@@ -3,11 +3,10 @@
 Plugin Name: Checkout Non PCI - WooCommerce Gateway
 Plugin URI: https://www.checkout.com/
 Description: Extends WooCommerce by Adding the Checkout Non PCI Gateway.
-Version:2.5.5
+Version:3.2.0
 Author: Checkout.com
 Author URI: https://www.checkout.com/
 */
-if (!session_id()) session_start();
 
 add_action( 'plugins_loaded', 'checkout_non_pci_init', 0 );
 function checkout_non_pci_init() {
@@ -16,12 +15,16 @@ function checkout_non_pci_init() {
 
     // If we made it this far, then include our Gateway Class
     include_once('woocommerce-checkout-non-pci.php');
+    include_once('woocommerce-checkout-google-pay.php');
+    include_once('woocommerce-checkout-apple-pay.php');
 
     // Now that we have successfully included our class,
     // Lets add it too WooCommerce
     add_filter( 'woocommerce_payment_gateways', 'checkout_add_non_pci_gateway' );
     function checkout_add_non_pci_gateway( $methods ) {
         $methods[] = 'WC_Checkout_Non_Pci';
+        $methods[] = 'WC_Checkout_Google_Pay';
+        $methods[] = 'WC_Checkout_Apple_Pay';
         return $methods;
     }
 }
@@ -61,6 +64,8 @@ add_action('woocommerce_order_action_checkout_non_pci_void', 'process_order_meta
 function process_order_meta_box_actions_non_pci_capture($order) {
     include_once('includes/class-wc-gateway-checkout-non-pci-request.php');
 
+    if (!session_id()) session_start();
+
     $request = new WC_Checkout_Non_Pci_Request(new WC_Checkout_Non_Pci());
 
     if (!$request->canCapture($order)) {
@@ -89,6 +94,9 @@ function process_order_meta_box_actions_non_pci_capture($order) {
  */
 function process_order_meta_box_actions_non_pci_void($order) {
     include_once( 'includes/class-wc-gateway-checkout-non-pci-request.php');
+
+    if (!session_id()) session_start();
+
     $request = new WC_Checkout_Non_Pci_Request(new WC_Checkout_Non_Pci());
 
     if (!$request->canVoid($order)) {
@@ -111,6 +119,8 @@ function process_order_meta_box_actions_non_pci_void($order) {
 
 /* START: Admin messages */
 function checkout_non_pci_admin_notice_error() {
+    if (!session_id()) session_start();
+
     if (empty($_SESSION['checkout_non_pci_admin_error'])) {
         return;
     }
@@ -126,6 +136,8 @@ function checkout_non_pci_admin_notice_error() {
 add_action('admin_notices', 'checkout_non_pci_admin_notice_error');
 
 function checkout_non_pci_admin_notice_success() {
+    if (!session_id()) session_start();
+    
     if (empty($_SESSION['checkout_non_pci_admin_success'])) {
         return;
     }
@@ -161,6 +173,7 @@ function checkout_non_pci_customer_cards_table_install() {
 	        `card_number` VARCHAR(4) NOT NULL COMMENT 'Short Customer Credit Card Number',
 	        `card_type` VARCHAR(20) NOT NULL COMMENT 'Credit Card Type',
 	        `card_enabled` BIT NOT NULL DEFAULT 1 COMMENT 'Credit Card Enabled',
+            `cko_customer_id` VARCHAR(100) NOT NULL COMMENT 'Customer ID from Checkout API',
 	        PRIMARY KEY (`entity_id`),
 	        UNIQUE INDEX `UNQ_CHECKOUT_CUSTOMER_CARDS_CUSTOMER_ID_CARD_ID_CARD_TYPE` (`customer_id`, `card_id`, `card_type`)
 	    )
@@ -191,6 +204,7 @@ function checkout_non_pci_customer_cards_table_install() {
     if(empty($row2)){
         $wpdb->query("ALTER TABLE {$tableName} ADD `cko_customer_id` VARCHAR(100) NOT NULL COMMENT 'Customer ID from Checkout API'");
     }
+
 }
 /* END: Create table script */
 

@@ -368,39 +368,59 @@ export default function () {
         switch (option) {
           case 'visa':
             browser.setValue(FRONTEND.pci.name, VAL.customer.firstname);
+            browser.pause(300);
             browser.setValue(FRONTEND.pci.card_number, VAL.card.visa.card_number);
+            browser.pause(300);
             browser.setValue(FRONTEND.pci.month_year, VAL.card.visa.month + '/' + VAL.card.visa.year);
+            browser.pause(300);
             browser.setValue(FRONTEND.pci.cvv, VAL.card.visa.cvv);
+            browser.pause(300);
             break;
           case 'mastercard':
             browser.setValue(FRONTEND.pci.name, VAL.customer.firstname);
+            browser.pause(300);
             browser.setValue(FRONTEND.pci.card_number, VAL.card.mastercard.card_number);
+            browser.pause(300);
             browser.setValue(FRONTEND.pci.month_year, VAL.card.mastercard.month + '/' + VAL.card.mastercard.year);
+            browser.pause(300);
+            browser.pause(300);
             browser.setValue(FRONTEND.pci.cvv, VAL.card.mastercard.cvv);
             break;
           case 'amex':
             browser.setValue(FRONTEND.pci.name, VAL.customer.firstname);
             browser.setValue(FRONTEND.pci.card_number, VAL.card.amex.card_number);
+            browser.pause(300);
             browser.setValue(FRONTEND.pci.month_year, VAL.card.amex.month + '/' + VAL.card.amex.year);
+            browser.pause(300);
             browser.setValue(FRONTEND.pci.cvv, VAL.card.amex.cvv);
+            browser.pause(300);
             break;
           case 'diners':
             browser.setValue(FRONTEND.pci.name, VAL.customer.firstname);
             browser.setValue(FRONTEND.pci.card_number, VAL.card.diners.card_number);
+            browser.pause(300);
             browser.setValue(FRONTEND.pci.month_year, VAL.card.diners.month + '/' + VAL.card.diners.year);
+            browser.pause(300);
             browser.setValue(FRONTEND.pci.cvv, VAL.card.mastercard.cvv);
+            browser.pause(300);
             break;
           case 'jcb':
             browser.setValue(FRONTEND.pci.name, VAL.customer.firstname);
             browser.setValue(FRONTEND.pci.card_number, VAL.card.jcb.card_number);
+            browser.pause(300);
             browser.setValue(FRONTEND.pci.month_year, VAL.card.jcb.month + '/' + VAL.card.jcb.year);
+            browser.pause(300);
             browser.setValue(FRONTEND.pci.cvv, VAL.card.jcb.cvv);
+            browser.pause(300);
             break;
           case 'discover':
             browser.setValue(FRONTEND.pci.name, VAL.customer.firstname);
             browser.setValue(FRONTEND.pci.card_number, VAL.card.discover.card_number);
+            browser.pause(300);
             browser.setValue(FRONTEND.pci.month_year, VAL.card.discover.month + '/' + VAL.card.discover.year);
+            browser.pause(300);
             browser.setValue(FRONTEND.pci.cvv, VAL.card.discover.cvv);
+            browser.pause(300);
             break;
           default:
             break;

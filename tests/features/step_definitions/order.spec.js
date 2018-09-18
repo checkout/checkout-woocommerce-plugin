@@ -42,9 +42,7 @@ export default function () {
     if (browser.getValue(FRONTEND.order.phone) !== VAL.guest.phone) {
       browser.setValue(FRONTEND.order.phone, VAL.guest.phone);
     }
-    if (browser.getValue(FRONTEND.order.email) !== VAL.guest.email) {
-      browser.setValue(FRONTEND.order.email, VAL.guest.email);
-    }
+    browser.setValue(FRONTEND.order.email, VAL.guest.email); 
   });
   this.Then(/^I select the (.*) payment option$/, (option) => {
     switch (option) {
