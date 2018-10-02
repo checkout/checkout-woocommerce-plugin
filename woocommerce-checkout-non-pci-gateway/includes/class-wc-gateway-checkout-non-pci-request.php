@@ -794,6 +794,9 @@ class WC_Checkout_Non_Pci_Request
 
         if (!$result->isValid() || !WC_Checkout_Non_Pci_Validator::responseValidation($result)) {
             $errorMessage = "Please check you card details and try again. Thank you.";
+
+            $orderMessage = "Checkout.com Charge Declined (Transaction ID - {$result['id']}, Response Message - {$result['responseMessage']} ";
+            $order->add_order_note( $orderMessage );
             
             WC_Checkout_Non_Pci::log($errorMessage. '-' .$responseCode);
             WC_Checkout_Non_Pci::log($result->getResponseCode());
