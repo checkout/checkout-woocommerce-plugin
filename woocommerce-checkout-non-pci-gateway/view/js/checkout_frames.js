@@ -3,6 +3,14 @@ jQuery(document).ready(function() {
     setTimeout(function(){
         
         if (window.hasOwnProperty('CheckoutApiEmbConfig') && typeof Frames != 'undefined') {
+            // Clean up the event handlers
+            Frames.removeAllEventHandlers(Frames.Events.LIGHTBOX_ACTIVATED);
+            Frames.removeAllEventHandlers(Frames.Events.CARD_TOKENISED);
+            Frames.removeAllEventHandlers(Frames.Events.CARD_VALIDATION_CHANGED);
+            Frames.removeAllEventHandlers(Frames.Events.FRAME_ACTIVATED);
+            Frames.removeAllEventHandlers(Frames.Events.READY);
+
+            // Init Frames
             Frames.init(window.CheckoutApiEmbConfig);
         }
 
