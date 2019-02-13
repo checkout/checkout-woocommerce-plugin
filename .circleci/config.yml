@@ -13,6 +13,10 @@ jobs:
             sudo service apache2 restart && sudo service mysql restart
             cd /var/www/html/wordpress/wp-content/plugins/ && sudo mv ~/cko_wp/woocommerce-checkout-non-pci-gateway . && sudo mv ~/cko_wp/woocommerce-checkout-pci-gateway .
       - run:
+          name: Refresh Chrome
+          command: |
+            apt-get update -y && apt-get install google-chrome-stable -y 
+      - run:
           name: Install dependencies
           command: |
             cd ~/cko_wp/tests && npm i 
@@ -23,5 +27,3 @@ jobs:
       - store_artifacts:
           path: ~/cko_wp/tests/screenshots
           destination: Failed-Tests
-
-
