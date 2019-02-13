@@ -15,7 +15,7 @@ jobs:
       - run:
           name: Refresh Chrome
           command: |
-            apt-get update -y && apt-get install google-chrome-stable -y 
+            sudo apt-get install google-chrome-stable -y 
       - run:
           name: Install dependencies
           command: |
