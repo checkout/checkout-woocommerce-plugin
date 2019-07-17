@@ -5,8 +5,6 @@
 
 This extension allows shop owners to process online payments (card / alternative payments) using:
   - **Frames.js** - Customisable payment form, embedded within your website
-  - **Checkout.js** - Customisable payment widget 
-  - **Checkout.js Hosted** - Redirection to a customisable page on Checkout.com's servers
   - **Apple Pay & Google Pay** - Shoppers can pay using mobile wallets
   - **Alternative payments** - Shoppers can pay using local payment options (Sofort, iDEAL, Boleto ... etc.)
 
