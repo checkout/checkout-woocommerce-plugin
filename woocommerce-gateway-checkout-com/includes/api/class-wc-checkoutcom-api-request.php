@@ -14,14 +14,36 @@ use Checkout\Models\Payments\Voids;
 use Checkout\Models\Payments\BillingDescriptor;
 use Checkout\Models\Phone;
 use Checkout\Models\Payments\IdSource;
+use Checkout\Models\Payments\IdealSource;
+use Checkout\Models\Product;
+use Checkout\Models\Sources\Klarna;
+use Checkout\Models\Payments\KlarnaSource;
+use Checkout\Models\Payments\GiropaySource;
+use Checkout\Models\Payments\BoletoSource;
+use Checkout\Models\Payments\AlipaySource;
+use Checkout\Models\Payments\PoliSource;
+use Checkout\Models\Payments\EpsSource;
+use Checkout\Models\Payments\BancontactSource;
+use Checkout\Models\Payments\KnetSource;
+use Checkout\Models\Payments\FawrySource;
+use Checkout\Models\Payments\SofortSource;
+use Checkout\Models\Payments\QpaySource;
 use Checkout\Models\Tokens\ApplePay;
 use Checkout\Models\Tokens\ApplePayHeader;
 use Checkout\Models\Tokens\GooglePay;
 use Checkout\Library\Exceptions\CheckoutHttpException;
 use Checkout\Library\Exceptions\CheckoutModelException;
 
+
 class WC_Checkoutcom_Api_request
 {
+    /**
+     * Create payment and return response
+     *
+     * @param WC_Order $order
+     * @param $arg
+     * @return array
+     */
     public static function create_payment( WC_Order $order, $arg )
     {
         $logger = wc_get_logger();
@@ -130,17 +152,23 @@ class WC_Checkoutcom_Api_request
             $payment_option = 'Google Pay';
 
             $method = new TokenSource($arg);
+        } elseif($_POST['payment_method'] == 'wc_checkout_com_alternative_payments') {
+
+            $method = WC_Checkoutcom_Api_request::get_apm_method($_POST, $order);
+            $payment_option = $method->type;
         }
 
-        // Set billing address in $method
-        $billingAddressParam = new Address();
-        $billingAddressParam->address_line1 = $customerAddress['billing_address_1'];
-        $billingAddressParam->address_line2 = $customerAddress['billing_address_2'];
-        $billingAddressParam->city = $customerAddress['billing_city'];
-        $billingAddressParam->state = $customerAddress['billing_state'];
-        $billingAddressParam->zip = $customerAddress['billing_postcode'];
-        $billingAddressParam->country = $customerAddress['billing_country'];
-        $method->billing_address = $billingAddressParam;
+        if ($method->type != 'klarna') {
+            // Set billing address in $method
+            $billingAddressParam = new Address();
+            $billingAddressParam->address_line1 = $customerAddress['billing_address_1'];
+            $billingAddressParam->address_line2 = $customerAddress['billing_address_2'];
+            $billingAddressParam->city = $customerAddress['billing_city'];
+            $billingAddressParam->state = $customerAddress['billing_state'];
+            $billingAddressParam->zip = $customerAddress['billing_postcode'];
+            $billingAddressParam->country = $customerAddress['billing_country'];
+            $method->billing_address = $billingAddressParam;
+        }
 
         $payment = new Payment($method, $order->get_currency());
         $payment->capture = $auto_capture;
@@ -300,6 +328,10 @@ class WC_Checkoutcom_Api_request
         );
     }
 
+    /**
+     * @param $session_id
+     * @return array|mixed
+     */
     public static function verify_session( $session_id )
     {
         $logger = wc_get_logger();
@@ -368,7 +400,7 @@ class WC_Checkoutcom_Api_request
             return $token->getId();
         } catch (CheckoutModelException $ex) {
             $error_message = __('An error has occured while processing your payment.',wc_checkout_com_cards );
-            WC_Checkoutcom_Utility::logger($error_message , $ex->getBody());
+            WC_Checkoutcom_Utility::logger($error_message , $ex);
         } catch (CheckoutHttpException $ex) {
             $error_message = __('An error has occured while processing your payment. 2',wc_checkout_com_cards );
             WC_Checkoutcom_Utility::logger($error_message , $ex->getBody());
@@ -425,7 +457,7 @@ class WC_Checkoutcom_Api_request
             }
         } catch (CheckoutModelException $ex) {
             $error_message = "An error has occurred while processing your capture request.";
-            WC_Checkoutcom_Utility::logger($error_message , $ex->getBody());
+            WC_Checkoutcom_Utility::logger($error_message , $ex);
 
             return array('error' => $error_message);
 
@@ -484,7 +516,7 @@ class WC_Checkoutcom_Api_request
             }
         } catch (CheckoutModelException $ex) {
             $error_message = "An error has occurred while processing your void request.";
-            WC_Checkoutcom_Utility::logger($error_message , $ex->getBody());
+            WC_Checkoutcom_Utility::logger($error_message , $ex);
 
             return array('error' => $error_message);
         } catch (CheckoutHttpException $ex) {
@@ -557,7 +589,7 @@ class WC_Checkoutcom_Api_request
             }
         } catch (CheckoutModelException $ex) {
             $error_message = "An error has occurred while processing your refund request. ";
-            WC_Checkoutcom_Utility::logger($error_message , $ex->getBody());
+            WC_Checkoutcom_Utility::logger($error_message , $ex);
 
             return array('error' => $error_message);
         } catch (CheckoutHttpException $ex) {
@@ -566,5 +598,502 @@ class WC_Checkoutcom_Api_request
 
             return array('error' => $error_message);
         }
+    }
+
+    /**
+     * Return ideal banks info
+     *
+     * @return array
+     */
+    public static function get_ideal_bank()
+    {
+        $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
+        $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
+
+        // Initialize the Checkout Api
+        $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
+
+        try {
+            $result = $checkout->payments()->issuers(IdealSource::QUALIFIED_NAME);
+
+            return $result;
+
+        } catch (CheckoutModelException $ex) {
+            $error_message = "An error has occurred while processing your payment. ";
+            WC_Checkoutcom_Utility::logger($error_message , $ex);
+
+            return array('error' => $error_message);
+        } catch (CheckoutHttpException $ex) {
+            $error_message = "An error has occurred while processing your payment. ";
+            WC_Checkoutcom_Utility::logger($error_message , $ex->getBody());
+
+            return array('error' => $error_message);
+        }
+    }
+
+    /**
+     * @return array
+     */
+    public static function get_giropay_bank()
+    {
+        $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
+        $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
+
+        // Initialize the Checkout Api
+        $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
+
+        try {
+            $result = $checkout->payments()->issuers(GiropaySource::QUALIFIED_NAME);
+
+            return $result;
+
+        } catch (CheckoutModelException $ex) {
+            $error_message = "An error has occurred while processing your payment. ";
+            WC_Checkoutcom_Utility::logger($error_message , $ex);
+
+            return array('error' => $error_message);
+        } catch (CheckoutHttpException $ex) {
+            $error_message = "An error has occurred while processing your payment. ";
+            WC_Checkoutcom_Utility::logger($error_message , $ex->getBody());
+
+            return array('error' => $error_message);
+        }
+    }
+
+    /**
+     * Return EPS Bank
+     *
+     * @return array
+     */
+    public static function get_eps_bank()
+    {
+        $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
+        $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
+
+        // Initialize the Checkout Api
+        $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
+
+        try {
+            $result = $checkout->payments()->issuers(EpsSource::QUALIFIED_NAME);
+
+            return $result;
+
+        } catch (CheckoutModelException $ex) {
+            $error_message = "An error has occurred while processing your payment. ";
+            WC_Checkoutcom_Utility::logger($error_message , $ex);
+
+            return array('error' => $error_message);
+        } catch (CheckoutHttpException $ex) {
+            $error_message = "An error has occurred while processing your payment. ";
+            WC_Checkoutcom_Utility::logger($error_message , $ex->getBody());
+
+            return array('error' => $error_message);
+        }
+    }
+
+    public static function create_apm_payment(WC_Order $order, $arg)
+    {
+        // Get payment request parameter
+        $request_param = WC_Checkoutcom_Api_request::get_request_param($order, $arg);
+        $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
+
+        $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
+
+        // Initialize the Checkout Api
+        $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
+
+
+        try {
+            // Call to create charge
+            $response = $checkout->payments()->request($request_param);
+
+            // Check if payment successful
+            if ($response->isSuccessful()) {
+                // Check if payment is 3Dsecure
+                if ($response->isPending() || $response->status == 'Authorized') {
+                    // Check if redirection link exist
+                    if ($response->getRedirection()) {
+                        // return apm redirection url
+                        return array('apm_redirection' => $response->getRedirection());
+
+                    } else {
+
+                        // Verify payment id
+                        $verifyPayment = $checkout->payments()->details($response->id);
+                        $source = $verifyPayment->source;
+
+                        // Check if payment source if Fawry
+                        if ($source['type'] == 'fawry'){
+
+                            return $verifyPayment;
+                        }
+
+                        $error_message = "An error has occurred while processing your payment. Redirection link not found";
+                        WC_Checkoutcom_Utility::logger($error_message , null);
+
+                        return array('error' => $error_message);
+                    }
+                } else {
+
+                    return $response;
+                }
+            } else {
+                $error_message = "An error has occurred while processing your payment. Please check your card details and try again.";
+                //Log error
+                WC_Checkoutcom_Utility::logger($error_message , $response);
+
+                return array('error' => $error_message);
+            }
+        } catch (CheckoutModelException $ex) {
+            $error_message = "An error has occurred while processing your payment. ";
+            WC_Checkoutcom_Utility::logger($error_message , $ex);
+
+            return array('error' => $error_message);
+        } catch (CheckoutHttpException $ex) {
+            $error_message = "An error has occurred while processing your payment. ";
+            WC_Checkoutcom_Utility::logger($error_message , $ex->getBody());
+
+            return array('error' => $error_message);
+        }
+    }
+
+    /**
+     * @param $data
+     * @param $order
+     * @return IdealSource
+     */
+    private static function get_apm_method($data, $order)
+    {
+        $apm_name = $data['cko-apm'];
+
+        switch ($apm_name) {
+            case 'ideal':
+                $bic = $data['issuer-id'];
+                $description = $order->get_order_number();
+
+                $method = new IdealSource($bic, $description);
+
+                break;
+            case 'klarna':
+                $klarna_token = $_POST['cko-klarna-token'];
+                $country_code = $_POST['billing_country'];
+                $locale = 'en-GB' ;//str_replace("_","-",$localisation);
+
+                $products = array();
+                foreach ($order->get_items() as $item_id => $item_data) {
+                    // Get an instance of corresponding the WC_Product object
+                    $product = $item_data->get_product();
+                    $item_total = $item_data->get_total(); // Get the item line total
+                    $amount_cents = WC_Checkoutcom_Utility::valueToDecimal($item_total, get_woocommerce_currency());
+                    $items_total = $item_data->get_total() * $item_data->get_quantity();
+                    $total_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($items_total, get_woocommerce_currency());
+
+                    // Displaying this data (to check)
+                    $products[] = array(
+                        "name" => $product->get_name(),
+                        "quantity" => $item_data->get_quantity(),
+                        "unit_price" => $amount_cents,
+                        "tax_rate" => 0,
+                        "total_amount" => $total_amount_cents,
+                        "total_tax_amount" => 0,
+                        "type" => "physical",
+                        "reference" => $product->get_name(),
+                        "total_discount_amount" => 0
+                    );
+                }
+
+                $chosen_methods = wc_get_chosen_shipping_method_ids();
+                $chosen_shipping = $chosen_methods[0];
+
+                if($chosen_shipping != 'free_shipping') {
+                    $shipping_amount = WC()->cart->get_shipping_total();
+                    $shipping_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($shipping_amount, get_woocommerce_currency());
+
+                    $products[] = array(
+                        "name" => $chosen_shipping,
+                        "quantity" => 1,
+                        "unit_price" => $shipping_amount_cents,
+                        "tax_rate" => 0,
+                        "total_amount" => $shipping_amount_cents,
+                        "total_tax_amount" => 0,
+                        "type" => "shipping_fee",
+                        "reference" => $chosen_shipping,
+                        "total_discount_amount" => 0
+                    );
+                }
+
+                // Set Billing address
+                $billingAddressParam = new Address();
+                $billingAddressParam->given_name = $_POST['billing_first_name'];
+                $billingAddressParam->family_name = $_POST['billing_last_name'];
+                $billingAddressParam->email = $_POST['billing_email'];
+                $billingAddressParam->street_address = $_POST['billing_address_1'];
+                $billingAddressParam->street_address2 = $_POST['billing_address_2'];
+                $billingAddressParam->postal_code = $_POST['billing_postcode'];
+                $billingAddressParam->city = $_POST['billing_city'];
+                $billingAddressParam->region = $_POST['billing_state'];
+                $billingAddressParam->phone = $_POST['billing_phone'];
+                $billingAddressParam->country = $_POST['billing_country'];
+
+                $method = new KlarnaSource($klarna_token, $country_code, $locale, $billingAddressParam, 0, $products);
+
+                break;
+            case 'giropay' :
+                $bic = $data['giropay-bank-details'];
+                $purpose = "#{$order->get_order_number()}-{$_SERVER['HTTP_HOST']}";
+
+                $method = new GiropaySource($purpose, $bic);
+
+                break;
+            case 'boleto':
+                $customerName = $data['name'];
+                $birthData = $data['birthDate'];
+                $cpf = $data['cpf'];
+
+                $method = new BoletoSource($customerName, $birthData, $cpf);
+
+                break;
+            case 'alipay':
+
+                $method = new AlipaySource();
+
+                break;
+            case 'poli':
+
+                $method = new PoliSource();
+
+                break;
+            case 'sofort':
+                $method = new SofortSource();
+                break;
+            case 'eps':
+                $purpose = get_bloginfo( 'name' );
+
+                $method =  new EpsSource($purpose);
+                break;
+            case 'bancontact':
+                $accountHolder = $_POST['billing_first_name'] . ' '. $_POST['billing_last_name'];
+                $countryCode = $_POST['billing_country'];
+
+                $method = new BancontactSource($accountHolder, $countryCode);
+                break;
+            case 'knet':
+                $language = get_locale();
+
+                switch ($language) {
+                    case 'ar_SA':
+                        $language = 'ar';
+                        break;
+                    default:
+                        $language = 'en';
+                        break;
+                }
+
+                $method = new KnetSource($language);
+                break;
+            case 'fawry':
+                $email = $_POST['billing_email'];
+                $phone = $_POST['billing_phone'];
+
+                $products = array();
+                foreach ($order->get_items() as $item_id => $item_data) {
+                    // Get an instance of corresponding the WC_Product object
+                    $product = $item_data->get_product();
+                    $item_total = $item_data->get_total(); // Get the item line total
+                    $amount_cents = WC_Checkoutcom_Utility::valueToDecimal($item_total, get_woocommerce_currency());
+                    $items_total = $item_data->get_total() * $item_data->get_quantity();
+                    $total_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($items_total, get_woocommerce_currency());
+
+                    $products[] = array(
+                        "product_id" => $product->get_id(),
+                        "quantity" => $item_data->get_quantity(),
+                        "price" => $amount_cents,
+                        "description" => $product->get_name(),
+                    );
+                }
+
+                $chosen_methods = wc_get_chosen_shipping_method_ids();
+                $chosen_shipping = $chosen_methods[0];
+
+                if($chosen_shipping != 'free_shipping') {
+                    $shipping_amount = WC()->cart->get_shipping_total();
+                    $shipping_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($shipping_amount, get_woocommerce_currency());
+
+                    $products[] = array(
+                        "product_id" => $chosen_shipping,
+                        "quantity" => 1,
+                        "price" => $shipping_amount_cents,
+                        "description" => $chosen_shipping,
+                    );
+                }
+
+                $method = new FawrySource($email, $phone, $order->get_order_number(), $products);
+                break;
+            case 'qpay':
+                $method = new QpaySource(get_bloginfo( 'name' ));
+        }
+
+        return $method;
+    }
+
+    /**
+     * Return klarna session
+     *
+     * @return array|mixed
+     */
+    public static function klarna_session()
+    {
+        global $woocommerce;
+        $items = $woocommerce->cart->get_cart();
+        $products = array();
+
+        $total_amount = $woocommerce->cart->total;
+        $amount_cents = WC_Checkoutcom_Utility::valueToDecimal($total_amount, get_woocommerce_currency());
+
+        foreach($items as $item => $values) {
+            $_product =  wc_get_product( $values['data']->get_id());
+            $unit_price = get_post_meta($values['product_id'] , '_price', true);
+            $unit_price_cents = WC_Checkoutcom_Utility::valueToDecimal($unit_price, get_woocommerce_currency());
+
+            $products[] = array(
+                "name" => $_product->get_title(),
+                "quantity" => $values['quantity'],
+                "unit_price" => $unit_price_cents,
+                "tax_rate" => 0,
+                "total_amount" => $unit_price_cents * $values['quantity'],
+                "total_tax_amount" => 0,
+                "type" => "physical",
+                "reference" => $_product->get_sku(),
+                "total_discount_amount" => 0
+
+            );
+        }
+
+        $chosen_methods = wc_get_chosen_shipping_method_ids();
+        $chosen_shipping = $chosen_methods[0];
+
+        if($chosen_shipping != 'free_shipping') {
+            $shipping_amount = WC()->cart->get_shipping_total();
+            $shipping_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($shipping_amount, get_woocommerce_currency());
+
+            $products[] = array(
+                "name" => $chosen_shipping,
+                "quantity" => 1,
+                "unit_price" => $shipping_amount_cents,
+                "tax_rate" => 0,
+                "total_amount" => $shipping_amount_cents,
+                "total_tax_amount" => 0,
+                "type" => "shipping_fee",
+                "reference" => $chosen_shipping,
+                "total_discount_amount" => 0
+            );
+
+        }
+
+        $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
+
+        $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
+
+        // Initialize the Checkout Api
+        $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
+
+        try{
+            $klarna = new Klarna('GB', get_woocommerce_currency(), 'en-GB', $amount_cents, 0, $products);
+            $source = $checkout->sources()
+                ->add($klarna);
+
+            return $source;
+
+        } catch (CheckoutModelException $ex) {
+            $error_message = "An error has occurred while processing your payment. ";
+            WC_Checkoutcom_Utility::logger($error_message , $ex);
+
+            return array('error' => $error_message);
+        } catch (CheckoutHttpException $ex) {
+            $error_message = "An error has occurred while processing your payment. ";
+            WC_Checkoutcom_Utility::logger($error_message , $ex->getBody());
+
+            return array('error' => $error_message);
+        }
+    }
+
+    /**
+     * Return cart information
+     *
+     * @return array
+     */
+    public static function get_cart_info()
+    {
+        global $woocommerce;
+        $billingAddress = WC()->customer->get_billing();
+
+        $items = $woocommerce->cart->get_cart();
+        $products = array();
+
+        $total_amount = $woocommerce->cart->total;
+        $amount_cents = WC_Checkoutcom_Utility::valueToDecimal($total_amount, get_woocommerce_currency());
+
+        foreach($items as $item => $values) {
+            $_product =  wc_get_product( $values['data']->get_id());
+            $unit_price = get_post_meta($values['product_id'] , '_price', true);
+            $unit_price_cents = WC_Checkoutcom_Utility::valueToDecimal($unit_price, get_woocommerce_currency());
+
+            $products[] = array(
+                "name" => $_product->get_title(),
+                "quantity" => $values['quantity'],
+                "unit_price" => $unit_price_cents,
+                "tax_rate" => 0,
+                "total_amount" => $unit_price_cents * $values['quantity'],
+                "total_tax_amount" => 0,
+                "type" => "physical",
+                "reference" => $_product->get_sku(),
+                "total_discount_amount" => 0
+
+            );
+        }
+
+        $chosen_methods = wc_get_chosen_shipping_method_ids();
+        $chosen_shipping = $chosen_methods[0];
+
+        if($chosen_shipping != 'free_shipping') {
+            $shipping_amount = WC()->cart->get_shipping_total();
+            $shipping_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($shipping_amount, get_woocommerce_currency());
+
+            $products[] = array(
+                "name" => $chosen_shipping,
+                "quantity" => 1,
+                "unit_price" => $shipping_amount_cents,
+                "tax_rate" => 0,
+                "total_amount" => $shipping_amount_cents,
+                "total_tax_amount" => 0,
+                "type" => "shipping_fee",
+                "reference" => $chosen_shipping,
+                "total_discount_amount" => 0
+            );
+
+        }
+
+        $cartInfo = array(
+            "purchase_country" => $billingAddress['country'],
+            "purchase_currency" => get_woocommerce_currency(),
+            "locale" => 'en-GB', //$locale,
+            "billing_address" => array(
+                "given_name" => $billingAddress['first_name'],
+                "family_name" => $billingAddress['last_name'],
+                "email" => $billingAddress['email'],
+                "street_address" => $billingAddress['address_1'],
+                "street_address2" => $billingAddress['address_2'],
+                "postal_code" => $billingAddress['postcode'],
+                "city" => $billingAddress['city'],
+                "region" => $billingAddress['state'],
+                "phone" => $billingAddress['phone'],
+                "country" => $billingAddress['country'],
+            ),
+            "order_amount" => $amount_cents,
+            "order_tax_amount" => 0,
+            "order_lines" => $products
+        );
+
+        return $cartInfo;
     }
 }

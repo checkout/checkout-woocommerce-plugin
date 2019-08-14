@@ -1,6 +1,6 @@
 <?php
 
-include_once('/settings/class-wc-checkoutcom-cards-settings.php');
+include_once('settings/class-wc-checkoutcom-cards-settings.php');
 
 class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway
 {

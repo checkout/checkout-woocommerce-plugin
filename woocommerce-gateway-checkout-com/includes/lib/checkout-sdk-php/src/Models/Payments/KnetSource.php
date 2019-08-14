@@ -26,7 +26,7 @@ namespace Checkout\Models\Payments;
  * @license  https://opensource.org/licenses/mit-license.html MIT License
  * @link     https://docs.checkout.com/
  */
-class KnetSource extends IdSource
+class KnetSource extends Source
 {
 
     /**
@@ -35,13 +35,6 @@ class KnetSource extends IdSource
      * @var string
      */
     const QUALIFIED_NAME = __CLASS__;
-
-    /**
-     * Qualified namespace of the class.
-     *
-     * @var string
-     */
-    const QUALIFIED_NAMESPACE = __NAMESPACE__;
 
     /**
      * Name of the model.
@@ -58,7 +51,7 @@ class KnetSource extends IdSource
     /**
      * Initialise KNET.
      *
-     * @param string   $purpose     2-letter language code in accordance with ISO 639-1
+     * @param string   $language     2-letter language code in accordance with ISO 639-1.
      */
     public function __construct($language)
     {

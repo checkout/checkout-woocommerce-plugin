@@ -472,5 +472,61 @@ class WC_Checkoutcom_Cards_Settings
 
         return apply_filters( 'wc_checkout_com_google_pay', $settings );
     }
+
+    /**
+     *
+     * @return mixed
+     */
+    public static function apm_settings()
+    {
+        $settings = array(
+            'apm_setting' => array(
+                'title'       => __( 'Alternative Payment Settings', 'checkoutcom-cards-settings' ),
+                'type'        => 'title',
+                'description' => '',
+            ),
+            'enabled' => array(
+                'id' => 'enable',
+                'title'   => __( 'Enable/Disable', 'checkoutcom-cards-settings' ),
+                'type'    => 'checkbox',
+                'label'   => __( 'Enable Checkout.com', 'checkoutcom-cards-settings' ),
+                'description' => __( 'This enables google pay as a payment method', 'checkoutcom-cards-settings' ),
+                'desc_tip'    => true,
+                'default'     => 'no',
+            ),
+            'title' => array(
+                'title' => __('Title', 'checkoutcom-cards-settings'),
+                'type' => 'text',
+                'label' => __('Alternative Payments', 'checkoutcom-cards-settings'),
+                'description' => __('Title that will be displayed on the checkout page', 'checkoutcom-cards-settings'),
+                'desc_tip' => true,
+                'default'     => 'Google Pay',
+            ),
+            'ckocom_apms_selector' => array(
+                'title' => __('Alternative Payment Methods', 'checkoutcom-cards-settings'),
+                'type' => 'multiselect',
+                'options' => array(
+                    'alipay' => __('Alipay', 'checkoutcom-cards-settings' ),
+                    'boleto' => __('Boleto', 'checkoutcom-cards-settings' ),
+                    'giropay' => __('Giropay', 'checkoutcom-cards-settings' ),
+                    'ideal' => __('iDEAL', 'checkoutcom-cards-settings' ),
+                    'klarna' => __('Klarna', 'checkoutcom-cards-settings' ),
+                    'poli' => __('Poli', 'checkoutcom-cards-settings' ),
+                    'sepa' => __('Sepa Direct Debit', 'checkoutcom-cards-settings' ),
+                    'sofort' => __('Sofort', 'checkoutcom-cards-settings' ),
+                    'eps' => __('EPS', 'checkoutcom-cards-settings' ),
+                    'bancontact' => __('Bancontact', 'checkoutcom-cards-settings' ),
+                    'knet' => __('KNET', 'checkoutcom-cards-settings' ),
+                    'fawry' => __('Fawry', 'checkoutcom-cards-settings' ),
+                    'qpay' => __('QPay', 'checkoutcom-cards-settings' ),
+                ),
+                'class' => 'wc-enhanced-select',
+                'css' => 'width: 400px;',
+            ),
+
+        );
+
+        return apply_filters( 'wc_checkout_com_alternative_payments', $settings );
+    }
 }
 
