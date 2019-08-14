@@ -1,8 +1,8 @@
 <?php
 include_once "lib/checkout-sdk-php/checkout.php";
-include_once('/settings/class-wc-checkoutcom-cards-settings.php');
-include_once('/settings/admin/class-wc-checkoutcom-admin.php');
-include_once('/api/class-wc-checkoutcom-api-request.php');
+include_once('settings/class-wc-checkoutcom-cards-settings.php');
+include_once('settings/admin/class-wc-checkoutcom-admin.php');
+include_once('api/class-wc-checkoutcom-api-request.php');
 
 
 class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
@@ -391,6 +391,12 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 
         // Set action id as woo transaction id
         update_post_meta($order_id, '_transaction_id', $action['0']['id']);
+
+        // if no action id and source is boleto
+        if($action['0']['id'] == null && $result['source']['type'] == 'boleto' ){
+            update_post_meta($order_id, '_transaction_id', $result['id']);
+        }
+
         update_post_meta($order_id, '_cko_payment_id', $result['id']);
 
         // Get cko auth status configured in admin
@@ -402,6 +408,11 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
             // Get cko auth status configured in admin
             $status = WC_Admin_Settings::get_option('ckocom_order_flagged');
             $message = __("Checkout.com Payment Flagged (Transaction ID - {$action['0']['id']}) ", 'wc_checkout_com_cards_settings');
+        }
+
+        if ($result['status'] == 'Captured') {
+            $status = WC_Admin_Settings::get_option('ckocom_order_captured');
+            $message = __("Checkout.com Payment Captured (Transaction ID - {$action['0']['id']}) ", 'wc_checkout_com_cards_settings');
         }
 
         // save card to db
@@ -511,6 +522,4 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 
         return true;
     }
-
-
 }

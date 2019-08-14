@@ -14,7 +14,6 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway
 
         $this->has_fields = true;
         $this->supports = array( 'products', 'refunds');
-        $this->description = 'test description';
 
         $this->init_form_fields();
         $this->init_settings();
@@ -293,6 +292,7 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway
 
         // Set action id as woo transaction id
         update_post_meta($order_id, '_transaction_id', $result['action_id']);
+        update_post_meta($order_id, '_cko_payment_id', $result['id']);
 
         // Get cko auth status configured in admin
         $status = WC_Admin_Settings::get_option('ckocom_order_authorised');
@@ -327,8 +327,39 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway
      * @param string $reason
      * @return bool|WP_Error
      */
-    public function process_refund($order_id, $amount = null, $reason = '') {
-        return false;
+    public function process_refund($order_id, $amount = null, $reason = '')
+    {
+        $order = wc_get_order( $order_id );
+        $result = (array) WC_Checkoutcom_Api_request::refund_payment($order_id, $order);
+
+        // check if result has error and return error message
+        if (isset($result['error']) && !empty($result['error'])) {
+            WC_Checkoutcom_Utility::wc_add_notice_self(__($result['error']), 'error');
+            return false;
+        }
+
+        // Set action id as woo transaction id
+        update_post_meta($order_id, '_transaction_id', $result['action_id']);
+
+        // Get cko auth status configured in admin
+        $status = WC_Admin_Settings::get_option('ckocom_order_refunded');
+        $message = __("Checkout.com Payment refunded (Transaction ID - {$result['action_id']}) ", 'wc_checkout_com_cards');
+
+        if(isset($_SESSION['cko-refund-is-less'])){
+            if($_SESSION['cko-refund-is-less']){
+                $status = WC_Admin_Settings::get_option('ckocom_order_captured');
+                $order->add_order_note( __("Checkout.com Payment Partially refunded (Transaction ID - {$result['action_id']})") );
+
+                unset($_SESSION['cko-refund-is-less']);
+
+                return true;
+            }
+        }
+
+        // Update order status on woo backend
+        $order->update_status($status,$message);
+
+        return true;
     }
 
 }

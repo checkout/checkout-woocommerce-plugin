@@ -3,7 +3,7 @@
 Plugin Name: WooCommerce Checkout.com Gateway
 Plugin URI: https://www.checkout.com/
 Description: Extends WooCommerce by Adding the Checkout.com Gateway.
-Version: 1.0.0
+Version: 4.0.0
 Author: Checkout.com
 Author URI: https://www.checkout.com/
 */
@@ -19,6 +19,7 @@ function init_checkout_com_gateway_class()
     include_once('includes/class-wc-gateway-checkout-com-cards.php');
     include_once('includes/class-wc-gateway-checkout-com-apple-pay.php');
     include_once('includes/class-wc-gateway-checkout-com-google-pay.php');
+    include_once('includes/class-wc-gateway-checkout-com-alternative-payments.php');
 
     // Add payment method class to WooCommerce
     add_filter( 'woocommerce_payment_gateways', 'checkout_com_add_gateway' );
@@ -26,6 +27,7 @@ function init_checkout_com_gateway_class()
         $methods[] = 'WC_Gateway_Checkout_Com_Cards';
         $methods[] = 'WC_Gateway_Checkout_Com_Apple_Pay';
         $methods[] = 'WC_Gateway_Checkout_Com_Google_Pay';
+        $methods[] = 'WC_Gateway_Checkout_Com_Alternative_Payments';
         return $methods;
     }
 
@@ -39,6 +41,10 @@ function init_checkout_com_gateway_class()
                 
                 if(jQuery('[data-gateway_id=\"wc_checkout_com_google_pay\"]').length > 0) {
                     jQuery('[data-gateway_id=\"wc_checkout_com_google_pay\"]').hide();
+                }
+                
+                if(jQuery('[data-gateway_id=\"wc_checkout_com_alternative_payments\"]').length > 0) {
+                    jQuery('[data-gateway_id=\"wc_checkout_com_alternative_payments\"]').hide();
                 }
             }, 1500);
         });
@@ -116,11 +122,27 @@ function cko_check_if_empty()
  */
 add_action('wp_enqueue_scripts', 'callback_for_setting_up_scripts');
 function callback_for_setting_up_scripts() {
+    // load cko custom css
     $css_path = plugins_url().'/woocommerce-gateway-checkout-com/assets/css/checkoutcom-styles.css';
 
+
+    // register cko css
     wp_register_style( 'checkoutcom-style', $css_path);
     wp_enqueue_style( 'checkoutcom-style' );
+    // Enqueue google pay script
     wp_enqueue_script( 'cko-google-script', 'https://pay.google.com/gp/p/js/pay.js', array( 'jquery' ) );
+
+    // load cko apm settings
+    $apm_settings = get_option('woocommerce_wc_checkout_com_alternative_payments_settings');
+    $apm_enable = $apm_settings['enabled'] == 'yes' ? true : false;
+
+    if ($apm_enable) {
+        foreach ($apm_settings['ckocom_apms_selector'] as $value) {
+            if($value == 'klarna') {
+                wp_enqueue_script( 'cko-klarna-script', 'https://x.klarnacdn.net/kp/lib/v1/api.js', array( 'jquery' ) );
+            }
+        }
+    }
 
 }
 

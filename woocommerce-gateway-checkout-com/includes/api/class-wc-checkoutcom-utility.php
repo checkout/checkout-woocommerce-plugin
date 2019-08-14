@@ -165,4 +165,79 @@ class WC_Checkoutcom_Utility
         $logger->error(wc_print_r($exception, true), $context );
 
     }
+
+    public static function get_alternative_payment_methods($currencyCode, $apm)
+    {
+        $apmArray = array();
+        if ($apm !== 0) {
+
+            foreach ($apm as $value) {
+                if ($value == 'ideal' && $currencyCode == 'EUR') {
+                    array_push($apmArray, $value);
+                }
+
+                if ($value == 'sofort' && $currencyCode == 'EUR') {
+                    array_push($apmArray, $value);
+                }
+
+                if ($value == 'boleto' ) {
+                    if ($currencyCode == 'BRL' || $currencyCode == 'USD' ) {
+                        array_push($apmArray, $value);
+                    }
+                }
+
+                if ($value == 'giropay' && $currencyCode == 'EUR') {
+                    array_push($apmArray, $value);
+                }
+
+                if ($value == 'poli') {
+                    if ($currencyCode == 'AUD' || $currencyCode == 'NZD') {
+                        array_push($apmArray, $value);
+                    }
+                }
+
+                if ($value == 'klarna') {
+                    if ($currencyCode == 'EUR'
+                        || $currencyCode == 'DKK'
+                        || $currencyCode == 'GBP'
+                        || $currencyCode == 'NOR'
+                        || $currencyCode == 'SEK')
+                    {
+                        array_push($apmArray, $value);
+                    }
+                }
+
+                if ($value == 'sepa' && $currencyCode == 'EUR') {
+                    array_push($apmArray, $value);
+                }
+
+                if ($value == 'eps' && $currencyCode == 'EUR') {
+                    array_push($apmArray, $value);
+                }
+
+                if ($value == 'bancontact' && $currencyCode == 'EUR') {
+                    array_push($apmArray, $value);
+                }
+
+                if ($value == 'knet' && $currencyCode == 'KWD') {
+                    array_push($apmArray, $value);
+                }
+
+                if ($value == 'fawry' && $currencyCode == 'EGP') {
+                    array_push($apmArray, $value);
+                }
+
+                if ($value == 'alipay' && $currencyCode == 'USD') {
+                    array_push($apmArray, $value);
+                }
+
+                if ($value == 'qpay' && $currencyCode == 'QAR') {
+                    array_push($apmArray, $value);
+                }
+            }
+        }
+
+        return $apmArray;
+    }
+
 }
