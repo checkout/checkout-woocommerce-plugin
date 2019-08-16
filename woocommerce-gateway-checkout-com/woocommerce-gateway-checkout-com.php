@@ -237,6 +237,7 @@ function renew_save_again($post_id, $post, $update){
 
                 // Set action id as woo transaction id
                 update_post_meta($_POST['post_ID'], '_transaction_id', $result['action_id']);
+                update_post_meta($_POST['post_ID'], 'cko_payment_captured', true);
 
                 // Get cko capture status configured in admin
                 $status = WC_Admin_Settings::get_option('ckocom_order_captured');

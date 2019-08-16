@@ -3,6 +3,7 @@ include_once "lib/checkout-sdk-php/checkout.php";
 include_once('settings/class-wc-checkoutcom-cards-settings.php');
 include_once('settings/admin/class-wc-checkoutcom-admin.php');
 include_once('api/class-wc-checkoutcom-api-request.php');
+include_once ('class-wc-gateway-checkout-com-webhook.php');
 
 
 class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
@@ -39,6 +40,9 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 
         // Redirection hook
         add_action( 'woocommerce_api_wc_checkoutcom_callback', array( $this, 'callback_handler' ) );
+
+        // webhook
+        add_action( 'woocommerce_api_wc_checkoutcom_webhook', array( $this, 'webhook_handler' ) );
     }
 
     /**
@@ -501,6 +505,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 
         // Set action id as woo transaction id
         update_post_meta($order_id, '_transaction_id', $result['action_id']);
+        update_post_meta($order_id, 'cko_payment_refunded', true);
 
         // Get cko auth status configured in admin
         $status = WC_Admin_Settings::get_option('ckocom_order_refunded');
@@ -521,5 +526,63 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         $order->update_status($status,$message);
 
         return true;
+    }
+
+    public function webhook_handler()
+    {
+        // webhook_url_format = http://localhost/wordpress-5.0.2/wordpress/?wc-api=wc_checkoutcom_webhook
+
+        // Get webhook data
+        $data = json_decode(file_get_contents('php://input'));
+
+        // Return to home page if empty data
+        if (empty($data)) {
+            wp_redirect(get_home_url());
+            exit();
+        }
+
+        $header = apache_request_headers();
+        $header_authorization = $header['Authorization'];
+
+        $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
+        // Get private shared key from module settings
+        $psk =  $core_settings['ckocom_psk'];
+
+        // Check if private shared key is not empty
+        if (!empty($psk)) {
+            // check if header athorization equals
+            // to private shared key configured in module settings
+            if($header_authorization !== $psk){
+                return http_response_code(401);
+            }
+        }
+
+        // Get webhook event type from data
+        $event_type = $data->type;
+
+        switch ($event_type){
+            case 'payment_captured':
+                $response = WC_Checkout_Com_Webhook::capture_payment($data);
+                break;
+            case 'payment_voided':
+                $response = WC_Checkout_Com_Webhook::void_payment($data);
+                break;
+            case 'payment_capture_declined':
+                $response = WC_Checkout_Com_Webhook::capture_declined($data);
+                break;
+            case 'payment_refunded':
+                $response = WC_Checkout_Com_Webhook::refund_payment($data);
+                break;
+            case 'payment_canceled':
+                $response = WC_Checkout_Com_Webhook::cancel_payment($data);
+                break;
+            default:
+                $response = true;
+                break;
+        }
+
+        $http_code = $response ? 200 : 400;
+
+        return http_response_code($http_code);
     }
 }
