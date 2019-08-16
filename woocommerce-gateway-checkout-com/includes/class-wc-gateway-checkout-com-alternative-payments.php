@@ -354,10 +354,11 @@ class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway
                 }
 
                 update_post_meta($order_id, '_cko_payment_id', $result['id']);
+                update_post_meta($order_id, 'cko_fawry_reference_number', $result['source']['reference_number']);
 
                 // Get cko auth status configured in admin
                 $status = WC_Admin_Settings::get_option('ckocom_order_authorised');
-                $message = __("Checkout.com Payment Fawry payment (Transaction ID - {$result['id']}) ", 'wc_checkout_com_cards_settings');
+                $message = __("Checkout.com - Fawry payment (Transaction ID : {$result['id']} - Fawry reference number : {$result['source']['reference_number']}) ", 'wc_checkout_com_cards_settings');
 
                 if ($result['status'] == 'Captured') {
                     $status = WC_Admin_Settings::get_option('ckocom_order_captured');
