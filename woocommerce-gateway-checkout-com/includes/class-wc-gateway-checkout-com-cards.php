@@ -5,6 +5,9 @@ include_once('settings/admin/class-wc-checkoutcom-admin.php');
 include_once('api/class-wc-checkoutcom-api-request.php');
 include_once ('class-wc-gateway-checkout-com-webhook.php');
 
+use Checkout\Library\Exceptions\CheckoutHttpException;
+use Checkout\Library\Exceptions\CheckoutModelException;
+
 
 class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 {
@@ -230,6 +233,13 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
                         jQuery('.cko-form').show();
                     }
 
+                    // check if add-payment-method exist
+                    if(jQuery('#add_payment_method').length > 0) {
+                        jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide();
+                        jQuery('.cko-save-card-checkbox').hide();
+                        jQuery('.cko-form').show();
+                    }
+
                 });
 
                 setTimeout(function(){
@@ -245,6 +255,13 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
                                         return true;
                                     } else if(Frames.isCardValid()) {
                                         Frames.submitCard();
+                                    }
+                                } else if (jQuery('#add_payment_method').length > 0) {
+                                    // check if card is valid from add-payment-method
+                                    if (jQuery('#payment_method_wc_checkout_com_cards').is(':checked')) {
+                                        if(Frames.isCardValid()) {
+                                            Frames.submitCard();
+                                        }
                                     }
                                 } else {
                                     return true;
@@ -264,12 +281,18 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
             </script>
 
         </div>
+
+        <div class="cko-save-card-checkbox">
+            <?php
+            if($save_card){
+                $this->save_payment_method_checkbox();
+            }
+            ?>
+        </div>
         <?php
 
         // Show save card checkbox if this is selected on admin
-        if($save_card){
-            $this->save_payment_method_checkbox();
-        }
+
     }
 
     /**
@@ -335,7 +358,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 
         // save card in db
         if($save_card && $_POST['wc-wc_checkout_com_cards-new-payment-method']){
-            $this->save_token($order, $result);
+            $this->save_token(get_current_user_id(), $result);
         }
 
         // Set action id as woo transaction id
@@ -390,10 +413,30 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 
         $order = new WC_Order( $order_id );
 
+        // Redirect to cart if an error occured
         if (isset($result['error']) && !empty($result['error'])) {
             WC_Checkoutcom_Utility::wc_add_notice_self(__($result['error'],'wc_checkout_com_cards_settings'), 'error');
             wp_redirect(WC_Cart::get_checkout_url());
             exit();
+        }
+
+        // Redirect to my-account/payment-method if card verification failed
+        // show error to customer
+        if(isset($result['card_verification']) == 'error'){
+            WC_Checkoutcom_Utility::wc_add_notice_self(__('Unable to add payment method to your account.' ,'wc_checkout_com_cards_settings'), 'error');
+            wp_redirect($result['redirection_url']);
+            exit;
+        }
+
+        // Redirect to my-account/payment-method if card verification successful
+        // show notice to customer
+        if(isset($result['status']) == 'Card Verified' && isset($result['metadata']['card_verification'])){
+
+            $this->save_token(get_current_user_id(), $result);
+
+            WC_Checkoutcom_Utility::wc_add_notice_self(__('Payment method successfully added.' ,'wc_checkout_com_cards_settings'), 'notice');
+            wp_redirect($result['metadata']['redirection_url']);
+            exit;
         }
 
         // Set action id as woo transaction id
@@ -425,7 +468,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         // save card to db
         $save_card =  WC_Admin_Settings::get_option('ckocom_card_saved');
         if($save_card && $_SESSION['wc-wc_checkout_com_cards-new-payment-method']){
-            $this->save_token($order, $result);
+            $this->save_token($order->get_user_id(), $result);
             unset($_SESSION['wc-wc_checkout_com_cards-new-payment-method']);
         }
 
@@ -446,7 +489,97 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 
     public function add_payment_method()
     {
-        // @todo create $0 auth from my-account
+        // check if cko card token is not empty
+        if (empty($_POST['cko-card-token'])) {
+            return array(
+                'result'   => 'failure', // success
+                'redirect' => wc_get_endpoint_url( 'payment-methods' ),
+            );
+        }
+
+        // load module settings
+        $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
+        $environment = $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
+
+        // Initialize the Checkout Api
+        $checkout = new Checkout\CheckoutApi($core_settings['ckocom_sk'], $environment);
+
+        // Load method with card token
+        $method = new Checkout\Models\Payments\TokenSource($_POST['cko-card-token']);
+
+        $payment = new Checkout\Models\Payments\Payment($method, get_woocommerce_currency());
+
+        // Load current user
+        $current_user = wp_get_current_user();
+        // Set customer email and name to payment request
+        $payment->customer = array(
+            'email' => $current_user->user_email,
+            'name' => $current_user->first_name. ' ' . $current_user->last_name
+        );
+
+        $metadata = array(
+            'card_verification' => true,
+            'redirection_url' => wc_get_endpoint_url( 'payment-methods' )
+        );
+        // Set Metadata in card verfication request
+        // to use in callback handler
+        $payment->metadata = $metadata;
+
+        // Set redirection url in payment request
+        $redirection_url = str_replace( 'https:', 'http:', add_query_arg( 'wc-api', 'wc_checkoutcom_callback', home_url( '/' ) ) );
+        $payment->success_url = $redirection_url;
+        $payment->failure_url = $redirection_url;
+
+        // to remove
+        $three_ds = new Checkout\Models\Payments\ThreeDs(true);
+        $payment->threeDs = $three_ds;
+        // end to remove
+
+        try {
+            $response = $checkout->payments()->request($payment);
+
+            // Check if payment successful
+            if ($response->isSuccessful()) {
+
+                // Check if payment is 3Dsecure
+                if ($response->isPending()) {
+                    // Check if redirection link exist
+                    if ($response->getRedirection()) {
+                        // return 3d redirection url
+                        wp_redirect($response->getRedirection());
+                        exit();
+
+                    } else {
+                        return array(
+                            'result'   => 'failure',
+                            'redirect' => wc_get_endpoint_url( 'payment-methods' ),
+                        );
+                    }
+                } else {
+                    $this->save_token($current_user->ID ,  (array) $response);
+
+                    return array(
+                        'result'   => 'success',
+                    );
+                }
+            } else {
+                return array(
+                    'result'   => 'failure',
+                    'redirect' => wc_get_endpoint_url( 'payment-methods' ),
+                );
+            }
+
+        } catch (CheckoutModelException $ex) {;
+            return array(
+                'result'   => 'failure',
+                'redirect' => wc_get_endpoint_url( 'payment-methods' ),
+            );
+        }  catch (CheckoutHttpException $ex) {
+            return array(
+                'result'   => 'failure',
+                'redirect' => wc_get_endpoint_url( 'payment-methods' ),
+            );
+        }
     }
 
     /**
@@ -454,13 +587,13 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
      * @param $order
      * @param $payment_response
      */
-    public function save_token( $order, $payment_response )
+    public function save_token( $user_id, $payment_response )
     {
         //Check if payment response is not null
         if(!is_null($payment_response)){
             // argument to check token
             $arg = array(
-                'user_id' => $order->get_user_id(),
+                'user_id' => $user_id,
                 'gateway_id' => $this->id
             );
 
@@ -483,7 +616,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
             $token->set_last4( $payment_response['source']['last4'] );
             $token->set_expiry_month( $payment_response['source']['expiry_month'] );
             $token->set_expiry_year( $payment_response['source']['expiry_year'] );
-            $token->set_user_id( $order->get_user_id() );
+            $token->set_user_id( $user_id );
 
             // Check if session has is mada and set token metadata
             if($_SESSION['cko-is-mada']) {
