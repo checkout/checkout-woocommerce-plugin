@@ -89,7 +89,7 @@ class WC_Checkoutcom_Api_request
 
                 return array('error' => $errorMessage);
             }
-        } catch (CheckoutModelException $ex) {
+        } catch (Exception $ex) {
             $errorMessage = "An error has occurred while processing your payment. ";
             $logger->error($errorMessage, $context );
             $logger->error(wc_print_r($ex, true), $context );
@@ -175,10 +175,30 @@ class WC_Checkoutcom_Api_request
         $payment->amount = $amount_cents;
         $payment->reference = $order->get_order_number();
 
+        $email = $_POST['billing_email'];
+        $name = $_POST['billing_first_name'] . ' ' . $_POST['billing_last_name'];
+
+        // Pay Order Page
+        $isPayOrder = !empty($_GET['pay_for_order']) ? (boolean)$_GET['pay_for_order'] : false;
+
+        if($isPayOrder) {
+            if(!empty($_GET['order_id'])) {
+                $order_id    = $_GET['order_id'];
+            } else if (!empty($_GET['key'])){
+                $order_id    = wc_get_order_id_by_order_key($_GET['key']);
+            }
+
+            $order = wc_get_order( $order_id );
+
+            $email = $order->billing_email;
+            $name = $order->billing_first_name. ' ' . $order->billing_last_name;
+        }
+
+
         // Customer
         $payment->customer = array(
-          'email' => $_POST['billing_email'],
-          'name' => $_POST['billing_first_name'] . ' ' . $_POST['billing_last_name']
+          'email' => $email,
+          'name' => $name
         );
 
         $three_ds = new ThreeDs($three_d);
@@ -279,6 +299,9 @@ class WC_Checkoutcom_Api_request
      */
     private static function customer_address($data)
     {
+        // Pay Order Page
+        $isPayOrder = !empty($_GET['pay_for_order']) ? (boolean)$_GET['pay_for_order'] : false;
+
         $billing_first_name = empty( $data[ 'billing_first_name' ] ) ? '' : wc_clean( $data[ 'billing_first_name' ] );
         $billing_last_name  = empty( $data[ 'billing_last_name' ] )  ? '' : wc_clean( $data[ 'billing_last_name' ] );
         $billing_address_1  = empty( $data[ 'billing_address_1' ] )  ? '' : wc_clean( $data[ 'billing_address_1' ] );
@@ -297,6 +320,37 @@ class WC_Checkoutcom_Api_request
             $shipping_state      = empty( $data[ 'shipping_state' ] )      ? '' : wc_clean( $data[ 'shipping_state' ] );
             $shipping_postcode   = empty( $data[ 'shipping_postcode' ] )   ? '' : wc_clean( $data[ 'shipping_postcode' ] );
             $shipping_country    = empty( $data[ 'shipping_country' ] )    ? '' : wc_clean( $data[ 'shipping_country' ] );
+        } elseif ($isPayOrder) {
+
+            // In case payment is from pay_order
+            // Get billing and shipping details from order
+            if(!empty($_GET['order_id'])) {
+                $order_id    = $_GET['order_id'];
+            } else if (!empty($_GET['key'])){
+                $order_id    = wc_get_order_id_by_order_key($_GET['key']);
+            }
+
+            $order = wc_get_order( $order_id );
+
+            $billing_first_name = $order->billing_first_name;
+            $billing_last_name  = $order->billing_last_name;
+            $billing_address_1  = $order->billing_address_1;
+            $billing_address_2  = $order->billing_address_2;
+            $billing_city       = $order->billing_city;
+            $billing_state      = $order->billing_state;
+            $billing_postcode   = $order->billing_postcode;
+            $billing_country    = $order->billing_country;
+
+            $shipping_first_name = $order->shipping_first_name;
+            $shipping_last_name  = $order->shipping_last_name;
+            $shipping_address_1  = $order->shipping_address_1;
+            $shipping_address_2  = $order->shipping_address_2;
+            $shipping_city       = $order->shipping_city;
+            $shipping_state      = $order->shipping_state;
+            $shipping_postcode   = $order->shipping_postcode;
+            $shipping_country    = $order->shipping_country;
+
+
         } else {
             $shipping_first_name = $billing_first_name;
             $shipping_last_name  = $billing_last_name;
@@ -358,7 +412,7 @@ class WC_Checkoutcom_Api_request
                 return array('error' => $errorMessage);
             }
 
-        } catch (CheckoutModelException $ex) {
+        } catch (Exception $ex) {
             $errorMessage = "An error has occurred while processing your payment. ";
             $logger->error($errorMessage, $context );
             $logger->error(wc_print_r($ex, true), $context );
@@ -398,7 +452,7 @@ class WC_Checkoutcom_Api_request
             $token = $checkout->tokens()->request($googlepay);
 
             return $token->getId();
-        } catch (CheckoutModelException $ex) {
+        } catch (Exception $ex) {
             $error_message = __('An error has occured while processing your payment.',wc_checkout_com_cards );
             WC_Checkoutcom_Utility::logger($error_message , $ex);
         } catch (CheckoutHttpException $ex) {
@@ -455,7 +509,7 @@ class WC_Checkoutcom_Api_request
             } else {
                 return $response;
             }
-        } catch (CheckoutModelException $ex) {
+        } catch (Exception $ex) {
             $error_message = "An error has occurred while processing your capture request.";
             WC_Checkoutcom_Utility::logger($error_message , $ex);
 
@@ -514,7 +568,7 @@ class WC_Checkoutcom_Api_request
             } else {
                 return $response;
             }
-        } catch (CheckoutModelException $ex) {
+        } catch (Exception $ex) {
             $error_message = "An error has occurred while processing your void request.";
             WC_Checkoutcom_Utility::logger($error_message , $ex);
 
@@ -587,7 +641,7 @@ class WC_Checkoutcom_Api_request
             } else {
                 return $response;
             }
-        } catch (CheckoutModelException $ex) {
+        } catch (Exception $ex) {
             $error_message = "An error has occurred while processing your refund request. ";
             WC_Checkoutcom_Utility::logger($error_message , $ex);
 
@@ -611,14 +665,14 @@ class WC_Checkoutcom_Api_request
         $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
 
         // Initialize the Checkout Api
-        $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
+        $checkout = new CheckoutApi($core_settings['ckocom_pk'], $environment);
 
         try {
             $result = $checkout->payments()->issuers(IdealSource::QUALIFIED_NAME);
 
             return $result;
 
-        } catch (CheckoutModelException $ex) {
+        } catch (Exception $ex) {
             $error_message = "An error has occurred while processing your payment. ";
             WC_Checkoutcom_Utility::logger($error_message , $ex);
 
@@ -647,7 +701,7 @@ class WC_Checkoutcom_Api_request
 
             return $result;
 
-        } catch (CheckoutModelException $ex) {
+        } catch (Exception $ex) {
             $error_message = "An error has occurred while processing your payment. ";
             WC_Checkoutcom_Utility::logger($error_message , $ex);
 
@@ -691,6 +745,11 @@ class WC_Checkoutcom_Api_request
         }
     }
 
+    /**
+     * @param WC_Order $order
+     * @param $arg
+     * @return array
+     */
     public static function create_apm_payment(WC_Order $order, $arg)
     {
         // Get payment request parameter
@@ -744,7 +803,7 @@ class WC_Checkoutcom_Api_request
 
                 return array('error' => $error_message);
             }
-        } catch (CheckoutModelException $ex) {
+        } catch (Exception $ex) {
             $error_message = "An error has occurred while processing your payment. ";
             WC_Checkoutcom_Utility::logger($error_message , $ex);
 
@@ -1004,7 +1063,7 @@ class WC_Checkoutcom_Api_request
 
             return $source;
 
-        } catch (CheckoutModelException $ex) {
+        } catch (Exception $ex) {
             $error_message = "An error has occurred while processing your payment. ";
             WC_Checkoutcom_Utility::logger($error_message , $ex);
 

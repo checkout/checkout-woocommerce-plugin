@@ -232,34 +232,37 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 
                 });
 
-                // hook place order button
-                jQuery('#place_order').on('click', function(e){
-                    // check if checkout.com is selected
-                    if (jQuery('#payment_method_wc_checkout_com_cards').is(':checked')) {
-                        // check if new card exist
-                        if(jQuery('#wc-wc_checkout_com_cards-payment-token-new').length > 0 ) {
-                            // check if new card is selected else process with saved card
-                            if(jQuery('#wc-wc_checkout_com_cards-payment-token-new').is(':checked')){
-                                if(document.getElementById('cko-card-token').value.length > 0 ){
+                setTimeout(function(){
+                    // hook place order button
+                    jQuery('#place_order').on('click', function(e){
+                        // check if checkout.com is selected
+                        if (jQuery('#payment_method_wc_checkout_com_cards').is(':checked')) {
+                            // check if new card exist
+                            if(jQuery('#wc-wc_checkout_com_cards-payment-token-new').length > 0 ) {
+                                // check if new card is selected else process with saved card
+                                if(jQuery('#wc-wc_checkout_com_cards-payment-token-new').is(':checked')){
+                                    if(document.getElementById('cko-card-token').value.length > 0 ){
+                                        return true;
+                                    } else if(Frames.isCardValid()) {
+                                        Frames.submitCard();
+                                    }
+                                } else {
                                     return true;
-                                } else if(Frames.isCardValid()) {
-                                    Frames.submitCard();
                                 }
-                            } else {
-                                return true;
                             }
-                        }
 
-                        if(document.getElementById('cko-card-token').value.length > 0 ){
-                            return true;
-                        } else if(Frames.isCardValid()) {
-                            Frames.submitCard();
-                        }
+                            if(document.getElementById('cko-card-token').value.length > 0 ){
+                                return true;
+                            } else if(Frames.isCardValid()) {
+                                Frames.submitCard();
+                            }
 
-                        return false;
-                    }
-                });
+                            return false;
+                        }
+                    });
+                }, 1500);
             </script>
+
         </div>
         <?php
 

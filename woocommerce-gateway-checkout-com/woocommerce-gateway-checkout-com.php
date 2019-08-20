@@ -253,7 +253,7 @@ function renew_save_again($post_id, $post, $update){
                 // send void request to cko
                 $result = (array) WC_Checkoutcom_Api_request::void_payment();
 
-                if (isset($result['error']) && !empty($result['error'])){ die('here');
+                if (isset($result['error']) && !empty($result['error'])){
                     WC_Admin_Notices::add_custom_notice('wc_checkout_com_cards', __($result['error']));
                     return false;
                 }
