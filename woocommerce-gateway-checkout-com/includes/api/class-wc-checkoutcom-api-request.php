@@ -409,7 +409,18 @@ class WC_Checkoutcom_Api_request
                 $logger->error($errorMessage, $context );
                 $logger->error(wc_print_r($response, true), $context );
 
-                return array('error' => $errorMessage);
+                $arr = array('error' => $errorMessage);
+
+                $metadata = $response->metadata;
+                // check if card verification
+                if(isset($metadata['card_verification'])){
+                    $arr = array(
+                        'card_verification' => 'error',
+                        'redirection_url' => $metadata['redirection_url']
+                        );
+                }
+
+                return $arr;
             }
 
         } catch (Exception $ex) {
