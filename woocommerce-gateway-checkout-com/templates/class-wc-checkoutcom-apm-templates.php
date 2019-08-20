@@ -2,19 +2,29 @@
 
 class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_request
 {
+    /**
+     * @return array|void
+     */
     public static function get_ideal_bank()
     {
         $ideal_banks = WC_Checkoutcom_Api_request::get_ideal_bank();
 
-        $country = $ideal_banks->countries;
-        $issuers = $country[0]['issuers'];
+        if($ideal_banks['error']){
+            ?>
+            <div class="ideal-bank-info" id="ideal-bank-info" style="display: none;">
+                This payment method is not available at the moment.
+            </div>
+            <?php
+        } else {
+            $country = $ideal_banks->countries;
+            $issuers = $country[0]['issuers'];
 
-        foreach ($issuers as $key => $value) {
-            $ideal_bank_bic = $value['bic'];
-            $ideal_bank_name = $value['name'];
-        }
+            foreach ($issuers as $key => $value) {
+                $ideal_bank_bic = $value['bic'];
+                $ideal_bank_name = $value['name'];
+            }
 
-        ?>
+            ?>
             <div class="ideal-bank-info" id="ideal-bank-info" style="display: none;">
                 <div class="ideal-heading">
                     <label>Your Bank</label>
@@ -30,12 +40,19 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_request
                     </input>
                 </label>
             </div>
-        <?php
+            <?php
+        }
+
+
     }
 
+    /**
+     * @return array|void
+     */
     public static function get_giropay_bank()
     {
         $giropay_banks = WC_Checkoutcom_Api_request::get_giropay_bank();
+
         $banks = $giropay_banks->banks;
 
         ?>
@@ -45,17 +62,21 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_request
             </div>
             <label for="giropay-bank-id">
                 <input name="giropay-bank-details" list="giropay-bank-details" style="width: 80%;">
-                    <datalist id="giropay-bank-details">
-                        <?php foreach ($banks as $key => $value) { ?>
-                            <option value="<?php echo $key; ?>"><?php echo $value;?></option>
-                        <?php } ?>
-                    </datalist>
+                <datalist id="giropay-bank-details">
+                    <?php foreach ($banks as $key => $value) { ?>
+                        <option value="<?php echo $key; ?>"><?php echo $value;?></option>
+                    <?php } ?>
+                </datalist>
                 </input>
             </label>
         </div>
         <?php
     }
 
+    /**
+     * @param $client_token
+     * @param $payment_method_categories
+     */
     public static function get_klarna($client_token, $payment_method_categories)
     {
         ?>
@@ -77,6 +98,9 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_request
         <?php
     }
 
+    /**
+     *
+     */
     public static function get_boleto_details()
     {
         ?>
