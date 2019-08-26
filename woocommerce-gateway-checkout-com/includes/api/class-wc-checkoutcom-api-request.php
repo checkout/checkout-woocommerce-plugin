@@ -46,12 +46,10 @@ class WC_Checkoutcom_Api_request
      */
     public static function create_payment( WC_Order $order, $arg )
     {
-        $logger = wc_get_logger();
-        $context = array( 'source' => 'wc_checkoutcom_gateway_log' );
-
         // Get payment request parameter
         $request_param = WC_Checkoutcom_Api_request::get_request_param($order, $arg);
         $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
+        $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes' ? true : false;
 
         $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
 
@@ -72,35 +70,41 @@ class WC_Checkoutcom_Api_request
                         return array('3d' => $response->getRedirection());
 
                     } else {
-                        $errorMessage = "An error has occurred while processing your payment. Redirection link not found";
-                        $logger->error($errorMessage, $context );
+                        $error_message = __("An error has occurred while processing your payment. Redirection link not found", 'wc_checkout_com_cards');
+                        // Log message
+                        WC_Checkoutcom_Utility::logger($error_message , null);
 
-                        return array('error' => $errorMessage);
+                        return array('error' => $error_message);
                     }
                 } else {
 
                     return $response;
                 }
             } else {
-                $errorMessage = "An error has occurred while processing your payment. Please check your card details and try again.";
-                //Log error
-                $logger->error($errorMessage, $context );
-                $logger->error(wc_print_r($response, true), $context );
+                $error_message = __("An error has occurred while processing your payment. Please check your card details and try again. ", 'wc_checkout_com_cards');
 
-                return array('error' => $errorMessage);
+                // check if gateway response is enable from module settings
+                if ($gateway_debug) {
+                    $error_message .= __('Status : ' . $response->status . ', Response summary : ' . $response->response_summary , 'wc_checkout_com_cards');
+                }
+
+                // Log message
+                WC_Checkoutcom_Utility::logger($error_message , $response);
+
+                return array('error' => $error_message);
             }
-        } catch (Exception $ex) {
-            $errorMessage = "An error has occurred while processing your payment. ";
-            $logger->error($errorMessage, $context );
-            $logger->error(wc_print_r($ex, true), $context );
-
-            return array('error' => $errorMessage);
         } catch (CheckoutHttpException $ex) {
-            $errorMessage = "An error has occurred while processing your payment. ";
-            $logger->error($errorMessage, $context );
-            $logger->error(wc_print_r($ex->getBody(), true), $context );
+            $error_message = _("An error has occurred while processing your payment. ", 'wc_checkout_com_cards');
 
-            return array('error' => $errorMessage);
+            // check if gateway response is enable from module settings
+            if ($gateway_debug) {
+                $error_message .= __($ex->getMessage() , 'wc_checkout_com_cards');
+            }
+
+            // Log message
+            WC_Checkoutcom_Utility::logger($error_message, $ex);
+
+            return array('error' => $error_message);
         }
     }
 
@@ -388,28 +392,36 @@ class WC_Checkoutcom_Api_request
      */
     public static function verify_session( $session_id )
     {
-        $logger = wc_get_logger();
-        $context = array( 'source' => 'wc_checkoutcom_gateway_log' );
         $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
-
         $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
+        $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes' ? true : false;
 
         // Initialize the Checkout Api
         $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
 
         try {
 
+            // Get payment response
             $response = $checkout->payments()->details($session_id);
 
+            // Check if payment is successful
             if ($response->isSuccessful()) {
                 return $response;
             } else {
-                $errorMessage = "An error has occurred while processing your payment. Please check your card details and try again.";
-                //Log error
-                $logger->error($errorMessage, $context );
-                $logger->error(wc_print_r($response, true), $context );
+                $error_message = __("An error has occurred while processing your payment. Please check your card details and try again.", 'wc_checkout_com_cards');
 
-                $arr = array('error' => $errorMessage);
+                // check if gateway response is enable from module settings
+                if ($gateway_debug) {
+                    if(isset($response->actions)){
+                        $action = $response->actions[0];
+                        $error_message .= __('Status : ' . $response->status . ', Response summary : ' . $action['response_summary'] , 'wc_checkout_com_cards');
+                    }
+                }
+
+                // Log message
+                WC_Checkoutcom_Utility::logger($error_message, $response);
+
+                $arr = array('error' => $error_message);
 
                 $metadata = $response->metadata;
                 // check if card verification
@@ -423,20 +435,19 @@ class WC_Checkoutcom_Api_request
                 return $arr;
             }
 
-        } catch (Exception $ex) {
-            $errorMessage = "An error has occurred while processing your payment. ";
-            $logger->error($errorMessage, $context );
-            $logger->error(wc_print_r($ex, true), $context );
-
-            return array('error' => $errorMessage);
         } catch (CheckoutHttpException $ex) {
-            $errorMessage = "An error has occurred while processing your payment. ";
-            $logger->error($errorMessage, $context );
-            $logger->error(wc_print_r($ex->getBody(), true), $context );
+            $error_message = _("An error has occurred while processing your payment. ", 'wc_checkout_com_cards');
 
-            return array('error' => $errorMessage);
+            // check if gateway response is enable from module settings
+            if ($gateway_debug) {
+                $error_message .= __($ex->getMessage() , 'wc_checkout_com_cards');
+            }
+
+            // Log message
+            WC_Checkoutcom_Utility::logger($error_message, $ex);
+
+            return array('error' => $error_message);
         }
-
     }
 
     /**
@@ -463,12 +474,12 @@ class WC_Checkoutcom_Api_request
             $token = $checkout->tokens()->request($googlepay);
 
             return $token->getId();
-        } catch (Exception $ex) {
-            $error_message = __('An error has occured while processing your payment.',wc_checkout_com_cards );
+        } catch (CheckoutModelException $ex) {
+            $error_message = __('An error has occured while processing your payment.', 'wc_checkout_com_cards' );
             WC_Checkoutcom_Utility::logger($error_message , $ex);
         } catch (CheckoutHttpException $ex) {
-            $error_message = __('An error has occured while processing your payment. 2',wc_checkout_com_cards );
-            WC_Checkoutcom_Utility::logger($error_message , $ex->getBody());
+            $error_message = __('An error has occured while processing your payment.', 'wc_checkout_com_cards' );
+            WC_Checkoutcom_Utility::logger($error_message , $ex);
         }
     }
 
@@ -493,6 +504,7 @@ class WC_Checkoutcom_Api_request
         $amount_cents = WC_Checkoutcom_Utility::valueToDecimal($amount, $order->get_currency());
         $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
         $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
+        $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes' ? true : false;
 
         // Initialize the Checkout Api
         $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
@@ -502,7 +514,7 @@ class WC_Checkoutcom_Api_request
             $details = $checkout->payments()->details($cko_payment_id);
 
             if ($details->status == 'Voided' || $details->status == 'Captured') {
-                $error_message = 'Payment has already been voided or captured on Checkout.com hub for order Id : ' . $order_id;
+                $error_message = __('Payment has already been voided or captured on Checkout.com hub for order Id : ' . $order_id, 'wc_checkout_com_cards');
 
                 return array('error' => $error_message);
             }
@@ -514,21 +526,30 @@ class WC_Checkoutcom_Api_request
             $response = $checkout->payments()->capture($ckoPayment);
 
             if (!$response->isSuccessful()) {
-                $error_message = 'An error has occurred while processing your capture payment on Checkout.com hub. Order Id : ' . $order_id;
+                $error_message = __('An error has occurred while processing your capture payment on Checkout.com hub. Order Id : ' . $order_id, 'wc_checkout_com_cards');
+
+                // check if gateway response is enable from module settings
+                if ($gateway_debug) {
+                    $error_message .= __($response , 'wc_checkout_com_cards');
+                }
+
+                // Log message
+                WC_Checkoutcom_Utility::logger($error_message, $response);
 
                 return array('error' => $error_message);
             } else {
                 return $response;
             }
-        } catch (Exception $ex) {
-            $error_message = "An error has occurred while processing your capture request.";
-            WC_Checkoutcom_Utility::logger($error_message , $ex);
-
-            return array('error' => $error_message);
-
         } catch (CheckoutHttpException $ex) {
-            $error_message = "An error has occurred while processing your capture request.";
-            WC_Checkoutcom_Utility::logger($error_message , $ex->getBody());
+            $error_message = _("An error has occurred while processing your capture request. ", 'wc_checkout_com_cards');
+
+            // check if gateway response is enable from module settings
+            if ($gateway_debug) {
+                $error_message .= __($ex->getMessage() , 'wc_checkout_com_cards');
+            }
+
+            // Log message
+            WC_Checkoutcom_Utility::logger($error_message, $ex);
 
             return array('error' => $error_message);
         }
@@ -552,6 +573,7 @@ class WC_Checkoutcom_Api_request
         $order = wc_get_order( $order_id );
         $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
         $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
+        $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes' ? true : false;
 
         // Initialize the Checkout Api
         $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
@@ -573,20 +595,30 @@ class WC_Checkoutcom_Api_request
             $response = $checkout->payments()->void($ckoPayment);
 
             if (!$response->isSuccessful()) {
-                $error_message = 'An error has occurred while processing your void payment on Checkout.com hub. Order Id : ' . $order_id;
+                $error_message = __('An error has occurred while processing your void payment on Checkout.com hub. Order Id : ' . $order_id, 'wc_checkout_com_cards');
+
+                // check if gateway response is enable from module settings
+                if ($gateway_debug) {
+                    $error_message .= __($response , 'wc_checkout_com_cards');
+                }
+
+                // Log message
+                WC_Checkoutcom_Utility::logger($error_message, $response);
 
                 return array('error' => $error_message);
             } else {
                 return $response;
             }
-        } catch (Exception $ex) {
-            $error_message = "An error has occurred while processing your void request.";
-            WC_Checkoutcom_Utility::logger($error_message , $ex);
-
-            return array('error' => $error_message);
         } catch (CheckoutHttpException $ex) {
             $error_message = "An error has occurred while processing your void request.";
-            WC_Checkoutcom_Utility::logger($error_message , $ex->getBody());
+
+            // check if gateway response is enable from module settings
+            if ($gateway_debug) {
+                $error_message .= __($ex->getMessage() , 'wc_checkout_com_cards');
+            }
+
+            // Log message
+            WC_Checkoutcom_Utility::logger($error_message, $ex);
 
             return array('error' => $error_message);
         }
@@ -618,6 +650,7 @@ class WC_Checkoutcom_Api_request
 
         $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
         $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
+        $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes' ? true : false;
 
         // Initialize the Checkout Api
         $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
@@ -648,18 +681,28 @@ class WC_Checkoutcom_Api_request
             if (!$response->isSuccessful()) {
                 $error_message = 'An error has occurred while processing your refund payment on Checkout.com hub. Order Id : ' . $order_id;
 
+                // check if gateway response is enable from module settings
+                if ($gateway_debug) {
+                    $error_message .= __($response , 'wc_checkout_com_cards');
+                }
+
+                // Log message
+                WC_Checkoutcom_Utility::logger($error_message, $response);
+
                 return array('error' => $error_message);
             } else {
                 return $response;
             }
-        } catch (Exception $ex) {
-            $error_message = "An error has occurred while processing your refund request. ";
-            WC_Checkoutcom_Utility::logger($error_message , $ex);
-
-            return array('error' => $error_message);
         } catch (CheckoutHttpException $ex) {
-            $error_message = "An error has occurred while processing your refund request. ";
-            WC_Checkoutcom_Utility::logger($error_message , $ex->getBody());
+            $error_message = "An error has occurred while processing your refund.";
+
+            // check if gateway response is enable from module settings
+            if ($gateway_debug) {
+                $error_message .= __($ex->getMessage() , 'wc_checkout_com_cards');
+            }
+
+            // Log message
+            WC_Checkoutcom_Utility::logger($error_message, $ex);
 
             return array('error' => $error_message);
         }
@@ -674,6 +717,7 @@ class WC_Checkoutcom_Api_request
     {
         $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
         $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
+        $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes' ? true : false;
 
         // Initialize the Checkout Api
         $checkout = new CheckoutApi($core_settings['ckocom_pk'], $environment);
@@ -683,14 +727,16 @@ class WC_Checkoutcom_Api_request
 
             return $result;
 
-        } catch (Exception $ex) {
-            $error_message = "An error has occurred while processing your payment. ";
-            WC_Checkoutcom_Utility::logger($error_message , $ex);
-
-            return array('error' => $error_message);
         } catch (CheckoutHttpException $ex) {
-            $error_message = "An error has occurred while processing your payment. ";
-            WC_Checkoutcom_Utility::logger($error_message , $ex->getBody());
+            $error_message = "An error has occurred while processing your refund.";
+
+            // check if gateway response is enable from module settings
+            if ($gateway_debug) {
+                $error_message .= __($ex->getMessage() , 'wc_checkout_com_cards');
+            }
+
+            // Log message
+            WC_Checkoutcom_Utility::logger($error_message, $ex);
 
             return array('error' => $error_message);
         }
@@ -703,6 +749,7 @@ class WC_Checkoutcom_Api_request
     {
         $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
         $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
+        $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes' ? true : false;
 
         // Initialize the Checkout Api
         $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
@@ -712,14 +759,16 @@ class WC_Checkoutcom_Api_request
 
             return $result;
 
-        } catch (Exception $ex) {
-            $error_message = "An error has occurred while processing your payment. ";
-            WC_Checkoutcom_Utility::logger($error_message , $ex);
-
-            return array('error' => $error_message);
         } catch (CheckoutHttpException $ex) {
-            $error_message = "An error has occurred while processing your payment. ";
-            WC_Checkoutcom_Utility::logger($error_message , $ex->getBody());
+            $error_message = "An error has occurred while processing your refund.";
+
+            // check if gateway response is enable from module settings
+            if ($gateway_debug) {
+                $error_message .= __($ex->getMessage() , 'wc_checkout_com_cards');
+            }
+
+            // Log message
+            WC_Checkoutcom_Utility::logger($error_message, $ex);
 
             return array('error' => $error_message);
         }
@@ -734,6 +783,7 @@ class WC_Checkoutcom_Api_request
     {
         $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
         $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
+        $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes' ? true : false;
 
         // Initialize the Checkout Api
         $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
@@ -743,14 +793,16 @@ class WC_Checkoutcom_Api_request
 
             return $result;
 
-        } catch (CheckoutModelException $ex) {
-            $error_message = "An error has occurred while processing your payment. ";
-            WC_Checkoutcom_Utility::logger($error_message , $ex);
-
-            return array('error' => $error_message);
         } catch (CheckoutHttpException $ex) {
-            $error_message = "An error has occurred while processing your payment. ";
-            WC_Checkoutcom_Utility::logger($error_message , $ex->getBody());
+            $error_message = "An error has occurred while processing your refund.";
+
+            // check if gateway response is enable from module settings
+            if ($gateway_debug) {
+                $error_message .= __($ex->getMessage() , 'wc_checkout_com_cards');
+            }
+
+            // Log message
+            WC_Checkoutcom_Utility::logger($error_message, $ex);
 
             return array('error' => $error_message);
         }
@@ -766,8 +818,8 @@ class WC_Checkoutcom_Api_request
         // Get payment request parameter
         $request_param = WC_Checkoutcom_Api_request::get_request_param($order, $arg);
         $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
-
         $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
+        $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes' ? true : false;
 
         // Initialize the Checkout Api
         $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
@@ -799,7 +851,6 @@ class WC_Checkoutcom_Api_request
                         }
 
                         $error_message = "An error has occurred while processing your payment. Redirection link not found";
-                        WC_Checkoutcom_Utility::logger($error_message , null);
 
                         return array('error' => $error_message);
                     }
@@ -809,19 +860,27 @@ class WC_Checkoutcom_Api_request
                 }
             } else {
                 $error_message = "An error has occurred while processing your payment. Please check your card details and try again.";
-                //Log error
-                WC_Checkoutcom_Utility::logger($error_message , $response);
+
+                // check if gateway response is enable from module settings
+                if ($gateway_debug) {
+                    $error_message .= __($response , 'wc_checkout_com_cards');
+                }
+
+                // Log message
+                WC_Checkoutcom_Utility::logger($error_message, $response);
 
                 return array('error' => $error_message);
             }
-        } catch (Exception $ex) {
-            $error_message = "An error has occurred while processing your payment. ";
-            WC_Checkoutcom_Utility::logger($error_message , $ex);
-
-            return array('error' => $error_message);
         } catch (CheckoutHttpException $ex) {
-            $error_message = "An error has occurred while processing your payment. ";
-            WC_Checkoutcom_Utility::logger($error_message , $ex->getBody());
+            $error_message = "An error has occurred while processing your refund.";
+
+            // check if gateway response is enable from module settings
+            if ($gateway_debug) {
+                $error_message .= __($ex->getMessage() , 'wc_checkout_com_cards');
+            }
+
+            // Log message
+            WC_Checkoutcom_Utility::logger($error_message, $ex);
 
             return array('error' => $error_message);
         }
@@ -1061,8 +1120,8 @@ class WC_Checkoutcom_Api_request
         }
 
         $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
-
         $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
+        $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes' ? true : false;
 
         // Initialize the Checkout Api
         $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
@@ -1074,14 +1133,16 @@ class WC_Checkoutcom_Api_request
 
             return $source;
 
-        } catch (Exception $ex) {
-            $error_message = "An error has occurred while processing your payment. ";
-            WC_Checkoutcom_Utility::logger($error_message , $ex);
-
-            return array('error' => $error_message);
         } catch (CheckoutHttpException $ex) {
-            $error_message = "An error has occurred while processing your payment. ";
-            WC_Checkoutcom_Utility::logger($error_message , $ex->getBody());
+            $error_message = "An error has occurred while processing your refund.";
+
+            // check if gateway response is enable from module settings
+            if ($gateway_debug) {
+                $error_message .= __($ex->getMessage() , 'wc_checkout_com_cards');
+            }
+
+            // Log message
+            WC_Checkoutcom_Utility::logger($error_message, $ex);
 
             return array('error' => $error_message);
         }

@@ -528,5 +528,42 @@ class WC_Checkoutcom_Cards_Settings
 
         return apply_filters( 'wc_checkout_com_alternative_payments', $settings );
     }
+
+    public static function debug_settings()
+    {
+        $settings = array(
+            'debug_settings'              => array(
+                'title'       => __( 'Debug Settings', 'checkoutcom-cards-settings' ),
+                'type'        => 'title',
+                'description' => '',
+            ),
+            'cko_file_logging' => array(
+                'id' => 'cko_file_logging',
+                'title'   => __( 'File Logging', 'checkoutcom-cards-settings' ),
+                'type'    => 'checkbox',
+                'desc_tip'    => true,
+                'default'     => 'no',
+                'desc' => __('Check to enable file logging', 'checkoutcom-cards-settings'),
+            ),
+            'cko_console_logging' => array(
+                'id' => 'cko_console_logging',
+                'title'   => __( 'Console Logging', 'checkoutcom-cards-settings' ),
+                'type'    => 'checkbox',
+                'desc_tip'    => true,
+                'default'     => 'no',
+                'desc' => __('Check to enable console logging', 'checkoutcom-cards-settings'),
+            ),
+            'cko_gateway_responses' => array(
+                'id' => 'cko_gateway_responses',
+                'title'   => __( 'Gateway Responses', 'checkoutcom-cards-settings' ),
+                'type'    => 'checkbox',
+                'desc_tip'    => true,
+                'default'     => 'no',
+                'desc' => __('Check to show gateway response.', 'checkoutcom-cards-settings'),
+            ),
+        );
+
+        return apply_filters( 'wc_checkout_com_cards', $settings );
+    }
 }
 
