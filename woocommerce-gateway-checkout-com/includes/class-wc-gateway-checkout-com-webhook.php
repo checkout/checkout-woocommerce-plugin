@@ -200,7 +200,8 @@ class WC_Checkout_Com_Webhook
         $webhook_data = $data->data;
         $payment_id = $webhook_data->id;
         $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
-        $environment =  $core_settings['ckocom_environment'] == 'sandboxx' ? true : false;
+        $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
+        $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes' ? true : false;
 
         // Initialize the Checkout Api
         $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
@@ -227,15 +228,16 @@ class WC_Checkout_Com_Webhook
 
             return true;
 
-        } catch (CheckoutModelException $ex) {
-            $error_message = "An error has occurred while processing your cancel request.";
-            WC_Checkoutcom_Utility::logger($error_message , $ex->getMessages());
-
-            return false;
-
         } catch (CheckoutHttpException $ex) {
             $error_message = "An error has occurred while processing your cancel request.";
-            WC_Checkoutcom_Utility::logger($error_message , $ex->getBody());
+
+            // check if gateway response is enable from module settings
+            if ($gateway_debug) {
+                $error_message .= __($ex->getMessage() , 'wc_checkout_com_cards');
+            }
+
+            // Log message
+            WC_Checkoutcom_Utility::logger($error_message, $ex);
 
             return false;
         }

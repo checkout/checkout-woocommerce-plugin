@@ -105,7 +105,12 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
                 echo '<table class="form-table">';
                 WC_Admin_Settings::output_fields( WC_Checkoutcom_Cards_Settings::cards_settings() );
                 echo '</table>';
-            }else {
+            } elseif ('debug_settings' === $_GET['screen']) {
+
+                echo '<table class="form-table">';
+                WC_Admin_Settings::output_fields( WC_Checkoutcom_Cards_Settings::debug_settings() );
+                echo '</table>';
+            } else {
 
                 echo '<table class="form-table">';
                 WC_Admin_Settings::output_fields( WC_Checkoutcom_Cards_Settings::core_settings() );
@@ -125,6 +130,8 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
                 WC_Admin_Settings::save_fields( WC_Checkoutcom_Cards_Settings::cards_settings());
             } elseif ('orders_settings' == $_GET['screen']) {
                 WC_Admin_Settings::save_fields( WC_Checkoutcom_Cards_Settings::order_settings());
+            } elseif ('debug_settings' == $_GET['screen']) {
+                WC_Admin_Settings::save_fields(WC_Checkoutcom_Cards_Settings::debug_settings());
             } else {
                 WC_Admin_Settings::save_fields( WC_Checkoutcom_Cards_Settings::core_settings());
             }
@@ -142,6 +149,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         $save_card =  WC_Admin_Settings::get_option('ckocom_card_saved');
         $mada_enable = WC_Admin_Settings::get_option('ckocom_card_mada') == 1 ? true : false;
         $require_cvv = WC_Admin_Settings::get_option('ckocom_card_require_cvv');
+        $debug_mode = WC_Admin_Settings::get_option('cko_console_logging') == 'yes' ? true: false;
 
         // check if saved card enable from module setting
         if($save_card) {
@@ -187,6 +195,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
                     jQuery('.payment_box.payment_method_wc_checkout_com_cards > ul').css('margin','auto')
 
                     Frames.init({
+                        debugMode: "<?php echo $debug_mode; ?>",
                         publicKey: "<?php echo $this->get_option( 'ckocom_pk' );?>",
                         containerSelector: '.frames-container',
                         cardTokenised: function(event){
@@ -282,6 +291,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 
         </div>
 
+        <!-- Show save card checkbox if this is selected on admin-->
         <div class="cko-save-card-checkbox">
             <?php
             if($save_card){
@@ -291,7 +301,6 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         </div>
         <?php
 
-        // Show save card checkbox if this is selected on admin
 
     }
 
@@ -500,6 +509,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         // load module settings
         $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
         $environment = $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
+        $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes' ? true : false;
 
         // Initialize the Checkout Api
         $checkout = new Checkout\CheckoutApi($core_settings['ckocom_sk'], $environment);
@@ -569,12 +579,17 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
                 );
             }
 
-        } catch (CheckoutModelException $ex) {;
-            return array(
-                'result'   => 'failure',
-                'redirect' => wc_get_endpoint_url( 'payment-methods' ),
-            );
-        }  catch (CheckoutHttpException $ex) {
+        } catch (CheckoutHttpException $ex) {
+            $error_message = "An error has occurred while processing your cancel request.";
+
+            // check if gateway response is enable from module settings
+            if ($gateway_debug) {
+                $error_message .= __($ex->getMessage() , 'wc_checkout_com_cards');
+            }
+
+            // Log message
+            WC_Checkoutcom_Utility::logger($error_message, $ex);
+
             return array(
                 'result'   => 'failure',
                 'redirect' => wc_get_endpoint_url( 'payment-methods' ),

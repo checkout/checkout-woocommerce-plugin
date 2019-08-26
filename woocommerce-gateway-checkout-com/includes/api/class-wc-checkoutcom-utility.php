@@ -113,6 +113,10 @@ class WC_Checkoutcom_Utility
         return gmdate("Y-m-d\TH:i:s\Z", strtotime('+' . $defaultSecondsDelay . 'seconds'));
     }
 
+    /**
+     * @param $bin
+     * @return bool
+     */
     public static function isMadaCard($bin)
     {
         // Path to MADA_BIN.csv
@@ -156,16 +160,34 @@ class WC_Checkoutcom_Utility
         }
     }
 
+    /**
+     * @param $errorMessage
+     * @param $exception
+     */
     public static function logger($errorMessage , $exception)
     {
         $logger = wc_get_logger();
         $context = array( 'source' => 'wc_checkoutcom_gateway_log' );
 
-        $logger->error($errorMessage, $context );
-        $logger->error(wc_print_r($exception, true), $context );
+        // Get file logging from module setting
+        $file_logging = WC_Admin_Settings::get_option('cko_file_logging') == 'yes' ? true : false;
 
+        // Check if file logging is enable
+        if($file_logging){
+            // Log error message with exception
+            $logger->error($errorMessage, $context );
+            $logger->error(wc_print_r($exception, true), $context );
+        } else {
+            // Log only error message
+            $logger->error($errorMessage, $context );
+        }
     }
 
+    /**
+     * @param $currencyCode
+     * @param $apm
+     * @return array
+     */
     public static function get_alternative_payment_methods($currencyCode, $apm)
     {
         $apmArray = array();
