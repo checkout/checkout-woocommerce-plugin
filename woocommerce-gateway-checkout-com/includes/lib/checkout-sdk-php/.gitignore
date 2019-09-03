@@ -1,0 +1,10 @@
+.idea
+.DS_Store
+composer.lock
+vendor/
+nbproject/
+
+index.php
+phpunit/
+
+*.log

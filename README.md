@@ -5,9 +5,7 @@
 
 This extension allows shop owners to process online payments (card / alternative payments) using:
   - **Frames.js** - Customisable payment form, embedded within your website
-  - **Checkout.js** - Customisable payment widget 
-  - **Checkout.js Hosted** - Redirection to a customisable page on Checkout.com's servers
-  - **Apple Pay & Google Pay** - Shoppers can pay using mobile wallets
+  - **Google Pay** - Shoppers can pay using mobile wallets
   - **Alternative payments** - Shoppers can pay using local payment options (Sofort, iDEAL, Boleto ... etc.)
 
 # Installation
@@ -17,9 +15,9 @@ You can find a full installation guide [here](https://github.com/checkout/checko
 If you do not have an account yet, simply go to [checkout.com](https://checkout.com/) and hit the "Get Test Account" button.
 
 # Keys
-There are 3 keys that you need to configure in the NON-PCI extension, while for the PCI version you just need 2:
+There are 3 keys that you need to configure in the module:
 - **Secret Key**
-- **Public Key** (not needed for PCI extension)
+- **Public Key**
 - **Private Shared Key**
 
 > The Private Shared Key is generated when you [configure the Webhook URL](https://docs.checkout.com/docs/business-level-administration#section-manage-webhook-url) in the Checkout HUB.
@@ -27,21 +25,13 @@ There are 3 keys that you need to configure in the NON-PCI extension, while for 
 # URLs
 In order to successfully complete 3D Secure transactions, and to keep Woocommerce order statuses in sync you need to configure the following URLs in your Checkout HUB as follows:
 
-> The following URL formats are for plugins versions 3.X or newer; click [here](https://github.com/checkout/checkout-woocommerce-plugin/wiki/URLs--2.x) to get the URLs for older plugin versions
+> The following URL formats are for plugins versions 4.X or newer; click [here](https://github.com/checkout/checkout-woocommerce-plugin/wiki/URLs--2.x) to get the URLs for older plugin versions
 
-For the **NON-PCI** extension:
-
-| Type | URL Example | Description |
-| ------ | ------ | ------ |
-| Redirections (success/fail)| _example.com_**/?wc-api=WC_Checkout_Non_Pci_Callback** | Redirect after 3D Secure |
-| Webhook | _example.com_**/?wc-api=WC_Checkout_Non_Pci_Webhook** | Sync Woocommerce |
-
-For the **PCI** extension:
 
 | Type | URL Example | Description |
 | ------ | ------ | ------ |
-| Redirections (success/fail)| _example.com_**/?wc-api=WC_Checkout_Pci_Callback** | Redirect after 3D Secure |
-| Webhook | _example.com_**/?wc-api=WC_Checkout_Pci_Webhook** &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| Sync Woocommerce |
+| Redirections (success/fail)| _example.com_**/?wc-api=wc_checkoutcom_callback** | Redirect after 3D Secure |
+| Webhook | _example.com_**/?wc-api=wc_checkoutcom_webhook** &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| Sync Woocommerce |
 
 > You can see a guide on how to set the URLs in the HUB [here](https://docs.checkout.com/docs/business-level-administration#section-manage-channel-urls) ; You can find test card details [here](https://docs.checkout.com/docs/testing#section-credit-cards)
 
@@ -51,7 +41,6 @@ Upon receiving your live credentials from your account manager, here are the req
 
 - In the plugin settings, place your **live** keys
 - Switch the _Endpoint URL mode_ to **live**.
-- Make sure you have configured the Redirection and Webhook URLs correctly in your **live** Checkout.com HUB
 
 
 # Reference 
