@@ -9,40 +9,26 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_request
     {
         $ideal_banks = WC_Checkoutcom_Api_request::get_ideal_bank();
 
-        if($ideal_banks['error']){
-            ?>
-            <div class="ideal-bank-info" id="ideal-bank-info" style="display: none;">
-                This payment method is not available at the moment.
+        $country = $ideal_banks->countries;
+        $issuers = $country[0]['issuers'];
+
+        ?>
+        <div class="ideal-bank-info" id="ideal-bank-info" style="display: none;">
+            <div class="ideal-heading">
+                <label>Your Bank</label>
             </div>
-            <?php
-        } else {
-            $country = $ideal_banks->countries;
-            $issuers = $country[0]['issuers'];
+            <label for="issuer-id">
 
-            foreach ($issuers as $key => $value) {
-                $ideal_bank_bic = $value['bic'];
-                $ideal_bank_name = $value['name'];
-            }
-
-            ?>
-            <div class="ideal-bank-info" id="ideal-bank-info" style="display: none;">
-                <div class="ideal-heading">
-                    <label>Your Bank</label>
-                </div>
-                <label for="issuer-id">
-
-                    <input name="issuer-id" list="issuer-id" style="width: 80%;">
-                    <datalist id="issuer-id">
-                        <?php foreach ($issuers as $value) { ?>
-                            <option value="<?php echo $value["bic"]; ?>"><?php echo $value["name"];?></option>
-                        <?php } ?>
-                    </datalist>
-                    </input>
-                </label>
-            </div>
-            <?php
-        }
-
+                <input name="issuer-id" list="issuer-id" style="width: 80%;">
+                <datalist id="issuer-id">
+                    <?php foreach ($issuers as $value) { ?>
+                        <option value="<?php echo $value["bic"]; ?>"><?php echo $value["name"];?></option>
+                    <?php } ?>
+                </datalist>
+                </input>
+            </label>
+        </div>
+        <?php
 
     }
 

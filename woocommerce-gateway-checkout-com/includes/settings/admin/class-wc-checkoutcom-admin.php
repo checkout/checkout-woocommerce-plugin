@@ -34,13 +34,13 @@ class WC_Checkoutcom_Admin
                     <p style="display: unset;opacity: 0.5;"><?php echo '|'; ?></p>
                 </td>
             </tr>
-            <tr valign="top">
-                <td colspan="2" class="forminp forminp-<?php echo sanitize_title( $value['type'] ) ?>">
-                    <a href="<?php echo admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_apple_pay' ); ?>"
-                       style="text-decoration: none"><?php _e( 'Apple Pay', 'wc_checkout_com_cards' ); ?></a>
-                    <p style="display: unset;opacity: 0.5;"><?php echo '|'; ?></p>
-                </td>
-            </tr>
+<!--            <tr valign="top">-->
+<!--                <td colspan="2" class="forminp forminp---><?php //echo sanitize_title( $value['type'] ) ?><!--">-->
+<!--                    <a href="--><?php //echo admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_apple_pay' ); ?><!--"-->
+<!--                       style="text-decoration: none">--><?php //_e( 'Apple Pay', 'wc_checkout_com_cards' ); ?><!--</a>-->
+<!--                    <p style="display: unset;opacity: 0.5;">--><?php //echo '|'; ?><!--</p>-->
+<!--                </td>-->
+<!--            </tr>-->
             <tr valign="top">
                 <td colspan="2" class="forminp forminp-<?php echo sanitize_title( $value['type'] ) ?>">
                     <a href="<?php echo admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_alternative_payments' ); ?>"
