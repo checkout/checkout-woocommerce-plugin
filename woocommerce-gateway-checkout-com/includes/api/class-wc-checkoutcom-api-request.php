@@ -728,7 +728,7 @@ class WC_Checkoutcom_Api_request
             return $result;
 
         } catch (CheckoutHttpException $ex) {
-            $error_message = "An error has occurred while processing your refund.";
+            $error_message = "An error has occured while retrieving ideal bank details.";
 
             // check if gateway response is enable from module settings
             if ($gateway_debug) {
@@ -760,7 +760,7 @@ class WC_Checkoutcom_Api_request
             return $result;
 
         } catch (CheckoutHttpException $ex) {
-            $error_message = "An error has occurred while processing your refund.";
+            $error_message = "An error has occured while retrieving giropay bank details..";
 
             // check if gateway response is enable from module settings
             if ($gateway_debug) {
@@ -794,7 +794,7 @@ class WC_Checkoutcom_Api_request
             return $result;
 
         } catch (CheckoutHttpException $ex) {
-            $error_message = "An error has occurred while processing your refund.";
+            $error_message = "An error has occured while retrieving eps bank details..";
 
             // check if gateway response is enable from module settings
             if ($gateway_debug) {
@@ -872,7 +872,7 @@ class WC_Checkoutcom_Api_request
                 return array('error' => $error_message);
             }
         } catch (CheckoutHttpException $ex) {
-            $error_message = "An error has occurred while processing your refund.";
+            $error_message = "An error has occurred while creating apm payments.";
 
             // check if gateway response is enable from module settings
             if ($gateway_debug) {
@@ -906,15 +906,17 @@ class WC_Checkoutcom_Api_request
             case 'klarna':
                 $klarna_token = $_POST['cko-klarna-token'];
                 $country_code = $_POST['billing_country'];
-                $locale = 'en-GB' ;//str_replace("_","-",$localisation);
+                $locale = str_replace("_", "-", get_locale());
 
                 $products = array();
                 foreach ($order->get_items() as $item_id => $item_data) {
                     // Get an instance of corresponding the WC_Product object
                     $product = $item_data->get_product();
-                    $item_total = $item_data->get_total(); // Get the item line total
-                    $amount_cents = WC_Checkoutcom_Utility::valueToDecimal($item_total, get_woocommerce_currency());
-                    $items_total = $item_data->get_total() * $item_data->get_quantity();
+                    $items = wc_get_product( $product->get_id() );
+                    
+                    $unit_price = $items->get_price();
+                    $amount_cents = WC_Checkoutcom_Utility::valueToDecimal($unit_price, get_woocommerce_currency());
+                    $items_total = $unit_price * $item_data->get_quantity();
                     $total_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($items_total, get_woocommerce_currency());
 
                     // Displaying this data (to check)
@@ -957,14 +959,14 @@ class WC_Checkoutcom_Api_request
                 $billingAddressParam->family_name = $_POST['billing_last_name'];
                 $billingAddressParam->email = $_POST['billing_email'];
                 $billingAddressParam->street_address = $_POST['billing_address_1'];
-                $billingAddressParam->street_address2 = $_POST['billing_address_2'];
+                // $billingAddressParam->street_address2 = $_POST['billing_address_2'];
                 $billingAddressParam->postal_code = $_POST['billing_postcode'];
                 $billingAddressParam->city = $_POST['billing_city'];
-                $billingAddressParam->region = $_POST['billing_state'];
+                $billingAddressParam->region = $_POST['billing_city'];
                 $billingAddressParam->phone = $_POST['billing_phone'];
                 $billingAddressParam->country = $_POST['billing_country'];
 
-                $method = new KlarnaSource($klarna_token, $country_code, $locale, $billingAddressParam, 0, $products);
+                $method = new KlarnaSource($klarna_token, $country_code, strtolower($locale), $billingAddressParam, 0, $products);
 
                 break;
             case 'giropay' :
@@ -1122,19 +1124,21 @@ class WC_Checkoutcom_Api_request
         $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
         $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
         $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes' ? true : false;
+        $locale = str_replace("_", "-", get_locale());
+        $country = WC()->customer->get_billing_country();
 
         // Initialize the Checkout Api
         $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
 
         try{
-            $klarna = new Klarna('GB', get_woocommerce_currency(), 'en-GB', $amount_cents, 0, $products);
+            $klarna = new Klarna($country, get_woocommerce_currency(), strtolower($locale), $amount_cents, 0, $products);
             $source = $checkout->sources()
                 ->add($klarna);
 
             return $source;
 
         } catch (CheckoutHttpException $ex) {
-            $error_message = "An error has occurred while processing your refund.";
+            $error_message = "An error has occured while creating klarna session.";
 
             // check if gateway response is enable from module settings
             if ($gateway_debug) {
@@ -1204,21 +1208,23 @@ class WC_Checkoutcom_Api_request
 
         }
 
+        $locale = str_replace("_", "-", get_locale());
+
         $cartInfo = array(
-            "purchase_country" => $billingAddress['country'],
+            "purchase_country" =>  WC()->customer->get_billing_country(),
             "purchase_currency" => get_woocommerce_currency(),
-            "locale" => 'en-GB', //$locale,
+            "locale" => strtolower($locale),
             "billing_address" => array(
-                "given_name" => $billingAddress['first_name'],
-                "family_name" => $billingAddress['last_name'],
-                "email" => $billingAddress['email'],
-                "street_address" => $billingAddress['address_1'],
-                "street_address2" => $billingAddress['address_2'],
-                "postal_code" => $billingAddress['postcode'],
-                "city" => $billingAddress['city'],
-                "region" => $billingAddress['state'],
-                "phone" => $billingAddress['phone'],
-                "country" => $billingAddress['country'],
+                "given_name" => WC()->customer->get_billing_first_name(),
+                "family_name" => WC()->customer->get_billing_last_name(),
+                "email" => WC()->customer->get_billing_email(),
+                "street_address" => WC()->customer->get_billing_address_1(),
+                "street_address2" => WC()->customer->get_billing_address_2(),
+                "postal_code" => WC()->customer->get_billing_postcode(),
+                "city" => WC()->customer->get_billing_city(),
+                "region" => WC()->customer->get_billing_city(),
+                "phone" => WC()->customer->get_billing_phone(),
+                "country" => WC()->customer->get_billing_country(),
             ),
             "order_amount" => $amount_cents,
             "order_tax_amount" => 0,
