@@ -264,8 +264,10 @@ class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway
                                 },
                                 // callback
                                 function (response) {
-                                    document.getElementById('cko-klarna-token').value = response.authorization_token;
-                                    jQuery('#place_order').trigger('click');
+                                    if(response.approved){
+                                        document.getElementById('cko-klarna-token').value = response.authorization_token;
+                                        jQuery('#place_order').trigger('click');
+                                    }
                                 }
                             );
                         } catch (e) {
@@ -279,9 +281,38 @@ class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway
 
             // load klarna widgets if selected
             if(jQuery('.klarna_widgets').length > 0) {
-                jQuery('.klarna_widgets').find('input[type="radio"]').on('click',function(event){
-                    var cartInfo = <?php echo json_encode($cartInfo); ?>;
 
+                setTimeout(function(){
+                    if(jQuery('.klarna_widgets').find('input[type="radio"]').is(':checked')){ console.log('here now');
+                        jQuery('.klarna_widgets').find('input[type="radio"]').prop('checked', false);
+                    }
+                },300)
+
+                jQuery('.klarna_widgets').find('input[type="radio"]').on('click',function(event){
+                    var cartInfo = <?php echo json_encode(WC_Checkoutcom_Api_request::get_cart_info()); ?>;
+
+                    var email  = cartInfo['billing_address']['email'];
+                    var family_name = cartInfo['billing_address']['family_name'];
+                    var given_name = cartInfo['billing_address']['given_name'];
+                    var phone = cartInfo['billing_address']['phone'];
+
+                    if(!email){
+                        email = document.getElementById('billing_email').value;
+                    }
+
+                    if(!family_name){
+                        family_name = document.getElementById('billing_last_name').value;
+                    }
+
+                    if(!given_name){
+                        given_name = document.getElementById('billing_first_name').value;
+                    }
+
+                    if(!phone){
+                        phone = document.getElementById('billing_phone').value;
+                    }
+
+                    console.log(cartInfo);
                     try {
                         Klarna.Payments.init(
                             {
@@ -296,7 +327,25 @@ class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway
                                 payment_method_categories: [event.target.id],
                                 instance_id: "klarna-payments-instance"
                             },
-                            cartInfo,
+                            {
+                                purchase_country:   cartInfo['purchase_country'],
+                                purchase_currency:  cartInfo['purchase_currency'],
+                                locale:             cartInfo['locale'],
+                                order_amount:       cartInfo['order_amount'],
+                                // order_tax_amount:   parseInt(data.tax_amount) *100,
+                                order_lines:        cartInfo['order_lines'],
+                                billing_address:    {
+                                    given_name:     given_name,
+                                    family_name:    family_name,
+                                    email:          email,
+                                    street_address: cartInfo['billing_address']['street_address'],
+                                    postal_code:    cartInfo['billing_address']['postal_code'],
+                                    city:          cartInfo['billing_address']['city'],
+                                    region:         cartInfo['billing_address']['city'],
+                                    phone:          phone,
+                                    country:        cartInfo['billing_address']['country'],
+                                }
+                            },
                             // callback
                             function (response) {
                                 // ...
