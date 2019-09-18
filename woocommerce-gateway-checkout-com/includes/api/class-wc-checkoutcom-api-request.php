@@ -116,7 +116,7 @@ class WC_Checkoutcom_Api_request
      */
     private static function get_request_param(WC_Order $order, $arg)
     {
-        global $woocommerce;
+        global $woocommerce, $wp_version;
 
         $auto_capture = WC_Admin_Settings::get_option('ckocom_card_autocap') == 1 ? true : false;
         $amount = $order->get_total();
@@ -241,16 +241,11 @@ class WC_Checkoutcom_Api_request
         $payment->failure_url = $redirection_url;
 
         $metadata = array(
-            'server' => get_site_url(),
             'order_id' => $order->get_order_number(),
-            'woo_version' =>  $woocommerce->version,
-            'plugin_version' => WC_Gateway_Checkout_Com_Cards::PLUGIN_VERSION,
-            'lib_version' => CheckoutApi::VERSION,
-            'integration_type' => $payment_option,
-            'time' => date('Y-m-d H:i:s'),
-            'udf5' => 'Woocommerce - '. $woocommerce->version
-                . ', Checkout Plugin - ' . WC_Gateway_Checkout_Com_Cards::PLUGIN_VERSION
-                . ', Php Sdk - '. CheckoutApi::VERSION
+            'server' => get_site_url(),
+            'sdk_data' => "PHP SDK v".CheckoutApi::VERSION,
+            'integration_data' => "Checkout.com Woocommerce Plugin v".WC_Gateway_Checkout_Com_Cards::PLUGIN_VERSION,
+            'platform_data' => "Wordpress v".$wp_version. ", WooCommerce v". $woocommerce->version,
         );
 
         // set capture delay if payment action is authorise and capture
