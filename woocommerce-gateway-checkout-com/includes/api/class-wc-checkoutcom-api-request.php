@@ -901,7 +901,8 @@ class WC_Checkoutcom_Api_request
             case 'klarna':
                 $klarna_token = $_POST['cko-klarna-token'];
                 $country_code = $_POST['billing_country'];
-                $locale = str_replace("_", "-", get_locale());
+                $woo_locale = str_replace("_", "-", get_locale());
+                $locale = substr($woo_locale, 0, 5);
 
                 $products = array();
                 foreach ($order->get_items() as $item_id => $item_data) {
@@ -1119,7 +1120,8 @@ class WC_Checkoutcom_Api_request
         $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
         $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
         $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes' ? true : false;
-        $locale = str_replace("_", "-", get_locale());
+        $woo_locale = str_replace("_", "-", get_locale());
+        $locale = substr($woo_locale, 0, 5);
         $country = WC()->customer->get_billing_country();
 
         // Initialize the Checkout Api
@@ -1203,7 +1205,8 @@ class WC_Checkoutcom_Api_request
 
         }
 
-        $locale = str_replace("_", "-", get_locale());
+        $woo_locale = str_replace("_", "-", get_locale());
+        $locale = substr($woo_locale, 0, 5);
 
         $cartInfo = array(
             "purchase_country" =>  WC()->customer->get_billing_country(),
