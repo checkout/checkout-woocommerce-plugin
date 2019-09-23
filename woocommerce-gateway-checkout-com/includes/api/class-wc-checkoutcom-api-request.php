@@ -910,7 +910,7 @@ class WC_Checkoutcom_Api_request
                     $product = $item_data->get_product();
                     $items = wc_get_product( $product->get_id() );
                     
-                    $unit_price = $items->get_price();
+                    $unit_price = $items->get_price_including_tax() ;//$items->get_price();
                     $amount_cents = WC_Checkoutcom_Utility::valueToDecimal($unit_price, get_woocommerce_currency());
                     $items_total = $unit_price * $item_data->get_quantity();
                     $total_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($items_total, get_woocommerce_currency());
@@ -933,7 +933,7 @@ class WC_Checkoutcom_Api_request
                 $chosen_shipping = $chosen_methods[0];
 
                 if($chosen_shipping != 'free_shipping') {
-                    $shipping_amount = WC()->cart->get_shipping_total();
+                    $shipping_amount = WC()->cart->get_shipping_total() + WC()->cart->get_shipping_tax();
                     $shipping_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($shipping_amount, get_woocommerce_currency());
 
                     $products[] = array(
@@ -1079,7 +1079,7 @@ class WC_Checkoutcom_Api_request
 
         foreach($items as $item => $values) {
             $_product =  wc_get_product( $values['data']->get_id());
-            $unit_price = get_post_meta($values['product_id'] , '_price', true);
+            $unit_price = $_product->get_price_including_tax();//get_post_meta($values['product_id'] , '_price', true);
             $unit_price_cents = WC_Checkoutcom_Utility::valueToDecimal($unit_price, get_woocommerce_currency());
 
             $products[] = array(
@@ -1100,7 +1100,7 @@ class WC_Checkoutcom_Api_request
         $chosen_shipping = $chosen_methods[0];
 
         if($chosen_shipping != 'free_shipping') {
-            $shipping_amount = WC()->cart->get_shipping_total();
+            $shipping_amount = WC()->cart->get_shipping_total() + WC()->cart->get_shipping_tax();
             $shipping_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($shipping_amount, get_woocommerce_currency());
 
             $products[] = array(
@@ -1114,7 +1114,6 @@ class WC_Checkoutcom_Api_request
                 "reference" => $chosen_shipping,
                 "total_discount_amount" => 0
             );
-
         }
 
         $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
@@ -1167,7 +1166,7 @@ class WC_Checkoutcom_Api_request
 
         foreach($items as $item => $values) {
             $_product =  wc_get_product( $values['data']->get_id());
-            $unit_price = get_post_meta($values['product_id'] , '_price', true);
+            $unit_price = $_product->get_price_including_tax();//get_post_meta($values['product_id'] , '_price', true);
             $unit_price_cents = WC_Checkoutcom_Utility::valueToDecimal($unit_price, get_woocommerce_currency());
 
             $products[] = array(
@@ -1188,7 +1187,7 @@ class WC_Checkoutcom_Api_request
         $chosen_shipping = $chosen_methods[0];
 
         if($chosen_shipping != 'free_shipping') {
-            $shipping_amount = WC()->cart->get_shipping_total();
+            $shipping_amount = WC()->cart->get_shipping_total() + WC()->cart->get_shipping_tax();
             $shipping_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($shipping_amount, get_woocommerce_currency());
 
             $products[] = array(
