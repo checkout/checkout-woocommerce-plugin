@@ -13,10 +13,10 @@
 /* Add size constrains for the frames rendered iframe */
 .frames-container {
     position: relative;
-    min-height: 90px;
+    /*min-height: 90px;*/
     max-width: var(--frames-max-width);
-    margin-top: 15px;
-    padding-bottom: 20px;
+    /*margin-top: 15px;*/
+    /*padding-bottom: 20px;*/
 }
 .main-loading-container {
     position: absolute;
@@ -85,7 +85,18 @@
 .apple-pay-button-text-donate {
     -apple-pay-button-type: donate;
 }
+
 /* For mobile devices */
+@media only screen and (min-width: 601px) {
+    .cko-form {
+        padding-left: inherit;
+    }
+
+    .cko-save-card-checkbox {
+        padding-left: inherit;
+    }
+}
+
 @media only screen and (max-width: 600px) {
     .apple-pay-button {
         width: var(--wallet-button-width-mobile) !important;
@@ -95,7 +106,16 @@
         width: var(--wallet-button-width-mobile) !important;
         height: var(--wallet-button-height-mobile) !important;
     }
+
+    .cko-form {
+        width: max-content;
+        /*padding-left: initial;*/
+        /*padding-left: initial;*/
+    }
 }
+
+
+
 /* Add style to the Apple and Google Pay methods to show the icons  */
 .cko-wallet-icon-spacer {
     display: inline-block;

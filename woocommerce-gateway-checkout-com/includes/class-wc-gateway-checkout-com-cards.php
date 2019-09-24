@@ -149,7 +149,6 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         $save_card =  WC_Admin_Settings::get_option('ckocom_card_saved');
         $mada_enable = WC_Admin_Settings::get_option('ckocom_card_mada') == 1 ? true : false;
         $require_cvv = WC_Admin_Settings::get_option('ckocom_card_require_cvv');
-        $debug_mode = WC_Admin_Settings::get_option('cko_console_logging') == 'yes' ? true: false;
 
         // check if saved card enable from module setting
         if($save_card) {
@@ -186,31 +185,40 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
             <input type="hidden" id="cko-card-token" name="cko-card-token" value=""/>
             <input type="hidden" id="cko-card-bin" name="cko-card-bin" value=""/>
 
-            <div class="frames-container">
-                <!-- frames will be loaded here -->
+            <!-- frames will be loaded here -->
+            <div class="one-liner">
+                <div class="card-frame"></div>
             </div>
+            
             <script type="text/javascript">
+                // Get debug mode from module config
+                var debug = '<?php echo WC_Admin_Settings::get_option('cko_console_logging'); ?>';
+
                 jQuery( function(){
                     // Set default ul to auto
                     jQuery('.payment_box.payment_method_wc_checkout_com_cards > ul').css('margin','auto')
 
+                    // Initialise frames v2
                     Frames.init({
-                        debugMode: "<?php echo $debug_mode; ?>",
                         publicKey: "<?php echo $this->get_option( 'ckocom_pk' );?>",
-                        containerSelector: '.frames-container',
-                        cardTokenised: function(event){
-
-                            if (document.getElementById('cko-card-token').value.length === 0
-                                || document.getElementById('cko-card-token').value != event.data.cardToken) {
-                                document.getElementById('cko-card-token').value = event.data.cardToken;
-                                document.getElementById('cko-card-bin').value = event.data.card.bin;
-                                jQuery('#place_order').trigger('click');
-                                document.getElementById("cko-card-token").value = "";
-                            }
-
-                            Frames.unblockFields();
-                        }
+                        debug : debug == 'yes' ? true : false
                     });
+
+                    Frames.addEventHandler(
+                        Frames.Events.CARD_TOKENIZED,
+                        onCardTokenized
+                    );
+
+                    function onCardTokenized(event) {
+                        if (document.getElementById('cko-card-token').value.length === 0
+                            || document.getElementById('cko-card-token').value != event.token) {
+                            document.getElementById('cko-card-token').value = event.token;
+                            document.getElementById('cko-card-bin').value = event.bin;
+                            jQuery('#place_order').trigger('click');
+                            document.getElementById("cko-card-token").value = "";
+                            Frames.enableSubmitForm();
+                        }
+                    }
 
                     // check if saved card exist
                     if(jQuery('.payment_box.payment_method_wc_checkout_com_cards').

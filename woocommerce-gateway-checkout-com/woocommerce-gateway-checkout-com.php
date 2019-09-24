@@ -98,7 +98,7 @@ function my_new_wc_order_statuses( $order_statuses )
 add_action( 'wp_head', 'cko_frames_js');
 function cko_frames_js()
 {
-    wp_register_script( 'cko-frames-script', 'https://cdn.checkout.com/js/frames.js', array( 'jquery' ) );
+    wp_register_script( 'cko-frames-script', 'https://cdn.checkout.com/js/framesv2.min.js', array( 'jquery' ) );
     wp_enqueue_script( 'cko-frames-script' );
 }
 
@@ -123,12 +123,18 @@ function cko_check_if_empty()
 add_action('wp_enqueue_scripts', 'callback_for_setting_up_scripts');
 function callback_for_setting_up_scripts() {
     // load cko custom css
-    $css_path = plugins_url().'/woocommerce-gateway-checkout-com/assets/css/checkoutcom-styles.css';
+    $checkoutcom_style = plugins_url().'/woocommerce-gateway-checkout-com/assets/css/checkoutcom-styles.css';
+    $normalize = plugins_url().'/woocommerce-gateway-checkout-com/assets/css/normalize.css';
+    $frames_style = plugins_url().'/woocommerce-gateway-checkout-com/assets/css/style.css';
 
 
     // register cko css
-    wp_register_style( 'checkoutcom-style', $css_path);
+    wp_register_style( 'checkoutcom-style', $checkoutcom_style);
+    wp_register_style( 'normalize', $normalize);
+    wp_register_style( 'frames_style', $frames_style);
     wp_enqueue_style( 'checkoutcom-style' );
+    wp_enqueue_style( 'normalize' );
+    wp_enqueue_style( 'frames_style' );
     // Enqueue google pay script
     wp_enqueue_script( 'cko-google-script', 'https://pay.google.com/gp/p/js/pay.js', array( 'jquery' ) );
 
