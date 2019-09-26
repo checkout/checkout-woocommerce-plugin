@@ -910,44 +910,68 @@ class WC_Checkoutcom_Api_request
                     $product = $item_data->get_product();
                     $items = wc_get_product( $product->get_id() );
                     
-                    $unit_price = $items->get_price_including_tax() ;//$items->get_price();
-                    $amount_cents = WC_Checkoutcom_Utility::valueToDecimal($unit_price, get_woocommerce_currency());
-                    $items_total = $unit_price * $item_data->get_quantity();
-                    $total_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($items_total, get_woocommerce_currency());
+                    $unit_price_include_tax = $items->get_price_including_tax();
+                    $unit_price_cents = WC_Checkoutcom_Utility::valueToDecimal($unit_price_include_tax, get_woocommerce_currency());
+                    $unit_price_exclude_tax = $items->get_price_excluding_tax();
+                    $unit_price_ex_tax_cents = WC_Checkoutcom_Utility::valueToDecimal($unit_price_exclude_tax, get_woocommerce_currency());
 
-                    // Displaying this data (to check)
+                    if($items->is_taxable()) {
+                        $tax_rate = round( reset( WC_Tax::get_rates() )['rate'] );
+                        $total_tax_amount_cents = $unit_price_cents - $unit_price_ex_tax_cents ;
+                    } else {
+                        $tax_rate = 0;
+                        $total_tax_amount_cents = 0;
+                    }
+
                     $products[] = array(
-                        "name" => $product->get_name(),
-                        "quantity" => $item_data->get_quantity(),
-                        "unit_price" => $amount_cents,
-                        "tax_rate" => 0,
-                        "total_amount" => $total_amount_cents,
-                        "total_tax_amount" => 0,
+                        "name" => $product->get_title(),
+                        "quantity" => $item_data['quantity'],
+                        "unit_price" => $unit_price_cents,
+                        "tax_rate" => $tax_rate * 100,
+                        "total_amount" => $unit_price_cents * $item_data['quantity'],
+                        "total_tax_amount" => $total_tax_amount_cents ,
                         "type" => "physical",
                         "reference" => $product->get_name(),
                         "total_discount_amount" => 0
+
                     );
+
                 }
 
                 $chosen_methods = wc_get_chosen_shipping_method_ids();
                 $chosen_shipping = $chosen_methods[0];
 
                 if($chosen_shipping != 'free_shipping') {
-                    $shipping_amount = WC()->cart->get_shipping_total() + WC()->cart->get_shipping_tax();
+
+                    $shipping_amount = WC()->cart->get_shipping_total() ;
                     $shipping_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($shipping_amount, get_woocommerce_currency());
+
+                    if(WC()->cart->get_shipping_tax() > 0){
+                        $shipping_amount = WC()->cart->get_shipping_total() + WC()->cart->get_shipping_tax();
+                        $shipping_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($shipping_amount, get_woocommerce_currency());
+
+                        $tax_rate = round( reset( WC_Tax::get_rates() )['rate'] );
+                        $total_tax_amount = WC()->cart->get_shipping_tax();
+                        $total_tax_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($total_tax_amount, get_woocommerce_currency());
+                    } else {
+                        $tax_rate = 0;
+                        $total_tax_amount_cents = 0;
+                    }
 
                     $products[] = array(
                         "name" => $chosen_shipping,
                         "quantity" => 1,
                         "unit_price" => $shipping_amount_cents,
-                        "tax_rate" => 0,
+                        "tax_rate" => $tax_rate * 100,
                         "total_amount" => $shipping_amount_cents,
-                        "total_tax_amount" => 0,
+                        "total_tax_amount" => $total_tax_amount_cents,
                         "type" => "shipping_fee",
                         "reference" => $chosen_shipping,
                         "total_discount_amount" => 0
                     );
                 }
+
+                $total_tax_amount_cents = WC_Checkoutcom_Utility::valueToDecimal(WC()->cart->get_total_tax(), get_woocommerce_currency());
 
                 // Set Billing address
                 $billingAddressParam = new Address();
@@ -962,7 +986,7 @@ class WC_Checkoutcom_Api_request
                 $billingAddressParam->phone = $_POST['billing_phone'];
                 $billingAddressParam->country = $_POST['billing_country'];
 
-                $method = new KlarnaSource($klarna_token, $country_code, strtolower($locale), $billingAddressParam, 0, $products);
+                $method = new KlarnaSource($klarna_token, $country_code, strtolower($locale), $billingAddressParam, $total_tax_amount_cents, $products);
 
                 break;
             case 'giropay' :
@@ -1079,16 +1103,29 @@ class WC_Checkoutcom_Api_request
 
         foreach($items as $item => $values) {
             $_product =  wc_get_product( $values['data']->get_id());
-            $unit_price = $_product->get_price_including_tax();//get_post_meta($values['product_id'] , '_price', true);
-            $unit_price_cents = WC_Checkoutcom_Utility::valueToDecimal($unit_price, get_woocommerce_currency());
+
+            $getProductDetail = wc_get_product( $values['product_id'] );
+
+            $unit_price_include_tax = $_product->get_price_including_tax();
+            $unit_price_cents = WC_Checkoutcom_Utility::valueToDecimal($unit_price_include_tax, get_woocommerce_currency());
+            $unit_price_exclude_tax = get_post_meta($values['product_id'] , '_price', true);
+            $unit_price_ex_tax_cents = WC_Checkoutcom_Utility::valueToDecimal($unit_price_exclude_tax, get_woocommerce_currency());
+
+            if($getProductDetail->is_taxable()) {
+                $tax_rate = round( reset( WC_Tax::get_rates() )['rate'] );
+                $total_tax_amount_cents = $unit_price_cents - $unit_price_ex_tax_cents ;
+            } else {
+                $tax_rate = 0;
+                $total_tax_amount_cents = 0;
+            }
 
             $products[] = array(
                 "name" => $_product->get_title(),
                 "quantity" => $values['quantity'],
                 "unit_price" => $unit_price_cents,
-                "tax_rate" => 0,
+                "tax_rate" => $tax_rate * 100,
                 "total_amount" => $unit_price_cents * $values['quantity'],
-                "total_tax_amount" => 0,
+                "total_tax_amount" => $total_tax_amount_cents ,
                 "type" => "physical",
                 "reference" => $_product->get_sku(),
                 "total_discount_amount" => 0
@@ -1100,21 +1137,35 @@ class WC_Checkoutcom_Api_request
         $chosen_shipping = $chosen_methods[0];
 
         if($chosen_shipping != 'free_shipping') {
-            $shipping_amount = WC()->cart->get_shipping_total() + WC()->cart->get_shipping_tax();
+            $shipping_amount = WC()->cart->get_shipping_total() ;
             $shipping_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($shipping_amount, get_woocommerce_currency());
+
+            if(WC()->cart->get_shipping_tax() > 0){
+                $shipping_amount = WC()->cart->get_shipping_total() + WC()->cart->get_shipping_tax();
+                $shipping_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($shipping_amount, get_woocommerce_currency());
+
+                $tax_rate = round( reset( WC_Tax::get_rates() )['rate'] );
+                $total_tax_amount = WC()->cart->get_shipping_tax();
+                $total_tax_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($total_tax_amount, get_woocommerce_currency());
+            } else {
+                $tax_rate = 0;
+                $total_tax_amount_cents = 0;
+            }
 
             $products[] = array(
                 "name" => $chosen_shipping,
                 "quantity" => 1,
                 "unit_price" => $shipping_amount_cents,
-                "tax_rate" => 0,
+                "tax_rate" => $tax_rate * 100,
                 "total_amount" => $shipping_amount_cents,
-                "total_tax_amount" => 0,
+                "total_tax_amount" => $total_tax_amount_cents,
                 "type" => "shipping_fee",
                 "reference" => $chosen_shipping,
                 "total_discount_amount" => 0
             );
         }
+
+        $total_tax_amount_cents = WC_Checkoutcom_Utility::valueToDecimal(WC()->cart->get_total_tax(), get_woocommerce_currency());
 
         $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
         $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
@@ -1127,7 +1178,8 @@ class WC_Checkoutcom_Api_request
         $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
 
         try{
-            $klarna = new Klarna($country, get_woocommerce_currency(), strtolower($locale), $amount_cents, 0, $products);
+            $klarna = new Klarna($country, get_woocommerce_currency(), strtolower($locale), $amount_cents, $total_tax_amount_cents, $products);
+
             $source = $checkout->sources()
                 ->add($klarna);
 
@@ -1166,16 +1218,29 @@ class WC_Checkoutcom_Api_request
 
         foreach($items as $item => $values) {
             $_product =  wc_get_product( $values['data']->get_id());
-            $unit_price = $_product->get_price_including_tax();//get_post_meta($values['product_id'] , '_price', true);
-            $unit_price_cents = WC_Checkoutcom_Utility::valueToDecimal($unit_price, get_woocommerce_currency());
+
+            $getProductDetail = wc_get_product( $values['product_id'] );
+
+            $unit_price_include_tax = $_product->get_price_including_tax();
+            $unit_price_cents = WC_Checkoutcom_Utility::valueToDecimal($unit_price_include_tax, get_woocommerce_currency());
+            $unit_price_exclude_tax = get_post_meta($values['product_id'] , '_price', true);
+            $unit_price_ex_tax_cents = WC_Checkoutcom_Utility::valueToDecimal($unit_price_exclude_tax, get_woocommerce_currency());
+
+            if($getProductDetail->is_taxable()) {
+                $tax_rate = round( reset( WC_Tax::get_rates() )['rate'] );
+                $total_tax_amount_cents = $unit_price_cents - $unit_price_ex_tax_cents ;
+            } else {
+                $tax_rate = 0;
+                $total_tax_amount_cents = 0;
+            }
 
             $products[] = array(
                 "name" => $_product->get_title(),
                 "quantity" => $values['quantity'],
                 "unit_price" => $unit_price_cents,
-                "tax_rate" => 0,
+                "tax_rate" => $tax_rate * 100,
                 "total_amount" => $unit_price_cents * $values['quantity'],
-                "total_tax_amount" => 0,
+                "total_tax_amount" => $total_tax_amount_cents ,
                 "type" => "physical",
                 "reference" => $_product->get_sku(),
                 "total_discount_amount" => 0
@@ -1187,25 +1252,37 @@ class WC_Checkoutcom_Api_request
         $chosen_shipping = $chosen_methods[0];
 
         if($chosen_shipping != 'free_shipping') {
-            $shipping_amount = WC()->cart->get_shipping_total() + WC()->cart->get_shipping_tax();
+            $shipping_amount = WC()->cart->get_shipping_total() ;
             $shipping_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($shipping_amount, get_woocommerce_currency());
+
+            if(WC()->cart->get_shipping_tax() > 0){
+                $shipping_amount = WC()->cart->get_shipping_total() + WC()->cart->get_shipping_tax();
+                $shipping_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($shipping_amount, get_woocommerce_currency());
+
+                $tax_rate = round( reset( WC_Tax::get_rates() )['rate'] );
+                $total_tax_amount = WC()->cart->get_shipping_tax();
+                $total_tax_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($total_tax_amount, get_woocommerce_currency());
+            } else {
+                $tax_rate = 0;
+                $total_tax_amount_cents = 0;
+            }
 
             $products[] = array(
                 "name" => $chosen_shipping,
                 "quantity" => 1,
                 "unit_price" => $shipping_amount_cents,
-                "tax_rate" => 0,
+                "tax_rate" => $tax_rate * 100,
                 "total_amount" => $shipping_amount_cents,
-                "total_tax_amount" => 0,
+                "total_tax_amount" => $total_tax_amount_cents,
                 "type" => "shipping_fee",
                 "reference" => $chosen_shipping,
                 "total_discount_amount" => 0
             );
-
         }
 
         $woo_locale = str_replace("_", "-", get_locale());
         $locale = substr($woo_locale, 0, 5);
+        $total_tax_amount_cents = WC_Checkoutcom_Utility::valueToDecimal(WC()->cart->get_total_tax(), get_woocommerce_currency());
 
         $cartInfo = array(
             "purchase_country" =>  WC()->customer->get_billing_country(),
@@ -1224,7 +1301,7 @@ class WC_Checkoutcom_Api_request
                 "country" => WC()->customer->get_billing_country(),
             ),
             "order_amount" => $amount_cents,
-            "order_tax_amount" => 0,
+            "order_tax_amount" => $total_tax_amount_cents,
             "order_lines" => $products
         );
 
