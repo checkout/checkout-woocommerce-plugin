@@ -917,7 +917,9 @@ class WC_Checkoutcom_Api_request
                         $unit_price_cents = WC_Checkoutcom_Utility::valueToDecimal($price_incl_tax, get_woocommerce_currency());
                         $tax_amount = $price_incl_tax - $price_excl_tax;
                         $total_tax_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($tax_amount, get_woocommerce_currency());
-                        $tax_rate = round( reset( WC_Tax::get_rates() )['rate'] );
+                        $tax = WC_Tax::get_rates();
+                        $reset_tax = reset($tax)['rate'];
+                        $tax_rate = round($reset_tax);
 
                     } else {
                         $tax_rate = 0;
@@ -1116,7 +1118,9 @@ class WC_Checkoutcom_Api_request
                 $unit_price_cents = WC_Checkoutcom_Utility::valueToDecimal($price_incl_tax, get_woocommerce_currency());
                 $tax_amount = $price_incl_tax - $price_excl_tax;
                 $total_tax_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($tax_amount, get_woocommerce_currency());
-                $tax_rate = round( reset( WC_Tax::get_rates() )['rate'] );
+                $tax = WC_Tax::get_rates();
+                $reset_tax = reset($tax)['rate'];
+                $tax_rate = round($reset_tax);
             } else {
                 $tax_rate = 0;
                 $total_tax_amount_cents = 0;
@@ -1235,7 +1239,12 @@ class WC_Checkoutcom_Api_request
                 $unit_price_cents = WC_Checkoutcom_Utility::valueToDecimal($price_incl_tax, get_woocommerce_currency());
                 $tax_amount = $price_incl_tax - $price_excl_tax;
                 $total_tax_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($tax_amount, get_woocommerce_currency());
-                $tax_rate = round( reset( WC_Tax::get_rates() )['rate'] );
+
+                $tax = WC_Tax::get_rates();
+                $reset_tax = reset($tax)['rate'];
+                $tax_rate = round($reset_tax);
+
+
             } else {
                 $tax_rate = 0;
                 $total_tax_amount_cents = 0;

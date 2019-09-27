@@ -155,6 +155,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         if($save_card) {
             // Show available saved cards
             $this->saved_payment_methods();
+            $is_mada_token = false;
 
             // check if mada enable in module settings
             if($mada_enable){
