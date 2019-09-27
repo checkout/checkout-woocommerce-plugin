@@ -953,7 +953,7 @@ class WC_Checkoutcom_Api_request
                         $total_tax_amount = WC()->cart->get_shipping_tax();
                         $total_tax_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($total_tax_amount, get_woocommerce_currency());
 
-                        $tax_rate = ( $total_tax_amount * 100 ) / WC()->cart->get_shipping_total();
+                        $tax_rate = round( ( $total_tax_amount * 100 ) / $shipping_amount);
                     } else {
                         $tax_rate = 0;
                         $total_tax_amount_cents = 0;
@@ -1150,7 +1150,7 @@ class WC_Checkoutcom_Api_request
                 $total_tax_amount = WC()->cart->get_shipping_tax();
                 $total_tax_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($total_tax_amount, get_woocommerce_currency());
 
-                $tax_rate = ( $total_tax_amount * 100 ) / WC()->cart->get_shipping_total();
+                $tax_rate = round( ( $total_tax_amount * 100 ) / $shipping_amount);
 
             } else {
                 $tax_rate = 0;
@@ -1269,7 +1269,7 @@ class WC_Checkoutcom_Api_request
                 $total_tax_amount = WC()->cart->get_shipping_tax();
                 $total_tax_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($total_tax_amount, get_woocommerce_currency());
 
-                $tax_rate = ( $total_tax_amount * 100 ) / WC()->cart->get_shipping_total();
+                $tax_rate = round( ( $total_tax_amount * 100 ) / $shipping_amount);
 
             } else {
                 $tax_rate = 0;
