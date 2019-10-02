@@ -955,9 +955,17 @@ class WC_Checkoutcom_Api_request
                         $total_tax_amount = WC()->cart->get_shipping_tax();
                         $total_tax_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($total_tax_amount, get_woocommerce_currency());
 
-                        $tax_rate = round( ( $total_tax_amount * 100 ) / $shipping_amount);
+                        $shipping_rates = WC_Tax::get_shipping_tax_rates();
+                        $vat            = array_shift( $shipping_rates );
+
+                        if ( isset( $vat['rate'] ) ) {
+                            $shipping_tax_rate = round( $vat['rate'] * 100 );
+                        } else {
+                            $shipping_tax_rate = 0;
+                        }
+
                     } else {
-                        $tax_rate = 0;
+                        $shipping_tax_rate = 0;
                         $total_tax_amount_cents = 0;
                     }
 
@@ -965,7 +973,7 @@ class WC_Checkoutcom_Api_request
                         "name" => $chosen_shipping,
                         "quantity" => 1,
                         "unit_price" => $shipping_amount_cents,
-                        "tax_rate" => $tax_rate * 100,
+                        "tax_rate" => $shipping_tax_rate,
                         "total_amount" => $shipping_amount_cents,
                         "total_tax_amount" => $total_tax_amount_cents,
                         "type" => "shipping_fee",
@@ -1154,10 +1162,17 @@ class WC_Checkoutcom_Api_request
                 $total_tax_amount = WC()->cart->get_shipping_tax();
                 $total_tax_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($total_tax_amount, get_woocommerce_currency());
 
-                $tax_rate = round( ( $total_tax_amount * 100 ) / $shipping_amount);
+                $shipping_rates = WC_Tax::get_shipping_tax_rates();
+                $vat            = array_shift( $shipping_rates );
+
+               if ( isset( $vat['rate'] ) ) {
+                   $shipping_tax_rate = round( $vat['rate'] * 100 );
+               } else {
+                   $shipping_tax_rate = 0;
+               }
 
             } else {
-                $tax_rate = 0;
+                $shipping_tax_rate = 0;
                 $total_tax_amount_cents = 0;
             }
 
@@ -1165,7 +1180,7 @@ class WC_Checkoutcom_Api_request
                 "name" => $chosen_shipping,
                 "quantity" => 1,
                 "unit_price" => $shipping_amount_cents,
-                "tax_rate" => $tax_rate * 100,
+                "tax_rate" => $shipping_tax_rate,
                 "total_amount" => $shipping_amount_cents,
                 "total_tax_amount" => $total_tax_amount_cents,
                 "type" => "shipping_fee",
@@ -1244,7 +1259,6 @@ class WC_Checkoutcom_Api_request
                 $reset_tax = reset($tax)['rate'];
                 $tax_rate = round($reset_tax);
 
-
             } else {
                 $tax_rate = 0;
                 $total_tax_amount_cents = 0;
@@ -1278,10 +1292,17 @@ class WC_Checkoutcom_Api_request
                 $total_tax_amount = WC()->cart->get_shipping_tax();
                 $total_tax_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($total_tax_amount, get_woocommerce_currency());
 
-                $tax_rate = round( ( $total_tax_amount * 100 ) / $shipping_amount);
+                $shipping_rates = WC_Tax::get_shipping_tax_rates();
+                $vat            = array_shift( $shipping_rates );
+
+                if ( isset( $vat['rate'] ) ) {
+                    $shipping_tax_rate = round( $vat['rate'] * 100 );
+                } else {
+                    $shipping_tax_rate = 0;
+                }
 
             } else {
-                $tax_rate = 0;
+                $shipping_tax_rate = 0;
                 $total_tax_amount_cents = 0;
             }
 
@@ -1289,7 +1310,7 @@ class WC_Checkoutcom_Api_request
                 "name" => $chosen_shipping,
                 "quantity" => 1,
                 "unit_price" => $shipping_amount_cents,
-                "tax_rate" => $tax_rate * 100,
+                "tax_rate" => $shipping_tax_rate,
                 "total_amount" => $shipping_amount_cents,
                 "total_tax_amount" => $total_tax_amount_cents,
                 "type" => "shipping_fee",
