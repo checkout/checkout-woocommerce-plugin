@@ -3,7 +3,7 @@
 Plugin Name: WooCommerce Checkout.com Gateway
 Plugin URI: https://www.checkout.com/
 Description: Extends WooCommerce by Adding the Checkout.com Gateway.
-Version: 4.0.2
+Version: 4.1.0
 Author: Checkout.com
 Author URI: https://www.checkout.com/
 */
@@ -25,7 +25,7 @@ function init_checkout_com_gateway_class()
     add_filter( 'woocommerce_payment_gateways', 'checkout_com_add_gateway' );
     function checkout_com_add_gateway( $methods ) {
         $methods[] = 'WC_Gateway_Checkout_Com_Cards';
-//        $methods[] = 'WC_Gateway_Checkout_Com_Apple_Pay';
+        $methods[] = 'WC_Gateway_Checkout_Com_Apple_Pay';
         $methods[] = 'WC_Gateway_Checkout_Com_Google_Pay';
         $methods[] = 'WC_Gateway_Checkout_Com_Alternative_Payments';
         return $methods;

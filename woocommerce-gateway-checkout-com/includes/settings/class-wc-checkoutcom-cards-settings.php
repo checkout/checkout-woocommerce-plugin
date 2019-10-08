@@ -362,6 +362,13 @@ class WC_Checkoutcom_Cards_Settings
                 'desc_tip' => true,
                 'default'     => 'Core settings',
             ),
+            'description' => array(
+                'title'       => __( 'Description', 'checkoutcom-cards-settings' ),
+                'type'        => 'text',
+                'description' => __( 'This controls the description which the user sees during checkout.', 'checkoutcom-cards-settings' ),
+                'default'     => 'Pay with Apple Pay.',
+                'desc_tip'    => true
+            ),
             'ckocom_apple_mercahnt_id' => array(
                 'title' => __('Merchant Identifier', 'checkoutcom-cards-settings'),
                 'type' => 'text',
