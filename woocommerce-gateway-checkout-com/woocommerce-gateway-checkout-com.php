@@ -25,7 +25,7 @@ function init_checkout_com_gateway_class()
     add_filter( 'woocommerce_payment_gateways', 'checkout_com_add_gateway' );
     function checkout_com_add_gateway( $methods ) {
         $methods[] = 'WC_Gateway_Checkout_Com_Cards';
-//        $methods[] = 'WC_Gateway_Checkout_Com_Apple_Pay';
+        $methods[] = 'WC_Gateway_Checkout_Com_Apple_Pay';
         $methods[] = 'WC_Gateway_Checkout_Com_Google_Pay';
         $methods[] = 'WC_Gateway_Checkout_Com_Alternative_Payments';
         return $methods;

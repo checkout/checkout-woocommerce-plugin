@@ -156,6 +156,10 @@ class WC_Checkoutcom_Api_request
             $payment_option = 'Google Pay';
 
             $method = new TokenSource($arg);
+        } elseif ($_POST['payment_method'] == 'wc_checkout_com_apple_pay') {
+            $payment_option = 'Apple Pay';
+
+            $method = new TokenSource($arg);
         } elseif($_POST['payment_method'] == 'wc_checkout_com_alternative_payments') {
 
             $method = WC_Checkoutcom_Api_request::get_apm_method($_POST, $order);
@@ -1165,11 +1169,11 @@ class WC_Checkoutcom_Api_request
                 $shipping_rates = WC_Tax::get_shipping_tax_rates();
                 $vat            = array_shift( $shipping_rates );
 
-               if ( isset( $vat['rate'] ) ) {
-                   $shipping_tax_rate = round( $vat['rate'] * 100 );
-               } else {
-                   $shipping_tax_rate = 0;
-               }
+                if ( isset( $vat['rate'] ) ) {
+                    $shipping_tax_rate = round( $vat['rate'] * 100 );
+                } else {
+                    $shipping_tax_rate = 0;
+                }
 
             } else {
                 $shipping_tax_rate = 0;
@@ -1345,5 +1349,36 @@ class WC_Checkoutcom_Api_request
         );
 
         return $cartInfo;
+    }
+
+    public static function generate_apple_token()
+    {
+        $apple_token = $_POST['token'];
+        $transactionId = $apple_token["header"]["transactionId"];
+        $publicKeyHash = $apple_token["header"]["publicKeyHash"];
+        $ephemeralPublicKey = $apple_token["header"]["ephemeralPublicKey"];
+        $version = $apple_token["version"];
+        $signature = $apple_token["signature"];
+        $data = $apple_token["data"];
+
+        $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
+        $publicKey = $core_settings['ckocom_pk'];
+        $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
+
+        $checkout = new CheckoutApi();
+        $checkout->configuration()->setPublicKey($publicKey);
+        $checkout->configuration()->setSandbox($environment);
+
+        $header = new ApplePayHeader($transactionId, $publicKeyHash, $ephemeralPublicKey);
+        $applepay = new ApplePay($version, $signature, $data, $header);
+        try {
+            $token = $checkout->tokens()->request($applepay);
+
+            return $token->token;
+
+        } catch (CheckoutHttpException $ex) {
+            
+            die('here');
+        }
     }
 }
