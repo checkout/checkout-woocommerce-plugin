@@ -234,10 +234,7 @@ class WC_Checkoutcom_Api_request
         $shippingAddressParam->zip = $customerAddress['shipping_postcode'];
         $shippingAddressParam->country = $customerAddress['shipping_country'];
 
-        $phone = new Phone();
-        $phone->number = $_POST['billing_phone'];
-
-        $payment->shipping = new Shipping($shippingAddressParam, $phone);
+        $payment->shipping = new Shipping($shippingAddressParam);
 
         // Set redirection url in payment request
         $redirection_url = str_replace( 'https:', 'http:', add_query_arg( 'wc-api', 'wc_checkoutcom_callback', home_url( '/' ) ) );
