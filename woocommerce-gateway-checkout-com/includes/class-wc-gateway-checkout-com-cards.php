@@ -11,7 +11,7 @@ use Checkout\Library\Exceptions\CheckoutModelException;
 
 class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 {
-    const PLUGIN_VERSION = '4.1.0';
+    const PLUGIN_VERSION = '4.1.1';
 
     /**
      * WC_Gateway_Checkout_Com_Cards constructor.
@@ -150,12 +150,12 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         $mada_enable = WC_Admin_Settings::get_option('ckocom_card_mada') == 1 ? true : false;
         $require_cvv = WC_Admin_Settings::get_option('ckocom_card_require_cvv');
         $debug_mode = WC_Admin_Settings::get_option('cko_console_logging') == 'yes' ? true: false;
+        $is_mada_token = false;
 
         // check if saved card enable from module setting
         if($save_card) {
             // Show available saved cards
             $this->saved_payment_methods();
-            $is_mada_token = false;
 
             // check if mada enable in module settings
             if($mada_enable){
