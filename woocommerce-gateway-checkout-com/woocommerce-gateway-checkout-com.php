@@ -123,8 +123,7 @@ function cko_check_if_empty()
 add_action('wp_enqueue_scripts', 'callback_for_setting_up_scripts');
 function callback_for_setting_up_scripts() {
     // load cko custom css
-    $css_path = plugins_url().'/woocommerce-gateway-checkout-com/assets/css/checkoutcom-styles.css';
-
+    $css_path = plugins_url('/assets/css/checkoutcom-styles.css',__FILE__);
 
     // register cko css
     wp_register_style( 'checkoutcom-style', $css_path);
