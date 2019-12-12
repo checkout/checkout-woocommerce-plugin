@@ -11,7 +11,7 @@ use Checkout\Library\Exceptions\CheckoutModelException;
 
 class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 {
-    const PLUGIN_VERSION = '4.1.1';
+    const PLUGIN_VERSION = '4.1.2';
 
     /**
      * WC_Gateway_Checkout_Com_Cards constructor.
@@ -127,22 +127,12 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
      */
     public function process_admin_options()
     {
-        if( isset( $_GET['screen'] ) && '' !== $_GET['screen'] ) {
-            $screen = sanitize_text_field($_GET['screen']);
 
-            if ('card_settings' == $screen) {
-                WC_Admin_Settings::save_fields( WC_Checkoutcom_Cards_Settings::cards_settings());
-            } elseif ('orders_settings' == $screen) {
-                WC_Admin_Settings::save_fields( WC_Checkoutcom_Cards_Settings::order_settings());
-            } elseif ('debug_settings' == $screen) {
-                WC_Admin_Settings::save_fields(WC_Checkoutcom_Cards_Settings::debug_settings());
-            } else {
-                WC_Admin_Settings::save_fields( WC_Checkoutcom_Cards_Settings::core_settings());
-            }
-            do_action( 'woocommerce_update_options_' . $this->id  );
-        } else {
-            parent::process_admin_options();
-        }
+        WC_Admin_Settings::save_fields( WC_Checkoutcom_Cards_Settings::cards_settings());
+        WC_Admin_Settings::save_fields( WC_Checkoutcom_Cards_Settings::order_settings());
+        WC_Admin_Settings::save_fields(WC_Checkoutcom_Cards_Settings::debug_settings());
+        WC_Admin_Settings::save_fields( WC_Checkoutcom_Cards_Settings::core_settings());
+
     }
 
     /**
@@ -343,7 +333,8 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         }
 
         // Create payment with card token
-        $result =  (array) (new WC_Checkoutcom_Api_request)->create_payment($order, $arg);
+        $result = (array)  WC_Checkoutcom_Api_request::create_payment($order, $arg);
+
 
         // check if result has error and return error message
         if (isset($result['error']) && !empty($result['error'])) {

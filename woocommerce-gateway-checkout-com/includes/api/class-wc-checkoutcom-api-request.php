@@ -128,7 +128,7 @@ class WC_Checkoutcom_Api_request
         $is_save_card = false;
         $payment_option = 'FramesJs';
 
-        $customerAddress = WC_Checkoutcom_Api_request::customer_address(sanitize_text_field($_POST));
+        $customerAddress = WC_Checkoutcom_Api_request::customer_address($_POST);
 
         // Prepare payment parameters
         if(sanitize_text_field($_POST['payment_method']) == 'wc_checkout_com_cards'){
@@ -162,7 +162,7 @@ class WC_Checkoutcom_Api_request
             $method = new TokenSource($arg);
         } elseif(sanitize_text_field($_POST['payment_method']) == 'wc_checkout_com_alternative_payments') {
 
-            $method = WC_Checkoutcom_Api_request::get_apm_method(sanitize_text_field($_POST), $order);
+            $method = WC_Checkoutcom_Api_request::get_apm_method($_POST, $order);
             $payment_option = $method->type;
         }
 
@@ -324,10 +324,10 @@ class WC_Checkoutcom_Api_request
 
             // In case payment is from pay_order
             // Get billing and shipping details from order
-            if(!empty(sanitize_text_field($_GET['order_id']))) {
-                $order_id    = sanitize_text_field($_GET['order_id']);
-            } else if (!empty(sanitize_text_field($_GET['key']))){
-                $order_id    = wc_get_order_id_by_order_key(sanitize_text_field($_GET['key']));
+            if(!empty($_GET['order_id'])) {
+                $order_id    = $_GET['order_id'];
+            } else if (!empty($_GET['key'])){
+                $order_id    = wc_get_order_id_by_order_key($_GET['key']);
             }
 
             $order = wc_get_order( $order_id );
