@@ -1,6 +1,6 @@
 <?php
 /*
-Plugin Name: WooCommerce Checkout.com Gateway
+Plugin Name: Checkout.com Payment Gateway
 Plugin URI: https://www.checkout.com/
 Description: Extends WooCommerce by Adding the Checkout.com Gateway.
 Version: 4.1.1
@@ -109,9 +109,9 @@ add_action('woocommerce_checkout_process', 'cko_check_if_empty');
 function cko_check_if_empty()
 {
     // check if require cvv is enable in module setting
-    if(WC_Admin_Settings::get_option('ckocom_card_require_cvv') && $_POST['wc-wc_checkout_com_cards-payment-token'] != 'new' ){
+    if(WC_Admin_Settings::get_option('ckocom_card_require_cvv') && sanitize_text_field($_POST['wc-wc_checkout_com_cards-payment-token']) != 'new' ){
         // check if cvv is empty on checkout page
-        if ( empty( $_POST['wc_checkout_com_cards-card-cvv'] ) )
+        if ( empty( sanitize_text_field($_POST['wc_checkout_com_cards-card-cvv'] ) ) )
         wc_add_notice( 'Please enter a valid cvv.', 'error' );
     }
 }
@@ -217,14 +217,14 @@ function renew_save_again($post_id, $post, $update){
         if ( $slug != $post->post_type ) {
             return;
         }
-        if(isset($_POST['cko_payment_action']) && $_POST['cko_payment_action']){
+        if(isset($_POST['cko_payment_action']) && sanitize_text_field($_POST['cko_payment_action'])){
 
-            $order = wc_get_order( $_POST['post_ID'] );
+            $order = wc_get_order( sanitize_text_field($_POST['post_ID']) );
 
             WC_Admin_Notices::remove_notice('wc_checkout_com_cards');
 
             // check if post is capture
-            if($_POST['cko_payment_action'] == 'cko-capture'){
+            if(sanitize_text_field($_POST['cko_payment_action']) == 'cko-capture'){
 
                 // send capture request to cko
                 $result = (array) WC_Checkoutcom_Api_request::capture_payment();
@@ -235,8 +235,8 @@ function renew_save_again($post_id, $post, $update){
                 }
 
                 // Set action id as woo transaction id
-                update_post_meta($_POST['post_ID'], '_transaction_id', $result['action_id']);
-                update_post_meta($_POST['post_ID'], 'cko_payment_captured', true);
+                update_post_meta(sanitize_text_field($_POST['post_ID']), '_transaction_id', $result['action_id']);
+                update_post_meta(sanitize_text_field($_POST['post_ID']), 'cko_payment_captured', true);
 
                 // Get cko capture status configured in admin
                 $status = WC_Admin_Settings::get_option('ckocom_order_captured');
@@ -247,7 +247,7 @@ function renew_save_again($post_id, $post, $update){
 
                 return true;
 
-            } elseif ($_POST['cko_payment_action'] == 'cko-void') {
+            } elseif (sanitize_text_field($_POST['cko_payment_action']) == 'cko-void') {
                 // check if post is void
                 // send void request to cko
                 $result = (array) WC_Checkoutcom_Api_request::void_payment();
@@ -258,7 +258,7 @@ function renew_save_again($post_id, $post, $update){
                 }
 
                 // Set action id as woo transaction id
-                update_post_meta($_POST['post_ID'], '_transaction_id', $result['action_id']);
+                update_post_meta(sanitize_text_field($_POST['post_ID']), '_transaction_id', $result['action_id']);
 
                 // Get cko capture status configured in admin
                 $status = WC_Admin_Settings::get_option('ckocom_order_void');
@@ -268,7 +268,7 @@ function renew_save_again($post_id, $post, $update){
                 $order->update_status($status,$message);
 
                 // increase stock level
-                wc_increase_stock_levels($_POST['post_ID']);
+                wc_increase_stock_levels(sanitize_text_field($_POST['post_ID']));
 
                 return true;
 

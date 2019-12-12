@@ -370,7 +370,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway
         $order = wc_get_order( $order_id );
 
         // check if no apm is selected
-        if(!$_POST['cko-apm']){
+        if(! sanitize_text_field($_POST['cko-apm'])){
             WC_Checkoutcom_Utility::wc_add_notice_self(__('Please select an alternative payment method.'), 'error');
             return;
         }
