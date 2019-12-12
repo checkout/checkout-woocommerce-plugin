@@ -11,7 +11,7 @@ use Checkout\Library\Exceptions\CheckoutModelException;
 
 class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 {
-    const PLUGIN_VERSION = '4.1.0';
+    const PLUGIN_VERSION = '4.1.1';
 
     /**
      * WC_Gateway_Checkout_Com_Cards constructor.
@@ -80,9 +80,11 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
      */
     public function admin_options()
     {
-        if( ! isset( $_GET['screen'] ) || '' === $_GET['screen'] ) {
+        if( ! isset( $_GET['screen'] ) || '' === sanitize_text_field($_GET['screen']) ) {
             parent::admin_options();
         } else {
+
+            $screen = sanitize_text_field($_GET['screen']);
 
             $test = array(
                 'screen_button' => array(
@@ -96,16 +98,16 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
             echo '<p>'. $this->method_description.' </p>';
             $this->generate_screen_button_html($key = 'screen_button', $test);
 
-            if ('orders_settings' === $_GET['screen']) {
+            if ('orders_settings' === $screen) {
                 echo '<table class="form-table">';
                 WC_Admin_Settings::output_fields(WC_Checkoutcom_Cards_Settings::order_settings());
                 echo '</table>';
-            } elseif ('card_settings' === $_GET['screen']) {
+            } elseif ('card_settings' === $screen) {
 
                 echo '<table class="form-table">';
                 WC_Admin_Settings::output_fields( WC_Checkoutcom_Cards_Settings::cards_settings() );
                 echo '</table>';
-            } elseif ('debug_settings' === $_GET['screen']) {
+            } elseif ('debug_settings' === $screen) {
 
                 echo '<table class="form-table">';
                 WC_Admin_Settings::output_fields( WC_Checkoutcom_Cards_Settings::debug_settings() );
@@ -126,11 +128,13 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
     public function process_admin_options()
     {
         if( isset( $_GET['screen'] ) && '' !== $_GET['screen'] ) {
-            if ('card_settings' == $_GET['screen']) {
+            $screen = sanitize_text_field($_GET['screen']);
+
+            if ('card_settings' == $screen) {
                 WC_Admin_Settings::save_fields( WC_Checkoutcom_Cards_Settings::cards_settings());
-            } elseif ('orders_settings' == $_GET['screen']) {
+            } elseif ('orders_settings' == $screen) {
                 WC_Admin_Settings::save_fields( WC_Checkoutcom_Cards_Settings::order_settings());
-            } elseif ('debug_settings' == $_GET['screen']) {
+            } elseif ('debug_settings' == $screen) {
                 WC_Admin_Settings::save_fields(WC_Checkoutcom_Cards_Settings::debug_settings());
             } else {
                 WC_Admin_Settings::save_fields( WC_Checkoutcom_Cards_Settings::core_settings());
@@ -150,12 +154,12 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         $mada_enable = WC_Admin_Settings::get_option('ckocom_card_mada') == 1 ? true : false;
         $require_cvv = WC_Admin_Settings::get_option('ckocom_card_require_cvv');
         $debug_mode = WC_Admin_Settings::get_option('cko_console_logging') == 'yes' ? true: false;
+        $is_mada_token = false;
 
         // check if saved card enable from module setting
         if($save_card) {
             // Show available saved cards
             $this->saved_payment_methods();
-            $is_mada_token = false;
 
             // check if mada enable in module settings
             if($mada_enable){
@@ -319,19 +323,19 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         $order = wc_get_order( $order_id );
 
         // check if card token or token_id exist
-        if($_POST['wc-wc_checkout_com_cards-payment-token']) {
-            if($_POST['wc-wc_checkout_com_cards-payment-token'] == 'new') {
-                $arg = $_POST['cko-card-token'];
+        if(sanitize_text_field($_POST['wc-wc_checkout_com_cards-payment-token'])) {
+            if(sanitize_text_field($_POST['wc-wc_checkout_com_cards-payment-token']) == 'new') {
+                $arg = sanitize_text_field($_POST['cko-card-token']);
             } else {
-                $arg = $_POST['wc-wc_checkout_com_cards-payment-token'];
+                $arg = sanitize_text_field($_POST['wc-wc_checkout_com_cards-payment-token']);
             }
         }
 
         // Check if empty card token and empty token_id
         if(empty($arg)){
             // check if card token exist
-            if($_POST['cko-card-token']) {
-                $arg = $_POST['cko-card-token'];
+            if(sanitize_text_field($_POST['cko-card-token'])){
+                $arg = sanitize_text_field($_POST['cko-card-token']);
             } else {
                 WC_Checkoutcom_Utility::wc_add_notice_self(__('There was an issue completing the payment.'), 'error');
                 return;
@@ -355,7 +359,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         if (isset($result['3d']) &&!empty($result['3d'])) {
 
             // check if save card is enable and customer select to save card
-            if($save_card && $_POST['wc-wc_checkout_com_cards-new-payment-method']){
+            if($save_card && sanitize_text_field($_POST['wc-wc_checkout_com_cards-new-payment-method'])){
                 // save in session for 3D secure payment
                 $_SESSION['wc-wc_checkout_com_cards-new-payment-method'] = isset($_POST['wc-wc_checkout_com_cards-new-payment-method']);
             }
@@ -367,7 +371,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         }
 
         // save card in db
-        if($save_card && $_POST['wc-wc_checkout_com_cards-new-payment-method']){
+        if($save_card && sanitize_text_field($_POST['wc-wc_checkout_com_cards-new-payment-method'])){
             $this->save_token(get_current_user_id(), $result);
         }
 
@@ -516,7 +520,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         $checkout = new Checkout\CheckoutApi($core_settings['ckocom_sk'], $environment);
 
         // Load method with card token
-        $method = new Checkout\Models\Payments\TokenSource($_POST['cko-card-token']);
+        $method = new Checkout\Models\Payments\TokenSource(sanitize_text_field($_POST['cko-card-token']));
 
         $payment = new Checkout\Models\Payments\Payment($method, get_woocommerce_currency());
 

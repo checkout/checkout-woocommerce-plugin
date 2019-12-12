@@ -62,7 +62,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway
         $apm = $this->get_option( 'ckocom_apms_selector' );
         // Get apm base on currency
         $apm_available = WC_Checkoutcom_Utility::get_alternative_payment_methods($currencyCode, $apm);
-        $plugin_url = plugins_url().'/woocommerce-gateway-checkout-com/assets/images/';
+        $plugin_url = plugins_url('/assets/images/',__DIR__);
         $cartInfo = WC_Checkoutcom_Api_request::get_cart_info();
         $count_apm = count($apm_available);
 
@@ -370,7 +370,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway
         $order = wc_get_order( $order_id );
 
         // check if no apm is selected
-        if(!$_POST['cko-apm']){
+        if(! sanitize_text_field($_POST['cko-apm'])){
             WC_Checkoutcom_Utility::wc_add_notice_self(__('Please select an alternative payment method.'), 'error');
             return;
         }
