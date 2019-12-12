@@ -128,12 +128,12 @@ class WC_Checkoutcom_Api_request
         $is_save_card = false;
         $payment_option = 'FramesJs';
 
-        $customerAddress = WC_Checkoutcom_Api_request::customer_address($_POST);
+        $customerAddress = WC_Checkoutcom_Api_request::customer_address(sanitize_text_field($_POST));
 
         // Prepare payment parameters
-        if($_POST['payment_method'] == 'wc_checkout_com_cards'){
-            if($_POST['wc-wc_checkout_com_cards-payment-token']) {
-                if($_POST['wc-wc_checkout_com_cards-payment-token'] == 'new') {
+        if(sanitize_text_field($_POST['payment_method']) == 'wc_checkout_com_cards'){
+            if(sanitize_text_field($_POST['wc-wc_checkout_com_cards-payment-token'])) {
+                if(sanitize_text_field($_POST['wc-wc_checkout_com_cards-payment-token']) == 'new') {
                     $method = new TokenSource($arg);
                 } else {
                     // load token by id ($arg)
@@ -146,23 +146,23 @@ class WC_Checkoutcom_Api_request
                     $is_save_card = true;
 
                     if(WC_Admin_Settings::get_option('ckocom_card_require_cvv')) {
-                        $method->cvv = $_POST['wc_checkout_com_cards-card-cvv'];
+                        $method->cvv = sanitize_text_field($_POST['wc_checkout_com_cards-card-cvv']);
                     }
                 }
             } else {
                 $method = new TokenSource($arg);
             }
-        } elseif ($_POST['payment_method'] == 'wc_checkout_com_google_pay') {
+        } elseif (sanitize_text_field($_POST['payment_method']) == 'wc_checkout_com_google_pay') {
             $payment_option = 'Google Pay';
 
             $method = new TokenSource($arg);
-        } elseif ($_POST['payment_method'] == 'wc_checkout_com_apple_pay') {
+        } elseif (sanitize_text_field($_POST['payment_method']) == 'wc_checkout_com_apple_pay') {
             $payment_option = 'Apple Pay';
 
             $method = new TokenSource($arg);
-        } elseif($_POST['payment_method'] == 'wc_checkout_com_alternative_payments') {
+        } elseif(sanitize_text_field($_POST['payment_method']) == 'wc_checkout_com_alternative_payments') {
 
-            $method = WC_Checkoutcom_Api_request::get_apm_method($_POST, $order);
+            $method = WC_Checkoutcom_Api_request::get_apm_method(sanitize_text_field($_POST), $order);
             $payment_option = $method->type;
         }
 
@@ -183,17 +183,17 @@ class WC_Checkoutcom_Api_request
         $payment->amount = $amount_cents;
         $payment->reference = $order->get_order_number();
 
-        $email = $_POST['billing_email'];
-        $name = $_POST['billing_first_name'] . ' ' . $_POST['billing_last_name'];
+        $email = sanitize_text_field($_POST['billing_email']);
+        $name = sanitize_text_field($_POST['billing_first_name']) . ' ' . sanitize_text_field($_POST['billing_last_name']);
 
         // Pay Order Page
-        $isPayOrder = !empty($_GET['pay_for_order']) ? (boolean)$_GET['pay_for_order'] : false;
+        $isPayOrder = !empty(sanitize_text_field($_GET['pay_for_order'])) ? (boolean) sanitize_text_field($_GET['pay_for_order']) : false;
 
         if($isPayOrder) {
-            if(!empty($_GET['order_id'])) {
-                $order_id    = $_GET['order_id'];
-            } else if (!empty($_GET['key'])){
-                $order_id    = wc_get_order_id_by_order_key($_GET['key']);
+            if(!empty(sanitize_text_field($_GET['order_id']))) {
+                $order_id    = sanitize_text_field($_GET['order_id']);
+            } else if (!empty(sanitize_text_field($_GET['key']))){
+                $order_id    = wc_get_order_id_by_order_key(sanitize_text_field($_GET['key']));
             }
 
             $order = wc_get_order( $order_id );
@@ -259,8 +259,8 @@ class WC_Checkoutcom_Api_request
         if($mada_enable){
             $is_mada = false;
 
-            if(!empty($_POST['cko-card-bin'])){
-                $is_mada = WC_Checkoutcom_Utility::isMadaCard($_POST['cko-card-bin']);
+            if(!empty(sanitize_text_field($_POST['cko-card-bin']))){
+                $is_mada = WC_Checkoutcom_Utility::isMadaCard(sanitize_text_field($_POST['cko-card-bin']));
             } else {
 
                 if($is_save_card) {
@@ -271,7 +271,7 @@ class WC_Checkoutcom_Api_request
                     $is_mada = $token->get_meta('is_mada');
 
                     if($is_mada){
-                        $method->cvv = $_POST['wc_checkout_com_cards-card-cvv'];
+                        $method->cvv = sanitize_text_field($_POST['wc_checkout_com_cards-card-cvv']);
                     }
                 }
             }
@@ -324,10 +324,10 @@ class WC_Checkoutcom_Api_request
 
             // In case payment is from pay_order
             // Get billing and shipping details from order
-            if(!empty($_GET['order_id'])) {
-                $order_id    = $_GET['order_id'];
-            } else if (!empty($_GET['key'])){
-                $order_id    = wc_get_order_id_by_order_key($_GET['key']);
+            if(!empty(sanitize_text_field($_GET['order_id']))) {
+                $order_id    = sanitize_text_field($_GET['order_id']);
+            } else if (!empty(sanitize_text_field($_GET['key']))){
+                $order_id    = wc_get_order_id_by_order_key(sanitize_text_field($_GET['key']));
             }
 
             $order = wc_get_order( $order_id );
@@ -455,8 +455,8 @@ class WC_Checkoutcom_Api_request
         $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
         $googleToken = $_REQUEST['token'];
         $publicKey = $core_settings['ckocom_pk'];
-        $protocolVersion = $_POST["cko-google-protocolVersion"];
-        $signature = $_POST["cko-google-signature"];
+        $protocolVersion = sanitize_text_field($_POST["cko-google-protocolVersion"]);
+        $signature = sanitize_text_field($_POST["cko-google-signature"]);
         $signedMessage = stripslashes($_POST['cko-google-signedMessage']);
         $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
 
@@ -486,7 +486,7 @@ class WC_Checkoutcom_Api_request
      */
     public static function capture_payment()
     {
-        $order_id = $_POST['post_ID'];
+        $order_id = sanitize_text_field($_POST['post_ID']);
         $cko_payment_id = get_post_meta($order_id, '_cko_payment_id', true );
 
         // Check if cko_payment_id is empty
@@ -557,7 +557,7 @@ class WC_Checkoutcom_Api_request
      */
     public static function void_payment()
     {
-        $order_id = $_POST['post_ID'];
+        $order_id = sanitize_text_field($_POST['post_ID']);
         $cko_payment_id = get_post_meta($order_id, '_cko_payment_id', true );
 
         // Check if cko_payment_id is empty
@@ -638,7 +638,7 @@ class WC_Checkoutcom_Api_request
 
         $order_amount = $order->get_total();
         $order_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($order_amount, $order->get_currency());
-        $refund_amount = $_POST['refund_amount'];
+        $refund_amount = sanitize_text_field($_POST['refund_amount']);
         $refund_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($refund_amount, $order->get_currency());
 
         // Check if refund amount is less than order amount
@@ -900,8 +900,8 @@ class WC_Checkoutcom_Api_request
 
                 break;
             case 'klarna':
-                $klarna_token = $_POST['cko-klarna-token'];
-                $country_code = $_POST['billing_country'];
+                $klarna_token = sanitize_text_field($_POST['cko-klarna-token']);
+                $country_code = sanitize_text_field($_POST['billing_country']);
                 $woo_locale = str_replace("_", "-", get_locale());
                 $locale = substr($woo_locale, 0, 5);
 
@@ -987,16 +987,16 @@ class WC_Checkoutcom_Api_request
 
                 // Set Billing address
                 $billingAddressParam = new Address();
-                $billingAddressParam->given_name = $_POST['billing_first_name'];
-                $billingAddressParam->family_name = $_POST['billing_last_name'];
-                $billingAddressParam->email = $_POST['billing_email'];
-                $billingAddressParam->street_address = $_POST['billing_address_1'];
+                $billingAddressParam->given_name = sanitize_text_field($_POST['billing_first_name']);
+                $billingAddressParam->family_name = sanitize_text_field($_POST['billing_last_name']);
+                $billingAddressParam->email = sanitize_text_field($_POST['billing_email']);
+                $billingAddressParam->street_address = sanitize_text_field($_POST['billing_address_1']);
                 // $billingAddressParam->street_address2 = $_POST['billing_address_2'];
-                $billingAddressParam->postal_code = $_POST['billing_postcode'];
-                $billingAddressParam->city = $_POST['billing_city'];
-                $billingAddressParam->region = $_POST['billing_city'];
-                $billingAddressParam->phone = $_POST['billing_phone'];
-                $billingAddressParam->country = $_POST['billing_country'];
+                $billingAddressParam->postal_code = sanitize_text_field($_POST['billing_postcode']);
+                $billingAddressParam->city = sanitize_text_field($_POST['billing_city']);
+                $billingAddressParam->region = sanitize_text_field($_POST['billing_city']);
+                $billingAddressParam->phone = sanitize_text_field($_POST['billing_phone']);
+                $billingAddressParam->country = sanitize_text_field($_POST['billing_country']);
 
                 $method = new KlarnaSource($klarna_token, $country_code, strtolower($locale), $billingAddressParam, $total_tax_amount_cents, $products);
 
@@ -1035,8 +1035,8 @@ class WC_Checkoutcom_Api_request
                 $method =  new EpsSource($purpose);
                 break;
             case 'bancontact':
-                $accountHolder = $_POST['billing_first_name'] . ' '. $_POST['billing_last_name'];
-                $countryCode = $_POST['billing_country'];
+                $accountHolder = sanitize_text_field($_POST['billing_first_name']) . ' '. sanitize_text_field($_POST['billing_last_name']);
+                $countryCode = sanitize_text_field($_POST['billing_country']);
 
                 $method = new BancontactSource($accountHolder, $countryCode);
                 break;
@@ -1055,8 +1055,8 @@ class WC_Checkoutcom_Api_request
                 $method = new KnetSource($language);
                 break;
             case 'fawry':
-                $email = $_POST['billing_email'];
-                $phone = $_POST['billing_phone'];
+                $email = sanitize_text_field($_POST['billing_email']);
+                $phone = sanitize_text_field($_POST['billing_phone']);
 
                 $products = array();
                 foreach ($order->get_items() as $item_id => $item_data) {
@@ -1350,7 +1350,7 @@ class WC_Checkoutcom_Api_request
 
     public static function generate_apple_token()
     {
-        $apple_token = $_POST['token'];
+        $apple_token = sanitize_text_field($_POST['token']);
         $transactionId = $apple_token["header"]["transactionId"];
         $publicKeyHash = $apple_token["header"]["publicKeyHash"];
         $ephemeralPublicKey = $apple_token["header"]["ephemeralPublicKey"];
