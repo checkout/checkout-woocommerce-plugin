@@ -162,7 +162,7 @@ class WC_Checkoutcom_Api_request
             $method = new TokenSource($arg);
         } elseif(sanitize_text_field($_POST['payment_method']) == 'wc_checkout_com_alternative_payments') {
 
-            $method = WC_Checkoutcom_Api_request::get_apm_method(sanitize_text_field($_POST), $order);
+            $method = WC_Checkoutcom_Api_request::get_apm_method($_POST, $order);
             $payment_option = $method->type;
         }
 
