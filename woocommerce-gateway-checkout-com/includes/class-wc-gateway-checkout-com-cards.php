@@ -11,7 +11,7 @@ use Checkout\Library\Exceptions\CheckoutModelException;
 
 class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 {
-    const PLUGIN_VERSION = '4.1.2';
+    const PLUGIN_VERSION = '4.1.3';
 
     /**
      * WC_Gateway_Checkout_Com_Cards constructor.
@@ -127,7 +127,8 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
      */
     public function process_admin_options()
     {
-
+        parent::process_admin_options();
+        
         WC_Admin_Settings::save_fields( WC_Checkoutcom_Cards_Settings::cards_settings());
         WC_Admin_Settings::save_fields( WC_Checkoutcom_Cards_Settings::order_settings());
         WC_Admin_Settings::save_fields(WC_Checkoutcom_Cards_Settings::debug_settings());
