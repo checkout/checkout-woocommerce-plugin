@@ -449,9 +449,9 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway
 
   public function applepay_sesion()
   {
-      $url = esc_url_raw($_POST["url"]);
-      $domain = sanitize_text_field($_POST["domain"]);
-      $displayName = sanitize_text_field($_POST["displayName"]);
+      $url = $_POST["url"];
+      $domain = $_POST["domain"];
+      $displayName = $_POST["displayName"];
 
       $merchantId = $this->get_option( 'ckocom_apple_mercahnt_id' );
       $certificate = $this->get_option( 'ckocom_apple_certificate' );
@@ -513,7 +513,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway
       $order = new WC_Order( $order_id );
 
       // create google token from google payment data
-      $apple_token = sanitize_text_field($_POST['cko-apple-card-token']);
+      $apple_token = $_POST['cko-apple-card-token'];
 
       // Check if apple token is not empty
       if(empty($apple_token)) {
