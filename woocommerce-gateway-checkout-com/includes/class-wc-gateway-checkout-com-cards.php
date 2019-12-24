@@ -11,7 +11,7 @@ use Checkout\Library\Exceptions\CheckoutModelException;
 
 class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 {
-    const PLUGIN_VERSION = '4.1.4';
+    const PLUGIN_VERSION = '4.1.5';
 
     /**
      * WC_Gateway_Checkout_Com_Cards constructor.
@@ -199,6 +199,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
             </div>
             <script type="text/javascript">
                 jQuery( function(){
+                    jQuery('input[type=radio][name=wc-wc_checkout_com_cards-payment-token]'). prop("checked", false);
                     // Set default ul to auto
                     jQuery('.payment_box.payment_method_wc_checkout_com_cards > ul').css('margin','auto')
 
@@ -219,24 +220,29 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
                             Frames.unblockFields();
                         }
                     });
+                });
 
+                setTimeout(function(){
                     // check if saved card exist
                     if(jQuery('.payment_box.payment_method_wc_checkout_com_cards').
                         children('ul.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').attr('data-count') > 0) {
+                    
                         jQuery('.cko-form').hide();
 
                         jQuery('input[type=radio][name=wc-wc_checkout_com_cards-payment-token]').change(function() {
                             if(this.value == 'new'){
                                 // display frames if new card is selected
                                 jQuery('.cko-form').show();
+                                jQuery('.cko-save-card-checkbox').show();
                                 jQuery('.cko-cvv').hide();
                             } else {
                                 jQuery('.cko-form').hide();
+                                jQuery('.cko-save-card-checkbox').hide();
                                 jQuery('.cko-cvv').show();
-
+                                
                                 var is_mada = '<?php echo $mada_enable; ?>';
 
-                                if(is_mada == 1){
+                                if(is_mada === 1){
                                     if(this.value === '<?php echo $is_mada_token;?>'){
                                         jQuery('.cko-form').hide();
                                         jQuery('.cko-cvv').show();
@@ -248,18 +254,16 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
                         });
                     } else {
                         jQuery('.cko-form').show();
+                        jQuery('.cko-save-card-checkbox').show();
                     }
 
-                    // check if add-payment-method exist
+                     // check if add-payment-method exist
                     if(jQuery('#add_payment_method').length > 0) {
                         jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide();
                         jQuery('.cko-save-card-checkbox').hide();
                         jQuery('.cko-form').show();
                     }
 
-                });
-
-                setTimeout(function(){
                     // hook place order button
                     jQuery('#place_order').on('click', function(e){
                         // check if checkout.com is selected
@@ -300,7 +304,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         </div>
 
         <!-- Show save card checkbox if this is selected on admin-->
-        <div class="cko-save-card-checkbox">
+        <div class="cko-save-card-checkbox" style="display: none">
             <?php
             if($save_card){
                 $this->save_payment_method_checkbox();
@@ -308,8 +312,6 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
             ?>
         </div>
         <?php
-
-
     }
 
     /**
