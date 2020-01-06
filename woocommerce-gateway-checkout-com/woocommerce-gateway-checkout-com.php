@@ -3,7 +3,7 @@
 Plugin Name: Checkout.com Payment Gateway
 Plugin URI: https://www.checkout.com/
 Description: Extends WooCommerce by Adding the Checkout.com Gateway.
-Version: 4.1.5
+Version: 4.1.6
 Author: Checkout.com
 Author URI: https://www.checkout.com/
 */
@@ -108,11 +108,17 @@ function cko_frames_js()
 add_action('woocommerce_checkout_process', 'cko_check_if_empty');
 function cko_check_if_empty()
 {
-    // check if require cvv is enable in module setting
-    if(WC_Admin_Settings::get_option('ckocom_card_require_cvv') && sanitize_text_field($_POST['wc-wc_checkout_com_cards-payment-token']) != 'new' ){
-        // check if cvv is empty on checkout page
-        if ( empty( sanitize_text_field($_POST['wc_checkout_com_cards-card-cvv'] ) ) )
-        wc_add_notice( 'Please enter a valid cvv.', 'error' );
+    if(sanitize_text_field($_POST['payment_method']) == 'wc_checkout_com_cards'){
+        
+         // check if require cvv is enable in module setting
+        if(WC_Admin_Settings::get_option('ckocom_card_saved') 
+                && WC_Admin_Settings::get_option('ckocom_card_require_cvv') 
+                && sanitize_text_field($_POST['wc-wc_checkout_com_cards-payment-token']) != 'new' ){
+            // check if cvv is empty on checkout page
+            if ( empty( sanitize_text_field($_POST['wc_checkout_com_cards-card-cvv'] ) ) ) {
+                wc_add_notice( 'Please enter a valid cvv.', 'error' );
+            }
+        }
     }
 }
 
