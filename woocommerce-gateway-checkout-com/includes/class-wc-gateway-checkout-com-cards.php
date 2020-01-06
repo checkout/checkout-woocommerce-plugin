@@ -183,7 +183,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         ?>
         <div class="cko-cvv" style="display: none;padding-top: 10px;">
             <p class="validate-required" id="cko-cvv" data-priority="10">
-                <label for="cko-cvv"><?php esc_html_e( 'Card Code', 'woocommerce-square' ); ?> <span class="required">*</span></label>
+                <label for="cko-cvv"><?php esc_html_e( 'Card Code', 'wc_checkout_com_cards' ); ?> <span class="required">*</span></label>
                 <input id="cko-cvv" type="text" autocomplete="off" class="input-text"
                        placeholder="<?php esc_attr_e( 'CVV', 'wc_checkout_com_cards' ); ?>"
                        name="<?php echo esc_attr( $this->id ); ?>-card-cvv" />
@@ -255,6 +255,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
                     } else {
                         jQuery('.cko-form').show();
                         jQuery('.cko-save-card-checkbox').show();
+                        jQuery('input[type=radio][name=wc-wc_checkout_com_cards-payment-token]'). prop("checked", true);
                     }
 
                      // check if add-payment-method exist
