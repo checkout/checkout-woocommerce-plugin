@@ -1354,7 +1354,7 @@ class WC_Checkoutcom_Api_request
 
     public static function generate_apple_token()
     {
-        $apple_token = sanitize_text_field($_POST['token']);
+        $apple_token = $_POST['token'];
         $transactionId = $apple_token["header"]["transactionId"];
         $publicKeyHash = $apple_token["header"]["publicKeyHash"];
         $ephemeralPublicKey = $apple_token["header"]["ephemeralPublicKey"];

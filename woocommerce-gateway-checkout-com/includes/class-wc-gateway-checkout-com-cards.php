@@ -11,7 +11,7 @@ use Checkout\Library\Exceptions\CheckoutModelException;
 
 class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 {
-    const PLUGIN_VERSION = '4.1.6';
+    const PLUGIN_VERSION = '4.1.7';
 
     /**
      * WC_Gateway_Checkout_Com_Cards constructor.
@@ -704,8 +704,29 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
             exit();
         }
 
-        $header = apache_request_headers();
-        $header_authorization = $header['Authorization'];
+        // Create apache function if not exist to get header authorization
+        if( !function_exists('apache_request_headers') ) {
+            function apache_request_headers() {
+              $arh = array();
+              $rx_http = '/\AHTTP_/';
+              foreach($_SERVER as $key => $val) {
+                    if( preg_match($rx_http, $key) ) {
+                      $arh_key = preg_replace($rx_http, '', $key);
+                      $rx_matches = array();
+                      $rx_matches = explode('_', $arh_key);
+                      if( count($rx_matches) > 0 and strlen($arh_key) > 2 ) {
+                            foreach($rx_matches as $ak_key => $ak_val) $rx_matches[$ak_key] = ucfirst($ak_val);
+                            $arh_key = implode('-', $rx_matches);
+                      }
+                      $arh[$arh_key] = $val;
+                    }
+              }
+              return( $arh );
+            }
+        }
+
+        $header = array_change_key_case(apache_request_headers(),CASE_LOWER);
+        $header_authorization = $header['authorization'];
 
         $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
         // Get private shared key from module settings
