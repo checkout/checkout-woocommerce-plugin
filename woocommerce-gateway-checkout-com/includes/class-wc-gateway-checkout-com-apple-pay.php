@@ -478,9 +478,9 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway
           curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
 
           // TODO: throw error and log it
-          // if (curl_exec($ch) === false) {
-          //     echo '{"curlError":"' . curl_error($ch) . '"}';
-          // }
+          if (curl_exec($ch) === false) {
+              echo '{"curlError":"' . curl_error($ch) . '"}';
+          }
 
           // close cURL resource, and free up system resources
           curl_close($ch);

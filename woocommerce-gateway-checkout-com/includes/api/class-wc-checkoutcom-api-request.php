@@ -168,14 +168,16 @@ class WC_Checkoutcom_Api_request
 
         if ($method->type != 'klarna') {
             // Set billing address in $method
-            $billingAddressParam = new Address();
-            $billingAddressParam->address_line1 = $customerAddress['billing_address_1'];
-            $billingAddressParam->address_line2 = $customerAddress['billing_address_2'];
-            $billingAddressParam->city = $customerAddress['billing_city'];
-            $billingAddressParam->state = $customerAddress['billing_state'];
-            $billingAddressParam->zip = $customerAddress['billing_postcode'];
-            $billingAddressParam->country = $customerAddress['billing_country'];
-            $method->billing_address = $billingAddressParam;
+            if(!empty($customerAddress['billing_address_1']) && !empty($customerAddress['billing_country'])){
+                $billingAddressParam = new Address();
+                $billingAddressParam->address_line1 = $customerAddress['billing_address_1'];
+                $billingAddressParam->address_line2 = $customerAddress['billing_address_2'];
+                $billingAddressParam->city = $customerAddress['billing_city'];
+                $billingAddressParam->state = $customerAddress['billing_state'];
+                $billingAddressParam->zip = $customerAddress['billing_postcode'];
+                $billingAddressParam->country = $customerAddress['billing_country'];
+                $method->billing_address = $billingAddressParam;
+            }
         }
 
         $payment = new Payment($method, $order->get_currency());
@@ -226,15 +228,17 @@ class WC_Checkoutcom_Api_request
         $payment->threeDs = $three_ds;
 
         // Set shipping Address
-        $shippingAddressParam = new Address();
-        $shippingAddressParam->address_line1 = $customerAddress['shipping_address_1'];
-        $shippingAddressParam->address_line2 = $customerAddress['shipping_address_2'];
-        $shippingAddressParam->city = $customerAddress['shipping_city'];
-        $shippingAddressParam->state = $customerAddress['shipping_state'];
-        $shippingAddressParam->zip = $customerAddress['shipping_postcode'];
-        $shippingAddressParam->country = $customerAddress['shipping_country'];
+        if(!empty($customerAddress['shipping_address_1']) && !empty($customerAddress['shipping_country'])){
+            $shippingAddressParam = new Address();
+            $shippingAddressParam->address_line1 = $customerAddress['shipping_address_1'];
+            $shippingAddressParam->address_line2 = $customerAddress['shipping_address_2'];
+            $shippingAddressParam->city = $customerAddress['shipping_city'];
+            $shippingAddressParam->state = $customerAddress['shipping_state'];
+            $shippingAddressParam->zip = $customerAddress['shipping_postcode'];
+            $shippingAddressParam->country = $customerAddress['shipping_country'];
 
-        $payment->shipping = new Shipping($shippingAddressParam);
+            $payment->shipping = new Shipping($shippingAddressParam);
+        }
 
         // Set redirection url in payment request
         $redirection_url = str_replace( 'https:', 'http:', add_query_arg( 'wc-api', 'wc_checkoutcom_callback', home_url( '/' ) ) );
@@ -1350,7 +1354,7 @@ class WC_Checkoutcom_Api_request
 
     public static function generate_apple_token()
     {
-        $apple_token = sanitize_text_field($_POST['token']);
+        $apple_token = $_POST['token'];
         $transactionId = $apple_token["header"]["transactionId"];
         $publicKeyHash = $apple_token["header"]["publicKeyHash"];
         $ephemeralPublicKey = $apple_token["header"]["ephemeralPublicKey"];
