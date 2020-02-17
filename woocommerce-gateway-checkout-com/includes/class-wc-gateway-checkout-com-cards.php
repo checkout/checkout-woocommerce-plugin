@@ -11,7 +11,7 @@ use Checkout\Library\Exceptions\CheckoutModelException;
 
 class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 {
-    const PLUGIN_VERSION = '4.1.7';
+    const PLUGIN_VERSION = '4.1.8';
 
     /**
      * WC_Gateway_Checkout_Com_Cards constructor.
@@ -156,7 +156,6 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         $save_card =  WC_Admin_Settings::get_option('ckocom_card_saved');
         $mada_enable = WC_Admin_Settings::get_option('ckocom_card_mada') == 1 ? true : false;
         $require_cvv = WC_Admin_Settings::get_option('ckocom_card_require_cvv');
-        $debug_mode = WC_Admin_Settings::get_option('cko_console_logging') == 'yes' ? true: false;
         $is_mada_token = false;
 
         // check if saved card enable from module setting
@@ -194,32 +193,39 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
             <input type="hidden" id="cko-card-token" name="cko-card-token" value=""/>
             <input type="hidden" id="cko-card-bin" name="cko-card-bin" value=""/>
 
-            <div class="frames-container">
+            <div class="one-liner">
                 <!-- frames will be loaded here -->
+                <div class="card-frame"></div>
             </div>
             <script type="text/javascript">
+                // Get debug mode from module config
+                var debug = '<?php echo WC_Admin_Settings::get_option('cko_console_logging'); ?>';
+
                 jQuery( function(){
                     jQuery('input[type=radio][name=wc-wc_checkout_com_cards-payment-token]'). prop("checked", false);
                     // Set default ul to auto
                     jQuery('.payment_box.payment_method_wc_checkout_com_cards > ul').css('margin','auto')
 
                     Frames.init({
-                        debugMode: "<?php echo $debug_mode; ?>",
-                        publicKey: "<?php echo $this->get_option( 'ckocom_pk' );?>",
-                        containerSelector: '.frames-container',
-                        cardTokenised: function(event){
-
-                            if (document.getElementById('cko-card-token').value.length === 0
-                                || document.getElementById('cko-card-token').value != event.data.cardToken) {
-                                document.getElementById('cko-card-token').value = event.data.cardToken;
-                                document.getElementById('cko-card-bin').value = event.data.card.bin;
-                                jQuery('#place_order').trigger('click');
-                                document.getElementById("cko-card-token").value = "";
-                            }
-
-                            Frames.unblockFields();
-                        }
+                        debug : debug === 'yes' ? true : false,
+                        publicKey: "<?php echo $this->get_option( 'ckocom_pk' );?>"
                     });
+                    
+                    Frames.addEventHandler(
+                        Frames.Events.CARD_TOKENIZED,
+                        onCardTokenized
+                    );
+
+                    function onCardTokenized(event) {
+                        if (document.getElementById('cko-card-token').value.length === 0
+                            || document.getElementById('cko-card-token').value != event.token) {
+                            document.getElementById('cko-card-token').value = event.token;
+                            document.getElementById('cko-card-bin').value = event.bin;
+                            jQuery('#place_order').trigger('click');
+                            document.getElementById("cko-card-token").value = "";
+                            Frames.enableSubmitForm();
+                        }
+                    }
                 });
 
                 setTimeout(function(){
