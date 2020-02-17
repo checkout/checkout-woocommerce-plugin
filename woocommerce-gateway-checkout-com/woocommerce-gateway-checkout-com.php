@@ -3,7 +3,7 @@
 Plugin Name: Checkout.com Payment Gateway
 Plugin URI: https://www.checkout.com/
 Description: Extends WooCommerce by Adding the Checkout.com Gateway.
-Version: 4.1.7
+Version: 4.1.8
 Author: Checkout.com
 Author URI: https://www.checkout.com/
 */
@@ -98,7 +98,7 @@ function my_new_wc_order_statuses( $order_statuses )
 add_action( 'wp_head', 'cko_frames_js');
 function cko_frames_js()
 {
-    wp_register_script( 'cko-frames-script', 'https://cdn.checkout.com/js/frames.js', array( 'jquery' ) );
+    wp_register_script( 'cko-frames-script', 'https://cdn.checkout.com/js/framesv2.min.js', array( 'jquery' ) );
     wp_enqueue_script( 'cko-frames-script' );
 }
 
@@ -130,10 +130,16 @@ add_action('wp_enqueue_scripts', 'callback_for_setting_up_scripts');
 function callback_for_setting_up_scripts() {
     // load cko custom css
     $css_path = plugins_url('/assets/css/checkoutcom-styles.css',__FILE__);
+    $normalize = plugins_url('/assets/css/normalize.css',__FILE__);
+    $frames_style = plugins_url('/assets/css/style.css',__FILE__);
 
     // register cko css
     wp_register_style( 'checkoutcom-style', $css_path);
+    wp_register_style( 'normalize', $normalize);
+    wp_register_style( 'frames_style', $frames_style);
     wp_enqueue_style( 'checkoutcom-style' );
+    wp_enqueue_style( 'normalize' );
+    wp_enqueue_style( 'frames_style' );
     // Enqueue google pay script
     wp_enqueue_script( 'cko-google-script', 'https://pay.google.com/gp/p/js/pay.js', array( 'jquery' ) );
 
@@ -161,8 +167,6 @@ function action_woocommerce_order_item_add_action_buttons( $order ) {
     $order_status = $order->get_status();
     $auth_status = str_replace('wc-', '', WC_Admin_Settings::get_option('ckocom_order_authorised'));
     $capture_status = str_replace('wc-', '', WC_Admin_Settings::get_option('ckocom_order_captured'));
-
-
 
     if($order->get_payment_method() == 'wc_checkout_com_cards'
         || $order->get_payment_method() == 'wc_checkout_com_google_pay') {
