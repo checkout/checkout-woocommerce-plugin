@@ -60,11 +60,6 @@
     display: inline-block;
     -webkit-appearance: -apple-pay-button;
     cursor: pointer;
-    float: right;
-    margin-top: 15px;
-    width: 150px;
-    height: 50px;
-
 }
 .apple-pay-button-with-text > * {
     display: none;
@@ -102,9 +97,11 @@
     }
 }
 
+
 @media only screen and (max-width: 600px) {
     .apple-pay-button {
         width: var(--wallet-button-width-mobile) !important;
+        height: var(--wallet-button-height-mobile) !important;
     }
     .google-pay-button {
         width: var(--wallet-button-width-mobile) !important;
@@ -112,9 +109,7 @@
     }
 
     .cko-form {
-        width: max-content;
-        /*padding-left: initial;*/
-        /*padding-left: initial;*/
+        width: fit-content;
     }
 }
 
@@ -164,7 +159,7 @@
     cursor: pointer;
     float: right;
     margin-top: 15px;
-    width: 150px;
+    width: 147px;
     height: 50px;
 }
 .google-pay-white {
