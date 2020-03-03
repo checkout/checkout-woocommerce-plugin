@@ -8,20 +8,29 @@ export default {
             order_path_1: '/wp-admin/post.php?post=',
             order_path_2: '&action=edit',
             product_path: '/?product=test',
-            woocommerce: 'http://localhost/wordpress/wp-admin/index.php?page=wc-setup',
-            non_pci:
-                '/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_non_pci',
-            pci: '/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_pci'
+            core_settings:
+                'http://localhost/wordpress/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards',
+            card_settings:
+                'http://localhost/wordpress/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards&screen=card_settings',
+            order_settings:
+                'http://localhost/wordpress/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards&screen=orders_settings',
+            google_pay_settings:
+                'http://localhost/wordpress/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_google_pay',
+            apple_pay_settings:
+                'http://localhost/wordpress/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_apple_pay',
+            apm_settings:
+                'http://localhost/wordpress/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_alternative_payments',
+            debug_settings:
+                'http://localhost/wordpress/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards&screen=debug_settings',
+            woocommerce: 'http://localhost/wordpress/wp-admin/index.php?page=wc-setup'
         },
         admin: {
             username: 'checkout',
             password: 'Checkout17',
             three_d_password: 'Checkout1!',
-            pci_secret_key: 'sk_test_d084c5ee-8407-4b10-ae46-f730ad7fe6b0',
-            pci_private_shared_key: '66265906-1ff3-4b78-a3aa-9837a303e8e6',
-            non_pci_secret_key: 'sk_test_fe1ea74c-e9be-4191-9781-76ec04523e29',
-            non_pci_public_key: 'pk_test_537c069c-9533-47e3-9a4a-14c55b9781ee',
-            non_pci_private_shared_key: 'fc8b91da-a59d-480e-93d7-3dd590948b04'
+            secret_key: 'sk_test_fe1ea74c-e9be-4191-9781-76ec04523e29',
+            public_key: 'pk_test_537c069c-9533-47e3-9a4a-14c55b9781ee',
+            private_shared_key: 'fc8b91da-a59d-480e-93d7-3dd590948b04'
         },
         guest: {
             email: 'john@smith.com',
@@ -46,49 +55,39 @@ export default {
             visa: {
                 card_number: '4242424242424242',
                 month: '06',
-                year: '18',
+                year: '29',
                 cvv: '100'
             },
             mastercard: {
                 card_number: '5436031030606378',
                 month: '06',
-                year: '25',
+                year: '29',
                 cvv: '257'
             },
             amex: {
                 card_number: '345678901234564',
                 month: '06',
-                year: '25',
+                year: '29',
                 cvv: '1051'
             },
             diners: {
                 card_number: '30123456789019',
                 month: '06',
-                year: '25',
+                year: '29',
                 cvv: '257'
             },
             jcb: {
                 card_number: '3530111333300000',
                 month: '06',
-                year: '18',
+                year: '29',
                 cvv: '100'
             },
             discover: {
                 card_number: '6011111111111117',
                 month: '06',
-                year: '18',
+                year: '29',
                 cvv: '100'
             }
-        },
-        customisation: {
-            lightbox_url:
-                'https://www.google.co.uk/images/branding/googlelogo/2x/googlelogo_color_120x44dp.png',
-            theme: '#8F1D21',
-            js_title: 'Test',
-            widget_color: '#9B59B6',
-            form_button_color: '#7A942E',
-            form_label_color: '#F4D03F',
-            opacity: 0.6
         }
     },
     selector: {
@@ -158,10 +157,31 @@ export default {
             }
         },
         backend: {
+            save_cahanges: '.submit > .button-primary',
             admin_username: '#user_login',
             admin_password: '#user_pass',
             admin_sign_in: '#wp-submit',
-            dashboard: '#menu-dashboard',
+            plugin: {
+                activate:
+                    '[data-slug="checkout-com-unified-payments-api"] > .plugin-title > .row-actions > .activate > .edit',
+                core: {
+                    secret_key: '#woocommerce_wc_checkout_com_cards_ckocom_sk',
+                    public_key: '#woocommerce_wc_checkout_com_cards_ckocom_pk',
+                    private_shared_key: '#woocommerce_wc_checkout_com_cards_ckocom_psk'
+                },
+                card: {
+                    payment_action: '#ckocom_card_autocap',
+                    capture_delay: '#ckocom_card_cap_delay',
+                    '3ds': '#ckocom_card_threed',
+                    atempt_n3d: '#ckocom_card_notheed',
+                    saved_card: '#ckocom_card_saved',
+                    require_cvv: '#ckocom_card_require_cvv',
+                    dynamic_descriptor: '#ckocom_card_desctiptor',
+                    dd_name: '#ckocom_card_desctiptor_name',
+                    dd_city: '#ckocom_card_desctiptor_city',
+                    mada: '#ckocom_card_mada'
+                }
+            },
             woo_plugin_state:
                 '[data-slug="woocommerce"] > .plugin-title > .row-actions > :nth-child(1) > a',
             woo_deactivate:
@@ -182,83 +202,7 @@ export default {
             woo_normal_price: '#_regular_price',
             woo_promo_price: '#_sale_price',
             woo_publish: '#publish',
-            woo_city: '#store_city',
-            plugin: {
-                save: 'input.button-primary',
-                non_pci: {
-                    enable_plugin: '#woocommerce_woocommerce_checkout_non_pci_enabled',
-                    settings_non_pci:
-                        'tr.active:nth-child(2) > td:nth-child(2) > div:nth-child(2) > span:nth-child(1) > a:nth-child(1)',
-                    activate_non_pci:
-                        'tr.inactive:nth-child(3) > td:nth-child(2) > div:nth-child(2) > span:nth-child(1) > a:nth-child(1)',
-                    secret_key: '#woocommerce_woocommerce_checkout_non_pci_secret_key',
-                    private_shared_key:
-                        '#woocommerce_woocommerce_checkout_non_pci_private_shared_key',
-                    public_key: '#woocommerce_woocommerce_checkout_non_pci_public_key',
-                    title: '#woocommerce_woocommerce_checkout_non_pci_title',
-                    cancel_status_on_void: '#woocommerce_woocommerce_checkout_non_pci_void_status',
-                    payment_action:
-                        '#select2-woocommerce_woocommerce_checkout_non_pci_payment_action-container',
-                    payment_action_selector:
-                        '#woocommerce_woocommerce_checkout_non_pci_payment_action',
-                    autocapture_time: '#woocommerce_woocommerce_checkout_non_pci_auto_cap_time',
-                    new_order_status:
-                        '#select2-woocommerce_woocommerce_checkout_non_pci_order_status-container',
-                    new_order_status_selector:
-                        '#woocommerce_woocommerce_checkout_non_pci_order_status',
-                    three_d: '#select2-woocommerce_woocommerce_checkout_non_pci_is_3d-container',
-                    three_d_selector: '#woocommerce_woocommerce_checkout_non_pci_is_3d',
-                    integration:
-                        '#select2-woocommerce_woocommerce_checkout_non_pci_integration_type-container',
-                    integration_selector:
-                        '#woocommerce_woocommerce_checkout_non_pci_integration_type',
-                    save_cards: '#woocommerce_woocommerce_checkout_non_pci_saved_cards',
-                    lightbox_url: '#woocommerce_woocommerce_checkout_non_pci_logo_url',
-                    theme: '#woocommerce_woocommerce_checkout_non_pci_theme_color',
-                    currency_code: '#woocommerce_woocommerce_checkout_non_pci_use_currency_code',
-                    js_title: '#woocommerce_woocommerce_checkout_non_pci_form_title',
-                    widget_color: '#woocommerce_woocommerce_checkout_non_pci_widget_color',
-                    form_button_color:
-                        '#woocommerce_woocommerce_checkout_non_pci_form_button_color',
-                    form_label_color:
-                        '#woocommerce_woocommerce_checkout_non_pci_form_button_color_label',
-                    overlay_shade:
-                        '#select2-woocommerce_woocommerce_checkout_non_pci_overlay_shade-container',
-                    overlay_shade_selector:
-                        '#woocommerce_woocommerce_checkout_non_pci_overlay_shade',
-                    opacity: '#woocommerce_woocommerce_checkout_non_pci_overlay_opacity',
-                    show_mobile_icons:
-                        '#woocommerce_woocommerce_checkout_non_pci_show_mobile_icons',
-                    payment_mode:
-                        '#select2-woocommerce_woocommerce_checkout_non_pci_payment_mode-container',
-                    js_theme:
-                        '#select2-woocommerce_woocommerce_checkout_non_pci_frames_theme-container'
-                },
-                pci: {
-                    enable_plugin: '#woocommerce_woocommerce_checkout_pci_enabled',
-                    activate_pci:
-                        'tr.inactive:nth-child(4) > td:nth-child(2) > div:nth-child(2) > span:nth-child(1) > a:nth-child(1)',
-                    settings_pci:
-                        'tr.active:nth-child(4) > td:nth-child(2) > div:nth-child(2) > span:nth-child(1) > a:nth-child(1)',
-                    secret_key: '#woocommerce_woocommerce_checkout_pci_secret_key',
-                    private_shared_key: '#woocommerce_woocommerce_checkout_pci_public_key',
-                    cancel_status_on_void: '#woocommerce_woocommerce_checkout_pci_void_status',
-                    payment_action:
-                        '#select2-woocommerce_woocommerce_checkout_pci_payment_action-container',
-                    payment_action_selector: '#woocommerce_woocommerce_checkout_pci_payment_action',
-                    payment_action_authorize:
-                        '#select2-woocommerce_woocommerce_checkout_pci_payment_action-result-qic8-authorize',
-                    payment_action_autocapture:
-                        '#select2-woocommerce_woocommerce_checkout_pci_payment_action-result-vjaz-authorize_capture',
-                    autocapture_time: '#woocommerce_woocommerce_checkout_pci_auto_cap_time',
-                    new_order_status:
-                        '#select2-woocommerce_woocommerce_checkout_pci_order_status-container',
-                    new_order_status_selector: '#woocommerce_woocommerce_checkout_pci_order_status',
-                    three_d: '#select2-woocommerce_woocommerce_checkout_pci_is_3d-container',
-                    three_d_selector: '#woocommerce_woocommerce_checkout_pci_is_3d',
-                    save_cards: '#woocommerce_woocommerce_checkout_pci_saved_cards'
-                }
-            }
+            woo_city: '#store_city'
         }
     }
 };

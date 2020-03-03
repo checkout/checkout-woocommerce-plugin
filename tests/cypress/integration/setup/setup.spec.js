@@ -1,4 +1,4 @@
-import Globals from './_values';
+import Globals from '../config/values';
 const URL = Globals.value.url;
 const VAL = Globals.value;
 const BACKEND = Globals.selector.backend;
@@ -38,8 +38,29 @@ describe('Setup Wocommerce', function() {
                 cy.get(BACKEND.woo_promo_price).type('123');
                 cy.get(BACKEND.woo_publish).click();
             }
-            cy.visit(URL.wordpress_base + URL.plugins_path);
         });
         cy.visit(URL.wordpress_base + URL.plugins_path);
+    });
+
+    it('should activate and configure the checkout plugin', function() {
+        cy.loginAdmin();
+        cy.visit(URL.wordpress_base + URL.plugins_path);
+        cy.get(BACKEND.plugin.activate).click();
+        cy.visit(URL.core_settings);
+        cy.get(BACKEND.plugin.core.secret_key)
+            .clear()
+            .click()
+            .type(VAL.admin.secret_key);
+        cy.get(BACKEND.plugin.core.public_key)
+            .clear()
+            .click()
+            .type(VAL.admin.public_key);
+        cy.get(BACKEND.plugin.core.private_shared_key)
+            .clear()
+            .type(VAL.admin.private_shared_key);
+        cy.get(BACKEND.save_cahanges).click();
+        cy.get('#message').then($el => {
+            expect($el.text()).to.equal('Your settings have been saved.');
+        });
     });
 });

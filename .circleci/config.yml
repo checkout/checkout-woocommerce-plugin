@@ -17,6 +17,10 @@ jobs:
           command: |
             cd ~/cko_wp/tests && npm i
       - run:
+          name: Setup up Woocmmerce
+          command: |
+            cd ~/cko_wp/tests && npm run setup
+      - run:
           name: Run Testss
           command: |
             cd ~/cko_wp/tests && npm test

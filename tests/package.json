@@ -5,7 +5,8 @@
     "main": "index.js",
     "scripts": {
         "cypress": "cypress open",
-        "test": "cypress run --record --key $CYPRESSKEY --headless --spec 'cypress/integration/*.spec.js'"
+        "setup": "cypress run --record --key $CYPRESSKEY --headless --spec 'cypress/integration/setup/*.spec.js'",
+        "test": "cypress run --record --key $CYPRESSKEY --headless --spec 'cypress/integration/specs/*.spec.js'"
     },
     "author": "",
     "license": "ISC",
