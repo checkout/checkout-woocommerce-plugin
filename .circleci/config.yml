@@ -8,7 +8,7 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Refresh Wordpress and Install Checkout New
+          name: Refresh Wordpress and Install Checkout 
           command: |
             sudo service apache2 restart && sudo service mysql restart
             cd /var/www/html/wordpress/wp-content/plugins/ && sudo mv ~/cko_wp/woocommerce-gateway-checkout-com .
