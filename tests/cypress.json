@@ -1,3 +1,4 @@
 {
-  "projectId": "cymf4w"
+    "projectId": "cymf4w",
+    "chromeWebSecurity": false
 }
