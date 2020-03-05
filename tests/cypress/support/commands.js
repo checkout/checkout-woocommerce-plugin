@@ -2,6 +2,7 @@ import Globals from '../integration/config/values';
 const URL = Globals.value.url;
 const VAL = Globals.value;
 const BACKEND = Globals.selector.backend;
+const FRONTEND = Globals.selector.frontend;
 
 Cypress.Commands.add('loginAdmin', () => {
     cy.visit(URL.wordpress_base + URL.admin_path);
@@ -137,5 +138,60 @@ Cypress.Commands.add('enableMada', value => {
     cy.get(BACKEND.save_cahanges).click();
     cy.get('#message').then($el => {
         expect($el.text()).to.equal('Your settings have been saved.');
+    });
+});
+
+Cypress.Commands.add('completeGuessDetails', value => {
+    cy.get(FRONTEND.order.firstname)
+        .clear()
+        .click()
+        .type(VAL.guest.firstname);
+    cy.get(FRONTEND.order.lastname)
+        .clear()
+        .click()
+        .type(VAL.customer.lastname);
+    cy.get(FRONTEND.order.street)
+        .clear()
+        .click()
+        .type(VAL.guest.street);
+    cy.get(FRONTEND.order.town)
+        .clear()
+        .click()
+        .type(VAL.guest.town);
+    cy.get(FRONTEND.order.postcode)
+        .clear()
+        .click()
+        .type(VAL.guest.postcode);
+    cy.get(FRONTEND.order.phone)
+        .clear()
+        .click()
+        .type(VAL.guest.phone);
+    cy.get(FRONTEND.order.email)
+        .clear()
+        .click()
+        .type(VAL.guest.email);
+});
+
+Cypress.Commands.add('completeFlowUtillPayment', () => {
+    cy.visit(URL.wordpress_base + URL.product_path);
+    cy.get(FRONTEND.order.add).click();
+    cy.get(FRONTEND.order.view_cart).click();
+    cy.get(FRONTEND.order.go_to_checkout).click();
+    cy.completeGuessDetails();
+});
+
+// pass the card number, expiry date (as 0629) and the cvv
+Cypress.Commands.add('fillFramesSingelFrame', (number, date, cvv) => {
+    cy.get(FRONTEND.singleFrames.selector).then($iframe => {
+        const $body = $iframe.contents().find('body');
+        cy.wrap($body.find(FRONTEND.singleFrames.cardNumber))
+            .click()
+            .type(number, { force: true, delay: 50 });
+        cy.wrap($body.find(FRONTEND.singleFrames.date))
+            .click()
+            .type(date, { force: true, delay: 50 });
+        cy.wrap($body.find(FRONTEND.singleFrames.cvv))
+            .click()
+            .type(cvv, { force: true, delay: 50 });
     });
 });

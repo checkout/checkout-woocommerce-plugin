@@ -7,7 +7,7 @@ export default {
             plugins_path: '/wp-admin/plugins.php',
             order_path_1: '/wp-admin/post.php?post=',
             order_path_2: '&action=edit',
-            product_path: '/?product=test',
+            product_path: '/index.php/product/test/',
             core_settings:
                 'http://localhost/wordpress/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards',
             card_settings:
@@ -28,8 +28,8 @@ export default {
             username: 'checkout',
             password: 'Checkout17',
             three_d_password: 'Checkout1!',
-            secret_key: 'sk_test_fe1ea74c-e9be-4191-9781-76ec04523e29',
-            public_key: 'pk_test_537c069c-9533-47e3-9a4a-14c55b9781ee',
+            secret_key: 'sk_test_0b9b5db6-f223-49d0-b68f-f6643dd4f808',
+            public_key: 'pk_test_4296fd52-efba-4a38-b6ce-cf0d93639d8a',
             private_shared_key: 'fc8b91da-a59d-480e-93d7-3dd590948b04'
         },
         guest: {
@@ -50,44 +50,6 @@ export default {
             country: 'GB',
             phone: '07987654321',
             password: 'Checkout17'
-        },
-        card: {
-            visa: {
-                card_number: '4242424242424242',
-                month: '06',
-                year: '29',
-                cvv: '100'
-            },
-            mastercard: {
-                card_number: '5436031030606378',
-                month: '06',
-                year: '29',
-                cvv: '257'
-            },
-            amex: {
-                card_number: '345678901234564',
-                month: '06',
-                year: '29',
-                cvv: '1051'
-            },
-            diners: {
-                card_number: '30123456789019',
-                month: '06',
-                year: '29',
-                cvv: '257'
-            },
-            jcb: {
-                card_number: '3530111333300000',
-                month: '06',
-                year: '29',
-                cvv: '100'
-            },
-            discover: {
-                card_number: '6011111111111117',
-                month: '06',
-                year: '29',
-                cvv: '100'
-            }
         }
     },
     selector: {
@@ -103,9 +65,7 @@ export default {
                 postcode: '#billing_postcode',
                 phone: '#billing_phone',
                 email: '#billing_email',
-                non_pci_option: 'li.wc_payment_method:nth-child(2)',
-                non_pci_save_card: '#save-card-checkbox',
-                pci_option: 'li.wc_payment_method:nth-child(3)',
+                checkout_card_option: '[for="payment_method_wc_checkout_com_cards"]',
                 place_order: '#place_order',
                 js_new_card: '.checkout-new-card-radio',
                 pci_new_card:
@@ -119,41 +79,11 @@ export default {
                 success_order_number: '.woocommerce-order-overview__order',
                 order_status: '#select2-order_status-container'
             },
-            js: {
-                iframe: 'iframe:last-of-type',
-                widget: '#cko-widget',
-                card_number: "input[data-checkout='card-number']",
-                month: "input[data-checkout='expiry-month']",
-                year: "input[data-checkout='expiry-year']",
-                cvv: "input[data-checkout='cvv']",
-                submit: '.form-submit',
-                header: '.header',
-                title: 'span.title:nth-child(1)',
-                logo: 'div.logo:nth-child(2) > img:nth-child(1)'
-            },
-            hosted: {
-                card_number: 'div.input-group:nth-child(2) > input:nth-child(2)',
-                month: 'div.split-view:nth-child(2) > div:nth-child(1) > input:nth-child(1)',
-                year: 'div.split-view:nth-child(2) > div:nth-child(2) > input:nth-child(1)',
-                cvv:
-                    'div.split-view:nth-child(3) > div:nth-child(2) > div:nth-child(1) > input:nth-child(2)',
-                title: '',
-                pay_button: '.form-submit',
-                hosted_header: '#modal-wrapper > div.cko-md-content > div > div.header',
-                hosted_pay_button:
-                    '#modal-wrapper > div.cko-md-content > div > div.container-body > div.content.card > form > input',
-                hosted_alt_payments_tab:
-                    '#modal-wrapper > div.cko-md-content > div > div.container-body > div.content-control.tabs.split-view > div.tab.lp.fragment-2.enter',
-                hosted_card_tab:
-                    '#modal-wrapper > div.cko-md-content > div > div.container-body > div.content-control.tabs.split-view > div.tab.active.card',
-                hosted_region_selector:
-                    '#modal-wrapper > div.cko-md-content > div > div.container-body > div.content-control.region-selector'
-            },
-            pci: {
-                name: '#woocommerce_checkout_pci-card-holder-name',
-                card_number: '#woocommerce_checkout_pci-card-number',
-                month_year: '#woocommerce_checkout_pci-card-expiry',
-                cvv: '#woocommerce_checkout_pci-card-cvc'
+            singleFrames: {
+                selector: '#singleIframe',
+                cardNumber: '#checkout-frames-card-number',
+                date: '#checkout-frames-expiry-date',
+                cvv: '#checkout-frames-cvv'
             }
         },
         backend: {
