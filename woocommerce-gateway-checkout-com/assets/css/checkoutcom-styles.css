@@ -577,3 +577,8 @@ datalist {
     padding-left: 20px;
     padding-right: 20px;
 }
+
+#cards-icon {
+    padding-right: 2px;
+    top: 4px;
+}
