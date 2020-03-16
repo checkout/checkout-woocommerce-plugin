@@ -157,6 +157,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         $mada_enable = WC_Admin_Settings::get_option('ckocom_card_mada') == 1 ? true : false;
         $require_cvv = WC_Admin_Settings::get_option('ckocom_card_require_cvv');
         $is_mada_token = false;
+        $cardValidationAlert = __("Please enter your card details.", 'wc_checkout_com_cards');
 
         // check if saved card enable from module setting
         if($save_card) {
@@ -200,6 +201,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
             <script type="text/javascript">
                 // Get debug mode from module config
                 var debug = '<?php echo WC_Admin_Settings::get_option('cko_console_logging'); ?>';
+                var cardValidationAlert = '<?php echo $cardValidationAlert; ?>';
 
                 jQuery( function(){
                     jQuery('input[type=radio][name=wc-wc_checkout_com_cards-payment-token]'). prop("checked", false);
@@ -283,13 +285,17 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
                                         return true;
                                     } else if(Frames.isCardValid()) {
                                         Frames.submitCard();
+                                    } else if(!Frames.isCardValid()){
+                                        alert(cardValidationAlert);
                                     }
                                 } else if (jQuery('#add_payment_method').length > 0) {
                                     // check if card is valid from add-payment-method
                                     if (jQuery('#payment_method_wc_checkout_com_cards').is(':checked')) {
                                         if(Frames.isCardValid()) {
                                             Frames.submitCard();
-                                        }
+                                        } else {
+                                        alert(cardValidationAlert);
+                                    }
                                     }
                                 } else {
                                     return true;
@@ -300,6 +306,8 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
                                 return true;
                             } else if(Frames.isCardValid()) {
                                 Frames.submitCard();
+                            } else if(!Frames.isCardValid()){
+                                alert(cardValidationAlert);
                             }
 
                             return false;

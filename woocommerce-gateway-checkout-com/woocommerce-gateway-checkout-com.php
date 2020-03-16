@@ -289,3 +289,32 @@ function renew_save_again($post_id, $post, $update){
         }
     }
 }
+
+/**
+ * filter for custom gateway icons
+ */
+add_filter( 'woocommerce_gateway_icon', 'cko_gateway_icon', 10, 2 );
+function cko_gateway_icon( $icons, $id ) {
+    /* Check if checkoutcom gateway */ 
+    if ($id == 'wc_checkout_com_cards') {
+        $display_card_icon = WC_Admin_Settings::get_option('ckocom_display_icon') == 1 ? true : false;
+
+        /* check if display card option is selected */
+        if ($display_card_icon ) {
+            $card_icon = WC_Admin_Settings::get_option('ckocom_card_icons');
+
+            $plugin_url = plugins_url( '/checkout-com-unified-payments-api/assets/images/', __DIR__ );
+
+            $icons = '';
+
+            foreach ($card_icon as $key => $value) {
+                $card_icons = $plugin_url . $value.'.svg';
+                $icons .= "<img src='$card_icons' id='cards-icon'>";
+            }
+
+            return $icons;
+        }
+
+        return false;
+    }
+}
