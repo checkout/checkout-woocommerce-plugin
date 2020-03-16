@@ -283,6 +283,23 @@ class WC_Checkoutcom_Cards_Settings
                 'class' => 'wc-enhanced-select',
                 'css' => 'width: 400px;',
             ),
+            'ckocom_language_fallback' => array(
+                'id' => 'ckocom_language_fallback',
+                'title' => __('Language Fallback', 'checkoutcom-cards-settings'),
+                'type' => 'select',
+                'desc_tip' => true,
+                'options' => array(
+                    'EN-GB'   => __('English', 'checkoutcom-cards-settings'),
+                    'NL-NL'   => __('Dutch', 'checkoutcom-cards-settings'),
+                    'FR-FR'   => __('French', 'checkoutcom-cards-settings'),
+                    'DE-DE'   => __('German', 'checkoutcom-cards-settings'),
+                    'IT-IT'   => __('Italian', 'checkoutcom-cards-settings'),
+                    'KR-KR'   => __('Korean', 'checkoutcom-cards-settings'),
+                    'ES-ES'   => __('Spanish', 'checkoutcom-cards-settings')
+                ),
+                'default' => 'EN-GB',
+                'desc' => 'Select the language to use by default if the one used by the shopper is not supported by the integration.',
+            ),
         );
 
         return apply_filters( 'wc_checkout_com_cards', $settings );

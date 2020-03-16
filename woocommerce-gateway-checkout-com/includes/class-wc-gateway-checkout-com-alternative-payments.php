@@ -9,9 +9,9 @@ class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway
     public function __construct()
     {
         $this->id = 'wc_checkout_com_alternative_payments';
-        $this->method_title = __("Checkout.com", 'checkout-com-google-pay');
-        $this->method_description = __("The Checkout.com extension allows shop owners to process online payments through the <a href=\"https://www.checkout.com\">Checkout.com Payment Gateway.</a>", 'checkout-com-google-pay');
-        $this->title = __("Alternative Payment", 'checkout-com-google-pay');
+        $this->method_title = __("Checkout.com", 'wc_checkout_com');
+        $this->method_description = __("The Checkout.com extension allows shop owners to process online payments through the <a href=\"https://www.checkout.com\">Checkout.com Payment Gateway.</a>", 'wc_checkout_com');
+        $this->title = __("Alternative Payment", 'wc_checkout_com');
 
         $this->has_fields = true;
         $this->supports = array('products', 'refunds');
@@ -42,7 +42,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway
             'screen_button' => array(
                 'id' => 'screen_button',
                 'type' => 'screen_button',
-                'title' => __('Other Settings', 'configuration_setting'),
+                'title' => __('Other Settings', 'wc_checkout_com'),
             )
         ));
     }
@@ -371,7 +371,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway
 
         // check if no apm is selected
         if(! sanitize_text_field($_POST['cko-apm'])){
-            WC_Checkoutcom_Utility::wc_add_notice_self(__('Please select an alternative payment method.'), 'error');
+            WC_Checkoutcom_Utility::wc_add_notice_self(__('Please select an alternative payment method.', 'wc_checkout_com'), 'error');
             return;
         }
 
@@ -407,11 +407,11 @@ class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway
 
                 // Get cko auth status configured in admin
                 $status = WC_Admin_Settings::get_option('ckocom_order_authorised');
-                $message = __("Checkout.com - Fawry payment (Transaction ID : {$result['id']} - Fawry reference number : {$result['source']['reference_number']}) ", 'wc_checkout_com_cards_settings');
+                $message = __("Checkout.com - Fawry payment (Transaction ID : {$result['id']} - Fawry reference number : {$result['source']['reference_number']}) ", 'wc_checkout_com');
 
                 if ($result['status'] == 'Captured') {
                     $status = WC_Admin_Settings::get_option('ckocom_order_captured');
-                    $message = __("Checkout.com Payment Captured (Transaction ID - {$result['id']}) ", 'wc_checkout_com_cards_settings');
+                    $message = __("Checkout.com Payment Captured (Transaction ID - {$result['id']}) ", 'wc_checkout_com');
                 }
 
                 // Update order status on woo backend
