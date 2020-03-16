@@ -158,6 +158,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         $require_cvv = WC_Admin_Settings::get_option('ckocom_card_require_cvv');
         $is_mada_token = false;
         $cardValidationAlert = __("Please enter your card details.", 'wc_checkout_com_cards');
+        $localisation = $this->get_localisation();
 
         // check if saved card enable from module setting
         if($save_card) {
@@ -202,6 +203,8 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
                 // Get debug mode from module config
                 var debug = '<?php echo WC_Admin_Settings::get_option('cko_console_logging'); ?>';
                 var cardValidationAlert = '<?php echo $cardValidationAlert; ?>';
+                var localization = '<?php echo $localisation; ?>';
+
 
                 jQuery( function(){
                     jQuery('input[type=radio][name=wc-wc_checkout_com_cards-payment-token]'). prop("checked", false);
@@ -210,7 +213,8 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 
                     Frames.init({
                         debug : debug === 'yes' ? true : false,
-                        publicKey: "<?php echo $this->get_option( 'ckocom_pk' );?>"
+                        publicKey : "<?php echo $this->get_option( 'ckocom_pk' );?>",
+                        localization : localization
                     });
                     
                     Frames.addEventHandler(
@@ -783,4 +787,45 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 
         return http_response_code($http_code);
     }
+
+    /**
+     * get_localisation
+     * 
+     * @return void
+     */
+    public function get_localisation()
+    {
+        $woo_locale = str_replace("_", "-", get_locale());
+        $locale = substr($woo_locale, 0, 2);
+        $localization = "EN-GB";
+
+        switch ($locale) {
+            case 'it':
+                $localization = "IT-IT";
+                break;
+            case 'nl':
+                $localization = "NL-NL";
+                break;
+            case 'fr':
+                $localization = "FR-FR";
+                break;
+            case 'de':
+                $localization = "DE-DE";
+                break;
+            case 'it':
+                $localization = "IT-IT";
+                break;
+            case 'kr':
+                $localization = "KR-KR";
+                break;
+            case 'es':
+                $localization = "ES-ES";
+                break;
+            default:
+            $localization = WC_Admin_Settings::get_option('ckocom_language_fallback');
+        }
+        
+        return $localization;
+    }
+
 }
