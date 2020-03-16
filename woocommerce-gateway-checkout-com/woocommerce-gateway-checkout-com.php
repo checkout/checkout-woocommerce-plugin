@@ -3,7 +3,7 @@
 Plugin Name: Checkout.com Payment Gateway
 Plugin URI: https://www.checkout.com/
 Description: Extends WooCommerce by Adding the Checkout.com Gateway.
-Version: 4.1.8
+Version: 4.1.9
 Author: Checkout.com
 Author URI: https://www.checkout.com/
 */
@@ -57,7 +57,7 @@ function init_checkout_com_gateway_class()
 add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), 'checkout_com_action_links' );
 function checkout_com_action_links($links) {
     $plugin_links = array(
-        '<a href="' . admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards' ) . '">' . __( 'Settings', 'wc_checkout_com_cards' ) . '</a>',
+        '<a href="' . admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards' ) . '">' . __( 'Settings', 'wc_checkout_com' ) . '</a>',
     );
 
     return array_merge( $plugin_links, $links );
@@ -250,7 +250,7 @@ function renew_save_again($post_id, $post, $update){
 
                 // Get cko capture status configured in admin
                 $status = WC_Admin_Settings::get_option('ckocom_order_captured');
-                $message = __("Checkout.com Payment Captured (Transaction ID - {$result['action_id']}) ", 'wc_checkout_com_cards');
+                $message = __("Checkout.com Payment Captured (Transaction ID - {$result['action_id']}) ", 'wc_checkout_com');
 
                 // Update order status on woo backend
                 $order->update_status($status,$message);
@@ -272,7 +272,7 @@ function renew_save_again($post_id, $post, $update){
 
                 // Get cko capture status configured in admin
                 $status = WC_Admin_Settings::get_option('ckocom_order_void');
-                $message = __("Checkout.com Payment Voided (Transaction ID - {$result['action_id']}) ", 'wc_checkout_com_cards');
+                $message = __("Checkout.com Payment Voided (Transaction ID - {$result['action_id']}) ", 'wc_checkout_com');
 
                 // Update order status on woo backend
                 $order->update_status($status,$message);
@@ -283,9 +283,38 @@ function renew_save_again($post_id, $post, $update){
                 return true;
 
             } else {
-                WC_Admin_Notices::add_custom_notice('wc_checkout_com_cards', __('An error has occured'));
+                WC_Admin_Notices::add_custom_notice('wc_checkout_com_cards', __('An error has occured.', 'wc_checkout_com'));
                 return false;
             }
         }
+    }
+}
+
+/**
+ * filter for custom gateway icons
+ */
+add_filter( 'woocommerce_gateway_icon', 'cko_gateway_icon', 10, 2 );
+function cko_gateway_icon( $icons, $id ) {
+    /* Check if checkoutcom gateway */ 
+    if ($id == 'wc_checkout_com_cards') {
+        $display_card_icon = WC_Admin_Settings::get_option('ckocom_display_icon') == 1 ? true : false;
+
+        /* check if display card option is selected */
+        if ($display_card_icon ) {
+            $card_icon = WC_Admin_Settings::get_option('ckocom_card_icons');
+
+            $plugin_url = plugins_url( '/checkout-com-unified-payments-api/assets/images/', __DIR__ );
+
+            $icons = '';
+
+            foreach ($card_icon as $key => $value) {
+                $card_icons = $plugin_url . $value.'.svg';
+                $icons .= "<img src='$card_icons' id='cards-icon'>";
+            }
+
+            return $icons;
+        }
+
+        return false;
     }
 }

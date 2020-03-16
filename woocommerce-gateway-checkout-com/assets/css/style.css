@@ -59,6 +59,7 @@ iframe {
   margin-bottom: 8px;
   height: 40px;
   box-shadow: 0 1px 3px 0 rgba(19,57,94,0.2);
+  background-color: white;
 }
 
 .card-frame.frame--rendered {

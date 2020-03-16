@@ -71,7 +71,7 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_request
                         </li></ul>
                     <?php }?>
                 <?php } else {
-                    echo  __('Klarna is not offering any payment options for this purchase. Please choose another payment method.');
+                    echo  __('Klarna is not offering any payment options for this purchase. Please choose another payment method.', 'wc_checkout_com');
                 }?>
             </div>
         </div>

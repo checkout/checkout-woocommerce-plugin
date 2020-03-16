@@ -1,6 +1,6 @@
 [![N|Solid](https://cdn.checkout.com/img/checkout-logo-online-payments.jpg)](https://checkout.com/)
 
-# Woocommerce Extension&nbsp; ![N|Solid](https://circleci.com/gh/checkout/checkout-woocommerce-plugin.svg?style=shield&circle-token=4f03ec3447eff0c5348eccf22649290978066a41)
+# Woocommerce Extension&nbsp; [![CircleCI](https://circleci.com/gh/checkout/checkout-woocommerce-plugin/tree/dev.svg?style=svg)](https://circleci.com/gh/checkout/checkout-woocommerce-plugin/tree/dev)
 [Checkout.com](https://www.checkout.com "Checkout.com") is a software platform that has integrated 100% of the value chain to create payment infrastructures that truly make a difference.
 
 This extension allows shop owners to process online payments (card / alternative payments) using:

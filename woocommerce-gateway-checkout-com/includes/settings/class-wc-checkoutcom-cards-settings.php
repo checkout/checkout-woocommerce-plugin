@@ -105,19 +105,13 @@ class WC_Checkoutcom_Cards_Settings
                 })
                 
                 if(jQuery('#ckocom_card_saved').val() == 0){
-//                    $( ckocom_card_saved_title ).closest( 'tr' ).hide();
-//                    $( ckocom_saved_a_card_title ).closest( 'tr' ).hide();
                     $( ckocom_card_require_cvv ).closest( 'tr' ).hide();
                 }
                 
                 jQuery('#ckocom_card_saved').on('change', function() {
                     if(this.value == 0){
-//                        $( ckocom_card_saved_title ).closest( 'tr' ).hide();
-//                        $( ckocom_saved_a_card_title ).closest( 'tr' ).hide();
                         $( ckocom_card_require_cvv ).closest( 'tr' ).hide();
                     } else {
-//                        $( ckocom_card_saved_title ).closest( 'tr' ).show();
-//                        $( ckocom_saved_a_card_title ).closest( 'tr' ).show();
                         $( ckocom_card_require_cvv ).closest( 'tr' ).show();
                     }
                 })
@@ -134,6 +128,18 @@ class WC_Checkoutcom_Cards_Settings
                     } else {
                         $( ckocom_card_desctiptor_name ).closest( 'tr' ).show();
                         $( ckocom_card_desctiptor_city ).closest( 'tr' ).show();
+                    }
+                })
+
+                if(jQuery('#ckocom_display_icon').val() == 0){
+                    $( ckocom_card_icons ).closest( 'tr' ).hide();
+                }
+
+                jQuery('#ckocom_display_icon').on('change', function() {
+                    if(this.value == 0){
+                        $( ckocom_card_icons ).closest( 'tr' ).hide();
+                    } else {
+                        $( ckocom_card_icons ).closest( 'tr' ).show();
                     }
                 })
             });
@@ -200,22 +206,6 @@ class WC_Checkoutcom_Cards_Settings
                 'default' => 0,
                 'desc' => 'Allow customers to save cards for future payments',
             ),
-//            'ckocom_card_saved_title' => array(
-//                'id' => 'ckocom_card_saved_title',
-//                'title' => __('Saved Cards Option Title', 'checkoutcom-cards-settings'),
-//                'type' => 'text',
-//                'desc' => __('This is the prefix of a saved card displayed in the checkout page)', 'checkoutcom-cards-settings'),
-//                'desc_tip' => true,
-//                'default' => __('Use your saved cards:', 'checkoutcom-cards-settings'),
-//            ),
-//            'ckocom_saved_a_card_title' => array(
-//                'id' => 'ckocom_saved_a_card_title',
-//                'title' => __('Saved A Cards Option Title', 'checkoutcom-cards-settings'),
-//                'type' => 'text',
-//                'desc' => __('This is the prefix of a saved card displayed in the checkout page)', 'checkoutcom-cards-settings'),
-//                'desc_tip' => true,
-//                'default' => __('Save this card', 'checkoutcom-cards-settings'),
-//            ),
             'ckocom_card_require_cvv' => array(
                 'id' => 'ckocom_card_require_cvv',
                 'title' => __('Require CVV For Saved Cards', 'checkoutcom-cards-settings'),
@@ -265,6 +255,50 @@ class WC_Checkoutcom_Cards_Settings
                 ),
                 'default' => 0,
                 'desc' => __('For processing MADA transactions, this option needs to be set to Yes', 'checkoutcom-cards-settings'),
+            ),
+            'ckocom_display_icon' => array(
+                'id' => 'ckocom_display_icon',
+                'title' => __('Display Card Icons', 'checkoutcom-cards-settings'),
+                'type' => 'select',
+                'desc_tip' => true,
+                'options' => array(
+                    0   => __('No', 'checkoutcom-cards-settings'),
+                    1   => __('Yes', 'checkoutcom-cards-settings')
+                ),
+                'default' => 0,
+                'desc' => 'Enable/disable cards icon on checkout page',
+            ),
+            'ckocom_card_icons' => array(
+                'id' => 'ckocom_card_icons',
+                'title' => __('Card Icons', 'checkoutcom-cards-settings'),
+                'type' => 'multiselect',
+                'options' => array(
+                    'visa' => __('Visa', 'checkoutcom-cards-settings'),
+                    'mastercard' => __('Mastercard', 'checkoutcom-cards-settings'),
+                    'amex' => __('American Express', 'checkoutcom-cards-settings'),
+                    'dinersclub' => __('Diners Club International', 'checkoutcom-cards-settings'),
+                    'discover' => __('Discover', 'checkoutcom-cards-settings'),
+                    'jcb' => __('JCB', 'checkoutcom-cards-settings')
+                ),
+                'class' => 'wc-enhanced-select',
+                'css' => 'width: 400px;',
+            ),
+            'ckocom_language_fallback' => array(
+                'id' => 'ckocom_language_fallback',
+                'title' => __('Language Fallback', 'checkoutcom-cards-settings'),
+                'type' => 'select',
+                'desc_tip' => true,
+                'options' => array(
+                    'EN-GB'   => __('English', 'checkoutcom-cards-settings'),
+                    'NL-NL'   => __('Dutch', 'checkoutcom-cards-settings'),
+                    'FR-FR'   => __('French', 'checkoutcom-cards-settings'),
+                    'DE-DE'   => __('German', 'checkoutcom-cards-settings'),
+                    'IT-IT'   => __('Italian', 'checkoutcom-cards-settings'),
+                    'KR-KR'   => __('Korean', 'checkoutcom-cards-settings'),
+                    'ES-ES'   => __('Spanish', 'checkoutcom-cards-settings')
+                ),
+                'default' => 'EN-GB',
+                'desc' => 'Select the language to use by default if the one used by the shopper is not supported by the integration.',
             ),
         );
 
