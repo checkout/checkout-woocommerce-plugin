@@ -2,31 +2,31 @@
 export default {
     value: {
         url: {
-            wordpress_base: 'http://localhost/wordpress',
+            wordpress_base: 'http://3.8.145.109',
             admin_path: '/wp-admin',
             plugins_path: '/wp-admin/plugins.php',
             order_path_1: '/wp-admin/post.php?post=',
             order_path_2: '&action=edit',
-            product_path: '/index.php/product/test/',
+            product_path: '/product/demo/',
             core_settings:
-                'http://localhost/wordpress/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards',
+                'http://3.8.145.109/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards',
             card_settings:
-                'http://localhost/wordpress/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards&screen=card_settings',
+                'http://3.8.145.109/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards&screen=card_settings',
             order_settings:
-                'http://localhost/wordpress/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards&screen=orders_settings',
+                'http://3.8.145.109/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards&screen=orders_settings',
             google_pay_settings:
-                'http://localhost/wordpress/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_google_pay',
+                'http://3.8.145.109/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_google_pay',
             apple_pay_settings:
-                'http://localhost/wordpress/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_apple_pay',
+                'http://3.8.145.109/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_apple_pay',
             apm_settings:
-                'http://localhost/wordpress/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_alternative_payments',
+                'http://3.8.145.109/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_alternative_payments',
             debug_settings:
-                'http://localhost/wordpress/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards&screen=debug_settings',
-            woocommerce: 'http://localhost/wordpress/wp-admin/index.php?page=wc-setup'
+                'http://3.8.145.109/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards&screen=debug_settings',
+            woocommerce: 'http://3.8.145.109/wp-admin/index.php?page=wc-setup'
         },
         admin: {
-            username: 'checkout',
-            password: 'Checkout17',
+            username: 'admin',
+            password: 'Checkout2020!$',
             three_d_password: 'Checkout1!',
             secret_key: 'sk_test_0b9b5db6-f223-49d0-b68f-f6643dd4f808',
             public_key: 'pk_test_4296fd52-efba-4a38-b6ce-cf0d93639d8a',
@@ -73,7 +73,7 @@ export default {
                 pci_saved_card:
                     '#woocommerce_checkout_pci-cc-form > ul:nth-child(1) > li:nth-child(1) > p:nth-child(1) > input:nth-child(1)',
                 js_saved_card: '#checkout-saved-card-0',
-                order_confirmation: '.woocommerce-notice',
+                order_confirmation: '.entry-title',
                 three_d_password: '#txtPassword',
                 three_d_submit: '#txtButton',
                 success_order_number: '.woocommerce-order-overview__order',
