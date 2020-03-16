@@ -8,9 +8,9 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway
     public function __construct()
     {
         $this->id                   = 'wc_checkout_com_google_pay';
-        $this->method_title         = __("Checkout.com", 'checkout-com-google-pay');
-        $this->method_description   = __("The Checkout.com extension allows shop owners to process online payments through the <a href=\"https://www.checkout.com\">Checkout.com Payment Gateway.</a>", 'checkout-com-google-pay');
-        $this->title                = __("Google Pay", 'checkout-com-google-pay');
+        $this->method_title         = __("Checkout.com", 'wc_checkout_com');
+        $this->method_description   = __("The Checkout.com extension allows shop owners to process online payments through the <a href=\"https://www.checkout.com\">Checkout.com Payment Gateway.</a>", 'wc_checkout_com');
+        $this->title                = __("Google Pay", 'wc_checkout_com');
 
         $this->has_fields = true;
         $this->supports = array( 'products', 'refunds');
@@ -41,7 +41,7 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway
             'screen_button' => array(
                 'id'    => 'screen_button',
                 'type'  => 'screen_button',
-                'title' => __( 'Other Settings', 'configuration_setting' ),
+                'title' => __( 'Other Settings', 'wc_checkout_com' ),
             )
         ));
     }
@@ -277,7 +277,7 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway
 
         // Check if google token is not empty
         if(empty($google_token)) {
-            WC_Checkoutcom_Utility::wc_add_notice_self(__('There was an issue completing the payment.'), 'error');
+            WC_Checkoutcom_Utility::wc_add_notice_self(__('There was an issue completing the payment.', 'wc_checkout_com'), 'error');
             return;
         }
 
@@ -296,13 +296,13 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway
 
         // Get cko auth status configured in admin
         $status = WC_Admin_Settings::get_option('ckocom_order_authorised');
-        $message = __("Checkout.com Payment Authorised (Transaction ID - {$result['action_id']}) ", 'wc_checkout_com_cards');
+        $message = __("Checkout.com Payment Authorised (Transaction ID - {$result['action_id']}) ", 'wc_checkout_com');
 
         // check if payment was flagged
         if ($result['risk']['flagged']) {
             // Get cko auth status configured in admin
             $status = WC_Admin_Settings::get_option('ckocom_order_flagged');
-            $message = __("Checkout.com Payment Flagged (Transaction ID - {$result['action_id']}) ", 'wc_checkout_com_cards');
+            $message = __("Checkout.com Payment Flagged (Transaction ID - {$result['action_id']}) ", 'wc_checkout_com');
         }
 
         // Update order status on woo backend
@@ -343,12 +343,12 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway
 
         // Get cko auth status configured in admin
         $status = WC_Admin_Settings::get_option('ckocom_order_refunded');
-        $message = __("Checkout.com Payment refunded (Transaction ID - {$result['action_id']}) ", 'wc_checkout_com_cards');
+        $message = __("Checkout.com Payment refunded (Transaction ID - {$result['action_id']}) ", 'wc_checkout_com');
 
         if(isset($_SESSION['cko-refund-is-less'])){
             if($_SESSION['cko-refund-is-less']){
                 $status = WC_Admin_Settings::get_option('ckocom_order_captured');
-                $order->add_order_note( __("Checkout.com Payment Partially refunded (Transaction ID - {$result['action_id']})") );
+                $order->add_order_note( __("Checkout.com Payment Partially refunded (Transaction ID - {$result['action_id']})", 'wc_checkout_com') );
 
                 unset($_SESSION['cko-refund-is-less']);
 

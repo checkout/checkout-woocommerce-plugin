@@ -31,7 +31,7 @@ class WC_Checkout_Com_Webhook
 
         // Add note to order if captured already
         if ($already_captured) {
-            $order->add_order_note(__($message, 'wc_checkout_com_cards'));
+            $order->add_order_note(__($message, 'wc_checkout_com'));
             return true;
         }
 
@@ -47,16 +47,16 @@ class WC_Checkout_Com_Webhook
 
         // Get cko capture status configured in admin
         $status = WC_Admin_Settings::get_option('ckocom_order_captured');
-        $order_message = __("Checkout.com Payment Captured (Transaction ID - {$action_id}) ", 'wc_checkout_com_cards');
+        $order_message = __("Checkout.com Payment Captured (Transaction ID - {$action_id}) ", 'wc_checkout_com');
 
         // Check if webhook amount is less than order amount
         if ($amount < $order_amount_cents) {
-            $order_message = __("Checkout.com Payment partially captured (Transaction ID - {$action_id}) ", 'wc_checkout_com_cards');
+            $order_message = __("Checkout.com Payment partially captured (Transaction ID - {$action_id}) ", 'wc_checkout_com');
         }
 
         // Update order status on woo backend
         $order->update_status($status, $order_message);
-        $order->add_order_note(__($message, 'wc_checkout_com_cards'));
+        $order->add_order_note(__($message, 'wc_checkout_com'));
 
         return true;
     }
@@ -82,7 +82,7 @@ class WC_Checkout_Com_Webhook
         $message = 'Webhook received from checkout.com. Payment capture declined. Reason : '.$webhook_data->response_summary;
 
         // Add note to order if capture declined
-        $order->add_order_note(__($message, 'wc_checkout_com_cards'));
+        $order->add_order_note(__($message, 'wc_checkout_com'));
 
         return true;
     }
@@ -112,7 +112,7 @@ class WC_Checkout_Com_Webhook
 
         // Add note to order if captured already
         if ($already_voided) {
-            $order->add_order_note(__($message, 'wc_checkout_com_cards'));
+            $order->add_order_note(__($message, 'wc_checkout_com'));
             return true;
         }
 
@@ -125,11 +125,11 @@ class WC_Checkout_Com_Webhook
 
         // Get cko capture status configured in admin
         $status = WC_Admin_Settings::get_option('ckocom_order_void');
-        $order_message = __("Checkout.com Payment Voided (Transaction ID - {$action_id}) ", 'wc_checkout_com_cards');
+        $order_message = __("Checkout.com Payment Voided (Transaction ID - {$action_id}) ", 'wc_checkout_com');
 
         // Update order status on woo backend
         $order->update_status($status, $order_message);
-        $order->add_order_note(__($message, 'wc_checkout_com_cards'));
+        $order->add_order_note(__($message, 'wc_checkout_com'));
 
         return true;
     }
@@ -159,7 +159,7 @@ class WC_Checkout_Com_Webhook
 
         // Add note to order if captured already
         if ($already_refunded) {
-            $order->add_order_note(__($message, 'wc_checkout_com_cards'));
+            $order->add_order_note(__($message, 'wc_checkout_com'));
             return true;
         }
 
@@ -175,16 +175,16 @@ class WC_Checkout_Com_Webhook
 
         // Get cko capture status configured in admin
         $status = WC_Admin_Settings::get_option('ckocom_order_refunded');
-        $order_message = __("Checkout.com Payment Refunded (Transaction ID - {$action_id}) ", 'wc_checkout_com_cards');
+        $order_message = __("Checkout.com Payment Refunded (Transaction ID - {$action_id}) ", 'wc_checkout_com');
 
         // Check if webhook amount is less than order amount
         if ($amount < $order_amount_cents) {
-            $order_message = __("Checkout.com Payment partially refunded (Transaction ID - {$action_id}) ", 'wc_checkout_com_cards');
+            $order_message = __("Checkout.com Payment partially refunded (Transaction ID - {$action_id}) ", 'wc_checkout_com');
         }
 
         // Update order status on woo backend
         $order->update_status($status, $order_message);
-        $order->add_order_note(__($message, 'wc_checkout_com_cards'));
+        $order->add_order_note(__($message, 'wc_checkout_com'));
 
         return true;
     }
@@ -233,7 +233,7 @@ class WC_Checkout_Com_Webhook
 
             // check if gateway response is enable from module settings
             if ($gateway_debug) {
-                $error_message .= __($ex->getMessage() , 'wc_checkout_com_cards');
+                $error_message .= __($ex->getMessage() , 'wc_checkout_com');
             }
 
             // Log message

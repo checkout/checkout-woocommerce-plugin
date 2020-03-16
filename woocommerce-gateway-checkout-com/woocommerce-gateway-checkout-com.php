@@ -57,7 +57,7 @@ function init_checkout_com_gateway_class()
 add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), 'checkout_com_action_links' );
 function checkout_com_action_links($links) {
     $plugin_links = array(
-        '<a href="' . admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards' ) . '">' . __( 'Settings', 'wc_checkout_com_cards' ) . '</a>',
+        '<a href="' . admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards' ) . '">' . __( 'Settings', 'wc_checkout_com' ) . '</a>',
     );
 
     return array_merge( $plugin_links, $links );
@@ -250,7 +250,7 @@ function renew_save_again($post_id, $post, $update){
 
                 // Get cko capture status configured in admin
                 $status = WC_Admin_Settings::get_option('ckocom_order_captured');
-                $message = __("Checkout.com Payment Captured (Transaction ID - {$result['action_id']}) ", 'wc_checkout_com_cards');
+                $message = __("Checkout.com Payment Captured (Transaction ID - {$result['action_id']}) ", 'wc_checkout_com');
 
                 // Update order status on woo backend
                 $order->update_status($status,$message);
@@ -272,7 +272,7 @@ function renew_save_again($post_id, $post, $update){
 
                 // Get cko capture status configured in admin
                 $status = WC_Admin_Settings::get_option('ckocom_order_void');
-                $message = __("Checkout.com Payment Voided (Transaction ID - {$result['action_id']}) ", 'wc_checkout_com_cards');
+                $message = __("Checkout.com Payment Voided (Transaction ID - {$result['action_id']}) ", 'wc_checkout_com');
 
                 // Update order status on woo backend
                 $order->update_status($status,$message);
@@ -283,7 +283,7 @@ function renew_save_again($post_id, $post, $update){
                 return true;
 
             } else {
-                WC_Admin_Notices::add_custom_notice('wc_checkout_com_cards', __('An error has occured'));
+                WC_Admin_Notices::add_custom_notice('wc_checkout_com_cards', __('An error has occured.', 'wc_checkout_com'));
                 return false;
             }
         }

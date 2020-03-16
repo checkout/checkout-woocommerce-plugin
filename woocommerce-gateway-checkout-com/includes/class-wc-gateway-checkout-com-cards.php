@@ -19,9 +19,9 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
     public function __construct()
     {
         $this->id                   = 'wc_checkout_com_cards';
-        $this->method_title         = __("Checkout.com", 'wc_checkout_com_cards');
-        $this->method_description   = __("The Checkout.com extension allows shop owners to process online payments through the <a href=\"https://www.checkout.com\">Checkout.com Payment Gateway.</a>", 'wc_checkout_com_cards');
-        $this->title                = __("Cards payment and general configuration", 'wc_checkout_com_cards');
+        $this->method_title         = __("Checkout.com", 'wc_checkout_com');
+        $this->method_description   = __("The Checkout.com extension allows shop owners to process online payments through the <a href=\"https://www.checkout.com\">Checkout.com Payment Gateway.</a>", 'wc_checkout_com');
+        $this->title                = __("Cards payment and general configuration", 'wc_checkout_com');
         $this->has_fields = true;
         $this->supports = array(
             'products',
@@ -29,7 +29,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
             'tokenization',
         );
 
-        $this->new_method_label   = __( 'Use a new card', 'woocommerce' );
+        $this->new_method_label   = __( 'Use a new card', 'wc_checkout_com' );
 
         $this->init_form_fields();
         $this->init_settings();
@@ -61,7 +61,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
             'screen_button' => array(
                 'id'    => 'screen_button',
                 'type'  => 'screen_button',
-                'title' => __( 'Other Settings', 'configuration_setting' ),
+                'title' => __( 'Other Settings', 'wc_checkout_com' ),
             )
         ));
     }
@@ -90,7 +90,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
                 'screen_button' => array(
                     'id'    => 'screen_button',
                     'type'  => 'screen_button',
-                    'title' => __( 'Settings', 'configuration_setting' ),
+                    'title' => __( 'Settings', 'wc_checkout_com' ),
                 )
             );
 
@@ -157,7 +157,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         $mada_enable = WC_Admin_Settings::get_option('ckocom_card_mada') == 1 ? true : false;
         $require_cvv = WC_Admin_Settings::get_option('ckocom_card_require_cvv');
         $is_mada_token = false;
-        $cardValidationAlert = __("Please enter your card details.", 'wc_checkout_com_cards');
+        $cardValidationAlert = __("Please enter your card details.", 'wc_checkout_com');
         $localisation = $this->get_localisation();
 
         // check if saved card enable from module setting
@@ -361,7 +361,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
             if(sanitize_text_field($_POST['cko-card-token'])){
                 $arg = sanitize_text_field($_POST['cko-card-token']);
             } else {
-                WC_Checkoutcom_Utility::wc_add_notice_self(__('There was an issue completing the payment.'), 'error');
+                WC_Checkoutcom_Utility::wc_add_notice_self(__('There was an issue completing the payment.', 'wc_checkout_com'), 'error');
                 return;
             }
         }
@@ -406,13 +406,13 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 
         // Get cko auth status configured in admin
         $status = WC_Admin_Settings::get_option('ckocom_order_authorised');
-        $message = __("Checkout.com Payment Authorised (Transaction ID - {$result['action_id']}) ", 'wc_checkout_com_cards');
+        $message = __("Checkout.com Payment Authorised (Transaction ID - {$result['action_id']}) ", 'wc_checkout_com');
 
         // check if payment was flagged
         if ($result['risk']['flagged']) {
             // Get cko auth status configured in admin
             $status = WC_Admin_Settings::get_option('ckocom_order_flagged');
-            $message = __("Checkout.com Payment Flagged (Transaction ID - {$result['action_id']}) ", 'wc_checkout_com_cards');
+            $message = __("Checkout.com Payment Flagged (Transaction ID - {$result['action_id']}) ", 'wc_checkout_com');
         }
 
         // Update order status on woo backend
@@ -462,7 +462,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         // Redirect to my-account/payment-method if card verification failed
         // show error to customer
         if(isset($result['card_verification']) == 'error'){
-            WC_Checkoutcom_Utility::wc_add_notice_self(__('Unable to add payment method to your account.' ,'wc_checkout_com_cards_settings'), 'error');
+            WC_Checkoutcom_Utility::wc_add_notice_self(__('Unable to add payment method to your account.', 'wc_checkout_com'), 'error');
             wp_redirect($result['redirection_url']);
             exit;
         }
@@ -473,7 +473,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 
             $this->save_token(get_current_user_id(), $result);
 
-            WC_Checkoutcom_Utility::wc_add_notice_self(__('Payment method successfully added.' ,'wc_checkout_com_cards_settings'), 'notice');
+            WC_Checkoutcom_Utility::wc_add_notice_self(__('Payment method successfully added.', 'wc_checkout_com'), 'notice');
             wp_redirect($result['metadata']['redirection_url']);
             exit;
         }
@@ -490,18 +490,18 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 
         // Get cko auth status configured in admin
         $status = WC_Admin_Settings::get_option('ckocom_order_authorised');
-        $message = __("Checkout.com Payment Authorised (Transaction ID - {$action['0']['id']}) ", 'wc_checkout_com_cards_settings');
+        $message = __("Checkout.com Payment Authorised (Transaction ID - {$action['0']['id']}) ", 'wc_checkout_com');
 
         // check if payment was flagged
         if ($result['risk']['flagged']) {
             // Get cko auth status configured in admin
             $status = WC_Admin_Settings::get_option('ckocom_order_flagged');
-            $message = __("Checkout.com Payment Flagged (Transaction ID - {$action['0']['id']}) ", 'wc_checkout_com_cards_settings');
+            $message = __("Checkout.com Payment Flagged (Transaction ID - {$action['0']['id']}) ", 'wc_checkout_com');
         }
 
         if ($result['status'] == 'Captured') {
             $status = WC_Admin_Settings::get_option('ckocom_order_captured');
-            $message = __("Checkout.com Payment Captured (Transaction ID - {$action['0']['id']}) ", 'wc_checkout_com_cards_settings');
+            $message = __("Checkout.com Payment Captured (Transaction ID - {$action['0']['id']}) ", 'wc_checkout_com');
         }
 
         // save card to db
@@ -614,7 +614,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 
             // check if gateway response is enable from module settings
             if ($gateway_debug) {
-                $error_message .= __($ex->getMessage() , 'wc_checkout_com_cards');
+                $error_message .= __($ex->getMessage() , 'wc_checkout_com');
             }
 
             // Log message
@@ -690,12 +690,12 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 
         // Get cko auth status configured in admin
         $status = WC_Admin_Settings::get_option('ckocom_order_refunded');
-        $message = __("Checkout.com Payment refunded (Transaction ID - {$result['action_id']}) ", 'wc_checkout_com_cards');
+        $message = __("Checkout.com Payment refunded (Transaction ID - {$result['action_id']}) ", 'wc_checkout_com');
 
         if(isset($_SESSION['cko-refund-is-less'])){
             if($_SESSION['cko-refund-is-less']){
                 $status = WC_Admin_Settings::get_option('ckocom_order_captured');
-                $order->add_order_note( __("Checkout.com Payment Partially refunded (Transaction ID - {$result['action_id']})") );
+                $order->add_order_note( __("Checkout.com Payment Partially refunded (Transaction ID - {$result['action_id']})", 'wc_checkout_com') );
 
                 unset($_SESSION['cko-refund-is-less']);
 
