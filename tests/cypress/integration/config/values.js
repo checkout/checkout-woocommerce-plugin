@@ -9,20 +9,20 @@ export default {
             order_path_2: '&action=edit',
             product_path: '/index.php/product/test/',
             core_settings:
-                'http://localhost/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards',
+                'http://localhost/wordpress/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards',
             card_settings:
-                'http://localhost/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards&screen=card_settings',
+                'http://localhost/wordpress/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards&screen=card_settings',
             order_settings:
-                'http://localhost/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards&screen=orders_settings',
+                'http://localhost/wordpress/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards&screen=orders_settings',
             google_pay_settings:
-                'http://localhost/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_google_pay',
+                'http://localhost/wordpress/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_google_pay',
             apple_pay_settings:
-                'http://localhost/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_apple_pay',
+                'http://localhost/wordpress/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_apple_pay',
             apm_settings:
-                'http://localhost/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_alternative_payments',
+                'http://localhost/wordpress/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_alternative_payments',
             debug_settings:
-                'http://localhost/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards&screen=debug_settings',
-            woocommerce: 'http://localhost/wp-admin/index.php?page=wc-setup'
+                'http://localhost/wordpress/wp-admin/admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards&screen=debug_settings',
+            woocommerce: 'http://localhost/wordpress/wp-admin/index.php?page=wc-setup'
         },
         admin: {
             username: 'checkout',
