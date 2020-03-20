@@ -37,6 +37,7 @@ describe('Setup Wocommerce', function() {
                 cy.get(BACKEND.woo_normal_price).type('1234');
                 cy.get(BACKEND.woo_promo_price).type('123');
                 cy.get(BACKEND.woo_publish).click();
+                cy.pause(4000);
             }
         });
         cy.visit(URL.wordpress_base + URL.plugins_path);
