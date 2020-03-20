@@ -40,6 +40,8 @@ describe('Setup Wocommerce', function() {
                 cy.pause(4000);
             }
         });
+        cy.visit(URL.wordpress_base + URL.plugins_path);
+        cy.pause(4000);
     });
 
     it('should activate and configure the checkout plugin', function() {
