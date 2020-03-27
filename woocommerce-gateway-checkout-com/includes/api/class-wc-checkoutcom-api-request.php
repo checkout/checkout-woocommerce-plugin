@@ -245,12 +245,12 @@ class WC_Checkoutcom_Api_request
         $payment->success_url = $redirection_url;
         $payment->failure_url = $redirection_url;
 
+        $udf5 = "Platform Data - Wordpress " . $wp_version . "/ Woocommerce " . $woocommerce->version
+        . ", Integration Data - Checkout.com " . WC_Gateway_Checkout_Com_Cards::PLUGIN_VERSION . ", SDK Data - PHP SDK ". CheckoutApi::VERSION . 
+        ", Order ID - " . $order->get_order_number() . ", Server - " . get_site_url();
+
         $metadata = array(
-            'order_id' => $order->get_order_number(),
-            'server' => get_site_url(),
-            'sdk_data' => "PHP SDK v".CheckoutApi::VERSION,
-            'integration_data' => "Checkout.com Woocommerce Plugin v".WC_Gateway_Checkout_Com_Cards::PLUGIN_VERSION,
-            'platform_data' => "Wordpress v".$wp_version. ", WooCommerce v". $woocommerce->version,
+            'udf5' => $udf5
         );
 
         // set capture delay if payment action is authorise and capture
