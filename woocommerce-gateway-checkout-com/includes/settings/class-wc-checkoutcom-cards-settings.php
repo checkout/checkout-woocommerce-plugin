@@ -300,6 +300,18 @@ class WC_Checkoutcom_Cards_Settings
                 'default' => 'EN-GB',
                 'desc' => 'Select the language to use by default if the one used by the shopper is not supported by the integration.',
             ),
+            'ckocom_iframe_style' => array(
+                'id' => 'ckocom_iframe_style',
+                'title' => __('Iframe Style', 'checkoutcom-cards-settings'),
+                'type' => 'select',
+                'desc_tip' => true,
+                'options' => array(
+                    0   => __('Single Iframe', 'checkoutcom-cards-settings'),
+                    1   => __('Multiple Iframe', 'checkoutcom-cards-settings')
+                ),
+                'default' => 0,
+                'desc' => 'Select the styling for card iframe',
+            ),
         );
 
         return apply_filters( 'wc_checkout_com_cards', $settings );

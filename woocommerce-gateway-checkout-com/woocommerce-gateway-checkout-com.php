@@ -3,7 +3,7 @@
 Plugin Name: Checkout.com Payment Gateway
 Plugin URI: https://www.checkout.com/
 Description: Extends WooCommerce by Adding the Checkout.com Gateway.
-Version: 4.1.9
+Version: 4.1.10
 Author: Checkout.com
 Author URI: https://www.checkout.com/
 */
@@ -108,14 +108,14 @@ function cko_frames_js()
 add_action('woocommerce_checkout_process', 'cko_check_if_empty');
 function cko_check_if_empty()
 {
-    if(sanitize_text_field($_POST['payment_method']) == 'wc_checkout_com_cards'){
+    if($_POST['payment_method'] == 'wc_checkout_com_cards'){
         
          // check if require cvv is enable in module setting
         if(WC_Admin_Settings::get_option('ckocom_card_saved') 
                 && WC_Admin_Settings::get_option('ckocom_card_require_cvv') 
-                && sanitize_text_field($_POST['wc-wc_checkout_com_cards-payment-token']) != 'new' ){
+                && $_POST['wc-wc_checkout_com_cards-payment-token'] !== 'new' ){
             // check if cvv is empty on checkout page
-            if ( empty( sanitize_text_field($_POST['wc_checkout_com_cards-card-cvv'] ) ) ) {
+            if ( empty( $_POST['wc_checkout_com_cards-card-cvv']  ) ) {
                 wc_add_notice( 'Please enter a valid cvv.', 'error' );
             }
         }
@@ -132,14 +132,23 @@ function callback_for_setting_up_scripts() {
     $css_path = plugins_url('/assets/css/checkoutcom-styles.css',__FILE__);
     $normalize = plugins_url('/assets/css/normalize.css',__FILE__);
     $frames_style = plugins_url('/assets/css/style.css',__FILE__);
+    $multi_frame = plugins_url('/assets/css/multi-iframe.css',__FILE__);
 
     // register cko css
     wp_register_style( 'checkoutcom-style', $css_path);
     wp_register_style( 'normalize', $normalize);
-    wp_register_style( 'frames_style', $frames_style);
     wp_enqueue_style( 'checkoutcom-style' );
     wp_enqueue_style( 'normalize' );
+    
+
+    if (WC_Admin_Settings::get_option('ckocom_iframe_style') ) {
+        wp_register_style( 'frames_style', $multi_frame);
+    } else {
+        wp_register_style( 'frames_style', $frames_style);
+    }
+
     wp_enqueue_style( 'frames_style' );
+    
     // Enqueue google pay script
     wp_enqueue_script( 'cko-google-script', 'https://pay.google.com/gp/p/js/pay.js', array( 'jquery' ) );
 

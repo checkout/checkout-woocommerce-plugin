@@ -582,3 +582,32 @@ datalist {
     padding-right: 2px;
     top: 4px;
 }
+
+.woocommerce-SavedPaymentMethods-token{
+    display: -webkit-box;
+}
+
+.woocommerce-SavedPaymentMethods-token > label{
+    padding-left: 5px;
+}
+
+.woocommerce-SavedPaymentMethods-new{
+    display: -webkit-box;
+}
+
+.woocommerce-SavedPaymentMethods-new > label{
+    padding-left: 5px;
+}
+
+#cko-cvv > input {
+    height : 35px;
+    width : 75px;
+    font-size: 17px;
+    font-family: monospace;
+}
+
+#cko-cvv::placeholder {
+    font-size: 17px;
+    font-family: monospace;
+    text-align: center;
+}
