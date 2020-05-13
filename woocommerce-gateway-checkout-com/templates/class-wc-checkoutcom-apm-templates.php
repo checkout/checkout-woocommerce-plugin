@@ -101,4 +101,125 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_request
         </div>
         <?php
     }
+
+    public static function get_sepa_details($current_user) {
+        ?>
+        <!-- Sepa details-->
+        <div class="sepa-content">
+            <div class="input-group">
+                <label class="icon" for="sepa-iban">
+                    <span class="ckojs ckojs-card"></label>
+                <input type="text" id="sepa-iban" name="sepa-iban" placeholder="<?= (__('IBAN')); ?>" class="input-control" required style="width: 100%;">
+            </div>
+            <div class="input-group">
+                <label class="icon" for="sepa-bic">
+                    <span class="ckojs ckojs-card"></label>
+                <input type="text" id="sepa-bic" name="sepa-bic" placeholder="<?= (__('BIC')); ?>" class="input-control" required style="width: 100%;">
+            </div>
+            <div class="sepa-continue-btn">
+                <input type="button" id="sepa-continue" name="sepa-continue" value="Continue">
+            </div>
+
+            <?php
+            $sepa_mandate = self::get_sepa_mandate($current_user);
+            $alert = __("Please fill in the required fields.", 'wc_checkout_com');
+            ?>
+        </div>
+        
+        <script type="text/javascript">
+            jQuery('#sepa-continue').click(function(){
+
+                if(jQuery('#sepa-iban').val().length > 0 && jQuery('#sepa-bic').val().length > 0) {
+                    jQuery('.sepa-mandate-card').show();
+                } else {
+                    alert('<?php echo $alert; ?>')
+                }
+                
+            })
+        </script>
+
+        <?php
+    }
+
+    private static function get_sepa_mandate($current_user) {
+    ?>
+    <div class="sepa-mandate-card" style="display: none;">
+        <div class="sepa-card-header">
+            <div class="sepa-card-header-text">
+                <div class="sepa-card-title">
+                    <h4 style="font-weight: bold;">SEPA Direct Debit Mandate for single payment</h4>
+                </div>
+            </div>
+        </div>
+        <div class="sepa-mandate-content">
+            <div class="sepa-creditor">
+                <h4 style="margin: unset;">Creditor</h4>
+                <h4 style="margin: unset; font-weight: bold; ">b4payment GmbH</h4>
+                <p style="margin: unset;">Obermünsterstraße&nbsp;14</p>
+                <p style="margin: unset;">93047&nbsp;Regensburg</p>
+                <p style="margin: unset;">GERMANY</p>
+                <br>
+                <p style="margin: unset;" class="monospace">Creditor ID: DE36ZZZ00001690322</p>
+            </div>
+            <div class="sepa-debitor">
+                <h4 style="margin: unset;">Debtor</h4>
+                <h4 style="margin: unset; font-weight: bold; "><div class="customerName"></div></h4>
+                <div class="address" style="margin: unset;">
+                    <p style="margin: unset;" class="address1"></p>
+                    <p style="margin: unset;" class="address2"></p>
+                    <p style="margin: unset;" class="country"></p>
+                </div>
+                <br>
+                <p class="monospace" style="margin: unset;" id="sepa-dd-bic"></p>
+                <p class="monospace" style="margin: unset;" id="sepa-dd-iban"></p>
+            </div>
+        </div>
+        <div class="sepa-par">
+            <hr style="opacity: 0.2;max-width: inherit;">
+            <p>By accepting this mandate form, you authorise (A) b4payment GmbH to send instructions to your bank to debit your account (B) your bank to debit your account in accordance with the instructions from b4payment GmbH.</p>
+            <p>As part of your rights, you are entitled to a refund from your bank under the terms and conditions of your agreement with your bank. A refund must be claimed within 8 weeks starting from the date on which your account was debited.
+            </p>
+            <div class="sepa-checkbox-container" id="sepa-checkbox-container">
+                <label class="sepa-checkbox-layout" for="sepa-checkbox-input">
+                    <div class="sepa-checkbox-inner-container">
+                        <input class="sepa-checkbox-input" type="checkbox" name="sepa-checkbox-input" id="sepa-checkbox-input" required>
+                    </div>
+                    <span class="sepa-checkbox-layout">
+                        <span style="display:none">&nbsp;</span>
+                        <h4 style="font-size: 12px;font-weight: 500">I accept the mandate for a single payment</h4>
+                    </span>
+                </label>
+            </div>
+        </div>
+
+        <div class="sepa-right">
+            <hr style="opacity: 0.2;max-width: inherit;margin-bottom: 22px;">
+            <div class="sepa-card-footer">
+                <div class="sepa-card-footer-text">
+                    <div class="sepa-footer-title">
+                        Your rights regarding the above mandate are explained in a statement that you can obtain from your bank.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+        jQuery(document).ready(function(){
+            var customerName = jQuery('#billing_first_name').val() + " " + jQuery('#billing_last_name').val();
+            jQuery('.customerName').html(customerName)
+            var address1 = jQuery('#billing_address_1').val();
+            jQuery('.address1').html(address1)
+            var address2 = jQuery('#billing_address_2').val();
+            var city = jQuery('#billing_city').val();
+            jQuery('.address2').html(address2 + ' ' + city)
+            var billingCountry = jQuery("#billing_country option:selected").html();
+            var country = billingCountry.toUpperCase();
+            jQuery('.country').html(country)
+
+        })
+    </script>
+
+    <?php
+    }
 }
