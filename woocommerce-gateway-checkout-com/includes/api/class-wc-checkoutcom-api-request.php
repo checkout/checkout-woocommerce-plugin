@@ -31,6 +31,9 @@ use Checkout\Models\Payments\QpaySource;
 use Checkout\Models\Tokens\ApplePay;
 use Checkout\Models\Tokens\ApplePayHeader;
 use Checkout\Models\Tokens\GooglePay;
+use Checkout\Models\Sources\SepaAddress;
+use Checkout\Models\Sources\SepaData;
+use Checkout\Models\Sources\Sepa;
 use Checkout\Library\Exceptions\CheckoutHttpException;
 use Checkout\Library\Exceptions\CheckoutModelException;
 
@@ -203,7 +206,6 @@ class WC_Checkoutcom_Api_request
             $email = $order->billing_email;
             $name = $order->billing_first_name. ' ' . $order->billing_last_name;
         }
-
 
         // Customer
         $payment->customer = array(
@@ -839,13 +841,12 @@ class WC_Checkoutcom_Api_request
                         return array('apm_redirection' => $response->getRedirection());
 
                     } else {
-
                         // Verify payment id
                         $verifyPayment = $checkout->payments()->details($response->id);
                         $source = $verifyPayment->source;
 
                         // Check if payment source if Fawry
-                        if ($source['type'] == 'fawry'){
+                        if ($source['type'] == 'fawry' || $source['type'] == 'sepa'){
 
                             return $verifyPayment;
                         }
@@ -893,7 +894,11 @@ class WC_Checkoutcom_Api_request
      */
     private static function get_apm_method($data, $order)
     {
+        if (!session_id()) session_start();
+
         $apm_name = $data['cko-apm'];
+
+        $post = sanitize_post($_POST);
 
         switch ($apm_name) {
             case 'ideal':
@@ -1098,6 +1103,41 @@ class WC_Checkoutcom_Api_request
                 break;
             case 'qpay':
                 $method = new QpaySource(get_bloginfo( 'name' ));
+                break;
+            case 'sepa':
+                $customerAddress = $post['billing_address_1'] . ' ' . $post['billing_address_2'];
+                $address = new SepaAddress(
+                    $customerAddress,
+                    $post['billing_city'],
+                    $post['billing_postcode'],
+                    $post['billing_country']
+                );
+
+                $data = new SepaData(
+                    $post['billing_first_name'],
+                    $post['billing_last_name'],
+                    $post['sepa-iban'],
+                    $post['sepa-bic'],
+                    "Thanks for shopping.",
+                    'single'
+                );
+
+                $sepa = new Sepa($address, $data);
+                $sepa->customer = array(
+                  'email' => $post['billing_email'],
+                  'name' => $post['billing_first_name'] . ' ' . $post['billing_last_name']
+                );
+
+                $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
+                $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
+                $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
+
+                $details = $checkout->sources()->add($sepa);
+                $responseData = $details->response_data;
+                WC()->session->set('mandate_reference', $responseData['mandate_reference']);
+
+                $method = new IdSource($details->getId());
+
         }
 
         return $method;
