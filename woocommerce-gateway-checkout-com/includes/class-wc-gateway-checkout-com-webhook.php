@@ -243,35 +243,32 @@ class WC_Checkout_Com_Webhook
         }
     }
 
-/**
-     * Ticket : ECPINT-559
+    /**
      * Desc : This function is used to change the status of an order which are created following
-     * a 422 error (invalid card details).
      * Status changed from "pending payment to Cancelled"
-     * 
      */
-
     public static function decline_payment($data)
     {
+        $webhook_data = $data->data;
+        $order_id = $webhook_data->reference;
+        $paymentID = $webhook_data->id;
+
+        if (empty($order_id)) {
+            WC_Checkoutcom_Utility::logger('No order id for payment '.$paymentID , null);
+           
+            return false;
+        }
+
+        $order = wc_get_order( $order_id );
+
+        $status = "wc-cancelled";
+        $message = "Webhook received from checkout.com. Payment declined";
 
         try{
-            $webhook_data = $data->data;
-            $order_id = $webhook_data->reference;
-
-            if (empty($order_id)) {
-                WC_Checkoutcom_Utility::logger('No order id' , null);
-                return false;
-            }
-
-            $order = wc_get_order( $order_id );
-
-            $status = "wc-cancelled";
-            $message = "Webhook received from checkout.com. Payment declined";
-
+           
             // Update order status on woo backend
             $order->update_status($status, $message);
             $order->add_order_note(__($message, 'wc_checkout_com'));
-
 
             return true;
 
@@ -288,8 +285,6 @@ class WC_Checkout_Com_Webhook
 
             return false;
         }
-
-    
 
     }
 
