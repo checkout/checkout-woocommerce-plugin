@@ -952,7 +952,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
                 break;
             case 'payment_declined':
                 $response = WC_Checkout_Com_Webhook::decline_payment($data);
-                break
+                break;
 
             default:
                 $response = true;
