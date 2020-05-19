@@ -251,7 +251,8 @@ class WC_Checkout_Com_Webhook
     {
         $webhook_data = $data->data;
         $order_id = $webhook_data->reference;
-        $paymentID = $webhook_data->id;
+        $payment_id = $webhook_data->id;
+        $response_summary = $webhook_data->response_summary;
 
         if (empty($order_id)) {
             WC_Checkoutcom_Utility::logger('No order id for payment '.$paymentID , null);
@@ -262,13 +263,12 @@ class WC_Checkout_Com_Webhook
         $order = wc_get_order( $order_id );
 
         $status = "wc-cancelled";
-        $message = "Webhook received from checkout.com. Payment declined";
+        $message = "Webhook received from checkout.com. Payment declined Reason : ".$response_summary;
 
         try{
            
             // Update order status on woo backend
             $order->update_status($status, $message);
-            $order->add_order_note(__($message, 'wc_checkout_com'));
 
             return true;
 
