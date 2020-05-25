@@ -242,4 +242,51 @@ class WC_Checkout_Com_Webhook
             return false;
         }
     }
+
+    /**
+     * Desc : This function is used to change the status of an order which are created following
+     * Status changed from "pending payment to Cancelled"
+     */
+    public static function decline_payment($data)
+    {
+        $webhook_data = $data->data;
+        $order_id = $webhook_data->reference;
+        $payment_id = $webhook_data->id;
+        $response_summary = $webhook_data->response_summary;
+
+        if (empty($order_id)) {
+            WC_Checkoutcom_Utility::logger('No order id for payment '.$paymentID , null);
+           
+            return false;
+        }
+
+        $order = wc_get_order( $order_id );
+
+        $status = "wc-cancelled";
+        $message = "Webhook received from checkout.com. Payment declined Reason : ".$response_summary;
+
+        try{
+           
+            // Update order status on woo backend
+            $order->update_status($status, $message);
+
+            return true;
+
+        }catch (CheckoutHttpException $ex) {
+            $error_message = "An error has occurred while processing your cancel request.";
+
+            // check if gateway response is enable from module settings
+            if ($gateway_debug) {
+                $error_message .= __($ex->getMessage() , 'wc_checkout_com');
+            }
+
+            // Log message
+            WC_Checkoutcom_Utility::logger($error_message, $ex);
+
+            return false;
+        }
+
+    }
+
+
 }

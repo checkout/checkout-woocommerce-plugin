@@ -950,6 +950,10 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
             case 'payment_canceled':
                 $response = WC_Checkout_Com_Webhook::cancel_payment($data);
                 break;
+            case 'payment_declined':
+                $response = WC_Checkout_Com_Webhook::decline_payment($data);
+                break;
+
             default:
                 $response = true;
                 break;
