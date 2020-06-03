@@ -1084,6 +1084,9 @@ class WC_Checkoutcom_Api_request
                     );
                 }
 
+                // check the presence of a shipping method
+                if (!empty($order->get_shipping_method())){
+
                 $chosen_methods = wc_get_chosen_shipping_method_ids();
                 $chosen_shipping = $chosen_methods[0];
 
@@ -1098,6 +1101,7 @@ class WC_Checkoutcom_Api_request
                         "description" => $chosen_shipping,
                     );
                 }
+            }
 
                 $method = new FawrySource($email, $phone, $order->get_order_number(), $products);
                 break;
