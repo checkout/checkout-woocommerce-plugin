@@ -33,7 +33,8 @@ function init_checkout_com_gateway_class()
 
     // Hide Apple pay, Google pay from payment method tab
     wc_enqueue_js( "
-        jQuery( function(){
+        jQuery( function()
+        {
             setTimeout(function(){ 
                 if(jQuery('[data-gateway_id=\"wc_checkout_com_apple_pay\"]').length > 0) {
                     jQuery('[data-gateway_id=\"wc_checkout_com_apple_pay\"]').hide();
