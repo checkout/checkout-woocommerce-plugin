@@ -1085,23 +1085,23 @@ class WC_Checkoutcom_Api_request
                 }
 
                 // check the presence of a shipping method
-                if (!empty($order->get_shipping_method())){
+                if (!empty($order->get_shipping_method())) {
 
-                $chosen_methods = wc_get_chosen_shipping_method_ids();
-                $chosen_shipping = $chosen_methods[0];
+                    $chosen_methods = wc_get_chosen_shipping_method_ids();
+                    $chosen_shipping = $chosen_methods[0];
 
-                if($chosen_shipping != 'free_shipping') {
-                    $shipping_amount = WC()->cart->get_shipping_total();
-                    $shipping_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($shipping_amount, get_woocommerce_currency());
+                    if($chosen_shipping != 'free_shipping') {
+                        $shipping_amount = WC()->cart->get_shipping_total();
+                        $shipping_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($shipping_amount, get_woocommerce_currency());
 
-                    $products[] = array(
-                        "product_id" => $chosen_shipping,
-                        "quantity" => 1,
-                        "price" => $shipping_amount_cents,
-                        "description" => $chosen_shipping,
-                    );
+                        $products[] = array(
+                            "product_id" => $chosen_shipping,
+                            "quantity" => 1,
+                            "price" => $shipping_amount_cents,
+                            "description" => $chosen_shipping,
+                        );
+                    }
                 }
-            }
 
                 $method = new FawrySource($email, $phone, $order->get_order_number(), $products);
                 break;
