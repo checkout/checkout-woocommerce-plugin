@@ -3,7 +3,7 @@
 Plugin Name: Checkout.com Payment Gateway
 Plugin URI: https://www.checkout.com/
 Description: Extends WooCommerce by Adding the Checkout.com Gateway.
-Version: 4.1.12
+Version: 4.1.13
 Author: Checkout.com
 Author URI: https://www.checkout.com/
 */
@@ -33,7 +33,8 @@ function init_checkout_com_gateway_class()
 
     // Hide Apple pay, Google pay from payment method tab
     wc_enqueue_js( "
-        jQuery( function(){
+        jQuery( function()
+        {
             setTimeout(function(){ 
                 if(jQuery('[data-gateway_id=\"wc_checkout_com_apple_pay\"]').length > 0) {
                     jQuery('[data-gateway_id=\"wc_checkout_com_apple_pay\"]').hide();
