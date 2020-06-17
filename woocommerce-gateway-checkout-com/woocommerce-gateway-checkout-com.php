@@ -3,7 +3,7 @@
 Plugin Name: Checkout.com Payment Gateway
 Plugin URI: https://www.checkout.com/
 Description: Extends WooCommerce by Adding the Checkout.com Gateway.
-Version: 4.1.13
+Version: 4.1.14
 Author: Checkout.com
 Author URI: https://www.checkout.com/
 */
@@ -299,6 +299,25 @@ function renew_save_again($post_id, $post, $update){
         }
     }
 }
+
+// add the fawry reference number in the "thank you" page
+add_action( 'woocommerce_thankyou', 'addFawryNumber');
+
+function addFawryNumber($order_id){
+    
+    $fawryNumber = get_post_meta($order_id, "cko_fawry_reference_number", $single = true );
+
+    if ($fawryNumber) {
+
+        wc_enqueue_js("
+            jQuery( function(){
+                jQuery('.woocommerce-thankyou-order-details.order_details').append('<li >Fawry number: $fawryNumber</li>')
+            }) 
+        ");
+        
+    }
+}
+
 
 /**
  * filter for custom gateway icons
