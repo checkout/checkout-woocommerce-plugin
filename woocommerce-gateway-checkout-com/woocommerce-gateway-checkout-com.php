@@ -302,19 +302,15 @@ function renew_save_again($post_id, $post, $update){
 
 // add the fawry reference number in the "thank you" page
 add_action( 'woocommerce_thankyou', 'addFawryNumber');
-
-function addFawryNumber($order_id){
-    
+function addFawryNumber($order_id) {
     $fawryNumber = get_post_meta($order_id, "cko_fawry_reference_number", $single = true );
-
+    $fawry = __('Fawry reference number: ', 'wc_checkout_com');
     if ($fawryNumber) {
-
         wc_enqueue_js("
             jQuery( function(){
-                jQuery('.woocommerce-thankyou-order-details.order_details').append('<li >Fawry number: $fawryNumber</li>')
-            }) 
+                jQuery('.woocommerce-thankyou-order-details.order_details').append('<li class=\"woocommerce-order-overview\">$fawry<strong>$fawryNumber</strong></li>')
+            })
         ");
-        
     }
 }
 
