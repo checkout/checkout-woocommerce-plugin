@@ -1072,6 +1072,8 @@ class WC_Checkoutcom_Api_request
                     // Get an instance of corresponding the WC_Product object
                     $product = $item_data->get_product();
                     $item_total = $item_data->get_total(); // Get the item line total
+                    $productPrice = $product->get_price(); // Get the unit price of the product
+                    $unitPrice = WC_Checkoutcom_Utility::valueToDecimal($productPrice, get_woocommerce_currency());
                     $amount_cents = WC_Checkoutcom_Utility::valueToDecimal($item_total, get_woocommerce_currency());
                     $items_total = $item_data->get_total() * $item_data->get_quantity();
                     $total_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($items_total, get_woocommerce_currency());
@@ -1079,7 +1081,7 @@ class WC_Checkoutcom_Api_request
                     $products[] = array(
                         "product_id" => $product->get_id(),
                         "quantity" => $item_data->get_quantity(),
-                        "price" => $amount_cents,
+                        "price" => $unitPrice,
                         "description" => $product->get_name(),
                     );
                 }
