@@ -311,6 +311,10 @@ class WC_Checkoutcom_Utility
                 if ($value == 'alipay' && $currencyCode == 'USD' && $countryCode == 'CN') {
                     array_push($apmArray, $value);
                 }
+
+                if ($value == 'qpay' && $currencyCode == 'QAR' && $countryCode == 'QA') {
+                    array_push($apmArray, $value);
+                }
             }
         }
 
