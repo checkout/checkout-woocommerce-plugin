@@ -84,7 +84,19 @@ class WC_Checkoutcom_Api_request
                     return $response;
                 }
             } else {
-                $error_message = __("An error has occurred while processing your payment. Please check your card details and try again. ", 'wc_checkout_com');
+                $showDeclineResponse = WC_Admin_Settings::get_option('ckocom_display_declines');
+
+                // If the merchant enabled decline reasons 
+                if($showDeclineResponse) {
+                    // Only show the decline reason in case the response code is not from a risk rule
+                    if(preg_match("/^(?:40)\d+$/",$response->response_code)) {
+                       $error_message = __("An error has occurred while processing your payment. Please check your card details and try again. ", 'wc_checkout_com');
+                    } else {
+                       $error_message = __($response->response_summary, 'wc_checkout_com');
+                    }
+                } else {
+                    $error_message = __("An error has occurred while processing your payment. Please check your card details and try again. ", 'wc_checkout_com');
+                }
 
                 // check if gateway response is enable from module settings
                 if ($gateway_debug) {

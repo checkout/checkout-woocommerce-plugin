@@ -312,6 +312,18 @@ class WC_Checkoutcom_Cards_Settings
                 'default' => 0,
                 'desc' => 'Select the styling for card iframe',
             ),
+            'ckocom_display_icon' => array(
+                'id' => 'ckocom_display_declines',
+                'title' => __('Display Decline Reason', 'checkoutcom-cards-settings'),
+                'type' => 'select',
+                'desc_tip' => true,
+                'options' => array(
+                    0   => __('No', 'checkoutcom-cards-settings'),
+                    1   => __('Yes', 'checkoutcom-cards-settings')
+                ),
+                'default' => 0,
+                'desc' => 'Enable/disable decline reasons on the checkout page. It will not display the decline reason for risk rule declines.',
+            ),
         );
 
         return apply_filters( 'wc_checkout_com_cards', $settings );
