@@ -3,7 +3,7 @@
 Plugin Name: Checkout.com Payment Gateway
 Plugin URI: https://www.checkout.com/
 Description: Extends WooCommerce by Adding the Checkout.com Gateway.
-Version: 4.1.14
+Version: 4.1.15
 Author: Checkout.com
 Author URI: https://www.checkout.com/
 */
@@ -150,8 +150,14 @@ function callback_for_setting_up_scripts() {
 
     wp_enqueue_style( 'frames_style' );
     
+    // load cko google pay setting
+    $google_settings = get_option('woocommerce_wc_checkout_com_google_pay_settings');
+    $google_pay_enabled = $google_settings['enabled'] == 'yes' ? true : false;
+
     // Enqueue google pay script
-    wp_enqueue_script( 'cko-google-script', 'https://pay.google.com/gp/p/js/pay.js', array( 'jquery' ) );
+    if ($google_pay_enabled){
+        wp_enqueue_script( 'cko-google-script', 'https://pay.google.com/gp/p/js/pay.js', array( 'jquery' ) );
+    }
 
     // load cko apm settings
     $apm_settings = get_option('woocommerce_wc_checkout_com_alternative_payments_settings');
