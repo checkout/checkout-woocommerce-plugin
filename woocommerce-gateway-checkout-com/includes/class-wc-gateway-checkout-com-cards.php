@@ -489,7 +489,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
                             return false;
                         }
                     });
-                }, 1500);
+                }, 0);
             </script>
 
         </div>
