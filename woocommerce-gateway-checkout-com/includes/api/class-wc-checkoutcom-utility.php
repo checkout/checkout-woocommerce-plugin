@@ -120,7 +120,7 @@ class WC_Checkoutcom_Utility
     public static function isMadaCard($bin)
     {
         // Path to MADA_BIN.csv
-        $csvPath = WP_PLUGIN_DIR. "\woocommerce-gateway-checkout-com\includes\Files\Mada\MADA_BINS.csv";
+        $csvPath = WP_PLUGIN_DIR. "\checkout-com-unified-payments-api\includes\Files\Mada\MADA_BINS.csv";
 
         $arrayFromCSV =  array_map('str_getcsv', file($csvPath));
 
@@ -130,7 +130,7 @@ class WC_Checkoutcom_Utility
         // Build the MADA BIN array
         $binArray = [];
         foreach ($arrayFromCSV as $row) {
-            $binArray[] = $row[1];
+            $binArray[] = $row[0];
         }
 
         return in_array($bin, $binArray);
