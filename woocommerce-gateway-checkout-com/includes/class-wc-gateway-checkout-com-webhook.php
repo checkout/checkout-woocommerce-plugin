@@ -23,7 +23,9 @@ class WC_Checkout_Com_Webhook
         }
 
         // Load order form order id
-        $order = wc_get_order( $order_id );
+        // $order = wc_get_order( $order_id );
+        $order = self::get_wc_order($order_id);
+        $order_id = $order->get_id();
 
         // check if payment is already captured
         $already_captured = get_post_meta($order_id, 'cko_payment_captured', true );
@@ -78,7 +80,10 @@ class WC_Checkout_Com_Webhook
         }
 
         // Load order form order id
-        $order = wc_get_order( $order_id );
+        // $order = wc_get_order( $order_id );
+        $order = self::get_wc_order($order_id);
+        $order_id = $order->get_id();
+        
         $message = 'Webhook received from checkout.com. Payment capture declined. Reason : '.$webhook_data->response_summary;
 
         // Add note to order if capture declined
@@ -104,7 +109,9 @@ class WC_Checkout_Com_Webhook
         }
 
         // Load order form order id
-        $order = wc_get_order( $order_id );
+        // $order = wc_get_order( $order_id );
+        $order = self::get_wc_order($order_id);
+        $order_id = $order->get_id();
 
         // check if payment is already captured
         $already_voided = get_post_meta($order_id, 'cko_payment_voided', true );
@@ -151,7 +158,9 @@ class WC_Checkout_Com_Webhook
         }
 
         // Load order form order id
-        $order = wc_get_order( $order_id );
+        // $order = wc_get_order( $order_id );
+        $order = self::get_wc_order($order_id);
+        $order_id = $order->get_id();
 
         // check if payment is already captured
         $already_refunded = get_post_meta($order_id, 'cko_payment_refunded', true );
@@ -219,7 +228,9 @@ class WC_Checkout_Com_Webhook
             }
 
             // Load order form order id
-            $order = wc_get_order( $order_id );
+            // $order = wc_get_order( $order_id );
+            $order = self::get_wc_order($order_id);
+            $order_id = $order->get_id();
 
             $status = 'wc-cancelled';
             $message = 'Webhook received from checkout.com. Payment cancelled';
@@ -260,7 +271,9 @@ class WC_Checkout_Com_Webhook
             return false;
         }
 
-        $order = wc_get_order( $order_id );
+        // $order = wc_get_order( $order_id );
+        $order = self::get_wc_order($order_id);
+        $order_id = $order->get_id();
 
         $status = "wc-cancelled";
         $message = "Webhook received from checkout.com. Payment declined Reason : ".$response_summary;
@@ -288,5 +301,25 @@ class WC_Checkout_Com_Webhook
 
     }
 
+    /**
+     * Load order from order id or 
+     * Query order by order number
+     */
+    private static function get_wc_order($order_id)
+    {
+        $order = wc_get_order( $order_id );
+        
+        // Query order by order number to check if order exist
+        if (!$order) {
+            $orders = wc_get_orders( array(
+                    'order_number' =>  $order_id
+                )
+            );
+
+            $order = $orders[0];
+        }
+
+        return $order;
+    }
 
 }
