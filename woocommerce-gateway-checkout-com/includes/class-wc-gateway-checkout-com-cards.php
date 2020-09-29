@@ -11,7 +11,7 @@ use Checkout\Library\Exceptions\CheckoutModelException;
 
 class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 {
-    const PLUGIN_VERSION = '4.1.15';
+    const PLUGIN_VERSION = '4.1.16';
 
     /**
      * WC_Gateway_Checkout_Com_Cards constructor.
@@ -623,6 +623,17 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         $action = $result['actions'];
 
         $order = new WC_Order( $order_id );
+
+        // Query order by order number to check if order exist
+        if (!$order) {
+            $orders = wc_get_orders( array(
+                    'order_number' =>  $order_id
+                )
+            );
+
+            $order = $orders[0];
+            $order_id = $order->get_id();
+        }
 
         // Redirect to cart if an error occured
         if (isset($result['error']) && !empty($result['error'])) {
