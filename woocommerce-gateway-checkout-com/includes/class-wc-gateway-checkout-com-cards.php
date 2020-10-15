@@ -160,7 +160,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         $cardValidationAlert = __("Please enter your card details.", 'wc_checkout_com');
         $localisation = $this->get_localisation();
         $iframe_style =  WC_Admin_Settings::get_option('ckocom_iframe_style');
-        
+
         // check if user is logged-in or a guest
         if (is_user_logged_in()) {
             $user_logged_in = true;
@@ -513,7 +513,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
                 return false;
             }
         });
-    }, 0);
+    }, 1500);
 
     // function to show saved card checkbox based on logged-in user
     function checkUserLoggedIn() {
