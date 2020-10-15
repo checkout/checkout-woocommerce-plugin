@@ -160,6 +160,14 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         $cardValidationAlert = __("Please enter your card details.", 'wc_checkout_com');
         $localisation = $this->get_localisation();
         $iframe_style =  WC_Admin_Settings::get_option('ckocom_iframe_style');
+        
+        // check if user is logged-in or a guest
+        if (is_user_logged_in()) {
+            $user_logged_in = true;
+        } else {
+            $user_logged_in = false;
+            $this->new_method_label   = __( 'Card Payment', 'wc_checkout_com' );
+        }
 
         // check if saved card enable from module setting
         if($save_card) {
@@ -183,326 +191,353 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         // Check if require cvv or mada is enable from module setting
         if($require_cvv || $mada_enable) {
         ?>
-        <div class="cko-cvv" style="display: none;padding-top: 10px;">
-            <p class="validate-required" id="cko-cvv" data-priority="10">
-                <label for="cko-cvv"><?php esc_html_e( 'Card Code', 'wc_checkout_com_cards' ); ?> <span class="required">*</span></label>
-                <input id="cko-cvv" type="text" autocomplete="off" class="input-text"
-                       placeholder="<?php esc_attr_e( 'CVV', 'wc_checkout_com_cards' ); ?>"
-                       name="<?php echo esc_attr( $this->id ); ?>-card-cvv" />
-            </p>
-        </div>
-        <?php } ?>
-        <div class="cko-form" style="display: none; padding-top: 10px;padding-bottom: 5px;">
-            <input type="hidden" id="cko-card-token" name="cko-card-token" value=""/>
-            <input type="hidden" id="cko-card-bin" name="cko-card-bin" value=""/>
+<div class="cko-cvv" style="display: none;padding-top: 10px;">
+    <p class="validate-required" id="cko-cvv" data-priority="10">
+        <label for="cko-cvv"><?php esc_html_e( 'Card Code', 'wc_checkout_com_cards' ); ?> <span
+                class="required">*</span></label>
+        <input id="cko-cvv" type="text" autocomplete="off" class="input-text"
+            placeholder="<?php esc_attr_e( 'CVV', 'wc_checkout_com_cards' ); ?>"
+            name="<?php echo esc_attr( $this->id ); ?>-card-cvv" />
+    </p>
+</div>
+<?php } ?>
+<div class="cko-form" style="display: none; padding-top: 10px;padding-bottom: 5px;">
+    <input type="hidden" id="cko-card-token" name="cko-card-token" value="" />
+    <input type="hidden" id="cko-card-bin" name="cko-card-bin" value="" />
 
-            <?php if ($iframe_style == 0) {
+    <?php if ($iframe_style == 0) {
                 ?>
-                <div class="one-liner">
-                    <!-- frames will be loaded here -->
-                    <div class="card-frame"></div>
-                </div>
-                <?php
+    <div class="one-liner">
+        <!-- frames will be loaded here -->
+        <div class="card-frame"></div>
+    </div>
+    <?php
             } else { ?>
-                <div class="multi-frame">
-                    <div class="input-container card-number">
-                    <div class="icon-container">
-                        <img id="icon-card-number" src="<?php echo plugins_url ('checkout-com-unified-payments-api/assets/images/card-icons/card.svg'); ?>" alt="PAN" />
-                    </div>
-                    <div class="card-number-frame"></div>
-                    <div class="icon-container payment-method">
-                        <img id="logo-payment-method" />
-                    </div>
-                    <div class="icon-container">
-                        <img id="icon-card-number-error" src="<?php echo plugins_url ('checkout-com-unified-payments-api/assets/images/card-icons/error.svg'); ?>" />
-                    </div>
-                    </div>
-
-                    <div class="date-and-code">
-                    <div>
-                        <div class="input-container expiry-date">
-                        <div class="icon-container">
-                            <img id="icon-expiry-date" src="<?php echo plugins_url ('checkout-com-unified-payments-api/assets/images/card-icons/exp-date.svg'); ?>" alt="Expiry date" />
-                        </div>
-                        <div class="expiry-date-frame"></div>
-                        <div class="icon-container">
-                            <img id="icon-expiry-date-error" src="<?php echo plugins_url ('checkout-com-unified-payments-api/assets/images/card-icons/error.svg'); ?>" />
-                        </div>
-                        </div>
-                    </div>
-
-                    <div>
-                        <div class="input-container cvv">
-                        <div class="icon-container">
-                            <img id="icon-cvv" src="<?php echo plugins_url ('checkout-com-unified-payments-api/assets/images/card-icons/cvv.svg'); ?>" alt="CVV" />
-                        </div>
-                        <div class="cvv-frame"></div>
-                        <div class="icon-container">
-                            <img id="icon-cvv-error" src="<?php echo plugins_url ('checkout-com-unified-payments-api/assets/images/card-icons/error.svg'); ?>"/>
-                        </div>
-                        </div>
-                    </div>
-                    </div>
-                </div>
-            <?php } ?>
-
-            <script type="text/javascript">
-                // Get debug mode from module config
-                var debug = '<?php echo WC_Admin_Settings::get_option('cko_console_logging'); ?>';
-                var cardValidationAlert = '<?php echo $cardValidationAlert; ?>';
-                var localization = '<?php echo $localisation; ?>';
-                var multiFrame = '<?php echo $iframe_style; ?>';
-
-                
-                jQuery( function(){
-                    jQuery('input[type=radio][name=wc-wc_checkout_com_cards-payment-token]'). prop("checked", false);
-                    // Set default ul to auto
-                    jQuery('.payment_box.payment_method_wc_checkout_com_cards > ul').css('margin','auto');
-
-                    if(typeof(Frames) != 'undefined'){
-                        Frames.removeAllEventHandlers();
-                    }
-
-                    Frames.init({
-                        debug : debug === 'yes' ? true : false,
-                        publicKey : "<?php echo $this->get_option( 'ckocom_pk' );?>",
-                        localization : localization
-                    });
-                    
-                    Frames.addEventHandler(
-                        Frames.Events.CARD_TOKENIZED,
-                        onCardTokenized
-                    );
-
-                    function onCardTokenized(event) {
-                        if (document.getElementById('cko-card-token').value.length === 0
-                            || document.getElementById('cko-card-token').value != event.token) {
-                            document.getElementById('cko-card-token').value = event.token;
-                            document.getElementById('cko-card-bin').value = event.bin;
-                            jQuery('#place_order').trigger('click');
-                            document.getElementById("cko-card-token").value = "";
-                            Frames.enableSubmitForm();
-                        }
-                    }
-
-                    if (multiFrame == 1) {
-                        var logos = generateLogos();
-                        function generateLogos() {
-                            var logos = {};
-                            logos["card-number"] = {
-                                src: "card",
-                                alt: "card number logo"
-                            };
-                            logos["expiry-date"] = {
-                                src: "exp-date",
-                                alt: "expiry date logo"
-                            };
-                            logos["cvv"] = {
-                                src: "cvv",
-                                alt: "cvv logo"
-                            };
-                            return logos;
-                        }
-                        var errors = {};
-                        errors["card-number"] = "Please enter a valid card number";
-                        errors["expiry-date"] = "Please enter a valid expiry date";
-                        errors["cvv"] = "Please enter a valid cvv code";
-
-                        Frames.addEventHandler(
-                            Frames.Events.FRAME_VALIDATION_CHANGED,
-                            onValidationChanged
-                        );
-                        function onValidationChanged(event) {
-                            var e = event.element;
-
-                            if (event.isValid || event.isEmpty) {
-                                if (e == "card-number" && !event.isEmpty) {
-                                    showPaymentMethodIcon();
-                                }
-                                setDefaultIcon(e);
-                                clearErrorIcon(e);
-                            } else {
-                                if (e == "card-number") {
-                                    clearPaymentMethodIcon();
-                                }
-                                setDefaultErrorIcon(e);
-                                setErrorIcon(e);
-                            }
-                        }
-
-                        function clearErrorMessage(el) {
-                            var selector = ".error-message__" + el;
-                            var message = document.querySelector(selector);
-                            message.textContent = "";
-                        }
-
-                        function clearErrorIcon(el) {
-                            var logo = document.getElementById("icon-" + el + "-error");
-                            logo.style.removeProperty("display");
-                        }
-
-                        function showPaymentMethodIcon(parent, pm) {
-                            if (parent) parent.classList.add("show");
-
-                            var logo = document.getElementById("logo-payment-method");
-                            if (pm) {
-                                var name = pm.toLowerCase();
-                                var test = "<?php echo  plugins_url ('checkout-com-unified-payments-api/assets/images/card-icons/'); ?>";
-                                logo.setAttribute("src", test + name + ".svg");
-                                logo.setAttribute("alt", pm || "payment method");
-                            }
-                            logo.style.removeProperty("display");
-                        }
-
-                        function clearPaymentMethodIcon(parent) {
-                            if (parent) parent.classList.remove("show");
-
-                            var logo = document.getElementById("logo-payment-method");
-                            logo.style.setProperty("display", "none");
-                        }
-
-                        function setErrorMessage(el) {
-                            var selector = ".error-message__" + el;
-                            var message = document.querySelector(selector);
-                            message.textContent = errors[el];
-                        }
-
-                        function setDefaultIcon(el) {
-                            var selector = "icon-" + el;
-                            var logo = document.getElementById(selector);
-                            var test = "<?php echo  plugins_url ('checkout-com-unified-payments-api/assets/images/card-icons/'); ?>";
-                            logo.setAttribute("src", test + logos[el].src + ".svg");
-                            logo.setAttribute("alt", logos[el].alt);
-                        }
-
-                        function setDefaultErrorIcon(el) {
-                            var selector = "icon-" + el;
-                            var logo = document.getElementById(selector);
-                            var test = "<?php echo  plugins_url ('checkout-com-unified-payments-api/assets/images/card-icons/'); ?>";
-                            logo.setAttribute("src", test + logos[el].src + "-error.svg");
-                            logo.setAttribute("alt", logos[el].alt);
-                        }
-
-                        function setErrorIcon(el) {
-                            var logo = document.getElementById("icon-" + el + "-error");
-                            logo.style.setProperty("display", "block");
-                        }
-
-                        Frames.addEventHandler(
-                            Frames.Events.PAYMENT_METHOD_CHANGED,
-                            paymentMethodChanged
-                        );
-                        function paymentMethodChanged(event) {
-                            var pm = event.paymentMethod;
-                            let container = document.querySelector(".icon-container.payment-method");
-
-                            if (!pm) {
-                                clearPaymentMethodIcon(container);
-                            } else {
-                                clearErrorIcon("card-number");
-                                showPaymentMethodIcon(container, pm);
-                            }
-                        }
-                    }
-                });
-
-                setTimeout(function(){
-                    // check if saved card exist
-                    if(jQuery('.payment_box.payment_method_wc_checkout_com_cards').
-                        children('ul.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').attr('data-count') > 0) {
-                    
-                        jQuery('.cko-form').hide();
-
-                        jQuery('input[type=radio][name=wc-wc_checkout_com_cards-payment-token]').change(function() {
-                            if(this.value == 'new'){
-                                // display frames if new card is selected
-                                jQuery('.cko-form').show();
-                                jQuery('.cko-save-card-checkbox').show();
-                                jQuery('.cko-cvv').hide();
-                            } else {
-                                jQuery('.cko-form').hide();
-                                jQuery('.cko-save-card-checkbox').hide();
-                                jQuery('.cko-cvv').show();
-                                
-                                var is_mada = '<?php echo $mada_enable; ?>';
-
-                                if(is_mada === 1){
-                                    if(this.value === '<?php echo $is_mada_token;?>'){
-                                        jQuery('.cko-form').hide();
-                                        jQuery('.cko-cvv').show();
-                                    } else {
-                                        jQuery('.cko-cvv').hide();
-                                    }
-                                }
-                            }
-                        });
-                    } else {
-                        jQuery('.cko-form').show();
-                        jQuery('.cko-save-card-checkbox').show();
-                        jQuery('input[type=radio][name=wc-wc_checkout_com_cards-payment-token]'). prop("checked", true);
-                    }
-
-                     // check if add-payment-method exist
-                    if(jQuery('#add_payment_method').length > 0) {
-                        jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide();
-                        jQuery('.cko-save-card-checkbox').hide();
-                        jQuery('.cko-form').show();
-                    }
-
-                    // hook place order button
-                    jQuery('#place_order').on('click', function(e){
-                        // check if checkout.com is selected
-                        if (jQuery('#payment_method_wc_checkout_com_cards').is(':checked')) {
-                            // check if new card exist
-                            if(jQuery('#wc-wc_checkout_com_cards-payment-token-new').length > 0 ) {
-                                // check if new card is selected else process with saved card
-                                if(jQuery('#wc-wc_checkout_com_cards-payment-token-new').is(':checked')){
-                                    if(document.getElementById('cko-card-token').value.length > 0 ){
-                                        return true;
-                                    } else if(Frames.isCardValid()) {
-                                        Frames.submitCard();
-                                    } else if(!Frames.isCardValid()){
-                                        alert(cardValidationAlert);
-                                    }
-                                } else if (jQuery('#add_payment_method').length > 0) {
-                                    // check if card is valid from add-payment-method
-                                    if (jQuery('#payment_method_wc_checkout_com_cards').is(':checked')) {
-                                        if(Frames.isCardValid()) {
-                                            Frames.submitCard();
-                                        } else {
-                                            alert(cardValidationAlert);
-                                        }
-                                    }
-                                } else {
-                                    return true;
-                                }
-                            } else {
-                                if(document.getElementById('cko-card-token').value.length > 0 ){
-                                    return true;
-                                } else if(Frames.isCardValid()) {
-                                    Frames.submitCard();
-                                } else if(!Frames.isCardValid()){
-                                    alert(cardValidationAlert);
-                                }
-                            }
-
-                            return false;
-                        }
-                    });
-                }, 1500);
-            </script>
-
+    <div class="multi-frame">
+        <div class="input-container card-number">
+            <div class="icon-container">
+                <img id="icon-card-number"
+                    src="<?php echo plugins_url ('checkout-com-unified-payments-api/assets/images/card-icons/card.svg'); ?>"
+                    alt="PAN" />
+            </div>
+            <div class="card-number-frame"></div>
+            <div class="icon-container payment-method">
+                <img id="logo-payment-method" />
+            </div>
+            <div class="icon-container">
+                <img id="icon-card-number-error"
+                    src="<?php echo plugins_url ('checkout-com-unified-payments-api/assets/images/card-icons/error.svg'); ?>" />
+            </div>
         </div>
 
-        <!-- Show save card checkbox if this is selected on admin-->
-        <div class="cko-save-card-checkbox" style="display: none">
-            <?php
+        <div class="date-and-code">
+            <div>
+                <div class="input-container expiry-date">
+                    <div class="icon-container">
+                        <img id="icon-expiry-date"
+                            src="<?php echo plugins_url ('checkout-com-unified-payments-api/assets/images/card-icons/exp-date.svg'); ?>"
+                            alt="Expiry date" />
+                    </div>
+                    <div class="expiry-date-frame"></div>
+                    <div class="icon-container">
+                        <img id="icon-expiry-date-error"
+                            src="<?php echo plugins_url ('checkout-com-unified-payments-api/assets/images/card-icons/error.svg'); ?>" />
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <div class="input-container cvv">
+                    <div class="icon-container">
+                        <img id="icon-cvv"
+                            src="<?php echo plugins_url ('checkout-com-unified-payments-api/assets/images/card-icons/cvv.svg'); ?>"
+                            alt="CVV" />
+                    </div>
+                    <div class="cvv-frame"></div>
+                    <div class="icon-container">
+                        <img id="icon-cvv-error"
+                            src="<?php echo plugins_url ('checkout-com-unified-payments-api/assets/images/card-icons/error.svg'); ?>" />
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php } ?>
+
+    <script type="text/javascript">
+    // Get debug mode from module config
+    var debug = '<?php echo WC_Admin_Settings::get_option('cko_console_logging'); ?>';
+    var cardValidationAlert = '<?php echo $cardValidationAlert; ?>';
+    var localization = '<?php echo $localisation; ?>';
+    var multiFrame = '<?php echo $iframe_style; ?>';
+
+
+    jQuery(function() {
+        jQuery('input[type=radio][name=wc-wc_checkout_com_cards-payment-token]').prop("checked", false);
+        // Set default ul to auto
+        jQuery('.payment_box.payment_method_wc_checkout_com_cards > ul').css('margin', 'auto');
+
+        if (typeof(Frames) != 'undefined') {
+            Frames.removeAllEventHandlers();
+        }
+
+        Frames.init({
+            debug: debug === 'yes' ? true : false,
+            publicKey: "<?php echo $this->get_option( 'ckocom_pk' );?>",
+            localization: localization
+        });
+
+        Frames.addEventHandler(
+            Frames.Events.CARD_TOKENIZED,
+            onCardTokenized
+        );
+
+        function onCardTokenized(event) {
+            if (document.getElementById('cko-card-token').value.length === 0 ||
+                document.getElementById('cko-card-token').value != event.token) {
+                document.getElementById('cko-card-token').value = event.token;
+                document.getElementById('cko-card-bin').value = event.bin;
+                jQuery('#place_order').trigger('click');
+                document.getElementById("cko-card-token").value = "";
+                Frames.enableSubmitForm();
+            }
+        }
+
+        if (multiFrame == 1) {
+            var logos = generateLogos();
+
+            function generateLogos() {
+                var logos = {};
+                logos["card-number"] = {
+                    src: "card",
+                    alt: "card number logo"
+                };
+                logos["expiry-date"] = {
+                    src: "exp-date",
+                    alt: "expiry date logo"
+                };
+                logos["cvv"] = {
+                    src: "cvv",
+                    alt: "cvv logo"
+                };
+                return logos;
+            }
+            var errors = {};
+            errors["card-number"] = "Please enter a valid card number";
+            errors["expiry-date"] = "Please enter a valid expiry date";
+            errors["cvv"] = "Please enter a valid cvv code";
+
+            Frames.addEventHandler(
+                Frames.Events.FRAME_VALIDATION_CHANGED,
+                onValidationChanged
+            );
+
+            function onValidationChanged(event) {
+                var e = event.element;
+
+                if (event.isValid || event.isEmpty) {
+                    if (e == "card-number" && !event.isEmpty) {
+                        showPaymentMethodIcon();
+                    }
+                    setDefaultIcon(e);
+                    clearErrorIcon(e);
+                } else {
+                    if (e == "card-number") {
+                        clearPaymentMethodIcon();
+                    }
+                    setDefaultErrorIcon(e);
+                    setErrorIcon(e);
+                }
+            }
+
+            function clearErrorMessage(el) {
+                var selector = ".error-message__" + el;
+                var message = document.querySelector(selector);
+                message.textContent = "";
+            }
+
+            function clearErrorIcon(el) {
+                var logo = document.getElementById("icon-" + el + "-error");
+                logo.style.removeProperty("display");
+            }
+
+            function showPaymentMethodIcon(parent, pm) {
+                if (parent) parent.classList.add("show");
+
+                var logo = document.getElementById("logo-payment-method");
+                if (pm) {
+                    var name = pm.toLowerCase();
+                    var test =
+                        "<?php echo  plugins_url ('checkout-com-unified-payments-api/assets/images/card-icons/'); ?>";
+                    logo.setAttribute("src", test + name + ".svg");
+                    logo.setAttribute("alt", pm || "payment method");
+                }
+                logo.style.removeProperty("display");
+            }
+
+            function clearPaymentMethodIcon(parent) {
+                if (parent) parent.classList.remove("show");
+
+                var logo = document.getElementById("logo-payment-method");
+                logo.style.setProperty("display", "none");
+            }
+
+            function setErrorMessage(el) {
+                var selector = ".error-message__" + el;
+                var message = document.querySelector(selector);
+                message.textContent = errors[el];
+            }
+
+            function setDefaultIcon(el) {
+                var selector = "icon-" + el;
+                var logo = document.getElementById(selector);
+                var test =
+                    "<?php echo  plugins_url ('checkout-com-unified-payments-api/assets/images/card-icons/'); ?>";
+                logo.setAttribute("src", test + logos[el].src + ".svg");
+                logo.setAttribute("alt", logos[el].alt);
+            }
+
+            function setDefaultErrorIcon(el) {
+                var selector = "icon-" + el;
+                var logo = document.getElementById(selector);
+                var test =
+                    "<?php echo  plugins_url ('checkout-com-unified-payments-api/assets/images/card-icons/'); ?>";
+                logo.setAttribute("src", test + logos[el].src + "-error.svg");
+                logo.setAttribute("alt", logos[el].alt);
+            }
+
+            function setErrorIcon(el) {
+                var logo = document.getElementById("icon-" + el + "-error");
+                logo.style.setProperty("display", "block");
+            }
+
+            Frames.addEventHandler(
+                Frames.Events.PAYMENT_METHOD_CHANGED,
+                paymentMethodChanged
+            );
+
+            function paymentMethodChanged(event) {
+                var pm = event.paymentMethod;
+                let container = document.querySelector(".icon-container.payment-method");
+
+                if (!pm) {
+                    clearPaymentMethodIcon(container);
+                } else {
+                    clearErrorIcon("card-number");
+                    showPaymentMethodIcon(container, pm);
+                }
+            }
+        }
+    });
+
+    setTimeout(function() {
+        // check if saved card exist
+        if (jQuery('.payment_box.payment_method_wc_checkout_com_cards').children(
+                'ul.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').attr('data-count') > 0) {
+
+            jQuery('.cko-form').hide();
+
+            jQuery('input[type=radio][name=wc-wc_checkout_com_cards-payment-token]').change(function() {
+                if (this.value == 'new') {
+                    // display frames if new card is selected
+                    jQuery('.cko-form').show();
+                    checkUserLoggedIn();
+                    jQuery('.cko-cvv').hide();
+                } else {
+                    jQuery('.cko-form').hide();
+                    jQuery('.cko-save-card-checkbox').hide();
+                    jQuery('.cko-cvv').show();
+
+                    var is_mada = '<?php echo $mada_enable; ?>';
+
+                    if (is_mada === 1) {
+                        if (this.value === '<?php echo $is_mada_token;?>') {
+                            jQuery('.cko-form').hide();
+                            jQuery('.cko-cvv').show();
+                        } else {
+                            jQuery('.cko-cvv').hide();
+                        }
+                    }
+                }
+            });
+        } else {
+            jQuery('.cko-form').show();
+            checkUserLoggedIn();
+            jQuery('input[type=radio][name=wc-wc_checkout_com_cards-payment-token]').prop("checked", true);
+        }
+
+        // check if add-payment-method exist
+        if (jQuery('#add_payment_method').length > 0) {
+            jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide();
+            jQuery('.cko-save-card-checkbox').hide();
+            jQuery('.cko-form').show();
+        }
+
+        // hook place order button
+        jQuery('#place_order').on('click', function(e) {
+            // check if checkout.com is selected
+            if (jQuery('#payment_method_wc_checkout_com_cards').is(':checked')) {
+                // check if new card exist
+                if (jQuery('#wc-wc_checkout_com_cards-payment-token-new').length > 0) {
+                    // check if new card is selected else process with saved card
+                    if (jQuery('#wc-wc_checkout_com_cards-payment-token-new').is(':checked')) {
+                        if (document.getElementById('cko-card-token').value.length > 0) {
+                            return true;
+                        } else if (Frames.isCardValid()) {
+                            Frames.submitCard();
+                        } else if (!Frames.isCardValid()) {
+                            alert(cardValidationAlert);
+                        }
+                    } else if (jQuery('#add_payment_method').length > 0) {
+                        // check if card is valid from add-payment-method
+                        if (jQuery('#payment_method_wc_checkout_com_cards').is(':checked')) {
+                            if (Frames.isCardValid()) {
+                                Frames.submitCard();
+                            } else {
+                                alert(cardValidationAlert);
+                            }
+                        }
+                    } else {
+                        return true;
+                    }
+                } else {
+                    if (document.getElementById('cko-card-token').value.length > 0) {
+                        return true;
+                    } else if (Frames.isCardValid()) {
+                        Frames.submitCard();
+                    } else if (!Frames.isCardValid()) {
+                        alert(cardValidationAlert);
+                    }
+                }
+
+                return false;
+            }
+        });
+    }, 0);
+
+    // function to show saved card checkbox based on logged-in user
+    function checkUserLoggedIn() {
+        var logged_in = '<?php echo $user_logged_in; ?>';
+
+        if (logged_in) {
+            jQuery('.cko-save-card-checkbox').show();
+        } else {
+            jQuery('.cko-save-card-checkbox').hide();
+        }
+    }
+    </script>
+
+</div>
+
+<!-- Show save card checkbox if this is selected on admin-->
+<div class="cko-save-card-checkbox" style="display: none">
+    <?php
             if($save_card){
                 $this->save_payment_method_checkbox();
             }
             ?>
-        </div>
-        <?php
+</div>
+<?php
     }
 
     /**
