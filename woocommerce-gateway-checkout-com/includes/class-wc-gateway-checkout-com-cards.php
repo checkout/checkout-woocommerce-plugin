@@ -162,10 +162,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         $iframe_style =  WC_Admin_Settings::get_option('ckocom_iframe_style');
 
         // check if user is logged-in or a guest
-        if (is_user_logged_in()) {
-            $user_logged_in = true;
-        } else {
-            $user_logged_in = false;
+        if (!is_user_logged_in()) {
             $this->new_method_label   = __( 'Card Payment', 'wc_checkout_com' );
         }
 
@@ -517,7 +514,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 
     // function to show saved card checkbox based on logged-in user
     function checkUserLoggedIn() {
-        var logged_in = '<?php echo $user_logged_in; ?>';
+        var logged_in = '<?php echo is_user_logged_in(); ?>';
 
         if (logged_in) {
             jQuery('.cko-save-card-checkbox').show();
