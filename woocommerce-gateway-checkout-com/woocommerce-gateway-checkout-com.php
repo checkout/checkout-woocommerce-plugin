@@ -6,6 +6,9 @@ Description: Extends WooCommerce by Adding the Checkout.com Gateway.
 Version: 4.1.16
 Author: Checkout.com
 Author URI: https://www.checkout.com/
+Requires at least: 4.0
+Stable tag: 4.1.16
+Tested up to: 5.5
 */
 
 /*
