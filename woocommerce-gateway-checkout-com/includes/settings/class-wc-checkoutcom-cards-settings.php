@@ -62,7 +62,7 @@ class WC_Checkoutcom_Cards_Settings
                 'title' => __('Private Shared Key', 'checkoutcom-cards-settings'),
                 'type' => 'text',
                 'description' => __('You need to configure your Webhook URL in the Checkout Hub to get this Key', 'checkoutcom-cards-settings'),
-                'description' => __('You need to '.'<a href="https://docs.checkout.com/docs/manage-webhooks">configure your Webhook URL </a>'. 'in the Checkout Hub to get this Key'.'<br>'. 'The URL follows this format: {example.com}/wc-api/wc_checkoutcom_webhook', 'checkoutcom-cards-settings'),
+                'description' => __('You need to '.'<a href="https://docs.checkout.com/docs/manage-webhooks">configure your Webhook URL </a>'. 'in the Checkout Hub to get this Key'.'<br>'. 'The URL follows this format: http://example.com/?wc-api=wc_checkoutcom_webhook', 'checkoutcom-cards-settings'),
             ),
         );
 
