@@ -959,20 +959,17 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         }
 
         $header = array_change_key_case(apache_request_headers(),CASE_LOWER);
-        $header_authorization = $header['authorization'];
+        $header_signature = $header['cko-signature'];
 
         $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
-        // Get private shared key from module settings
-        $psk =  $core_settings['ckocom_psk'];
-
-        // Check if private shared key is not empty
-        if (!empty($psk)) {
-            // check if header athorization equals
-            // to private shared key configured in module settings
-            if($header_authorization !== $psk){
-                return http_response_code(401);
-            }
+        $raw_event = file_get_contents('php://input');
+        $signature =  WC_Checkoutcom_Utility::verifySignature($raw_event, $core_settings['ckocom_sk'], $header_signature);
+        
+        // check if cko signature matches
+        if($signature === false){
+            return http_response_code(401);
         }
+      
 
         // Get webhook event type from data
         $event_type = $data->type;

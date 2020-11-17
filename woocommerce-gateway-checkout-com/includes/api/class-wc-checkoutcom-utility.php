@@ -5,6 +5,16 @@
  */
 class WC_Checkoutcom_Utility
 {
+     /**
+     * 
+     * *verify cko signature for webhooks
+     * @param event
+     * @param secretKey
+     */
+    public static function verifySignature($event, $key, $cko_signature) {
+        return hash_hmac('sha256', $event, $key) === $cko_signature ? true : false;
+    }
+    
     /**
      * Format amount in cents
      *

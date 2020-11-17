@@ -3,11 +3,11 @@
 Plugin Name: Checkout.com Payment Gateway
 Plugin URI: https://www.checkout.com/
 Description: Extends WooCommerce by Adding the Checkout.com Gateway.
-Version: 4.1.16
+Version: 4.1.17
 Author: Checkout.com
 Author URI: https://www.checkout.com/
 Requires at least: 4.0
-Stable tag: 4.1.16
+Stable tag: 4.1.17
 Tested up to: 5.5
 */
 
@@ -191,10 +191,10 @@ function action_woocommerce_order_item_add_action_buttons( $order ) {
         || $order->get_payment_method() == 'wc_checkout_com_google_pay') {
 
             ?>
-            <input type="hidden" value="" name="cko_payment_action" id="cko_payment_action" />
-            <button class="button" id="cko-capture" style="display:none;">Capture</button>
-            <button class="button" id="cko-void" style="display:none;">Void</button>
-            <?php
+<input type="hidden" value="" name="cko_payment_action" id="cko_payment_action" />
+<button class="button" id="cko-capture" style="display:none;">Capture</button>
+<button class="button" id="cko-void" style="display:none;">Void</button>
+<?php
     }
 
     wc_enqueue_js( "

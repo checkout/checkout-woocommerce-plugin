@@ -56,14 +56,7 @@ class WC_Checkoutcom_Cards_Settings
                 'type' => 'text',
                 'description' => __('You can '.'<a href="https://docs.checkout.com/docs/update-your-hub-settings#section-manage-the-api-keys">find your public key </a>'. 'in the Checkout.com Hub', 'checkoutcom-cards-settings'),
                 'placeholder' => 'pk_xxx'
-
-            ),
-            'ckocom_psk' => array(
-                'title' => __('Private Shared Key', 'checkoutcom-cards-settings'),
-                'type' => 'text',
-                'description' => __('You need to configure your Webhook URL in the Checkout Hub to get this Key', 'checkoutcom-cards-settings'),
-                'description' => __('You need to '.'<a href="https://docs.checkout.com/docs/manage-webhooks">configure your Webhook URL </a>'. 'in the Checkout Hub to get this Key'.'<br>'. 'The URL follows this format: http://example.com/?wc-api=wc_checkoutcom_webhook', 'checkoutcom-cards-settings'),
-            ),
+            )
         );
 
         return apply_filters( 'wc_checkout_com_cards', $settings );
@@ -619,4 +612,3 @@ class WC_Checkoutcom_Cards_Settings
         return apply_filters( 'wc_checkout_com_cards', $settings );
     }
 }
-
