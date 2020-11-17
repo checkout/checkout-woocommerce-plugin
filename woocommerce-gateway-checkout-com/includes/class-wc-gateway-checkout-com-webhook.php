@@ -195,7 +195,7 @@ class WC_Checkout_Com_Webhook
         // Check if webhook amount is less than order amount - partial refund
         if ($amount < $order_amount_cents) {
             $order_message = __("Checkout.com Payment partially refunded (Transaction ID - {$action_id}) ", 'wc_checkout_com');
-            $status = __("processing");
+            $status = WC_Admin_Settings::get_option('ckocom_order_captured');
 
             // handle partial refund
             $refund = wc_create_refund(array('amount' => $refund_amount, 'reason' => "", 'order_id' => $order_id, 'line_items' => array()));
