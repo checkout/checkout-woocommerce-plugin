@@ -619,8 +619,11 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
             $message = __("Checkout.com Payment Flagged (Transaction ID - {$result['action_id']}) ", 'wc_checkout_com');
         }
 
-        // Update order status on woo backend
-        $order->update_status($status,$message);
+         // add notes for the order
+         $order->add_order_note($message);
+
+         // Update order status on woo backend
+         $order->update_status($status);
 
         // Reduce stock levels
         wc_reduce_stock_levels( $order_id );
