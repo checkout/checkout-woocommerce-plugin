@@ -158,42 +158,53 @@ class WC_Checkout_Com_Webhook
         }
 
         // Load order form order id
-        // $order = wc_get_order( $order_id );
         $order = self::get_wc_order($order_id);
         $order_id = $order->get_id();
 
-        // check if payment is already captured
+        // check if payment is already refunded
         $already_refunded = get_post_meta($order_id, 'cko_payment_refunded', true );
         $message = 'Webhook received from checkout.com. Payment refunded';
-
-        // Add note to order if captured already
-        if ($already_refunded) {
-            $order->add_order_note(__($message, 'wc_checkout_com'));
-            return true;
-        }
 
         // Get action id from webhook data
         $action_id = $webhook_data->action_id;
         $amount = $webhook_data->amount;
         $order_amount = $order->get_total();
         $order_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($order_amount, $order->get_currency() );
+        $get_transaction_id = get_post_meta( $order_id, '_transaction_id', true );
+
+        if ($get_transaction_id == $action_id) {
+            return true;
+        }
+
+        // Add note to order if refunded already
+        if ($order->get_total_refunded() == $order_amount) {
+            $order->add_order_note(__($message, 'wc_checkout_com'));
+            return true;
+        }
 
         // Set action id as woo transaction id
         update_post_meta($order_id, '_transaction_id', $action_id);
         update_post_meta($order_id, 'cko_payment_refunded', true);
 
-        // Get cko capture status configured in admin
+        $refund_amount = WC_Checkoutcom_Utility::decimalToValue($amount, $order->get_currency() );
+
+        // Get cko refund status configured in admin - full refund
         $status = WC_Admin_Settings::get_option('ckocom_order_refunded');
         $order_message = __("Checkout.com Payment Refunded (Transaction ID - {$action_id}) ", 'wc_checkout_com');
 
-        // Check if webhook amount is less than order amount
+        // Check if webhook amount is less than order amount - partial refund
         if ($amount < $order_amount_cents) {
             $order_message = __("Checkout.com Payment partially refunded (Transaction ID - {$action_id}) ", 'wc_checkout_com');
+            $status = WC_Admin_Settings::get_option('ckocom_order_captured');
+
+            // handle partial refund
+            $refund = wc_create_refund(array('amount' => $refund_amount, 'reason' => "", 'order_id' => $order_id, 'line_items' => array()));
+
         }
 
         // Update order status on woo backend
-        $order->update_status($status, $order_message);
-        $order->add_order_note(__($message, 'wc_checkout_com'));
+        $order->update_status($status);
+        $order->add_order_note(__($order_message, 'wc_checkout_com'));
 
         return true;
     }
