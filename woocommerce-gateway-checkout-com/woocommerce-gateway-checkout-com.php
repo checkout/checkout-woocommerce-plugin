@@ -176,6 +176,22 @@ function callback_for_setting_up_scripts() {
 
 }
 
+/**
+ * Disable cko refund button to prevent refund of 0.00
+ */
+add_action('woocommerce_order_item_add_line_buttons','cko_refund');
+function cko_refund() {
+    wc_enqueue_js("
+        // disable button by default
+        const refund_button = document.getElementsByClassName('button-primary do-api-refund')[0];
+        refund_button.disabled = true
+
+        $('#refund_amount').on('change', function(){
+            $(this).val() <= 0 ?  refund_button.disabled = true : refund_button.disabled = false;
+       });
+    ");
+};
+
 /*
  * Add custom button to admin order
  * Button capture and button void
