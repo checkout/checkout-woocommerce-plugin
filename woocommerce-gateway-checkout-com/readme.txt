@@ -2,8 +2,8 @@
 Contributors: checkoutintegration
 Tags: checkout, payments, credit card, Payment gateway, Apple pay, Payment request
 Requires at least: 4.0
-Stable tag: 4.1.16
-Version: 4.1.16
+Stable tag: 4.2.0
+Version: 4.2.0
 Tested up to: 5.5
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
@@ -163,6 +163,14 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v4.2.0 25 Nov 2020
+. The merchant can perform a partial refund in the Hub and it is reflected in Woo backend.
+. The partial refund amount is deducted from the transaction order amount in Woo.
+. The notification in Woo specifies that the transaction has been partially refunded.
+. The merchant is able to perform a partial refund from Woo backend.
+. The merchant is no longer required to use the private shared key for webhook authentication. The new release supports HMAC CKO Signature authentication.
+. Core settings persist during update of plugin
+. When performing a full refund in the Hub, the notification in Woo specifies that the transaction has been fully refunded.
 
 
 v4.1.16 26 Oct 2020
