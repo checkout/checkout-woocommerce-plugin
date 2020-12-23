@@ -97,7 +97,7 @@ class WC_Checkoutcom_Api_request
                 return array('error' => $error_message);
             }
         } catch (CheckoutHttpException $ex) {
-            $error_message = _("An error has occurred while processing your payment. ", 'wc_checkout_com');
+            $error_message = __("An error has occurred while processing your payment. ", 'wc_checkout_com');
 
             // check if gateway response is enable from module settings
             if ($gateway_debug) {
