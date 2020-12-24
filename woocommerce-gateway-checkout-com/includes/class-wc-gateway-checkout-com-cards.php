@@ -159,7 +159,12 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 
         // check if user is logged-in or a guest
         if (!is_user_logged_in()) {
-            $this->new_method_label   = __( 'Card Payment', 'wc_checkout_com' );
+            ?>
+            <script>
+                jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
+            </script>
+
+            <?php
         }
 
         // check if saved card enable from module setting
