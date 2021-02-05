@@ -318,7 +318,8 @@ class WC_Checkout_Com_Webhook
      */
     private static function get_wc_order($order_id)
     {
-        $order = wc_get_order( $order_id );
+        $orderId = preg_replace("/[^0-9]/", "", $order_id); 
+        $order = wc_get_order( $orderId );
         
         // Query order by order number to check if order exist
         if (!$order) {
