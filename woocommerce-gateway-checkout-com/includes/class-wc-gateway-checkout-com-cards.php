@@ -11,7 +11,7 @@ use Checkout\Library\Exceptions\CheckoutModelException;
 
 class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 {
-    const PLUGIN_VERSION = '4.2.1';
+    const PLUGIN_VERSION = '4.2.2';
 
     /**
      * WC_Gateway_Checkout_Com_Cards constructor.
@@ -655,7 +655,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         // Verify session id
         $result =  (array) (new WC_Checkoutcom_Api_request)->verify_session($cko_session_id);
 
-        $order_id = preg_replace("/[^0-9]/", "", $result['reference']);
+        $order_id = $result['metadata']['order_id'];
         $action = $result['actions'];
 
         $order = new WC_Order( $order_id );
