@@ -89,9 +89,9 @@ class WC_Checkoutcom_Api_request
                 if ($gateway_debug) {
                     // Only show the decline reason in case the response code is not from a risk rule
                     if (preg_match("/^(?:40)\d+$/",$response->response_code)) {
-                       $error_message = __("An error has occurred while processing your payment. Please check your card details and try again. ", 'wc_checkout_com');
+                        $error_message = __("An error has occurred while processing your payment. Please check your card details and try again. ", 'wc_checkout_com');
                     } else {
-                        $error_message .= __('Status : ' . $response->status . ', Response summary : ' . $response->response_summary , 'wc_checkout_com');
+                        $error_message = __('Status : ' . $response->status . ', Response summary : ' . $response->response_summary , 'wc_checkout_com');
                     }
                 } else {
                     $error_message = __("An error has occurred while processing your payment. Please check your card details and try again. ", 'wc_checkout_com');
