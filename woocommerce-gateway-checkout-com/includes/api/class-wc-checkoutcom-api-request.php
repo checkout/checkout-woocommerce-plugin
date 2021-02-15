@@ -255,7 +255,8 @@ class WC_Checkoutcom_Api_request
         ", Order ID - " . $order->get_order_number() . ", Server - " . get_site_url();
 
         $metadata = array(
-            'udf5' => $udf5
+            'udf5' => $udf5,
+            'order_id' => $order->get_id()
         );
 
         // set capture delay if payment action is authorise and capture

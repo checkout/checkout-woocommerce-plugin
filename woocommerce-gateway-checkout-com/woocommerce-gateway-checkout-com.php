@@ -9,6 +9,8 @@ Author URI: https://www.checkout.com/
 Requires at least: 4.0
 Stable tag: 4.2.1
 Tested up to: 5.5
+
+WC tested up to: 5.0
 */
 
 /*
