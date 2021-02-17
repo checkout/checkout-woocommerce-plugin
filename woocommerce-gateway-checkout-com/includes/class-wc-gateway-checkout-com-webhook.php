@@ -37,6 +37,8 @@ class WC_Checkout_Com_Webhook
             return true;
         }
 
+        $order->add_order_note(__("Checkout.com Payment Capture webhook received", 'wc_checkout_com'));
+
         // Get action id from webhook data
         $action_id = $webhook_data->action_id;
         $amount = $webhook_data->amount;
@@ -49,16 +51,16 @@ class WC_Checkout_Com_Webhook
 
         // Get cko capture status configured in admin
         $status = WC_Admin_Settings::get_option('ckocom_order_captured');
-        $order_message = __("Checkout.com Payment Captured (Transaction ID - {$action_id}) ", 'wc_checkout_com');
+        $order_message = __("Checkout.com Payment Captured " ."</br>". " Action ID : {$action_id} ", 'wc_checkout_com');
 
         // Check if webhook amount is less than order amount
         if ($amount < $order_amount_cents) {
-            $order_message = __("Checkout.com Payment partially captured (Transaction ID - {$action_id}) ", 'wc_checkout_com');
+            $order_message = __("Checkout.com Payment partially captured " ."</br>". " Action ID : {$action_id} ", 'wc_checkout_com');
         }
 
-        // Update order status on woo backend
-        $order->update_status($status, $order_message);
-        $order->add_order_note(__($message, 'wc_checkout_com'));
+       // add notes for the order and update status
+        $order->add_order_note($order_message);
+        $order->update_status($status);
 
         return true;
     }
@@ -123,6 +125,8 @@ class WC_Checkout_Com_Webhook
             return true;
         }
 
+        $order->add_order_note(__("Checkout.com Payment Void webhook received", 'wc_checkout_com'));
+
         // Get action id from webhook data
         $action_id = $webhook_data->action_id;
 
@@ -132,11 +136,11 @@ class WC_Checkout_Com_Webhook
 
         // Get cko capture status configured in admin
         $status = WC_Admin_Settings::get_option('ckocom_order_void');
-        $order_message = __("Checkout.com Payment Voided (Transaction ID - {$action_id}) ", 'wc_checkout_com');
+        $order_message = __("Checkout.com Payment Voided " ."</br>". " Action ID : {$action_id} ", 'wc_checkout_com');
 
-        // Update order status on woo backend
-        $order->update_status($status, $order_message);
-        $order->add_order_note(__($message, 'wc_checkout_com'));
+        // add notes for the order and update status
+        $order->add_order_note($order_message);
+        $order->update_status($status);
 
         return true;
     }
@@ -182,6 +186,8 @@ class WC_Checkout_Com_Webhook
             return true;
         }
 
+        $order->add_order_note(__("Checkout.com Payment Refund webhook received", 'wc_checkout_com'));
+
         // Set action id as woo transaction id
         update_post_meta($order_id, '_transaction_id', $action_id);
         update_post_meta($order_id, 'cko_payment_refunded', true);
@@ -190,11 +196,11 @@ class WC_Checkout_Com_Webhook
 
         // Get cko refund status configured in admin - full refund
         $status = WC_Admin_Settings::get_option('ckocom_order_refunded');
-        $order_message = __("Checkout.com Payment Refunded (Transaction ID - {$action_id}) ", 'wc_checkout_com');
+        $order_message = __("Checkout.com Payment Refunded " ."</br>". " Action ID : {$action_id} ", 'wc_checkout_com');
 
         // Check if webhook amount is less than order amount - partial refund
         if ($amount < $order_amount_cents) {
-            $order_message = __("Checkout.com Payment partially refunded (Transaction ID - {$action_id}) ", 'wc_checkout_com');
+            $order_message = __("Checkout.com Payment partially refunded " ."</br>". " Action ID : {$action_id} ", 'wc_checkout_com');
             $status = WC_Admin_Settings::get_option('ckocom_order_captured');
 
             // handle partial refund
@@ -202,9 +208,9 @@ class WC_Checkout_Com_Webhook
 
         }
 
-        // Update order status on woo backend
+        // add notes for the order and update status
+        $order->add_order_note($order_message);
         $order->update_status($status);
-        $order->add_order_note(__($order_message, 'wc_checkout_com'));
 
         return true;
     }
@@ -246,7 +252,9 @@ class WC_Checkout_Com_Webhook
             $status = 'wc-cancelled';
             $message = 'Webhook received from checkout.com. Payment cancelled';
 
-            $order->update_status($status, $message);
+            // add notes for the order and update status
+            $order->add_order_note($message);
+            $order->update_status($status);
 
             return true;
 
@@ -291,8 +299,9 @@ class WC_Checkout_Com_Webhook
 
         try{
            
-            // Update order status on woo backend
-            $order->update_status($status, $message);
+            // add notes for the order and update status
+            $order->add_order_note($message);
+            $order->update_status($status);
 
             return true;
 
