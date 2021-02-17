@@ -536,7 +536,7 @@ class WC_Checkoutcom_Cards_Settings
                 'title'   => __( 'Enable/Disable', 'checkoutcom-cards-settings' ),
                 'type'    => 'checkbox',
                 'label'   => __( 'Enable Checkout.com', 'checkoutcom-cards-settings' ),
-                'description' => __( 'This enables google pay as a payment method', 'checkoutcom-cards-settings' ),
+                'description' => __( 'This enables alternative payment methods', 'checkoutcom-cards-settings' ),
                 'desc_tip'    => true,
                 'default'     => 'no',
             ),
@@ -546,7 +546,7 @@ class WC_Checkoutcom_Cards_Settings
                 'label' => __('Alternative Payments', 'checkoutcom-cards-settings'),
                 'description' => __('Title that will be displayed on the checkout page', 'checkoutcom-cards-settings'),
                 'desc_tip' => true,
-                'default'     => 'Google Pay',
+                'default'     => 'Alternative Payment Methods',
             ),
             'ckocom_apms_selector' => array(
                 'title' => __('Alternative Payment Methods', 'checkoutcom-cards-settings'),

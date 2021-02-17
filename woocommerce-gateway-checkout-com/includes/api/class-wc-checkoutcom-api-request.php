@@ -86,18 +86,21 @@ class WC_Checkoutcom_Api_request
             } else {
                 $error_message = __("An error has occurred while processing your payment. Please check your card details and try again. ", 'wc_checkout_com');
 
-                // check if gateway response is enable from module settings
+                // If the merchant enabled gateway response 
                 if ($gateway_debug) {
-                    $error_message .= __('Status : ' . $response->status . ', Response summary : ' . $response->response_summary , 'wc_checkout_com');
+                    // Only show the decline reason in case the response code is not from a risk rule
+                    if (! preg_match("/^(?:40)\d+$/", $response->response_code)) {
+                        $error_message .= __('Status : ' . $response->status . ', Response summary : ' . $response->response_summary , 'wc_checkout_com');
+                    }
                 }
-
+                
                 // Log message
                 WC_Checkoutcom_Utility::logger($error_message , $response);
 
                 return array('error' => $error_message);
             }
         } catch (CheckoutHttpException $ex) {
-            $error_message = _("An error has occurred while processing your payment. ", 'wc_checkout_com');
+            $error_message = __("An error has occurred while processing your payment. ", 'wc_checkout_com');
 
             // check if gateway response is enable from module settings
             if ($gateway_debug) {
@@ -252,7 +255,8 @@ class WC_Checkoutcom_Api_request
         ", Order ID - " . $order->get_order_number() . ", Server - " . get_site_url();
 
         $metadata = array(
-            'udf5' => $udf5
+            'udf5' => $udf5,
+            'order_id' => $order->get_id()
         );
 
         // set capture delay if payment action is authorise and capture

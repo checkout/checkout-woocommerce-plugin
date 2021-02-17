@@ -15,7 +15,7 @@ class WC_Checkout_Com_Webhook
     public static function capture_payment($data)
     {
         $webhook_data = $data->data;
-        $order_id = $webhook_data->reference;
+        $order_id = $webhook_data->metadata->order_id;
 
         // return false if no order id
         if (empty($order_id)) {
@@ -74,7 +74,7 @@ class WC_Checkout_Com_Webhook
     public static function capture_declined($data)
     {
         $webhook_data = $data->data;
-        $order_id = $webhook_data->reference;
+        $order_id = $webhook_data->metadata->order_id;
 
         // return false if no order id
         if (empty($order_id)) {
@@ -103,7 +103,7 @@ class WC_Checkout_Com_Webhook
     public static function void_payment($data)
     {
         $webhook_data = $data->data;
-        $order_id = $webhook_data->reference;
+        $order_id = $webhook_data->metadata->order_id;
 
         // return false if no order id
         if (empty($order_id)) {
@@ -154,7 +154,7 @@ class WC_Checkout_Com_Webhook
     public static function refund_payment($data)
     {
         $webhook_data = $data->data;
-        $order_id = $webhook_data->reference;
+        $order_id = $webhook_data->metadata->order_id;
 
         // return false if no order id
         if (empty($order_id)) {
@@ -236,7 +236,7 @@ class WC_Checkout_Com_Webhook
             // Check if payment is already voided or captured on checkout.com hub
             $details = $checkout->payments()->details($payment_id);
 
-            $order_id = $details->reference;
+            $order_id = $details->metadata->order_id;
 
             // return false if no order id
             if (empty($order_id)) {
@@ -280,7 +280,7 @@ class WC_Checkout_Com_Webhook
     public static function decline_payment($data)
     {
         $webhook_data = $data->data;
-        $order_id = $webhook_data->reference;
+        $order_id = $webhook_data->metadata->order_id;
         $payment_id = $webhook_data->id;
         $response_summary = $webhook_data->response_summary;
 

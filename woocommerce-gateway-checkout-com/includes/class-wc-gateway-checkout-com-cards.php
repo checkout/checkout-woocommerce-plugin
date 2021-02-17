@@ -11,7 +11,7 @@ use Checkout\Library\Exceptions\CheckoutModelException;
 
 class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 {
-    const PLUGIN_VERSION = '4.2.0';
+    const PLUGIN_VERSION = '4.2.1';
 
     /**
      * WC_Gateway_Checkout_Com_Cards constructor.
@@ -159,7 +159,12 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 
         // check if user is logged-in or a guest
         if (!is_user_logged_in()) {
-            $this->new_method_label   = __( 'Card Payment', 'wc_checkout_com' );
+            ?>
+            <script>
+                jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
+            </script>
+
+            <?php
         }
 
         // check if saved card enable from module setting
@@ -648,7 +653,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         // Verify session id
         $result =  (array) (new WC_Checkoutcom_Api_request)->verify_session($cko_session_id);
 
-        $order_id = $result['reference'];
+        $order_id = $result['metadata']['order_id'];
         $action = $result['actions'];
 
         $order = new WC_Order( $order_id );
