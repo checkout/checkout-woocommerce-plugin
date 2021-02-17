@@ -71,20 +71,20 @@ class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway
         $count_apm = count($apm_available);
 
         ?>
-        <input type="hidden" id="cko-ideal-bic" name="cko-ideal-bic" value="" />
-        <input type="hidden" id="cko-klarna-token" name="cko-klarna-token" value="" />
-        <input type="hidden" id="cko-giropay-bank" name="cko-giropay-bank" value="" />
-        <input type="hidden" id="cko-eps-bank" name="cko-eps-bank" value="" />
-        <?php
+<input type="hidden" id="cko-ideal-bic" name="cko-ideal-bic" value="" />
+<input type="hidden" id="cko-klarna-token" name="cko-klarna-token" value="" />
+<input type="hidden" id="cko-giropay-bank" name="cko-giropay-bank" value="" />
+<input type="hidden" id="cko-eps-bank" name="cko-eps-bank" value="" />
+<?php
 
         foreach ($apm_available as $index => $value){
             if($count_apm > 1) {
                 ?>
-                <div>
-                    <input type="radio" id="cko-apms-<?php echo $value; ?>" value="<?php echo $value; ?>" name="cko-apm"/>
-                    <img src="<?php echo $plugin_url . $value . '.svg'; ?>"/>
-                    <label for="cko-apms-<?php echo $value; ?>">
-                        <?php
+<div>
+    <input type="radio" id="cko-apms-<?php echo $value; ?>" value="<?php echo $value; ?>" name="cko-apm" />
+    <img src="<?php echo $plugin_url . $value . '.svg'; ?>" />
+    <label for="cko-apms-<?php echo $value; ?>">
+        <?php
                         switch ($value) {
                             case "ideal":
                                 $value = "iDEAL";
@@ -108,7 +108,8 @@ class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway
                             $payment_method_categories = $klarna_session->payment_method_categories;
                             $klarna = WC_Checkoutcom_Apm_Templates::get_klarna($client_token, $payment_method_categories);
 
-                            ?> <div class="klarna-details"></div><div id="klarna_container"></div><?php
+                            ?> <div class="klarna-details"></div>
+        <div id="klarna_container"></div><?php
 
                         } elseif ($value == 'iDEAL') {
                             $ideal_bank = WC_Checkoutcom_Apm_Templates::get_ideal_bank();
@@ -120,16 +121,16 @@ class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway
                             $sepa = WC_Checkoutcom_Apm_Templates::get_sepa_details(wp_get_current_user());
                         }
                         ?>
-                    </label>
-                </div>
-                <?php
+    </label>
+</div>
+<?php
             } elseif (count($apm_available) == 1) {
                 ?>
-                <div class="cko-single-apm">
-                    <input type="radio" id="cko-apms-<?php echo $value; ?>" value="<?php echo $value; ?>" name="cko-apm" checked />
-                    <img src="<?php echo $plugin_url . $value . '.svg'; ?>"/>
-                    <label for="cko-apms-<?php echo $value; ?>">
-                    <?php
+<div class="cko-single-apm">
+    <input type="radio" id="cko-apms-<?php echo $value; ?>" value="<?php echo $value; ?>" name="cko-apm" checked />
+    <img src="<?php echo $plugin_url . $value . '.svg'; ?>" />
+    <label for="cko-apms-<?php echo $value; ?>">
+        <?php
                     switch ($value) {
                         case "ideal":
                             $value = "iDEAL";
@@ -153,7 +154,8 @@ class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway
                         $client_token = $klarna_session->client_token;
                         $payment_method_categories = $klarna_session->payment_method_categories;
                         $klarna = WC_Checkoutcom_Apm_Templates::get_klarna($client_token, $payment_method_categories);
-                        ?> <div class="klarna-details"></div><div id="klarna_container"></div><?php
+                        ?> <div class="klarna-details"></div>
+        <div id="klarna_container"></div><?php
                     } elseif ($value == 'iDEAL') {
                         $ideal_bank = WC_Checkoutcom_Apm_Templates::get_ideal_bank();
                     } elseif ($value == 'Boleto') {
@@ -161,246 +163,248 @@ class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway
                     } elseif ($value == 'SEPA Direct Debit') {
                         $sepa = WC_Checkoutcom_Apm_Templates::get_sepa_details(wp_get_current_user());
                     }
-                ?></div><?php
+                ?>
+</div><?php
             }
         }
         ?>
-        <script>
-            var count_apm = '<?= $count_apm ?>';
+<script>
+var count_apm = '<?= $count_apm ?>';
 
-            // check if apm count >1 and hide/show apm payment method
-            if(count_apm == 0){
-                jQuery('.payment_method_wc_checkout_com_alternative_payments').hide();
-            } else {
-                jQuery('.payment_method_wc_checkout_com_alternative_payments').show();
+// check if apm count >1 and hide/show apm payment method
+if (count_apm == 0) {
+    jQuery('.payment_method_wc_checkout_com_alternative_payments').hide();
+} else {
+    jQuery('.payment_method_wc_checkout_com_alternative_payments').show();
+}
+
+if (jQuery("[name='cko-apm']").length == 0) {
+    if (jQuery('.klarna_widgets').length > 0) {
+        jQuery('.klarna_widgets').show();
+    }
+}
+
+// hide/show individual
+jQuery("[name='cko-apm']").change(function() {
+    if (jQuery('#cko-apms-ideal').length > 0 && jQuery("[name='cko-apm']:checked").val() == 'ideal') {
+        // Show Ideal form
+        jQuery('.ideal-bank-info').show();
+        jQuery('.klarna_widgets').hide();
+        jQuery('#klarna_container').hide();
+        jQuery('.giropay-bank-info').hide();
+        jQuery('.boleto-content').hide();
+        jQuery('.sepa-content').hide();
+
+    } else if (jQuery('#cko-apms-klarna').length > 0 && jQuery("[name='cko-apm']:checked").val() == 'klarna') {
+        jQuery('.ideal-bank-info').hide();
+        jQuery('.klarna_widgets').show();
+        jQuery('#klarna_container').show();
+        jQuery('.giropay-bank-info').hide();
+        jQuery('.boleto-content').hide();
+        jQuery('.sepa-content').hide();
+
+    } else if (jQuery('#cko-apms-giropay').length > 0 && jQuery("[name='cko-apm']:checked").val() ==
+        'giropay') {
+        jQuery('.giropay-bank-info').show();
+        jQuery('.ideal-bank-info').hide();
+        jQuery('.klarna_widgets').hide();
+        jQuery('#klarna_container').hide();
+        jQuery('.boleto-content').hide();
+        jQuery('.sepa-content').hide();
+
+    } else if (jQuery('#cko-apms-boleto').length > 0 && jQuery("[name='cko-apm']:checked").val() == 'boleto') {
+        jQuery('.ideal-bank-info').hide();
+        jQuery('.klarna_widgets').hide();
+        jQuery('#klarna_container').hide()
+        jQuery('.giropay-bank-info').hide();
+        jQuery('.boleto-content').show();
+        jQuery('.sepa-content').hide();
+
+    } else if (jQuery('#cko-apms-eps').length > 0 && jQuery("[name='cko-apm']:checked").val() == 'eps') {
+        jQuery('.ideal-bank-info').hide();
+        jQuery('.klarna_widgets').hide();
+        jQuery('#klarna_container').hide()
+        jQuery('.giropay-bank-info').hide();
+        jQuery('.boleto-content').hide();
+        jQuery('.sepa-content').hide();
+
+    } else if (jQuery('#cko-apms-sepa').length > 0 && jQuery("[name='cko-apm']:checked").val() == 'sepa') {
+        jQuery('.ideal-bank-info').hide();
+        jQuery('.klarna_widgets').hide();
+        jQuery('#klarna_container').hide()
+        jQuery('.giropay-bank-info').hide();
+        jQuery('.boleto-content').hide();
+        jQuery('.sepa-content').show();
+
+    } else {
+        jQuery('.ideal-bank-info').hide();
+        jQuery('.klarna_widgets').hide();
+        jQuery('#klarna_container').hide()
+        jQuery('.giropay-bank-info').hide();
+        jQuery('.boleto-content').hide();
+        jQuery('.sepa-content').hide();
+    }
+});
+
+// Alter default place order button click
+jQuery('#place_order').click(function(e) {
+    // check if apm is selected as payment method
+    if (jQuery('#payment_method_wc_checkout_com_alternative_payments').is(':checked')) {
+
+        // Boleto
+        if (jQuery('#cko-apms-boleto').length > 0 && jQuery('#cko-apms-boleto').is(':checked')) {
+            if (!jQuery("[name='name']")[0].checkValidity()) {
+                alert('Please enter your name');
+                return false;
             }
 
-            if(jQuery("[name='cko-apm']").length == 0) {
-                if(jQuery('.klarna_widgets').length > 0) {
-                    jQuery('.klarna_widgets').show();
-                }
+            if (!jQuery("[name='cpf']")[0].checkValidity()) {
+                alert('Please enter your CPF');
+                return false;
             }
 
-            // hide/show individual
-            jQuery("[name='cko-apm']").change(function() {
-                if (jQuery('#cko-apms-ideal').length > 0 && jQuery("[name='cko-apm']:checked").val() == 'ideal') {
-                    // Show Ideal form
-                    jQuery('.ideal-bank-info').show();
-                    jQuery('.klarna_widgets').hide();
-                    jQuery('#klarna_container').hide();
-                    jQuery('.giropay-bank-info').hide();
-                    jQuery('.boleto-content').hide();
-                    jQuery('.sepa-content').hide();
+            if (!jQuery("[name='birthDate']")[0].checkValidity()) {
+                alert('Please enter your birthdate in the correct format.');
+                return false;
+            }
+        }
 
-                } else if (jQuery('#cko-apms-klarna').length > 0 && jQuery("[name='cko-apm']:checked").val() == 'klarna') {
-                    jQuery('.ideal-bank-info').hide();
-                    jQuery('.klarna_widgets').show();
-                    jQuery('#klarna_container').show();
-                    jQuery('.giropay-bank-info').hide();
-                    jQuery('.boleto-content').hide();
-                    jQuery('.sepa-content').hide();
+        // Sepa
+        if (jQuery('#cko-apms-sepa').length > 0 && jQuery('#cko-apms-sepa').is(':checked')) {
+            if (jQuery('#sepa-iban').val().length == 0) {
+                alert('Please enter your bank accounts iban');
+                return false;
+            }
 
-                } else if (jQuery('#cko-apms-giropay').length > 0 && jQuery("[name='cko-apm']:checked").val() == 'giropay'){
-                    jQuery('.giropay-bank-info').show();
-                    jQuery('.ideal-bank-info').hide();
-                    jQuery('.klarna_widgets').hide();
-                    jQuery('#klarna_container').hide();
-                    jQuery('.boleto-content').hide();
-                    jQuery('.sepa-content').hide();
+            if (jQuery('#sepa-bic').val().length == 0) {
+                alert('Please enter your BIC code');
+                return false;
+            }
 
-                } else if(jQuery('#cko-apms-boleto').length > 0 && jQuery("[name='cko-apm']:checked").val() == 'boleto') {
-                    jQuery('.ideal-bank-info').hide();
-                    jQuery('.klarna_widgets').hide();
-                    jQuery('#klarna_container').hide()
-                    jQuery('.giropay-bank-info').hide();
-                    jQuery('.boleto-content').show();
-                    jQuery('.sepa-content').hide();
+            if (jQuery('input[name="sepa-checkbox-input"]:checked').length == 0) {
+                alert('Please accept the mandate to continue');
+                return false;
+            }
+        }
 
-                } else if(jQuery('#cko-apms-eps').length > 0 && jQuery("[name='cko-apm']:checked").val() == 'eps') {
-                    jQuery('.ideal-bank-info').hide();
-                    jQuery('.klarna_widgets').hide();
-                    jQuery('#klarna_container').hide()
-                    jQuery('.giropay-bank-info').hide();
-                    jQuery('.boleto-content').hide();
-                    jQuery('.sepa-content').hide();
+        // Klarna
+        if (jQuery('.klarna_widgets').length > 0 && jQuery('.klarna_widgets').find('input[type="radio"]').is(
+                ':checked')) {
 
-                } else if(jQuery('#cko-apms-sepa').length > 0 && jQuery("[name='cko-apm']:checked").val() == 'sepa') {
-                    jQuery('.ideal-bank-info').hide();
-                    jQuery('.klarna_widgets').hide();
-                    jQuery('#klarna_container').hide()
-                    jQuery('.giropay-bank-info').hide();
-                    jQuery('.boleto-content').hide();
-                    jQuery('.sepa-content').show();
+            // check if token value not empty
+            if (document.getElementById('cko-klarna-token').value.length > 0) {
+                return true;
+            }
 
-                } else {
-                    jQuery('.ideal-bank-info').hide();
-                    jQuery('.klarna_widgets').hide();
-                    jQuery('#klarna_container').hide()
-                    jQuery('.giropay-bank-info').hide();
-                    jQuery('.boleto-content').hide();
-                    jQuery('.sepa-content').hide();
-                }
+            // prevent default click
+            e.preventDefault();
+
+            // create token and trigger place order button
+            try {
+                Klarna.Payments.authorize(
+                    // options
+                    {
+                        // Same as instance_id set in Klarna.Payments.load().
+                        instance_id: "klarna-payments-instance"
+                    },
+                    // callback
+                    function(response) {
+                        if (response.approved) {
+                            document.getElementById('cko-klarna-token').value = response
+                                .authorization_token;
+                            jQuery('#place_order').trigger('click');
+                        }
+                    }
+                );
+            } catch (e) {
+                // Handle error. The authorize~callback will have been called
+                // with "{ show_form: false, approved: false }" at this point.
+                console.log(e);
+            }
+        }
+    }
+});
+
+// load klarna widgets if selected
+if (jQuery('.klarna_widgets').length > 0) {
+
+    setTimeout(function() {
+        if (jQuery('.klarna_widgets').find('input[type="radio"]').is(':checked')) {
+            console.log('here now');
+            jQuery('.klarna_widgets').find('input[type="radio"]').prop('checked', false);
+        }
+    }, 300)
+
+    jQuery('.klarna_widgets').find('input[type="radio"]').on('click', function(event) {
+        var cartInfo = <?php echo json_encode(WC_Checkoutcom_Api_request::get_cart_info()); ?>;
+
+        var email = cartInfo['billing_address']['email'];
+        var family_name = cartInfo['billing_address']['family_name'];
+        var given_name = cartInfo['billing_address']['given_name'];
+        var phone = cartInfo['billing_address']['phone'];
+
+        if (!email) {
+            email = document.getElementById('billing_email').value;
+        }
+
+        if (!family_name) {
+            family_name = document.getElementById('billing_last_name').value;
+        }
+
+        if (!given_name) {
+            given_name = document.getElementById('billing_first_name').value;
+        }
+
+        if (!phone) {
+            phone = document.getElementById('billing_phone').value;
+        }
+
+        console.log(cartInfo);
+        try {
+            Klarna.Payments.init({
+                client_token: "<?php echo $client_token; ?>"
             });
 
-            // Alter default place order button click
-            jQuery('#place_order').click(function (e) {
-                // check if apm is selected as payment method
-                if (jQuery('#payment_method_wc_checkout_com_alternative_payments').is(':checked')) {
-
-                    // Boleto
-                    if (jQuery('#cko-apms-boleto').length > 0 && jQuery('#cko-apms-boleto').is(':checked')) {
-                        if (!jQuery("[name='name']")[0].checkValidity()) {
-                            alert('Please enter your name');
-                            return false;
-                        }
-
-                        if (!jQuery("[name='cpf']")[0].checkValidity()) {
-                            alert('Please enter your CPF');
-                            return false;
-                        }
-
-                        if (!jQuery("[name='birthDate']")[0].checkValidity()) {
-                            alert('Please enter your birthdate in the correct format.');
-                            return false;
-                        }
+            Klarna.Payments.load(
+                // options
+                {
+                    container: "#klarna_container",
+                    payment_method_categories: [event.target.id],
+                    instance_id: "klarna-payments-instance"
+                }, {
+                    purchase_country: cartInfo['purchase_country'],
+                    purchase_currency: cartInfo['purchase_currency'],
+                    locale: cartInfo['locale'],
+                    order_amount: cartInfo['order_amount'],
+                    // order_tax_amount:   parseInt(data.tax_amount) *100,
+                    order_lines: cartInfo['order_lines'],
+                    billing_address: {
+                        given_name: given_name,
+                        family_name: family_name,
+                        email: email,
+                        street_address: cartInfo['billing_address']['street_address'],
+                        postal_code: cartInfo['billing_address']['postal_code'],
+                        city: cartInfo['billing_address']['city'],
+                        region: cartInfo['billing_address']['city'],
+                        phone: phone,
+                        country: cartInfo['billing_address']['country'],
                     }
-
-                    // Sepa
-                    if (jQuery('#cko-apms-sepa').length > 0 && jQuery('#cko-apms-sepa').is(':checked')) {
-                        if(jQuery('#sepa-iban').val().length == 0){
-                            alert('Please enter your bank accounts iban');
-                            return false;
-                        }
-
-                        if(jQuery('#sepa-bic').val().length == 0){
-                            alert('Please enter your BIC code');
-                            return false;
-                        }
-
-                        if (jQuery('input[name="sepa-checkbox-input"]:checked').length == 0) {
-                            alert('Please accept the mandate to continue');
-                            return false;
-                        }
-                    }
-
-                    // Klarna
-                    if (jQuery('.klarna_widgets').length > 0 && jQuery('.klarna_widgets').find('input[type="radio"]').is(':checked')) {
-
-                        // check if token value not empty
-                        if (document.getElementById('cko-klarna-token').value.length > 0) {
-                            return true;
-                        }
-
-                        // prevent default click
-                        e.preventDefault();
-
-                        // create token and trigger place order button
-                        try {
-                            Klarna.Payments.authorize(
-                                // options
-                                {
-                                    // Same as instance_id set in Klarna.Payments.load().
-                                    instance_id: "klarna-payments-instance"
-                                },
-                                // callback
-                                function (response) {
-                                    if(response.approved){
-                                        document.getElementById('cko-klarna-token').value = response.authorization_token;
-                                        jQuery('#place_order').trigger('click');
-                                    }
-                                }
-                            );
-                        } catch (e) {
-                            // Handle error. The authorize~callback will have been called
-                            // with "{ show_form: false, approved: false }" at this point.
-                            console.log(e);
-                        }
-                    }
+                },
+                // callback
+                function(response) {
+                    // ...
+                    console.log(response);
                 }
-            });
-
-            // load klarna widgets if selected
-            if(jQuery('.klarna_widgets').length > 0) {
-
-                setTimeout(function(){
-                    if(jQuery('.klarna_widgets').find('input[type="radio"]').is(':checked')){ console.log('here now');
-                        jQuery('.klarna_widgets').find('input[type="radio"]').prop('checked', false);
-                    }
-                },300)
-
-                jQuery('.klarna_widgets').find('input[type="radio"]').on('click',function(event){
-                    var cartInfo = <?php echo json_encode(WC_Checkoutcom_Api_request::get_cart_info()); ?>;
-
-                    var email  = cartInfo['billing_address']['email'];
-                    var family_name = cartInfo['billing_address']['family_name'];
-                    var given_name = cartInfo['billing_address']['given_name'];
-                    var phone = cartInfo['billing_address']['phone'];
-
-                    if(!email){
-                        email = document.getElementById('billing_email').value;
-                    }
-
-                    if(!family_name){
-                        family_name = document.getElementById('billing_last_name').value;
-                    }
-
-                    if(!given_name){
-                        given_name = document.getElementById('billing_first_name').value;
-                    }
-
-                    if(!phone){
-                        phone = document.getElementById('billing_phone').value;
-                    }
-
-                    console.log(cartInfo);
-                    try {
-                        Klarna.Payments.init(
-                            {
-                                client_token: "<?php echo $client_token; ?>"
-                            }
-                        );
-
-                        Klarna.Payments.load(
-                            // options
-                            {
-                                container: "#klarna_container",
-                                payment_method_categories: [event.target.id],
-                                instance_id: "klarna-payments-instance"
-                            },
-                            {
-                                purchase_country:   cartInfo['purchase_country'],
-                                purchase_currency:  cartInfo['purchase_currency'],
-                                locale:             cartInfo['locale'],
-                                order_amount:       cartInfo['order_amount'],
-                                // order_tax_amount:   parseInt(data.tax_amount) *100,
-                                order_lines:        cartInfo['order_lines'],
-                                billing_address:    {
-                                    given_name:     given_name,
-                                    family_name:    family_name,
-                                    email:          email,
-                                    street_address: cartInfo['billing_address']['street_address'],
-                                    postal_code:    cartInfo['billing_address']['postal_code'],
-                                    city:          cartInfo['billing_address']['city'],
-                                    region:         cartInfo['billing_address']['city'],
-                                    phone:          phone,
-                                    country:        cartInfo['billing_address']['country'],
-                                }
-                            },
-                            // callback
-                            function (response) {
-                                // ...
-                                console.log(response);
-                            }
-                        );
-                    } catch (e) {
-                        // Handle error. The load~callback will have been called
-                        // with "{ show_form: false }" at this point.
-                        console.log(e);
-                    }
-                });
-            }
-        </script>
-        <?php
+            );
+        } catch (e) {
+            // Handle error. The load~callback will have been called
+            // with "{ show_form: false }" at this point.
+            console.log(e);
+        }
+    });
+}
+</script>
+<?php
     }
 
     public function process_payment( $order_id )
@@ -464,8 +468,9 @@ class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway
             update_post_meta($order_id, '_transaction_id', $result['id']);
             update_post_meta($order_id, '_cko_payment_id', $result['id']);
 
-            // Update order status on woo backend
-            $order->update_status($status,$message);
+            // add notes for the order and update status
+            $order->add_order_note($message);
+            $order->update_status($status);
 
             // Reduce stock levels
             wc_reduce_stock_levels( $order_id );
