@@ -973,6 +973,13 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         if($signature === false){
             return http_response_code(401);
         }
+
+        $payment_id = get_post_meta($data->data->metadata->order_id, '_cko_payment_id', true );
+
+        // check if payment ID matches that of the webhook
+        if($payment_id !== $data->data->id){
+            return http_response_code(422);
+        }
       
 
         // Get webhook event type from data
