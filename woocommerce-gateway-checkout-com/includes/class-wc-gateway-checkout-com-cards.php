@@ -620,11 +620,15 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
             $message = __("Checkout.com Payment Flagged (Transaction ID - {$result['action_id']}) ", 'wc_checkout_com');
         }
 
-         // add notes for the order
-         $order->add_order_note($message);
+        // add notes for the order
+        $order->add_order_note($message);
 
-         // Update order status on woo backend
-         $order->update_status($status);
+        $order_status = $order->get_status();
+
+        if($order_status == 'pending') {
+            update_post_meta($order_id, 'cko_payment_authorized', true);
+            $order->update_status($status);
+        }
 
         // Reduce stock levels
         wc_reduce_stock_levels( $order_id );
@@ -730,9 +734,13 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
             unset($_SESSION['wc-wc_checkout_com_cards-new-payment-method']);
         }
 
-        // Update order status on woo backend
-        $order->update_status($status,$message);
-
+        $order_status = $order->get_status();
+        
+        if($order_status == 'pending') {
+            update_post_meta($order_id, 'cko_payment_authorized', true);
+            $order->update_status($status, $message);
+        }
+        
         // Reduce stock levels
         wc_reduce_stock_levels( $order_id );
 
@@ -979,6 +987,9 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         $event_type = $data->type;
 
         switch ($event_type){
+            case 'payment_approved':
+                $response = WC_Checkout_Com_Webhook::authorize_payment($data);
+                break;
             case 'payment_captured':
                 $response = WC_Checkout_Com_Webhook::capture_payment($data);
                 break;

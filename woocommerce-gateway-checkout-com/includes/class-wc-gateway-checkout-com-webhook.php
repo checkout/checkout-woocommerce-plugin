@@ -7,6 +7,49 @@ use Checkout\Library\Exceptions\CheckoutModelException;
 class WC_Checkout_Com_Webhook
 {
     /**
+     * authorize_payment
+     *
+     * @param  mixed $data
+     * @return void
+     */
+    public static function authorize_payment($data)
+    {
+        $webhook_data = $data->data;
+        $order_id = $webhook_data->metadata->order_id;
+
+        if (empty($order_id)) {
+            return false;
+        }
+
+        $order = self::get_wc_order($order_id);
+        $order_id = $order->get_id();
+
+        // Check if order was set to authorized
+        $already_authorized = get_post_meta($order_id, 'cko_payment_authorized', true );
+        $status = WC_Admin_Settings::get_option('ckocom_order_authorised');
+        $message = 'Webhook received from checkout.com. Payment Authorized';
+
+        // Add note to order if already Authorized 
+        if($already_authorized && $order->get_status() === $status) {
+            $order->add_order_note(__($message, 'wc_checkout_com'));
+            return true;
+        }
+
+        $action_id = $webhook_data->action_id;
+
+        update_post_meta($order_id, '_transaction_id', $action_id);
+        update_post_meta($order_id, '_cko_payment_id', $webhook_data->id);
+        update_post_meta($order_id, 'cko_payment_authorized', true);
+        
+        $order_message = __("Checkout.com Payment Authorized (Transaction ID - {$action_id}) ", 'wc_checkout_com');
+        
+        $order->update_status($status, $order_message);
+        $order->add_order_note(__($message, 'wc_checkout_com'));
+
+        return true;
+    }
+
+    /**
      * Process webhook for captured payment
      *
      * @param $data
@@ -30,6 +73,17 @@ class WC_Checkout_Com_Webhook
         // check if payment is already captured
         $already_captured = get_post_meta($order_id, 'cko_payment_captured', true );
         $message = 'Webhook received from checkout.com. Payment captured';
+
+        $already_authorized = get_post_meta($order_id, 'cko_payment_authorized', true);
+
+        /**
+        * We return false here as payment approved webhook is not yet delivered
+        * Gateway will retry sending the captured webhook 
+        */
+        if(!$already_authorized) {
+            WC_Checkoutcom_Utility::logger('Payment approved webhook not received yet', null);
+            return false;
+        }
 
         // Add note to order if captured already
         if ($already_captured) {
