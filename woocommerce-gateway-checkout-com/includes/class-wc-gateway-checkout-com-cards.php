@@ -160,11 +160,11 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         // check if user is logged-in or a guest
         if (!is_user_logged_in()) {
             ?>
-            <script>
-                jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
-            </script>
+<script>
+jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
+</script>
 
-            <?php
+<?php
         }
 
         // check if saved card enable from module setting
@@ -978,6 +978,10 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 
         // check if payment ID matches that of the webhook
         if($payment_id !== $data->data->id){
+            // log message
+            $message = __('order payment Id ('. $payment_id .') does not match that of the webhook ('. $data->data->id .')', 'wc_checkout_com');
+            WC_Checkoutcom_Utility::logger($message , null);
+            
             return http_response_code(422);
         }
       
