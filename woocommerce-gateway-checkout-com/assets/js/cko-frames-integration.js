@@ -159,9 +159,6 @@ jQuery(function () {
     }
   }
 
-  /**
-   * set timeout
-   */
   setTimeout(function () {
     // check if saved card exist
     if (
