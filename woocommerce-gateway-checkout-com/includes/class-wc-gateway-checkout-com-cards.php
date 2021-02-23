@@ -611,19 +611,17 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 
         // Get cko auth status configured in admin
         $status = WC_Admin_Settings::get_option('ckocom_order_authorised');
-        $message = __("Checkout.com Payment Authorised (Transaction ID - {$result['action_id']}) ", 'wc_checkout_com');
+        $message = __("Checkout.com Payment Authorised " ."</br>". " Action ID : {$result['action_id']} ", 'wc_checkout_com');
 
         // check if payment was flagged
         if ($result['risk']['flagged']) {
             // Get cko auth status configured in admin
             $status = WC_Admin_Settings::get_option('ckocom_order_flagged');
-            $message = __("Checkout.com Payment Flagged (Transaction ID - {$result['action_id']}) ", 'wc_checkout_com');
+            $message = __("Checkout.com Payment Flagged " ."</br>". " Action ID : {$result['action_id']} ", 'wc_checkout_com');
         }
 
-         // add notes for the order
+         // add notes for the order and update status
          $order->add_order_note($message);
-
-         // Update order status on woo backend
          $order->update_status($status);
 
         // Reduce stock levels
@@ -709,18 +707,18 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 
         // Get cko auth status configured in admin
         $status = WC_Admin_Settings::get_option('ckocom_order_authorised');
-        $message = __("Checkout.com Payment Authorised (Transaction ID - {$action['0']['id']}) ", 'wc_checkout_com');
+        $message = __("Checkout.com Payment Authorised " ."</br>". " Action ID : {$action['0']['id']} ", 'wc_checkout_com');
 
         // check if payment was flagged
         if ($result['risk']['flagged']) {
             // Get cko auth status configured in admin
             $status = WC_Admin_Settings::get_option('ckocom_order_flagged');
-            $message = __("Checkout.com Payment Flagged (Transaction ID - {$action['0']['id']}) ", 'wc_checkout_com');
+            $message = __("Checkout.com Payment Flagged " ."</br>". " Action ID : {$action['0']['id']} ", 'wc_checkout_com');
         }
 
         if ($result['status'] == 'Captured') {
             $status = WC_Admin_Settings::get_option('ckocom_order_captured');
-            $message = __("Checkout.com Payment Captured (Transaction ID - {$action['0']['id']}) ", 'wc_checkout_com');
+            $message = __("Checkout.com Payment Captured" ."</br>". " Action ID : {$action['0']['id']} ", 'wc_checkout_com');
         }
 
         // save card to db
@@ -730,8 +728,9 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
             unset($_SESSION['wc-wc_checkout_com_cards-new-payment-method']);
         }
 
-        // Update order status on woo backend
-        $order->update_status($status,$message);
+        // Update order status and add note
+        $order->add_order_note($message);
+        $order->update_status($status);
 
         // Reduce stock levels
         wc_reduce_stock_levels( $order_id );
@@ -909,12 +908,12 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 
         // Get cko auth status configured in admin
         $status = WC_Admin_Settings::get_option('ckocom_order_refunded');
-        $message = __("Checkout.com Payment refunded (Transaction ID - {$result['action_id']}) ", 'wc_checkout_com');
+        $message = __("Checkout.com Payment refunded from Admin " ."</br>". " Action ID : {$result['action_id']} ", 'wc_checkout_com');
 
         if(isset($_SESSION['cko-refund-is-less'])){
             if($_SESSION['cko-refund-is-less']){
                 $status = WC_Admin_Settings::get_option('ckocom_order_captured');
-                $order->add_order_note( __("Checkout.com Payment Partially refunded (Transaction ID - {$result['action_id']})", 'wc_checkout_com') );
+                $order->add_order_note( __("Checkout.com Payment Partially refunded from Admin " ."</br>". " Action ID : {$result['action_id']}", 'wc_checkout_com') );
 
                 unset($_SESSION['cko-refund-is-less']);
 
@@ -922,9 +921,10 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
             }
         }
 
-        // Update order status on woo backend
-        $order->update_status($status,$message);
+        // add note for order
+        $order->add_order_note($message);
 
+        // when true is returned, status is changed to refunded automatically
         return true;
     }
 
