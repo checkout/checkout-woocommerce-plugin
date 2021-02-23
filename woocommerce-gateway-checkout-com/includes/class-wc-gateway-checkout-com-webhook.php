@@ -17,33 +17,43 @@ class WC_Checkout_Com_Webhook
         $webhook_data = $data->data;
         $order_id = $webhook_data->metadata->order_id;
 
+        // return false if no order id
         if (empty($order_id)) {
             return false;
         }
 
+        // Load order form order id
         $order = self::get_wc_order($order_id);
         $order_id = $order->get_id();
 
-        // Check if order was set to authorized
-        $already_authorized = get_post_meta($order_id, 'cko_payment_authorized', true );
-        $status = WC_Admin_Settings::get_option('ckocom_order_authorised');
+        $already_captured = get_post_meta($order_id, 'cko_payment_captured', true);
+
+        if ($already_captured) {
+            return true;
+        }
+        
+        $already_authorized = get_post_meta($order_id, 'cko_payment_authorized', true);
+        $auth_status = WC_Admin_Settings::get_option('ckocom_order_authorised');
         $message = 'Webhook received from checkout.com. Payment Authorized';
 
-        // Add note to order if already Authorized 
-        if($already_authorized && $order->get_status() === $status) {
+        // Add note to order if Authorized already
+        if ($already_authorized && $order->get_status() === $auth_status ) {
             $order->add_order_note(__($message, 'wc_checkout_com'));
             return true;
         }
 
+        // Get action id from webhook data
         $action_id = $webhook_data->action_id;
 
+        // Set action id as woo transaction id
         update_post_meta($order_id, '_transaction_id', $action_id);
         update_post_meta($order_id, '_cko_payment_id', $webhook_data->id);
         update_post_meta($order_id, 'cko_payment_authorized', true);
         
         $order_message = __("Checkout.com Payment Authorized (Transaction ID - {$action_id}) ", 'wc_checkout_com');
         
-        $order->update_status($status, $order_message);
+        // Update order status on woo backend
+        $order->update_status($auth_status, $order_message);
         $order->add_order_note(__($message, 'wc_checkout_com'));
 
         return true;
