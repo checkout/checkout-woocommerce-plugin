@@ -723,6 +723,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         }
 
         if ($result['status'] == 'Captured') {
+            update_post_meta($order_id, 'cko_payment_captured', true);
             $status = WC_Admin_Settings::get_option('ckocom_order_captured');
             $message = __("Checkout.com Payment Captured (Transaction ID - {$action['0']['id']}) ", 'wc_checkout_com');
         }
@@ -740,7 +741,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
             update_post_meta($order_id, 'cko_payment_authorized', true);
             $order->update_status($status, $message);
         }
-        
+
         // Reduce stock levels
         wc_reduce_stock_levels( $order_id );
 
