@@ -50,11 +50,11 @@ class WC_Checkout_Com_Webhook
         update_post_meta($order_id, '_cko_payment_id', $webhook_data->id);
         update_post_meta($order_id, 'cko_payment_authorized', true);
         
-        $order_message = __("Checkout.com Payment Authorized (Transaction ID - {$action_id}) ", 'wc_checkout_com');
+        $order_message = __("Checkout.com Payment Authorised " ."</br>". " Action ID : {$action_id} ", 'wc_checkout_com');
         
-        // Update order status on woo backend
-        $order->update_status($auth_status, $order_message);
         $order->add_order_note(__($message, 'wc_checkout_com'));
+        $order->update_status($auth_status);
+        
 
         return true;
     }

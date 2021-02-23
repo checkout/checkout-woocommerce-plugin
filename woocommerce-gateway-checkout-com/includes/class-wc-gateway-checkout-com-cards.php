@@ -736,10 +736,12 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         }
 
         $order_status = $order->get_status();
+
+        $order->add_order_note($message);
         
         if($order_status == 'pending') {
             update_post_meta($order_id, 'cko_payment_authorized', true);
-            $order->update_status($status, $message);
+            $order->update_status($status);
         }
 
         // Reduce stock levels
