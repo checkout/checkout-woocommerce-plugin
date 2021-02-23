@@ -978,7 +978,6 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
 
         // check if payment ID matches that of the webhook
         if($payment_id !== $data->data->id){
-            // log message
             $message = __('order payment Id ('. $payment_id .') does not match that of the webhook ('. $data->data->id .')', 'wc_checkout_com');
             WC_Checkoutcom_Utility::logger($message , null);
             
