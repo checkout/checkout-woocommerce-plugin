@@ -527,7 +527,7 @@ class WC_Checkoutcom_Api_request
 
             $ckoPayment = new Capture($cko_payment_id);
             $ckoPayment->amount = $amount_cents;
-            $ckoPayment->reference = $order_id;
+            $ckoPayment->reference = $order->get_order_number();
 
             $response = $checkout->payments()->capture($ckoPayment);
 
@@ -676,7 +676,7 @@ class WC_Checkoutcom_Api_request
             // Process partial refund if amount is less than order amount
             if ($refund_is_less) {
                 $ckoPayment->amount = $refund_amount_cents;
-                $ckoPayment->reference = $order_id;
+                $ckoPayment->reference = $order->get_order_number();
 
                 // Set is_mada in session
                 $_SESSION['cko-refund-is-less'] = $refund_is_less;
