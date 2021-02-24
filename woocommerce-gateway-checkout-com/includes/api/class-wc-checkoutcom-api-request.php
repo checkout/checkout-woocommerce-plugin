@@ -823,6 +823,9 @@ class WC_Checkoutcom_Api_request
     {
         // Get payment request parameter
         $request_param = WC_Checkoutcom_Api_request::get_request_param($order, $arg);
+
+        WC_Checkoutcom_Utility::logger('Apm request payload,' , $request_param);
+        
         $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
         $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
         $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes' ? true : false;
@@ -1071,43 +1074,33 @@ class WC_Checkoutcom_Api_request
                 $email = sanitize_text_field($_POST['billing_email']);
                 $phone = sanitize_text_field($_POST['billing_phone']);
 
+                $cartInfo = self::get_cart_info();
+                $productInfo = $cartInfo['order_lines'];
+                $orderAmount = $cartInfo['order_amount'];
                 $products = array();
-                foreach ($order->get_items() as $item_id => $item_data) {
-                    // Get an instance of corresponding the WC_Product object
-                    $product = $item_data->get_product();
-                    $item_total = $item_data->get_total(); // Get the item line total
-                    $productPrice = $product->get_price(); // Get the unit price of the product
-                    $unitPrice = WC_Checkoutcom_Utility::valueToDecimal($productPrice, get_woocommerce_currency());
-                    $amount_cents = WC_Checkoutcom_Utility::valueToDecimal($item_total, get_woocommerce_currency());
-                    $items_total = $item_data->get_total() * $item_data->get_quantity();
-                    $total_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($items_total, get_woocommerce_currency());
+                $totalProductAmount = 0;
 
+                foreach ($productInfo as $item) {
                     $products[] = array(
-                        "product_id" => $product->get_id(),
-                        "quantity" => $item_data->get_quantity(),
-                        "price" => $unitPrice,
-                        "description" => $product->get_name(),
-                    );
-                }
-
-                // check the presence of a shipping method
-                if (!empty($order->get_shipping_method())) {
-
-                    $chosen_methods = wc_get_chosen_shipping_method_ids();
-                    $chosen_shipping = $chosen_methods[0];
-
-                    if($chosen_shipping != 'free_shipping') {
-                        $shipping_amount = WC()->cart->get_shipping_total();
-                        $shipping_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($shipping_amount, get_woocommerce_currency());
-
-                        $products[] = array(
-                            "product_id" => $chosen_shipping,
-                            "quantity" => 1,
-                            "price" => $shipping_amount_cents,
-                            "description" => $chosen_shipping,
+                        "product_id" => $item['name'],
+                        "quantity" => $item['quantity'],
+                        "price" => $item['unit_price'],
+                        "description" => $item['name'],
                         );
-                    }
+
+                    $totalProductAmount += $item['unit_price'] * $item['quantity'];
                 }
+
+
+                if ($totalProductAmount !== $orderAmount) {
+                    
+                    WC_Checkoutcom_Utility::logger("Total product amount {$totalProductAmount} does not match order amount {$orderAmount}", null);
+                    
+                    $product[] = self::format_fawry_product($products, $orderAmount);
+
+                    $products = $product;
+                }
+                
 
                 $method = new FawrySource($email, $phone, $order->get_order_number(), $products);
                 break;
@@ -1340,38 +1333,40 @@ class WC_Checkoutcom_Api_request
             $shipping_amount = WC()->cart->get_shipping_total() ;
             $shipping_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($shipping_amount, get_woocommerce_currency());
 
-            if(WC()->cart->get_shipping_tax() > 0){
-                $shipping_amount = WC()->cart->get_shipping_total() + WC()->cart->get_shipping_tax();
-                $shipping_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($shipping_amount, get_woocommerce_currency());
-
-                $total_tax_amount = WC()->cart->get_shipping_tax();
-                $total_tax_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($total_tax_amount, get_woocommerce_currency());
-
-                $shipping_rates = WC_Tax::get_shipping_tax_rates();
-                $vat            = array_shift( $shipping_rates );
-
-                if ( isset( $vat['rate'] ) ) {
-                    $shipping_tax_rate = round( $vat['rate'] * 100 );
+            if($shipping_amount_cents > 0) {
+                if(WC()->cart->get_shipping_tax() > 0){
+                    $shipping_amount = WC()->cart->get_shipping_total() + WC()->cart->get_shipping_tax();
+                    $shipping_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($shipping_amount, get_woocommerce_currency());
+    
+                    $total_tax_amount = WC()->cart->get_shipping_tax();
+                    $total_tax_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($total_tax_amount, get_woocommerce_currency());
+    
+                    $shipping_rates = WC_Tax::get_shipping_tax_rates();
+                    $vat            = array_shift( $shipping_rates );
+    
+                    if ( isset( $vat['rate'] ) ) {
+                        $shipping_tax_rate = round( $vat['rate'] * 100 );
+                    } else {
+                        $shipping_tax_rate = 0;
+                    }
+    
                 } else {
                     $shipping_tax_rate = 0;
+                    $total_tax_amount_cents = 0;
                 }
-
-            } else {
-                $shipping_tax_rate = 0;
-                $total_tax_amount_cents = 0;
+    
+                $products[] = array(
+                    "name" => $chosen_shipping,
+                    "quantity" => 1,
+                    "unit_price" => $shipping_amount_cents,
+                    "tax_rate" => $shipping_tax_rate,
+                    "total_amount" => $shipping_amount_cents,
+                    "total_tax_amount" => $total_tax_amount_cents,
+                    "type" => "shipping_fee",
+                    "reference" => $chosen_shipping,
+                    "total_discount_amount" => 0
+                );
             }
-
-            $products[] = array(
-                "name" => $chosen_shipping,
-                "quantity" => 1,
-                "unit_price" => $shipping_amount_cents,
-                "tax_rate" => $shipping_tax_rate,
-                "total_amount" => $shipping_amount_cents,
-                "total_tax_amount" => $total_tax_amount_cents,
-                "type" => "shipping_fee",
-                "reference" => $chosen_shipping,
-                "total_discount_amount" => 0
-            );
         }
 
         $woo_locale = str_replace("_", "-", get_locale());
@@ -1431,5 +1426,26 @@ class WC_Checkoutcom_Api_request
             
             die('here');
         }
+    }
+
+    /**
+     * format_fawry_product
+     *
+     * @param  mixed $products
+     * @param  mixed $amount
+     * @return void
+     */
+    public static function format_fawry_product($products, $amount)
+    {
+        $arr = [];
+        
+        foreach($products as $product) {
+            $arr['product_id'] = 'All_Products';
+            $arr['quantity'] = 1;
+            $arr['price'] = $amount;
+            $arr['description'] .= $product['description'] . ',';
+        }
+        
+        return $arr;
     }
 }
