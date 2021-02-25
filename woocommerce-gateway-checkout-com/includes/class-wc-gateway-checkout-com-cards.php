@@ -620,9 +620,15 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
             $message = __("Checkout.com Payment Flagged " ."</br>". " Action ID : {$result['action_id']} ", 'wc_checkout_com');
         }
 
-         // add notes for the order and update status
-         $order->add_order_note($message);
-         $order->update_status($status);
+        // add notes for the order
+        $order->add_order_note($message);
+
+        $order_status = $order->get_status();
+
+        if($order_status == 'pending') {
+            update_post_meta($order_id, 'cko_payment_authorized', true);
+            $order->update_status($status);
+        }
 
         // Reduce stock levels
         wc_reduce_stock_levels( $order_id );
@@ -717,6 +723,7 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
         }
 
         if ($result['status'] == 'Captured') {
+            update_post_meta($order_id, 'cko_payment_captured', true);
             $status = WC_Admin_Settings::get_option('ckocom_order_captured');
             $message = __("Checkout.com Payment Captured" ."</br>". " Action ID : {$action['0']['id']} ", 'wc_checkout_com');
         }
@@ -728,9 +735,14 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
             unset($_SESSION['wc-wc_checkout_com_cards-new-payment-method']);
         }
 
-        // Update order status and add note
+        $order_status = $order->get_status();
+
         $order->add_order_note($message);
-        $order->update_status($status);
+        
+        if($order_status == 'pending') {
+            update_post_meta($order_id, 'cko_payment_authorized', true);
+            $order->update_status($status);
+        }
 
         // Reduce stock levels
         wc_reduce_stock_levels( $order_id );
@@ -989,6 +1001,9 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
         $event_type = $data->type;
 
         switch ($event_type){
+            case 'payment_approved':
+                $response = WC_Checkout_Com_Webhook::authorize_payment($data);
+                break;
             case 'payment_captured':
                 $response = WC_Checkout_Com_Webhook::capture_payment($data);
                 break;
