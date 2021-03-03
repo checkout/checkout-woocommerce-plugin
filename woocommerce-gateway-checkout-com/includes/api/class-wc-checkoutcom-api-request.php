@@ -133,6 +133,8 @@ class WC_Checkoutcom_Api_request
         $mada_enable = WC_Admin_Settings::get_option('ckocom_card_mada') == 1 ? true : false;
         $is_save_card = false;
         $payment_option = 'FramesJs';
+        $apms_settings = get_option('woocommerce_wc_checkout_com_alternative_payments_settings');
+        $apms_selected = $apms_settings['ckocom_apms_selector'];
 
         $customerAddress = WC_Checkoutcom_Api_request::customer_address($_POST);
 
@@ -166,7 +168,7 @@ class WC_Checkoutcom_Api_request
             $payment_option = 'Apple Pay';
 
             $method = new TokenSource($arg);
-        } elseif(sanitize_text_field($_POST['payment_method']) == 'wc_checkout_com_alternative_payments') {
+        } elseif (in_array (sanitize_text_field($_POST['cko-apm']), $apms_selected)) {
 
             $method = WC_Checkoutcom_Api_request::get_apm_method($_POST, $order);
             $payment_option = $method->type;
