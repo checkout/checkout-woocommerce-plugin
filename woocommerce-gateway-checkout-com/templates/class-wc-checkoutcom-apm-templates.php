@@ -15,7 +15,7 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_request
         }
 
         ?>
-            <div class="ideal-bank-info" id="ideal-bank-info">
+            <div class="ideal-bank-info" id="ideal-bank-info" style="display: block;">
                 <div class="ideal-heading">
                     <label>Your Bank</label>
                 </div>
