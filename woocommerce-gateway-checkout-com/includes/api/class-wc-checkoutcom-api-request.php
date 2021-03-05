@@ -1027,11 +1027,13 @@ class WC_Checkoutcom_Api_request
 
                 break;
             case 'boleto':
-                $customerName = $data['name'];
-                $birthData = $data['birthDate'];
-                $cpf = $data['cpf'];
+                $payer = [
+                    'name' => $data['name'],
+                    'email' => sanitize_text_field($_POST['billing_email']),
+                    'document' => $data['cpf']
+                ];
 
-                $method = new BoletoSource($customerName, $birthData, $cpf);
+                $method = new BoletoSource('redirect',sanitize_text_field($_POST['billing_country']), $payer);
 
                 break;
             case 'alipay':

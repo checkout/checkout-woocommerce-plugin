@@ -22,47 +22,38 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Boleto extends WC_Gateway_Che
         $apm_available = WC_Checkoutcom_Utility::get_alternative_payment_methods();
 
         ?>
-<input type="hidden" id="cko-apm" name="cko-apm" value="boleto">
-<?php
+            <input type="hidden" id="cko-apm" name="cko-apm" value="boleto">
+        <?php
 
         if (! in_array("boleto", $apm_available) ) {
             ?>
-<script>
-jQuery('.payment_method_wc_checkout_com_alternative_payments_boleto').hide();
-</script>
-<?php
+                <script>
+                    jQuery('.payment_method_wc_checkout_com_alternative_payments_boleto').hide();
+                </script>
+            <?php
         } else {
             WC_Checkoutcom_Apm_Templates::get_boleto_details();
             ?>
+                <script>
+                // Alter default place order button click
+                jQuery('#place_order').click(function(e) {
+                    // check if apm is selected as payment method
+                    if (jQuery('#payment_method_wc_checkout_com_alternative_payments_boleto').is(':checked')) {
 
-<!-- klarna js file -->
-<script>
-// Alter default place order button click
-jQuery('#place_order').click(function(e) {
-    // check if apm is selected as payment method
-    if (jQuery('#payment_method_wc_checkout_com_alternative_payments').is(':checked')) {
+                        if (!jQuery("[name='name']")[0].checkValidity()) {
+                            alert('Please enter your name');
+                            return false;
+                        }
 
-        if (!jQuery("[name='name']")[0].checkValidity()) {
-            alert('Please enter your name');
-            return false;
+                        if (!jQuery("[name='cpf']")[0].checkValidity()) {
+                            alert('Please enter your CPF');
+                            return false;
+                        }
+                    }
+                });
+                </script>
+            <?php
         }
-
-        if (!jQuery("[name='cpf']")[0].checkValidity()) {
-            alert('Please enter your CPF');
-            return false;
-        }
-
-        if (!jQuery("[name='birthDate']")[0].checkValidity()) {
-            alert('Please enter your birthdate in the correct format.');
-            return false;
-        }
-    }
-});
-</script>
-
-<?php
-        }
-
     }
 
     public function process_payment( $order_id )
@@ -88,28 +79,6 @@ jQuery('#place_order').click(function(e) {
             return array(
                 'result'        => 'success',
                 'redirect'      => $result['apm_redirection'],
-            );
-        } else {
-            $status = WC_Admin_Settings::get_option('ckocom_order_authorised');
-            $message = "";
-
-            update_post_meta($order_id, '_transaction_id', $result['id']);
-            update_post_meta($order_id, '_cko_payment_id', $result['id']);
-
-            // add notes for the order and update status
-            $order->add_order_note($message);
-            $order->update_status($status);
-
-            // Reduce stock levels
-            wc_reduce_stock_levels( $order_id );
-
-            // Remove cart
-            $woocommerce->cart->empty_cart();
-
-            // Return thank you page
-            return array(
-                'result' => 'success',
-                'redirect' => $this->get_return_url( $order )
             );
         }
     }

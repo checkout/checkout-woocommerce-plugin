@@ -60,9 +60,9 @@ class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway
     public function payment_fields()
     {
         ?>
-<script>
-jQuery('.payment_method_wc_checkout_com_alternative_payments').hide();
-</script>
-<?php
+            <script>
+                jQuery('.payment_method_wc_checkout_com_alternative_payments').hide();
+            </script>
+        <?php
     }
 }
