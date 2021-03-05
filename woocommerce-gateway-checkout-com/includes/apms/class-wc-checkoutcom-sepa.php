@@ -33,8 +33,27 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Sepa extends WC_Gateway_Check
             <?php
         } else {
              WC_Checkoutcom_Apm_Templates::get_sepa_details(wp_get_current_user());
-        }
+            ?>
+                <script>
+                // Alter default place order button click
+                jQuery('#place_order').click(function(e) {
+                    // check if apm is selected as payment method
+                    if (jQuery('#payment_method_wc_checkout_com_alternative_payments_sepa').is(':checked')) {
 
+                        if (jQuery('#sepa-iban').val().length == 0) {
+                            alert('Please enter your bank accounts iban');
+                            return false;
+                        }
+
+                        if (jQuery('input[name="sepa-checkbox-input"]:checked').length == 0) {
+                            alert('Please accept the mandate to continue');
+                            return false;
+                        }
+                    }
+                });
+                </script>
+            <?php
+        }
     }
 
     public function process_payment( $order_id )

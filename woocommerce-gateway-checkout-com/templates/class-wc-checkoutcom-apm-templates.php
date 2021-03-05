@@ -124,7 +124,7 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_request
         <script type="text/javascript">
             jQuery('#sepa-continue').click(function(){
 
-                if(jQuery('#sepa-iban').val().length > 0 && jQuery('#sepa-bic').val().length > 0) {
+                if(jQuery('#sepa-iban').val().length > 0) {
                     jQuery('.sepa-mandate-card').show();
                 } else {
                     alert('<?php echo $alert; ?>')
