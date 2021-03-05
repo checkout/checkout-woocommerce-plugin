@@ -55,8 +55,8 @@ function init_checkout_com_gateway_class()
                     jQuery('[data-gateway_id=\"wc_checkout_com_google_pay\"]').hide();
                 }
                 
-                if(jQuery('[data-gateway_id=\"wc_checkout_com_alternative_payments\"]').length > 0) {
-                    jQuery('[data-gateway_id=\"wc_checkout_com_alternative_payments\"]').hide();
+                if(jQuery('[data-gateway_id*=\"wc_checkout_com_alternative_payments\"]').length > 0) {
+                    jQuery('[data-gateway_id*=\"wc_checkout_com_alternative_payments\"]').hide();
                 }
             }, 1500);
         });
