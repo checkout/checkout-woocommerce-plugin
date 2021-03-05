@@ -2,10 +2,23 @@
     "name": "checkout/checkout-sdk-php",
     "description": "Checkout.com SDK for PHP",
     "homepage": "https://github.com/checkout/checkout-sdk-php",
-    "version": "1.0.8",
+    "version": "1.0.14",
     "type": "library",
     "license": "MIT",
-    "keywords": ["checkout.com","payment","gateway","checkout","checkoutcom","GW3","CKO", "Reboot", "SDK", "Library", "PHP", "API"],
+    "keywords": [
+        "checkout.com",
+        "payment",
+        "gateway",
+        "checkout",
+        "checkoutcom",
+        "GW3",
+        "CKO",
+        "Reboot",
+        "SDK",
+        "Library",
+        "PHP",
+        "API"
+    ],
     "authors": [
         {
             "name": "Checkout.com",

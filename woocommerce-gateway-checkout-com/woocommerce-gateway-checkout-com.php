@@ -29,10 +29,16 @@ function init_checkout_com_gateway_class()
     // Add payment method class to WooCommerce
     add_filter( 'woocommerce_payment_gateways', 'checkout_com_add_gateway' );
     function checkout_com_add_gateway( $methods ) {
+
+        $array = get_selected_apms_Class();
+
         $methods[] = 'WC_Gateway_Checkout_Com_Cards';
         $methods[] = 'WC_Gateway_Checkout_Com_Apple_Pay';
         $methods[] = 'WC_Gateway_Checkout_Com_Google_Pay';
         $methods[] = 'WC_Gateway_Checkout_Com_Alternative_Payments';
+
+        $methods = sizeof($array) > 0 ? array_merge($methods, $array) : $methods;
+
         return $methods;
     }
 
@@ -55,6 +61,27 @@ function init_checkout_com_gateway_class()
             }, 1500);
         });
     ");
+}
+
+/**
+ *  return the class name of the apm selected
+ */
+function get_selected_apms_Class() {
+
+    $apms_settings = get_option('woocommerce_wc_checkout_com_alternative_payments_settings');
+    $selected_apms_class = array();
+
+    // check if alternative payment method is enabled
+    if ($apms_settings['enabled'] == 'yes') {
+        $apm_selected = $apms_settings['ckocom_apms_selector'];
+
+        // get apm selected and add the class name in array
+        foreach($apm_selected as $value) {
+            $selected_apms_class[] = 'WC_Gateway_Checkout_Com_Alternative_Payments'.'_'.$value;
+        }
+    }
+    
+    return $selected_apms_class;
 }
 
 /*
