@@ -7,7 +7,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Sepa extends WC_Gateway_Check
         $this->id = 'wc_checkout_com_alternative_payments_sepa';
         $this->method_title = __("Checkout.com", 'wc_checkout_com');
         $this->method_description = __("The Checkout.com extension allows shop owners to process online payments through the <a href=\"https://www.checkout.com\">Checkout.com Payment Gateway.</a>", 'wc_checkout_com');
-        $this->title = __("Sepa", 'wc_checkout_com');
+        $this->title = __("SEPA Direct Debit", 'wc_checkout_com');
         $this->has_fields = true;
         $this->supports = array('products', 'refunds');
 

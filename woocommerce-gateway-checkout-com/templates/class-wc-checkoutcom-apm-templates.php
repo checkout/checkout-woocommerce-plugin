@@ -111,11 +111,6 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_request
                     <span class="ckojs ckojs-card"></label>
                 <input type="text" id="sepa-iban" name="sepa-iban" placeholder="<?= (__('IBAN')); ?>" class="input-control" required style="width: 100%;">
             </div>
-            <div class="input-group">
-                <label class="icon" for="sepa-bic">
-                    <span class="ckojs ckojs-card"></label>
-                <input type="text" id="sepa-bic" name="sepa-bic" placeholder="<?= (__('BIC')); ?>" class="input-control" required style="width: 100%;">
-            </div>
             <div class="sepa-continue-btn">
                 <input type="button" id="sepa-continue" name="sepa-continue" value="Continue">
             </div>
