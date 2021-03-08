@@ -22,20 +22,19 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Alipay extends WC_Gateway_Che
         $apm_available = WC_Checkoutcom_Utility::get_alternative_payment_methods();
 
         ?>
-<script>
-jQuery('.payment_box.payment_method_wc_checkout_com_alternative_payments_alipay').attr("style", "visibility: hidden;");
-</script>
-<input type="hidden" id="cko-apm" name="cko-apm" value="alipay">
-<?php
+            <script>
+                jQuery('.payment_box.payment_method_wc_checkout_com_alternative_payments_alipay').attr("style", "visibility: hidden;");
+            </script>
+            <input type="hidden" id="cko-apm" name="cko-apm" value="alipay">
+        <?php
 
         if (! in_array("alipay", $apm_available) ) {
             ?>
-<script>
-jQuery('.payment_method_wc_checkout_com_alternative_payments_alipay').hide();
-</script>
-<?php
+                <script>
+                    jQuery('.payment_method_wc_checkout_com_alternative_payments_alipay').hide();
+                </script>
+            <?php
         }
-
     }
 
     public function process_payment( $order_id )
