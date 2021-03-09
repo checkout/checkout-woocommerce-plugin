@@ -5,20 +5,7 @@
     "version": "1.0.14",
     "type": "library",
     "license": "MIT",
-    "keywords": [
-        "checkout.com",
-        "payment",
-        "gateway",
-        "checkout",
-        "checkoutcom",
-        "GW3",
-        "CKO",
-        "Reboot",
-        "SDK",
-        "Library",
-        "PHP",
-        "API"
-    ],
+    "keywords": ["checkout.com","payment","gateway","checkout","checkoutcom","GW3","CKO", "Reboot", "SDK", "Library", "PHP", "API"],
     "authors": [
         {
             "name": "Checkout.com",
