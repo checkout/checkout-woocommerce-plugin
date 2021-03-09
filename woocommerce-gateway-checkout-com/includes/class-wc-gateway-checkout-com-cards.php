@@ -154,17 +154,28 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         $require_cvv = WC_Admin_Settings::get_option('ckocom_card_require_cvv');
         $is_mada_token = false;
         $cardValidationAlert = __("Please enter your card details.", 'wc_checkout_com');
-        $localisation = $this->get_localisation();
         $iframe_style =  WC_Admin_Settings::get_option('ckocom_iframe_style');
+
+        ?>
+            <input type="hidden" id="debug" value='<?php echo WC_Admin_Settings::get_option('cko_console_logging'); ?>' ;></input>
+            <input type="hidden" id="public-key" value='<?php echo $this->get_option( 'ckocom_pk' );?>'></input>
+            <input type="hidden" id="localization" value='<?php echo $this->get_localisation(); ?>'></input>
+            <input type="hidden" id="multiFrame" value='<?php echo $iframe_style; ?>'></input>
+            <input type="hidden" id="cko-icons"
+                value='<?php echo  plugins_url ('checkout-com-unified-payments-api/assets/images/card-icons/'); ?>'></input>
+            <input type="hidden" id="is-mada" value='<?php echo $mada_enable; ?>'></input>
+            <input type="hidden" id="mada-token" value='<?php echo $is_mada_token; ?>'></input>
+            <input type="hidden" id="user-logged-in" value='<?php echo is_user_logged_in(); ?>'></input>
+            <input type="hidden" id="card-validation-alert" value='<?php echo $cardValidationAlert; ?>'></input>
+        <?php
 
         // check if user is logged-in or a guest
         if (!is_user_logged_in()) {
             ?>
-<script>
-jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
-</script>
-
-<?php
+                <script>
+                    jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
+                </script>
+            <?php
         }
 
         // check if saved card enable from module setting
@@ -189,17 +200,17 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
         // Check if require cvv or mada is enable from module setting
         if($require_cvv || $mada_enable) {
         ?>
-<div class="cko-cvv" style="display: none;padding-top: 10px;">
-    <p class="validate-required" id="cko-cvv" data-priority="10">
-        <label for="cko-cvv"><?php esc_html_e( 'Card Code', 'wc_checkout_com_cards' ); ?> <span
-                class="required">*</span></label>
-        <input id="cko-cvv" type="text" autocomplete="off" class="input-text"
-            placeholder="<?php esc_attr_e( 'CVV', 'wc_checkout_com_cards' ); ?>"
-            name="<?php echo esc_attr( $this->id ); ?>-card-cvv" />
-    </p>
-</div>
-<?php } ?>
-<div class="cko-form" style="display: none; padding-top: 10px;padding-bottom: 5px;">
+            <div class="cko-cvv" style="display: none;padding-top: 10px;">
+                <p class="validate-required" id="cko-cvv" data-priority="10">
+                    <label for="cko-cvv"><?php esc_html_e( 'Card Code', 'wc_checkout_com_cards' ); ?> <span
+                            class="required">*</span></label>
+                    <input id="cko-cvv" type="text" autocomplete="off" class="input-text"
+                        placeholder="<?php esc_attr_e( 'CVV', 'wc_checkout_com_cards' ); ?>"
+                        name="<?php echo esc_attr( $this->id ); ?>-card-cvv" />
+                </p>
+            </div>
+        <?php } ?>
+    <div class="cko-form" style="display: none; padding-top: 10px;padding-bottom: 5px;">
     <input type="hidden" id="cko-card-token" name="cko-card-token" value="" />
     <input type="hidden" id="cko-card-bin" name="cko-card-bin" value="" />
 

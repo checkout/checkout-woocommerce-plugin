@@ -181,10 +181,8 @@ jQuery(function () {
           jQuery(".cko-save-card-checkbox").hide();
           jQuery(".cko-cvv").show();
 
-          var is_mada = isMada;
-
-          if (is_mada === 1) {
-            if (this.value === madatoken) {
+          if (document.getElementById("is-mada").value === 1) {
+            if (this.value === document.getElementById("mada-token")) {
               jQuery(".cko-form").hide();
               jQuery(".cko-cvv").show();
             } else {
