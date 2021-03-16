@@ -91,7 +91,9 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway
 
                 return {
                     hideDefaultPlaceOrder: function () {
-                        jQuery(DOMStrings.placeOrder).hide();
+                        jQuery("input[name='payment_method']").change(function(e){
+                            jQuery(this).val() == 'wc_checkout_com_google_pay' ? jQuery(DOMStrings.placeOrder).hide() : jQuery(DOMStrings.placeOrder).show();
+                        })
                     },
                     addGooglePayButton: function (type) {
                         // Create the GooglePayButton
