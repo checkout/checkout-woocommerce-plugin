@@ -83,7 +83,7 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway
                     buttonClass: 'google-pay-button',
                     googleButtonArea: 'method_wc_checkout_com_google_pay',
                     buttonArea: '.form-row.place-order',
-                    placeOrder: '.place_order',
+                    placeOrder: '#place_order',
                     paymentOptionLabel: '#dt_method_checkoutcomgooglepay > label:nth-child(2)',
                     iconSpacer: 'cko-wallet-icon-spacer',
                     token: 'google-cko-card-token',
