@@ -439,7 +439,8 @@ class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway
 
             if ($result['source']['type'] == 'fawry') {
                 update_post_meta($order_id, 'cko_fawry_reference_number', $result['source']['reference_number']);
-
+                update_post_meta($order_id, 'cko_payment_authorized', true);
+                
                 // Get cko auth status configured in admin
                 $message = __("Checkout.com - Fawry payment " ."</br>". " Action ID : {$result['id']} - Fawry reference number : {$result['source']['reference_number']} ", 'wc_checkout_com');
 
