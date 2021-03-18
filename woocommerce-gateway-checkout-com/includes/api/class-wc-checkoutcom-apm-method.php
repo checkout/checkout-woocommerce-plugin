@@ -39,7 +39,7 @@ class WC_Gateway_Checkout_Com_APM_Method {
     /**
      *  @return Sofortsource
      */
-    public static function sofort() {
+    public function sofort() {
 
         $method = new SofortSource();
 
@@ -49,7 +49,7 @@ class WC_Gateway_Checkout_Com_APM_Method {
     /**
      *  @return AlipaySource
      */
-    public static function alipay() {
+    public function alipay() {
 
         $method = new AlipaySource();
 
@@ -59,7 +59,7 @@ class WC_Gateway_Checkout_Com_APM_Method {
      /**
      *  @return PoliSource
      */
-    public static function poli() {
+    public function poli() {
 
         $method = new PoliSource();
 
@@ -69,7 +69,7 @@ class WC_Gateway_Checkout_Com_APM_Method {
     /**
      *  @return QpaySource
      */
-    public static function qpay() {
+    public function qpay() {
 
         $method = new QpaySource(get_bloginfo( 'name' ));
 
@@ -79,7 +79,7 @@ class WC_Gateway_Checkout_Com_APM_Method {
     /**
      *  @return GiropaySource
      */
-    public static function giropay() {
+    public function giropay() {
 
         $bic = self::$dataInfo['giropay-bank-details'];
         $purpose = self::$orderInfo->get_order_number(). '-' . $_SERVER['HTTP_HOST'];
@@ -92,7 +92,7 @@ class WC_Gateway_Checkout_Com_APM_Method {
     /**
      *  @return BoletoSource
      */
-    public static function boleto() {
+    public function boleto() {
 
         $payer = [
             'name' => self::$dataInfo['name'],
@@ -108,7 +108,7 @@ class WC_Gateway_Checkout_Com_APM_Method {
     /**
      *  @return KnetSource
      */
-    public static function knet() {
+    public function knet() {
 
         $language = get_locale();
 
@@ -129,7 +129,7 @@ class WC_Gateway_Checkout_Com_APM_Method {
     /**
      *  @return EpsSource
      */
-    public static function eps() {
+    public function eps() {
 
         $purpose = get_bloginfo( 'name' );
         $method = new EpsSource($purpose);
@@ -140,7 +140,7 @@ class WC_Gateway_Checkout_Com_APM_Method {
      /**
      *  @return BancontactSource
      */
-    public static function bancontact() {
+    public function bancontact() {
 
         $accountHolder = self::$post['billing_first_name'] . ' '. self::$post['billing_last_name'];
         $countryCode = self::$post['billing_country'];
@@ -153,7 +153,7 @@ class WC_Gateway_Checkout_Com_APM_Method {
     /**
      *  @return IdSource
      */
-    public static function sepa() {
+    public function sepa() {
 
         $details = self::get_sepa_info();
         $method = new IdSource($details->getId());
@@ -164,7 +164,7 @@ class WC_Gateway_Checkout_Com_APM_Method {
     /**
      *  @return IdealSource
      */
-    public static function ideal() {
+    public function ideal() {
 
         $bic = self::$dataInfo['issuer-id'];
         $description = self::$orderInfo->get_order_number();
@@ -177,7 +177,7 @@ class WC_Gateway_Checkout_Com_APM_Method {
     /**
      *  @return FawrySource
      */
-    public static function fawry() {
+    public function fawry() {
 
         $fawryInfo = self::get_fawry_info();
         $method = new FawrySource($fawryInfo['email'], $fawryInfo['phone'], self::$orderInfo->get_order_number(), $fawryInfo['products']);
@@ -188,10 +188,12 @@ class WC_Gateway_Checkout_Com_APM_Method {
     /**
      *  @return KlarnaSource
      */
-    public static function klarna() {
+    public function klarna() {
 
         $klarnaInfo = self::get_klarna_info();
-        $method = new KlarnaSource(self::$post['cko-klarna-token'], self::$post['billing_country'], strtolower($klarnaInfo['locale']), $klarnaInfo['billingAddress'], $klarnaInfo['tax'], $klarnaInfo['products']);
+        $cartInfo = WC_Checkoutcom_Api_request::get_cart_info();
+
+        $method = new KlarnaSource(self::$post['cko-klarna-token'], self::$post['billing_country'], strtolower($cartInfo['locale']), $klarnaInfo['billingAddress'], $cartInfo['order_tax_amount'], $cartInfo['order_lines']);
 
         return $method;
     }
@@ -284,95 +286,12 @@ class WC_Gateway_Checkout_Com_APM_Method {
     }
 
     /**
-     * Gather info for klarna
+     * Gather billing info from Address instance
      * @return array
      */
     public static function get_klarna_info() {
 
         $klarnaInfo = array();
-
-        $woo_locale = str_replace("_", "-", get_locale());
-        $locale = substr($woo_locale, 0, 5);
-
-        $products = array();
-        foreach (self::$orderInfo->get_items() as $item_id => $item_data) {
-            // Get an instance of corresponding the WC_Product object
-            $product = $item_data->get_product();
-            $items = wc_get_product( $product->get_id() );
-            $price_excl_tax = wc_get_price_excluding_tax($items);
-            $unit_price_cents = WC_Checkoutcom_Utility::valueToDecimal($price_excl_tax, get_woocommerce_currency());
-
-            if($items->is_taxable()) {
-                $price_incl_tax = wc_get_price_including_tax($items);
-                $unit_price_cents = WC_Checkoutcom_Utility::valueToDecimal($price_incl_tax, get_woocommerce_currency());
-                $tax_amount = $price_incl_tax - $price_excl_tax;
-                $total_tax_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($tax_amount, get_woocommerce_currency());
-                $tax = WC_Tax::get_rates();
-                $reset_tax = reset($tax)['rate'];
-                $tax_rate = round($reset_tax);
-
-            } else {
-                $tax_rate = 0;
-                $total_tax_amount_cents = 0;
-            }
-
-            $products[] = array(
-                "name" => $product->get_title(),
-                "quantity" => $item_data['quantity'],
-                "unit_price" => $unit_price_cents,
-                "tax_rate" => $tax_rate * 100,
-                "total_amount" => $unit_price_cents * $item_data['quantity'],
-                "total_tax_amount" => $total_tax_amount_cents ,
-                "type" => "physical",
-                "reference" => $product->get_name(),
-                "total_discount_amount" => 0
-
-            );
-        }
-
-        $chosen_methods = wc_get_chosen_shipping_method_ids();
-        $chosen_shipping = $chosen_methods[0];
-
-        if($chosen_shipping != 'free_shipping') {
-
-            $shipping_amount = WC()->cart->get_shipping_total() ;
-            $shipping_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($shipping_amount, get_woocommerce_currency());
-
-            if(WC()->cart->get_shipping_tax() > 0){
-                $shipping_amount = WC()->cart->get_shipping_total() + WC()->cart->get_shipping_tax();
-                $shipping_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($shipping_amount, get_woocommerce_currency());
-
-                $total_tax_amount = WC()->cart->get_shipping_tax();
-                $total_tax_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($total_tax_amount, get_woocommerce_currency());
-
-                $shipping_rates = WC_Tax::get_shipping_tax_rates();
-                $vat            = array_shift( $shipping_rates );
-
-                if ( isset( $vat['rate'] ) ) {
-                    $shipping_tax_rate = round( $vat['rate'] * 100 );
-                } else {
-                    $shipping_tax_rate = 0;
-                }
-
-            } else {
-                $shipping_tax_rate = 0;
-                $total_tax_amount_cents = 0;
-            }
-
-            $products[] = array(
-                "name" => $chosen_shipping,
-                "quantity" => 1,
-                "unit_price" => $shipping_amount_cents,
-                "tax_rate" => $shipping_tax_rate,
-                "total_amount" => $shipping_amount_cents,
-                "total_tax_amount" => $total_tax_amount_cents,
-                "type" => "shipping_fee",
-                "reference" => $chosen_shipping,
-                "total_discount_amount" => 0
-            );
-        }
-
-        $total_tax_amount_cents = WC_Checkoutcom_Utility::valueToDecimal(WC()->cart->get_total_tax(), get_woocommerce_currency());
 
         // Set Billing address
         $billingAddressParam = new Address();
@@ -385,13 +304,9 @@ class WC_Gateway_Checkout_Com_APM_Method {
         $billingAddressParam->region = self::$post['billing_city'];
         $billingAddressParam->phone = self::$post['billing_phone'];
         $billingAddressParam->country = self::$post['billing_country'];
-
-        $klarnaInfo['locale'] = $locale;
+ 
         $klarnaInfo['billingAddress'] = $billingAddressParam;
-        $klarnaInfo['tax'] = $total_tax_amount_cents;
-        $klarnaInfo['products'] = $products;
-
+    
         return $klarnaInfo;
-
     }
 }
