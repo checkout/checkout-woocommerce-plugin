@@ -5,8 +5,6 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Sofort extends WC_Gateway_Che
     public function __construct()
     {
         $this->id = 'wc_checkout_com_alternative_payments_sofort';
-        $this->method_title = __("Checkout.com", 'wc_checkout_com');
-        $this->method_description = __("The Checkout.com extension allows shop owners to process online payments through the <a href=\"https://www.checkout.com\">Checkout.com Payment Gateway.</a>", 'wc_checkout_com');
         $this->title = __("Sofort", 'wc_checkout_com');
         $this->has_fields = true;
         $this->supports = array('products', 'refunds');
@@ -21,11 +19,11 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Sofort extends WC_Gateway_Che
 
         // get available apms depending on currency
         $apm_available = WC_Checkoutcom_Utility::get_alternative_payment_methods();
-
-        // hide payment field box
+        $message = __("Pay with Sofort. You will be redirected upon place order", 'wc_checkout_com')
+        
         ?>
             <script>
-                jQuery('.payment_box.payment_method_wc_checkout_com_alternative_payments_sofort').attr("style", "visibility: hidden;");
+                <p style="margin-bottom: 0;"> <?php echo $message ?> </p>
             </script>
             <input type="hidden" id="cko-apm" name="cko-apm" value="sofort">
         <?php
