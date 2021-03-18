@@ -8,8 +8,8 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Fawry extends WC_Gateway_Chec
         $this->method_title = __("Checkout.com", 'wc_checkout_com');
         $this->method_description = __("The Checkout.com extension allows shop owners to process online payments through the <a href=\"https://www.checkout.com\">Checkout.com Payment Gateway.</a>", 'wc_checkout_com');
         $this->title = __("Fawry", 'wc_checkout_com');
-        $this->has_fields = true;
         $this->supports = array('products', 'refunds');
+        $this->has_fields = true;
 
         $this->init_form_fields();
 
@@ -20,12 +20,10 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Fawry extends WC_Gateway_Chec
     {
         // get available apms depending on currency
         $apm_available = WC_Checkoutcom_Utility::get_alternative_payment_methods();
+        $message = __("Pay with Fawry", 'wc_checkout_com')
 
-        // hide payment field box
-        ?>
-            <script>
-                jQuery('.payment_box.payment_method_wc_checkout_com_alternative_payments_fawry').attr("style", "visibility: hidden;");
-            </script>
+        ?>  
+            <p style="margin-bottom: 0;"> <?php echo $message ?> </p>
             <input type="hidden" id="cko-apm" name="cko-apm" value="fawry">
         <?php
 
