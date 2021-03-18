@@ -5,8 +5,6 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Eps extends WC_Gateway_Checko
     public function __construct()
     {
         $this->id = 'wc_checkout_com_alternative_payments_eps';
-        $this->method_title = __("Checkout.com", 'wc_checkout_com');
-        $this->method_description = __("The Checkout.com extension allows shop owners to process online payments through the <a href=\"https://www.checkout.com\">Checkout.com Payment Gateway.</a>", 'wc_checkout_com');
         $this->title = __("EPS", 'wc_checkout_com');
         $this->has_fields = true;
         $this->supports = array('products', 'refunds');
@@ -20,11 +18,10 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Eps extends WC_Gateway_Checko
     {   
         // get available apms depending on currency
         $apm_available = WC_Checkoutcom_Utility::get_alternative_payment_methods();
+        $message = __("Pay with EPS. You will be redirected upon place order", 'wc_checkout_com')
 
         ?>
-            <script>
-                jQuery('.payment_box.payment_method_wc_checkout_com_alternative_payments_eps').attr("style", "visibility: hidden;");
-            </script>
+            <p style="margin-bottom: 0;"> <?php echo $message ?> </p>
             <input type="hidden" id="cko-apm" name="cko-apm" value="eps">
         <?php
 
