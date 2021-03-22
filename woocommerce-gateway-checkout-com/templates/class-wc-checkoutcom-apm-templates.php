@@ -60,7 +60,7 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_request
     {
         ?>
         <div class="klarna-details">
-            <div class="klarna_widgets" style="display: none">
+            <div class="klarna_widgets">
                 <?php if (!empty($payment_method_categories)) { ?>
                     <?php foreach ($payment_method_categories as $key => $value){ ?>
                         <ul style="margin-bottom: 0px;margin-top: 0px;"><li>
