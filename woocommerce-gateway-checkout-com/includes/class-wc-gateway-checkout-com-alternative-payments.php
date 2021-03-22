@@ -12,6 +12,7 @@ include_once __DIR__."/apms/class-wc-checkoutcom-poli.php";
 include_once __DIR__."/apms/class-wc-checkoutcom-klarna.php";
 include_once __DIR__."/apms/class-wc-checkoutcom-sofort.php";
 include_once __DIR__."/apms/class-wc-checkoutcom-fawry.php";
+include_once __DIR__."/apms/class-wc-checkoutcom-giropay.php";
 
 class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway
 {
