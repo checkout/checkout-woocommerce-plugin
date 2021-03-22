@@ -248,7 +248,7 @@ class WC_Checkoutcom_Api_request
         }
 
         // Set redirection url in payment request
-        $redirection_url = str_replace( 'https:', 'http:', add_query_arg( 'wc-api', 'wc_checkoutcom_callback', home_url( '/' ) ) );
+        $redirection_url = add_query_arg( 'wc-api', 'wc_checkoutcom_callback', home_url( '/' ) );
         $payment->success_url = $redirection_url;
         $payment->failure_url = $redirection_url;
 
