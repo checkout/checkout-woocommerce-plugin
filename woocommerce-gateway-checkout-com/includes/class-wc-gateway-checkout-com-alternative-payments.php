@@ -1,12 +1,13 @@
 <?php
 include_once __DIR__."/../templates/class-wc-checkoutcom-apm-templates.php";
 include_once __DIR__."/apms/class-wc-checkoutcom-klarna.php";
+include_once __DIR__."/apms/class-wc-checkoutcom-sofort.php";
+include_once __DIR__."/apms/class-wc-checkoutcom-fawry.php";
+
 
 class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway
 {
-    /**
-     * WC_Gateway_Checkout_Com_Google_Pay constructor.
-     */
+
     public function __construct()
     {
         $this->id = 'wc_checkout_com_alternative_payments';
@@ -60,9 +61,9 @@ class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway
     public function payment_fields()
     {
         ?>
-<script>
-jQuery('.payment_method_wc_checkout_com_alternative_payments').hide();
-</script>
-<?php
+            <script>
+                jQuery('.payment_method_wc_checkout_com_alternative_payments').hide();
+            </script>
+        <?php
     }
 }
