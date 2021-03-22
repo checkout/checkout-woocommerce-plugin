@@ -287,10 +287,11 @@ function renew_save_again($post_id, $post, $update){
 
                 // Get cko capture status configured in admin
                 $status = WC_Admin_Settings::get_option('ckocom_order_captured');
-                $message = __("Checkout.com Payment Captured (Transaction ID - {$result['action_id']}) ", 'wc_checkout_com');
+                $message = __("Checkout.com Payment Captured from Admin " ."</br>". " Action ID : {$result['action_id']} ", 'wc_checkout_com');
 
-                // Update order status on woo backend
-                $order->update_status($status,$message);
+                // add notes for the order and update status
+                $order->add_order_note($message);
+                $order->update_status($status);
 
                 return true;
 
@@ -306,13 +307,15 @@ function renew_save_again($post_id, $post, $update){
 
                 // Set action id as woo transaction id
                 update_post_meta(sanitize_text_field($_POST['post_ID']), '_transaction_id', $result['action_id']);
+                update_post_meta(sanitize_text_field($_POST['post_ID']), 'cko_payment_voided', true);
 
                 // Get cko capture status configured in admin
                 $status = WC_Admin_Settings::get_option('ckocom_order_void');
-                $message = __("Checkout.com Payment Voided (Transaction ID - {$result['action_id']}) ", 'wc_checkout_com');
+                $message = __("Checkout.com Payment Voided from Admin " ."</br>". " Action ID : {$result['action_id']} ", 'wc_checkout_com');
 
-                // Update order status on woo backend
-                $order->update_status($status,$message);
+                // add notes for the order and update status
+                $order->add_order_note($message);
+                $order->update_status($status);
 
                 // increase stock level
                 wc_increase_stock_levels(sanitize_text_field($_POST['post_ID']));

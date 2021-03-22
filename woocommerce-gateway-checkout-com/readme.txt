@@ -163,6 +163,21 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v4.2.1 25 Feb 2021
+. Set woo order id in metadata
+. Restrict declined reason in error message in case of risk declined response
+. Improve order note in backend orders
+. Update auto capture flow
+. Add support for approved webhook
+. Update post meta with payment_captured when payment response status is captured
+. Add validation to verify payment id when webhook is sent
+. Set order number as reference when capture and refund action happens
+. Fix fawry product mismatch
+. Fix message translation in case of declined errors
+. Fix UI for guest users
+. Change label in Alternative payments setting
+
+
 v4.2.0 25 Nov 2020
 . The merchant can perform a partial refund in the Hub and it is reflected in Woo backend.
 . The partial refund amount is deducted from the transaction order amount in Woo.
@@ -171,7 +186,6 @@ v4.2.0 25 Nov 2020
 . The merchant is no longer required to use the private shared key for webhook authentication. The new release supports HMAC CKO Signature authentication.
 . Core settings persist during update of plugin
 . When performing a full refund in the Hub, the notification in Woo specifies that the transaction has been fully refunded.
-
 
 v4.1.16 26 Oct 2020
 . Bug Fix - Removed saved card checkbox for guest users

@@ -439,13 +439,14 @@ class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway
 
             if ($result['source']['type'] == 'fawry') {
                 update_post_meta($order_id, 'cko_fawry_reference_number', $result['source']['reference_number']);
-
+                update_post_meta($order_id, 'cko_payment_authorized', true);
+                
                 // Get cko auth status configured in admin
-                $message = __("Checkout.com - Fawry payment (Transaction ID : {$result['id']} - Fawry reference number : {$result['source']['reference_number']}) ", 'wc_checkout_com');
+                $message = __("Checkout.com - Fawry payment " ."</br>". " Action ID : {$result['id']} - Fawry reference number : {$result['source']['reference_number']} ", 'wc_checkout_com');
 
                 if ($result['status'] == 'Captured') {
                     $status = WC_Admin_Settings::get_option('ckocom_order_captured');
-                    $message = __("Checkout.com Payment Captured (Transaction ID - {$result['id']}) ", 'wc_checkout_com');
+                    $message = __("Checkout.com Payment Captured " ."</br>". " Action ID - {$result['id']} ", 'wc_checkout_com');
                 }
             }
 
@@ -455,7 +456,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway
 
                 update_post_meta($order_id, 'cko_sepa_mandate_reference', $mandate);
 
-                $message = __("Checkout.com - Sepa payment (Transaction ID : {$result['id']} - Sepa mandate reference : {$mandate}) ", 'wc_checkout_com');
+                $message = __("Checkout.com - Sepa payment " ."</br>". " Action ID : {$result['id']} - Sepa mandate reference : {$mandate} ", 'wc_checkout_com');
 
                 WC()->session->__unset( 'mandate_reference' );
 
@@ -464,8 +465,9 @@ class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway
             update_post_meta($order_id, '_transaction_id', $result['id']);
             update_post_meta($order_id, '_cko_payment_id', $result['id']);
 
-            // Update order status on woo backend
-            $order->update_status($status,$message);
+            // add notes for the order and update status
+            $order->add_order_note($message);
+            $order->update_status($status);
 
             // Reduce stock levels
             wc_reduce_stock_levels( $order_id );

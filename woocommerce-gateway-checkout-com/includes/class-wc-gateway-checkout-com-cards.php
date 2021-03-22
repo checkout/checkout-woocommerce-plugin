@@ -176,6 +176,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
                     jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
                 </script>
             <?php
+        <?php
         }
 
         // check if saved card enable from module setting
@@ -362,20 +363,24 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 
         // Get cko auth status configured in admin
         $status = WC_Admin_Settings::get_option('ckocom_order_authorised');
-        $message = __("Checkout.com Payment Authorised (Transaction ID - {$result['action_id']}) ", 'wc_checkout_com');
+        $message = __("Checkout.com Payment Authorised " ."</br>". " Action ID : {$result['action_id']} ", 'wc_checkout_com');
 
         // check if payment was flagged
         if ($result['risk']['flagged']) {
             // Get cko auth status configured in admin
             $status = WC_Admin_Settings::get_option('ckocom_order_flagged');
-            $message = __("Checkout.com Payment Flagged (Transaction ID - {$result['action_id']}) ", 'wc_checkout_com');
+            $message = __("Checkout.com Payment Flagged " ."</br>". " Action ID : {$result['action_id']} ", 'wc_checkout_com');
         }
 
-         // add notes for the order
-         $order->add_order_note($message);
+        // add notes for the order
+        $order->add_order_note($message);
 
-         // Update order status on woo backend
-         $order->update_status($status);
+        $order_status = $order->get_status();
+
+        if($order_status == 'pending') {
+            update_post_meta($order_id, 'cko_payment_authorized', true);
+            $order->update_status($status);
+        }
 
         // Reduce stock levels
         wc_reduce_stock_levels( $order_id );
@@ -460,18 +465,19 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 
         // Get cko auth status configured in admin
         $status = WC_Admin_Settings::get_option('ckocom_order_authorised');
-        $message = __("Checkout.com Payment Authorised (Transaction ID - {$action['0']['id']}) ", 'wc_checkout_com');
+        $message = __("Checkout.com Payment Authorised " ."</br>". " Action ID : {$action['0']['id']} ", 'wc_checkout_com');
 
         // check if payment was flagged
         if ($result['risk']['flagged']) {
             // Get cko auth status configured in admin
             $status = WC_Admin_Settings::get_option('ckocom_order_flagged');
-            $message = __("Checkout.com Payment Flagged (Transaction ID - {$action['0']['id']}) ", 'wc_checkout_com');
+            $message = __("Checkout.com Payment Flagged " ."</br>". " Action ID : {$action['0']['id']} ", 'wc_checkout_com');
         }
 
         if ($result['status'] == 'Captured') {
+            update_post_meta($order_id, 'cko_payment_captured', true);
             $status = WC_Admin_Settings::get_option('ckocom_order_captured');
-            $message = __("Checkout.com Payment Captured (Transaction ID - {$action['0']['id']}) ", 'wc_checkout_com');
+            $message = __("Checkout.com Payment Captured" ."</br>". " Action ID : {$action['0']['id']} ", 'wc_checkout_com');
         }
 
         // save card to db
@@ -481,8 +487,14 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
             unset($_SESSION['wc-wc_checkout_com_cards-new-payment-method']);
         }
 
-        // Update order status on woo backend
-        $order->update_status($status,$message);
+        $order_status = $order->get_status();
+
+        $order->add_order_note($message);
+        
+        if($order_status == 'pending') {
+            update_post_meta($order_id, 'cko_payment_authorized', true);
+            $order->update_status($status);
+        }
 
         // Reduce stock levels
         wc_reduce_stock_levels( $order_id );
@@ -536,7 +548,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         $payment->metadata = $metadata;
 
         // Set redirection url in payment request
-        $redirection_url = str_replace( 'https:', 'http:', add_query_arg( 'wc-api', 'wc_checkoutcom_callback', home_url( '/' ) ) );
+        $redirection_url = add_query_arg( 'wc-api', 'wc_checkoutcom_callback', home_url( '/' ) );
         $payment->success_url = $redirection_url;
         $payment->failure_url = $redirection_url;
 
@@ -660,12 +672,12 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 
         // Get cko auth status configured in admin
         $status = WC_Admin_Settings::get_option('ckocom_order_refunded');
-        $message = __("Checkout.com Payment refunded (Transaction ID - {$result['action_id']}) ", 'wc_checkout_com');
+        $message = __("Checkout.com Payment refunded from Admin " ."</br>". " Action ID : {$result['action_id']} ", 'wc_checkout_com');
 
         if(isset($_SESSION['cko-refund-is-less'])){
             if($_SESSION['cko-refund-is-less']){
                 $status = WC_Admin_Settings::get_option('ckocom_order_captured');
-                $order->add_order_note( __("Checkout.com Payment Partially refunded (Transaction ID - {$result['action_id']})", 'wc_checkout_com') );
+                $order->add_order_note( __("Checkout.com Payment Partially refunded from Admin " ."</br>". " Action ID : {$result['action_id']}", 'wc_checkout_com') );
 
                 unset($_SESSION['cko-refund-is-less']);
 
@@ -673,9 +685,10 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
             }
         }
 
-        // Update order status on woo backend
-        $order->update_status($status,$message);
+        // add note for order
+        $order->add_order_note($message);
 
+        // when true is returned, status is changed to refunded automatically
         return true;
     }
 
@@ -724,12 +737,25 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         if($signature === false){
             return http_response_code(401);
         }
+
+        $payment_id = get_post_meta($data->data->metadata->order_id, '_cko_payment_id', true );
+
+        // check if payment ID matches that of the webhook
+        if($payment_id !== $data->data->id){
+            $message = __('order payment Id ('. $payment_id .') does not match that of the webhook ('. $data->data->id .')', 'wc_checkout_com');
+            WC_Checkoutcom_Utility::logger($message , null);
+            
+            return http_response_code(422);
+        }
       
 
         // Get webhook event type from data
         $event_type = $data->type;
 
         switch ($event_type){
+            case 'payment_approved':
+                $response = WC_Checkout_Com_Webhook::authorize_payment($data);
+                break;
             case 'payment_captured':
                 $response = WC_Checkout_Com_Webhook::capture_payment($data);
                 break;
