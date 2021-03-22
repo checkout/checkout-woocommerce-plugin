@@ -204,7 +204,7 @@ class WC_Checkoutcom_Utility
         $apm_setting = get_option('woocommerce_wc_checkout_com_alternative_payments_settings');
         $apm = $apm_setting['ckocom_apms_selector'];
         $countryCode = WC()->customer->get_billing_country();
-      
+
         $apmArray = array();
         if ($apm !== 0) {
 

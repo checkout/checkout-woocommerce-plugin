@@ -1,5 +1,6 @@
 <?php
 include_once __DIR__."/../templates/class-wc-checkoutcom-apm-templates.php";
+include_once __DIR__."/apms/class-wc-checkoutcom-klarna.php";
 include_once __DIR__."/apms/class-wc-checkoutcom-sofort.php";
 include_once __DIR__."/apms/class-wc-checkoutcom-fawry.php";
 
