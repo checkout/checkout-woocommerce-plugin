@@ -38,7 +38,7 @@ function init_checkout_com_gateway_class()
         $methods[] = 'WC_Gateway_Checkout_Com_Alternative_Payments';
 
         $methods = sizeof($array) > 0 ? array_merge($methods, $array) : $methods;
-        
+      
         return $methods;
     }
 
@@ -65,6 +65,7 @@ function init_checkout_com_gateway_class()
 
 /**
  *  return the class name of the apm selected
+ * @return array 
  */
 function get_selected_apms_Class() {
 
