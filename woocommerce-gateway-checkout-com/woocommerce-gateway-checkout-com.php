@@ -65,6 +65,7 @@ function init_checkout_com_gateway_class()
 
 /**
  *  return the class name of the apm selected
+ * @return array 
  */
 function get_selected_apms_Class() {
 
