@@ -161,7 +161,6 @@ class WC_Checkoutcom_Api_request
             $payment_option = 'Apple Pay';
 
             $method = new TokenSource($arg);
-
         } elseif($postData['payment_method'] == 'wc_checkout_com_alternative_payments') {
             $method = WC_Checkoutcom_Api_request::get_apm_method($_POST, $order);
             $payment_option = $method->type;
