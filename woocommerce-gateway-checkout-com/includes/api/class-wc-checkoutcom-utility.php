@@ -198,8 +198,14 @@ class WC_Checkoutcom_Utility
      * @param $apm
      * @return array
      */
-    public static function get_alternative_payment_methods($currencyCode, $apm, $countryCode)
+    public static function get_alternative_payment_methods()
     {
+
+        $currencyCode = get_woocommerce_currency();
+        $apm_setting = get_option('woocommerce_wc_checkout_com_alternative_payments_settings');
+        $apm = $apm_setting['ckocom_apms_selector'];
+        $countryCode = WC()->customer->get_billing_country();
+        
         $apmArray = array();
         if ($apm !== 0) {
 

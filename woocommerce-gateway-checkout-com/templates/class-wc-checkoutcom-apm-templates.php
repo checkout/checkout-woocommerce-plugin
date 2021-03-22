@@ -15,7 +15,7 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_request
         }
 
         ?>
-            <div class="ideal-bank-info" id="ideal-bank-info" style="display: none;">
+            <div class="ideal-bank-info" id="ideal-bank-info" style="display: block;">
                 <div class="ideal-heading">
                     <label>Your Bank</label>
                 </div>
@@ -39,7 +39,7 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_request
         $banks = $giropay_banks->banks;
 
         ?>
-        <div class="giropay-bank-info" id="giropay-bank-info" style="display: none;">
+        <div class="giropay-bank-info" id="giropay-bank-info">
             <div class="giropay-heading">
                 <label> Your Bank</label>
             </div>
