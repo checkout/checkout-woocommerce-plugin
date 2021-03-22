@@ -93,11 +93,6 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_request
                     <span class="ckojs ckojs-card"></label>
                 <input type="text" id="cpf" name="cpf" placeholder="<?= (__('Cadastro de Pessoas Físicas')); ?>" class="input-control" required style="width: 100%;">
             </div>
-            <div class="input-group">
-                <label class="icon" for="birthDate">
-                    <span class="ckojs ckojs-calendar"></label>
-                <input type="text" id="birthDate" name="birthDate" placeholder="<?= (__('Data de Nascimento (YYYY-MM-DD)')); ?>" class="input-control" pattern="^\d{4}[\-\/\s]?((((0[13578])|(1[02]))[\-\/\s]?(([0-2][0-9])|(3[01])))|(((0[469])|(11))[\-\/\s]?(([0-2][0-9])|(30)))|(02[\-\/\s]?[0-2][0-9]))$" required style="width: 100%;">
-            </div>
         </div>
         <?php
     }
