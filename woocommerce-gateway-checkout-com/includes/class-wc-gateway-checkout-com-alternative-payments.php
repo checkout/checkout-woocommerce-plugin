@@ -1,5 +1,6 @@
 <?php
 include_once __DIR__."/../templates/class-wc-checkoutcom-apm-templates.php";
+include_once __DIR__."/apms/class-wc-checkoutcom-knet.php";
 include_once __DIR__."/apms/class-wc-checkoutcom-bancontact.php";
 include_once __DIR__."/apms/class-wc-checkoutcom-eps.php";
 include_once __DIR__."/apms/class-wc-checkoutcom-poli.php";
