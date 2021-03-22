@@ -82,7 +82,8 @@ class PaymentController extends Controller
     public function refund(Refund $refund, $mode = HttpHandler::MODE_EXECUTE)
     {
         $response = $this->requestAPI($refund->getEndpoint())
-            ->setBody($refund->getValues());
+            ->setBody($refund->getValues())
+            ->setIdempotencyKey($refund->getIdempotencyKey());
 
         return $this->response($response, Refund::QUALIFIED_NAME, $mode, $refund->id);
     }
@@ -127,7 +128,8 @@ class PaymentController extends Controller
     public function void(Voids $void, $mode = HttpHandler::MODE_EXECUTE)
     {
         $response = $this->requestAPI($void->getEndpoint())
-            ->setBody($void->getValues());
+            ->setBody($void->getValues())
+            ->setIdempotencyKey($void->getIdempotencyKey());
 
         return $this->response($response, Voids::QUALIFIED_NAME, $mode, $void->id);
     }
@@ -142,7 +144,8 @@ class PaymentController extends Controller
     public function capture(Capture $capture, $mode = HttpHandler::MODE_EXECUTE)
     {
         $response = $this->requestAPI($capture->getEndpoint())
-            ->setBody($capture->getValues());
+            ->setBody($capture->getValues())
+            ->setIdempotencyKey($capture->getIdempotencyKey());
 
         return $this->response($response, Capture::QUALIFIED_NAME, $mode, $capture->id);
     }
@@ -162,34 +165,34 @@ class PaymentController extends Controller
 
         return parent::response($response, Payment::QUALIFIED_NAME, $mode);
     }
-    
+
     /**
      * Extra methods.
      */
-    
+
     /**
      * Retrieve supported banks.
-     * 
+     *
      * @param  string $class Qualified name of the class.
      * @return Response
      */
     public function banks($class, $mode = HttpHandler::MODE_EXECUTE)
-    { 
-        
+    {
+
         $banks = new Response();
         $url = $class::MODEL_REQUEST_BANKS_URL;
-       
+
         if($url) {
             $response = $this->requestAPI($url);
             $banks = $this->response($response, Response::QUALIFIED_NAME, $mode);
         }
-        
+
         return $banks;
     }
-    
+
     /**
      * Retrieve supported issuers. Alias for $this->banks().
-     * 
+     *
      * @param  string $model
      * @return array
      */

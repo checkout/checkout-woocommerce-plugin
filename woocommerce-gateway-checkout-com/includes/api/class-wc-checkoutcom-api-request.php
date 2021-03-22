@@ -1,6 +1,7 @@
 <?php
 
 include 'class-wc-checkoutcom-utility.php';
+include 'class-wc-checkoutcom-apm-method.php';
 
 use Checkout\CheckoutApi;
 use Checkout\Models\Address;
@@ -17,22 +18,11 @@ use Checkout\Models\Payments\IdSource;
 use Checkout\Models\Payments\IdealSource;
 use Checkout\Models\Product;
 use Checkout\Models\Sources\Klarna;
-use Checkout\Models\Payments\KlarnaSource;
 use Checkout\Models\Payments\GiropaySource;
-use Checkout\Models\Payments\BoletoSource;
-use Checkout\Models\Payments\AlipaySource;
-use Checkout\Models\Payments\PoliSource;
 use Checkout\Models\Payments\EpsSource;
-use Checkout\Models\Payments\BancontactSource;
-use Checkout\Models\Payments\KnetSource;
-use Checkout\Models\Payments\FawrySource;
-use Checkout\Models\Payments\SofortSource;
-use Checkout\Models\Payments\QpaySource;
 use Checkout\Models\Tokens\ApplePay;
 use Checkout\Models\Tokens\ApplePayHeader;
 use Checkout\Models\Tokens\GooglePay;
-use Checkout\Models\Sources\SepaAddress;
-use Checkout\Models\Sources\SepaData;
 use Checkout\Models\Sources\Sepa;
 use Checkout\Library\Exceptions\CheckoutHttpException;
 use Checkout\Library\Exceptions\CheckoutModelException;
@@ -136,12 +126,15 @@ class WC_Checkoutcom_Api_request
         $apms_settings = get_option('woocommerce_wc_checkout_com_alternative_payments_settings');
         $apms_selected = $apms_settings['ckocom_apms_selector'];
 
+        $postData = sanitize_post($_POST);
+        $getData = sanitize_post($_GET);
+
         $customerAddress = WC_Checkoutcom_Api_request::customer_address($_POST);
 
         // Prepare payment parameters
-        if(sanitize_text_field($_POST['payment_method']) == 'wc_checkout_com_cards'){
-            if(sanitize_text_field($_POST['wc-wc_checkout_com_cards-payment-token'])) {
-                if(sanitize_text_field($_POST['wc-wc_checkout_com_cards-payment-token']) == 'new') {
+        if($postData['payment_method'] == 'wc_checkout_com_cards'){
+            if($postData['wc-wc_checkout_com_cards-payment-token']) {
+                if($postData['wc-wc_checkout_com_cards-payment-token'] == 'new') {
                     $method = new TokenSource($arg);
                 } else {
                     // load token by id ($arg)
@@ -154,22 +147,21 @@ class WC_Checkoutcom_Api_request
                     $is_save_card = true;
 
                     if(WC_Admin_Settings::get_option('ckocom_card_require_cvv')) {
-                        $method->cvv = sanitize_text_field($_POST['wc_checkout_com_cards-card-cvv']);
+                        $method->cvv = $postData['wc_checkout_com_cards-card-cvv'];
                     }
                 }
             } else {
                 $method = new TokenSource($arg);
             }
-        } elseif (sanitize_text_field($_POST['payment_method']) == 'wc_checkout_com_google_pay') {
+        } elseif ($postData['payment_method'] == 'wc_checkout_com_google_pay') {
             $payment_option = 'Google Pay';
 
             $method = new TokenSource($arg);
-        } elseif (sanitize_text_field($_POST['payment_method']) == 'wc_checkout_com_apple_pay') {
+        } elseif ($postData['payment_method'] == 'wc_checkout_com_apple_pay') {
             $payment_option = 'Apple Pay';
 
             $method = new TokenSource($arg);
-        } elseif (in_array (sanitize_text_field($_POST['cko-apm']), $apms_selected)) {
-
+        } elseif($postData['payment_method'] == 'wc_checkout_com_alternative_payments') {
             $method = WC_Checkoutcom_Api_request::get_apm_method($_POST, $order);
             $payment_option = $method->type;
         }
@@ -193,17 +185,17 @@ class WC_Checkoutcom_Api_request
         $payment->amount = $amount_cents;
         $payment->reference = $order->get_order_number();
 
-        $email = sanitize_text_field($_POST['billing_email']);
-        $name = sanitize_text_field($_POST['billing_first_name']) . ' ' . sanitize_text_field($_POST['billing_last_name']);
+        $email = $postData['billing_email'];
+        $name = $postData['billing_first_name'] . ' ' . $postData['billing_last_name'];
 
         // Pay Order Page
-        $isPayOrder = !empty(sanitize_text_field($_GET['pay_for_order'])) ? (boolean) sanitize_text_field($_GET['pay_for_order']) : false;
+        $isPayOrder = !empty($getData['pay_for_order']) ? (boolean) $getData['pay_for_order'] : false;
 
         if($isPayOrder) {
-            if(!empty(sanitize_text_field($_GET['order_id']))) {
-                $order_id    = sanitize_text_field($_GET['order_id']);
-            } else if (!empty(sanitize_text_field($_GET['key']))){
-                $order_id    = wc_get_order_id_by_order_key(sanitize_text_field($_GET['key']));
+            if(!empty($getData['order_id'])) {
+                $order_id    = $getData['order_id'];
+            } else if (!empty($getData['key'])){
+                $order_id    = wc_get_order_id_by_order_key($getData['key']);
             }
 
             $order = wc_get_order( $order_id );
@@ -271,8 +263,8 @@ class WC_Checkoutcom_Api_request
         if($mada_enable){
             $is_mada = false;
 
-            if(!empty(sanitize_text_field($_POST['cko-card-bin']))){
-                $is_mada = WC_Checkoutcom_Utility::isMadaCard(sanitize_text_field($_POST['cko-card-bin']));
+            if(!empty($postData['cko-card-bin'])){
+                $is_mada = WC_Checkoutcom_Utility::isMadaCard($postData['cko-card-bin']);
             } else {
 
                 if($is_save_card) {
@@ -283,7 +275,7 @@ class WC_Checkoutcom_Api_request
                     $is_mada = $token->get_meta('is_mada');
 
                     if($is_mada){
-                        $method->cvv = sanitize_text_field($_POST['wc_checkout_com_cards-card-cvv']);
+                        $method->cvv = $postData['wc_checkout_com_cards-card-cvv'];
                     }
                 }
             }
@@ -899,7 +891,7 @@ class WC_Checkoutcom_Api_request
     /**
      * @param $data
      * @param $order
-     * @return IdealSource
+     * @return array
      */
     private static function get_apm_method($data, $order)
     {
@@ -907,244 +899,9 @@ class WC_Checkoutcom_Api_request
 
         $apm_name = $data['cko-apm'];
 
-        $post = sanitize_post($_POST);
-
-        switch ($apm_name) {
-            case 'ideal':
-                $bic = $data['issuer-id'];
-                $description = $order->get_order_number();
-
-                $method = new IdealSource($bic, $description);
-
-                break;
-            case 'klarna':
-                $klarna_token = sanitize_text_field($_POST['cko-klarna-token']);
-                $country_code = sanitize_text_field($_POST['billing_country']);
-                $woo_locale = str_replace("_", "-", get_locale());
-                $locale = substr($woo_locale, 0, 5);
-
-                $products = array();
-                foreach ($order->get_items() as $item_id => $item_data) {
-                    // Get an instance of corresponding the WC_Product object
-                    $product = $item_data->get_product();
-                    $items = wc_get_product( $product->get_id() );
-                    $price_excl_tax = wc_get_price_excluding_tax($items);
-                    $unit_price_cents = WC_Checkoutcom_Utility::valueToDecimal($price_excl_tax, get_woocommerce_currency());
-
-                    if($items->is_taxable()) {
-                        $price_incl_tax = wc_get_price_including_tax($items);
-                        $unit_price_cents = WC_Checkoutcom_Utility::valueToDecimal($price_incl_tax, get_woocommerce_currency());
-                        $tax_amount = $price_incl_tax - $price_excl_tax;
-                        $total_tax_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($tax_amount, get_woocommerce_currency());
-                        $tax = WC_Tax::get_rates();
-                        $reset_tax = reset($tax)['rate'];
-                        $tax_rate = round($reset_tax);
-
-                    } else {
-                        $tax_rate = 0;
-                        $total_tax_amount_cents = 0;
-                    }
-
-                    $products[] = array(
-                        "name" => $product->get_title(),
-                        "quantity" => $item_data['quantity'],
-                        "unit_price" => $unit_price_cents,
-                        "tax_rate" => $tax_rate * 100,
-                        "total_amount" => $unit_price_cents * $item_data['quantity'],
-                        "total_tax_amount" => $total_tax_amount_cents ,
-                        "type" => "physical",
-                        "reference" => $product->get_name(),
-                        "total_discount_amount" => 0
-
-                    );
-                }
-
-                $chosen_methods = wc_get_chosen_shipping_method_ids();
-                $chosen_shipping = $chosen_methods[0];
-
-                if($chosen_shipping != 'free_shipping') {
-
-                    $shipping_amount = WC()->cart->get_shipping_total() ;
-                    $shipping_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($shipping_amount, get_woocommerce_currency());
-
-                    if(WC()->cart->get_shipping_tax() > 0){
-                        $shipping_amount = WC()->cart->get_shipping_total() + WC()->cart->get_shipping_tax();
-                        $shipping_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($shipping_amount, get_woocommerce_currency());
-
-                        $total_tax_amount = WC()->cart->get_shipping_tax();
-                        $total_tax_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($total_tax_amount, get_woocommerce_currency());
-
-                        $shipping_rates = WC_Tax::get_shipping_tax_rates();
-                        $vat            = array_shift( $shipping_rates );
-
-                        if ( isset( $vat['rate'] ) ) {
-                            $shipping_tax_rate = round( $vat['rate'] * 100 );
-                        } else {
-                            $shipping_tax_rate = 0;
-                        }
-
-                    } else {
-                        $shipping_tax_rate = 0;
-                        $total_tax_amount_cents = 0;
-                    }
-
-                    $products[] = array(
-                        "name" => $chosen_shipping,
-                        "quantity" => 1,
-                        "unit_price" => $shipping_amount_cents,
-                        "tax_rate" => $shipping_tax_rate,
-                        "total_amount" => $shipping_amount_cents,
-                        "total_tax_amount" => $total_tax_amount_cents,
-                        "type" => "shipping_fee",
-                        "reference" => $chosen_shipping,
-                        "total_discount_amount" => 0
-                    );
-                }
-
-                $total_tax_amount_cents = WC_Checkoutcom_Utility::valueToDecimal(WC()->cart->get_total_tax(), get_woocommerce_currency());
-
-                // Set Billing address
-                $billingAddressParam = new Address();
-                $billingAddressParam->given_name = sanitize_text_field($_POST['billing_first_name']);
-                $billingAddressParam->family_name = sanitize_text_field($_POST['billing_last_name']);
-                $billingAddressParam->email = sanitize_text_field($_POST['billing_email']);
-                $billingAddressParam->street_address = sanitize_text_field($_POST['billing_address_1']);
-                // $billingAddressParam->street_address2 = $_POST['billing_address_2'];
-                $billingAddressParam->postal_code = sanitize_text_field($_POST['billing_postcode']);
-                $billingAddressParam->city = sanitize_text_field($_POST['billing_city']);
-                $billingAddressParam->region = sanitize_text_field($_POST['billing_city']);
-                $billingAddressParam->phone = sanitize_text_field($_POST['billing_phone']);
-                $billingAddressParam->country = sanitize_text_field($_POST['billing_country']);
-
-                $method = new KlarnaSource($klarna_token, $country_code, strtolower($locale), $billingAddressParam, $total_tax_amount_cents, $products);
-
-                break;
-            case 'giropay' :
-                $bic = $data['giropay-bank-details'];
-                $purpose = "#{$order->get_order_number()}-{$_SERVER['HTTP_HOST']}";
-
-                $method = new GiropaySource($purpose, $bic);
-
-                break;
-            case 'boleto':
-                $customerName = $data['name'];
-                $birthData = $data['birthDate'];
-                $cpf = $data['cpf'];
-
-                $method = new BoletoSource($customerName, $birthData, $cpf);
-
-                break;
-            case 'alipay':
-
-                $method = new AlipaySource();
-
-                break;
-            case 'poli':
-
-                $method = new PoliSource();
-
-                break;
-            case 'sofort':
-                $method = new SofortSource();
-                break;
-            case 'eps':
-                $purpose = get_bloginfo( 'name' );
-
-                $method =  new EpsSource($purpose);
-                break;
-            case 'bancontact':
-                $accountHolder = sanitize_text_field($_POST['billing_first_name']) . ' '. sanitize_text_field($_POST['billing_last_name']);
-                $countryCode = sanitize_text_field($_POST['billing_country']);
-
-                $method = new BancontactSource($accountHolder, $countryCode);
-                break;
-            case 'knet':
-                $language = get_locale();
-
-                switch ($language) {
-                    case 'ar_SA':
-                        $language = 'ar';
-                        break;
-                    default:
-                        $language = 'en';
-                        break;
-                }
-
-                $method = new KnetSource($language);
-                break;
-            case 'fawry':
-                $email = sanitize_text_field($_POST['billing_email']);
-                $phone = sanitize_text_field($_POST['billing_phone']);
-
-                $cartInfo = self::get_cart_info();
-                $productInfo = $cartInfo['order_lines'];
-                $orderAmount = $cartInfo['order_amount'];
-                $products = array();
-                $totalProductAmount = 0;
-
-                foreach ($productInfo as $item) {
-                    $products[] = array(
-                        "product_id" => $item['name'],
-                        "quantity" => $item['quantity'],
-                        "price" => $item['unit_price'],
-                        "description" => $item['name'],
-                        );
-
-                    $totalProductAmount += $item['unit_price'] * $item['quantity'];
-                }
-
-
-                if ($totalProductAmount !== $orderAmount) {
-                    
-                    WC_Checkoutcom_Utility::logger("Total product amount {$totalProductAmount} does not match order amount {$orderAmount}", null);
-                    
-                    $product[] = self::format_fawry_product($products, $orderAmount);
-
-                    $products = $product;
-                }
-                
-
-                $method = new FawrySource($email, $phone, $order->get_order_number(), $products);
-                break;
-            case 'qpay':
-                $method = new QpaySource(get_bloginfo( 'name' ));
-                break;
-            case 'sepa':
-                $customerAddress = $post['billing_address_1'] . ' ' . $post['billing_address_2'];
-                $address = new SepaAddress(
-                    $customerAddress,
-                    $post['billing_city'],
-                    $post['billing_postcode'],
-                    $post['billing_country']
-                );
-
-                $data = new SepaData(
-                    $post['billing_first_name'],
-                    $post['billing_last_name'],
-                    $post['sepa-iban'],
-                    $post['sepa-bic'],
-                    "Thanks for shopping.",
-                    'single'
-                );
-
-                $sepa = new Sepa($address, $data);
-                $sepa->customer = array(
-                  'email' => $post['billing_email'],
-                  'name' => $post['billing_first_name'] . ' ' . $post['billing_last_name']
-                );
-
-                $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
-                $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
-                $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
-
-                $details = $checkout->sources()->add($sepa);
-                $responseData = $details->response_data;
-                WC()->session->set('mandate_reference', $responseData['mandate_reference']);
-
-                $method = new IdSource($details->getId());
-
-        }
-
+        $obj = new WC_Gateway_Checkout_Com_APM_Method($data, $order);
+        $method = $obj->$apm_name();
+      
         return $method;
     }
 

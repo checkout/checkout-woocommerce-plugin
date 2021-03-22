@@ -38,7 +38,7 @@ function init_checkout_com_gateway_class()
         $methods[] = 'WC_Gateway_Checkout_Com_Alternative_Payments';
 
         $methods = sizeof($array) > 0 ? array_merge($methods, $array) : $methods;
-        
+
         return $methods;
     }
 
@@ -50,7 +50,6 @@ function init_checkout_com_gateway_class()
                 if(jQuery('[data-gateway_id=\"wc_checkout_com_apple_pay\"]').length > 0) {
                     jQuery('[data-gateway_id=\"wc_checkout_com_apple_pay\"]').hide();
                 }
-                
                 if(jQuery('[data-gateway_id=\"wc_checkout_com_google_pay\"]').length > 0) {
                     jQuery('[data-gateway_id=\"wc_checkout_com_google_pay\"]').hide();
                 }
@@ -65,6 +64,7 @@ function init_checkout_com_gateway_class()
 
 /**
  *  return the class name of the apm selected
+ * @return array 
  */
 function get_selected_apms_Class() {
 
@@ -377,6 +377,9 @@ function addFawryNumber($order_id) {
  */
 add_filter( 'woocommerce_gateway_icon', 'cko_gateway_icon', 10, 2 );
 function cko_gateway_icon( $icons, $id ) {
+
+    $plugin_url = plugins_url( '/checkout-com-unified-payments-api/assets/images/', __DIR__ );
+
     /* Check if checkoutcom gateway */ 
     if ($id == 'wc_checkout_com_cards') {
         $display_card_icon = WC_Admin_Settings::get_option('ckocom_display_icon') == 1 ? true : false;
@@ -384,8 +387,6 @@ function cko_gateway_icon( $icons, $id ) {
         /* check if display card option is selected */
         if ($display_card_icon ) {
             $card_icon = WC_Admin_Settings::get_option('ckocom_card_icons');
-
-            $plugin_url = plugins_url( '/checkout-com-unified-payments-api/assets/images/', __DIR__ );
 
             $icons = '';
 
@@ -395,6 +396,24 @@ function cko_gateway_icon( $icons, $id ) {
             }
 
             return $icons;
+        }
+
+        return false;
+    }
+    /**
+     *  Display logo for APM available for payment
+     */
+    if (strpos($id, 'alternative_payments')) {
+
+        $apm_available = WC_Checkoutcom_Utility::get_alternative_payment_methods();
+
+        foreach($apm_available as $value) {
+            if (strpos($id, $value)) {
+                $apm_icons = $plugin_url . $value .'.svg';
+                $icons .= "<img src='$apm_icons' id='apm-icon'>";
+
+                return $icons;
+            }
         }
 
         return false;
