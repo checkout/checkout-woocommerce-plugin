@@ -123,6 +123,8 @@ class WC_Checkoutcom_Api_request
         $mada_enable = WC_Admin_Settings::get_option('ckocom_card_mada') == 1 ? true : false;
         $is_save_card = false;
         $payment_option = 'FramesJs';
+        $apms_settings = get_option('woocommerce_wc_checkout_com_alternative_payments_settings');
+        $apms_selected = $apms_settings['ckocom_apms_selector'];
 
         $postData = sanitize_post($_POST);
         $getData = sanitize_post($_GET);
@@ -159,8 +161,8 @@ class WC_Checkoutcom_Api_request
             $payment_option = 'Apple Pay';
 
             $method = new TokenSource($arg);
-        } elseif($postData['payment_method'] == 'wc_checkout_com_alternative_payments') {
 
+        } elseif($postData['payment_method'] == 'wc_checkout_com_alternative_payments') {
             $method = WC_Checkoutcom_Api_request::get_apm_method($_POST, $order);
             $payment_option = $method->type;
         }
@@ -239,7 +241,7 @@ class WC_Checkoutcom_Api_request
         }
 
         // Set redirection url in payment request
-        $redirection_url = str_replace( 'https:', 'http:', add_query_arg( 'wc-api', 'wc_checkoutcom_callback', home_url( '/' ) ) );
+        $redirection_url = add_query_arg( 'wc-api', 'wc_checkoutcom_callback', home_url( '/' ) );
         $payment->success_url = $redirection_url;
         $payment->failure_url = $redirection_url;
 
@@ -900,7 +902,7 @@ class WC_Checkoutcom_Api_request
 
         $obj = new WC_Gateway_Checkout_Com_APM_Method($data, $order);
         $method = $obj->$apm_name();
-
+      
         return $method;
     }
 

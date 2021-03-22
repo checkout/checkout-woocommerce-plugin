@@ -29,10 +29,16 @@ function init_checkout_com_gateway_class()
     // Add payment method class to WooCommerce
     add_filter( 'woocommerce_payment_gateways', 'checkout_com_add_gateway' );
     function checkout_com_add_gateway( $methods ) {
+
+        $array = get_selected_apms_Class();
+
         $methods[] = 'WC_Gateway_Checkout_Com_Cards';
         $methods[] = 'WC_Gateway_Checkout_Com_Apple_Pay';
         $methods[] = 'WC_Gateway_Checkout_Com_Google_Pay';
         $methods[] = 'WC_Gateway_Checkout_Com_Alternative_Payments';
+
+        $methods = sizeof($array) > 0 ? array_merge($methods, $array) : $methods;
+
         return $methods;
     }
 
@@ -44,17 +50,38 @@ function init_checkout_com_gateway_class()
                 if(jQuery('[data-gateway_id=\"wc_checkout_com_apple_pay\"]').length > 0) {
                     jQuery('[data-gateway_id=\"wc_checkout_com_apple_pay\"]').hide();
                 }
-                
                 if(jQuery('[data-gateway_id=\"wc_checkout_com_google_pay\"]').length > 0) {
                     jQuery('[data-gateway_id=\"wc_checkout_com_google_pay\"]').hide();
                 }
                 
-                if(jQuery('[data-gateway_id=\"wc_checkout_com_alternative_payments\"]').length > 0) {
-                    jQuery('[data-gateway_id=\"wc_checkout_com_alternative_payments\"]').hide();
+                if(jQuery('[data-gateway_id*=\"wc_checkout_com_alternative_payments\"]').length > 0) {
+                    jQuery('[data-gateway_id*=\"wc_checkout_com_alternative_payments\"]').hide();
                 }
             }, 1500);
         });
     ");
+}
+
+/**
+ *  return the class name of the apm selected
+ * @return array 
+ */
+function get_selected_apms_Class() {
+
+    $apms_settings = get_option('woocommerce_wc_checkout_com_alternative_payments_settings');
+    $selected_apms_class = array();
+
+    // check if alternative payment method is enabled
+    if ($apms_settings['enabled'] == 'yes') {
+        $apm_selected = $apms_settings['ckocom_apms_selector'];
+
+        // get apm selected and add the class name in array
+        foreach($apm_selected as $value) {
+            $selected_apms_class[] = 'WC_Gateway_Checkout_Com_Alternative_Payments'.'_'.$value;
+        }
+    }
+    
+    return $selected_apms_class;
 }
 
 /*
@@ -350,6 +377,9 @@ function addFawryNumber($order_id) {
  */
 add_filter( 'woocommerce_gateway_icon', 'cko_gateway_icon', 10, 2 );
 function cko_gateway_icon( $icons, $id ) {
+
+    $plugin_url = plugins_url( '/checkout-com-unified-payments-api/assets/images/', __DIR__ );
+
     /* Check if checkoutcom gateway */ 
     if ($id == 'wc_checkout_com_cards') {
         $display_card_icon = WC_Admin_Settings::get_option('ckocom_display_icon') == 1 ? true : false;
@@ -357,8 +387,6 @@ function cko_gateway_icon( $icons, $id ) {
         /* check if display card option is selected */
         if ($display_card_icon ) {
             $card_icon = WC_Admin_Settings::get_option('ckocom_card_icons');
-
-            $plugin_url = plugins_url( '/checkout-com-unified-payments-api/assets/images/', __DIR__ );
 
             $icons = '';
 
@@ -368,6 +396,24 @@ function cko_gateway_icon( $icons, $id ) {
             }
 
             return $icons;
+        }
+
+        return false;
+    }
+    /**
+     *  Display logo for APM available for payment
+     */
+    if (strpos($id, 'alternative_payments')) {
+
+        $apm_available = WC_Checkoutcom_Utility::get_alternative_payment_methods();
+
+        foreach($apm_available as $value) {
+            if (strpos($id, $value)) {
+                $apm_icons = $plugin_url . $value .'.svg';
+                $icons .= "<img src='$apm_icons' id='apm-icon'>";
+
+                return $icons;
+            }
         }
 
         return false;
