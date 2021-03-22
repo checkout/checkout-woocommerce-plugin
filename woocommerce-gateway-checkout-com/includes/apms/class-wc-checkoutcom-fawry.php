@@ -2,6 +2,8 @@
 
 class WC_Gateway_Checkout_Com_Alternative_Payments_Fawry extends WC_Gateway_Checkout_Com_Alternative_Payments {
 
+    const PAYMENT_METHOD = 'fawry';
+
     public function __construct()
     {
         $this->id = 'wc_checkout_com_alternative_payments_fawry';
@@ -20,14 +22,13 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Fawry extends WC_Gateway_Chec
     {
         // get available apms depending on currency
         $apm_available = WC_Checkoutcom_Utility::get_alternative_payment_methods();
-        $message = __("Pay with Fawry", 'wc_checkout_com')
+        $message = __("Pay with Fawry", 'wc_checkout_com');
 
         ?>  
             <p style="margin-bottom: 0;"> <?php echo $message ?> </p>
-            <input type="hidden" id="cko-apm" name="cko-apm" value="fawry">
         <?php
 
-        if (! in_array("fawry", $apm_available) ) {
+        if (! in_array(self::PAYMENT_METHOD, $apm_available) ) {
             ?>
                 <script>
                     jQuery('.payment_method_wc_checkout_com_alternative_payments_fawry').hide();
@@ -45,7 +46,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Fawry extends WC_Gateway_Chec
         $order = wc_get_order( $order_id );
 
         // create alternative payment
-        $result =  (array) WC_Checkoutcom_Api_request::create_apm_payment($order, $arg = null);
+        $result =  (array) WC_Checkoutcom_Api_request::create_apm_payment($order, self::PAYMENT_METHOD);
 
         // check if result has error and return error message
         if (isset($result['error']) && !empty($result['error'])) {
@@ -57,7 +58,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Fawry extends WC_Gateway_Chec
         $status = WC_Admin_Settings::get_option('ckocom_order_authorised');
         $message = "";
 
-        if ($result['source']['type'] == 'fawry') {
+        if ($result['source']['type'] == self::PAYMENT_METHOD) {
             update_post_meta($order_id, 'cko_fawry_reference_number', $result['source']['reference_number']);
 
             // Get cko auth status configured in admin

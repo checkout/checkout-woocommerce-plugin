@@ -2,6 +2,8 @@
 
 class WC_Gateway_Checkout_Com_Alternative_Payments_Alipay extends WC_Gateway_Checkout_Com_Alternative_Payments {
 
+    const PAYMENT_METHOD = 'alipay';
+
     public function __construct()
     {
         $this->id = 'wc_checkout_com_alternative_payments_alipay';
@@ -22,10 +24,9 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Alipay extends WC_Gateway_Che
 
         ?>
             <p style="margin-bottom: 0;"> <?php echo $message ?> </p>
-            <input type="hidden" id="cko-apm" name="cko-apm" value="alipay">
         <?php
 
-        if (! in_array("alipay", $apm_available) ) {
+        if (! in_array(self::PAYMENT_METHOD, $apm_available) ) {
             ?>
                 <script>
                     jQuery('.payment_method_wc_checkout_com_alternative_payments_alipay').hide();
@@ -43,7 +44,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Alipay extends WC_Gateway_Che
         $order = wc_get_order( $order_id );
 
         // create alternative payment
-        $result =  (array) WC_Checkoutcom_Api_request::create_apm_payment($order, $arg = null);
+        $result =  (array) WC_Checkoutcom_Api_request::create_apm_payment($order, self::PAYMENT_METHOD);
 
         // check if result has error and return error message
         if (isset($result['error']) && !empty($result['error'])) {
