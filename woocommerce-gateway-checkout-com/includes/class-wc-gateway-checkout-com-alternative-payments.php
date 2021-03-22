@@ -1,5 +1,6 @@
 <?php
 include_once __DIR__."/../templates/class-wc-checkoutcom-apm-templates.php";
+include_once __DIR__."/apms/class-wc-checkoutcom-alipay.php";
 include_once __DIR__."/apms/class-wc-checkoutcom-qpay.php";
 include_once __DIR__."/apms/class-wc-checkoutcom-boleto.php";
 include_once __DIR__."/apms/class-wc-checkoutcom-sepa.php";
@@ -70,6 +71,6 @@ class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway
             <script>
                 jQuery('.payment_method_wc_checkout_com_alternative_payments').hide();
             </script>
-        <?php
+        <?php  
     }
 }
