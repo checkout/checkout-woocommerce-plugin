@@ -176,7 +176,6 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
                     jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
                 </script>
             <?php
-        <?php
         }
 
         // check if saved card enable from module setting

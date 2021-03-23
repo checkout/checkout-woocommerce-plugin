@@ -110,7 +110,7 @@ class WC_Checkoutcom_Api_request
      * @param $card_token
      * @return Payment
      */
-    private static function get_request_param(WC_Order $order, $arg)
+    private static function get_request_param(WC_Order $order, $payment_method)
     {
         global $woocommerce, $wp_version;
 
@@ -161,8 +161,8 @@ class WC_Checkoutcom_Api_request
             $payment_option = 'Apple Pay';
 
             $method = new TokenSource($arg);
-        } elseif($postData['payment_method'] == 'wc_checkout_com_alternative_payments') {
-            $method = WC_Checkoutcom_Api_request::get_apm_method($_POST, $order);
+        } elseif(in_array ($payment_method, $apms_selected)) {
+            $method = WC_Checkoutcom_Api_request::get_apm_method($postData, $order, $payment_method);
             $payment_option = $method->type;
         }
 
@@ -813,10 +813,10 @@ class WC_Checkoutcom_Api_request
      * @param $arg
      * @return array
      */
-    public static function create_apm_payment(WC_Order $order, $arg)
+    public static function create_apm_payment(WC_Order $order, $payment_method)
     {
         // Get payment request parameter
-        $request_param = WC_Checkoutcom_Api_request::get_request_param($order, $arg);
+        $request_param = WC_Checkoutcom_Api_request::get_request_param($order, $payment_method);
 
         WC_Checkoutcom_Utility::logger('Apm request payload,' , $request_param);
         
@@ -893,14 +893,12 @@ class WC_Checkoutcom_Api_request
      * @param $order
      * @return array
      */
-    private static function get_apm_method($data, $order)
+    private static function get_apm_method($data, $order, $payment_method)
     {
         if (!session_id()) session_start();
 
-        $apm_name = $data['cko-apm'];
-
         $obj = new WC_Gateway_Checkout_Com_APM_Method($data, $order);
-        $method = $obj->$apm_name();
+        $method = $obj->$payment_method();
       
         return $method;
     }
