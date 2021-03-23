@@ -110,7 +110,7 @@ class WC_Checkoutcom_Api_request
      * @param $card_token
      * @return Payment
      */
-    private static function get_request_param(WC_Order $order, $payment_method)
+    private static function get_request_param(WC_Order $order, $arg)
     {
         global $woocommerce, $wp_version;
 
@@ -129,7 +129,7 @@ class WC_Checkoutcom_Api_request
         $postData = sanitize_post($_POST);
         $getData = sanitize_post($_GET);
 
-        $customerAddress = WC_Checkoutcom_Api_request::customer_address($_POST);
+        $customerAddress = WC_Checkoutcom_Api_request::customer_address($postData);
 
         // Prepare payment parameters
         if($postData['payment_method'] == 'wc_checkout_com_cards'){
@@ -161,8 +161,8 @@ class WC_Checkoutcom_Api_request
             $payment_option = 'Apple Pay';
 
             $method = new TokenSource($arg);
-        } elseif(in_array ($payment_method, $apms_selected)) {
-            $method = WC_Checkoutcom_Api_request::get_apm_method($postData, $order, $payment_method);
+        } elseif(in_array ($arg, $apms_selected)) {
+            $method = WC_Checkoutcom_Api_request::get_apm_method($postData, $order, $arg);
             $payment_option = $method->type;
         }
 
