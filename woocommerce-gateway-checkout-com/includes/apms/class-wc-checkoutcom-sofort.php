@@ -1,27 +1,27 @@
 <?php
 
-class WC_Gateway_Checkout_Com_Alternative_Payments_Giropay extends WC_Gateway_Checkout_Com_Alternative_Payments {
+class WC_Gateway_Checkout_Com_Alternative_Payments_Sofort extends WC_Gateway_Checkout_Com_Alternative_Payments {
 
-    const PAYMENT_METHOD = 'giropay';
+    const PAYMENT_METHOD = 'sofort';
 
     public function __construct()
     {
-        $this->id = 'wc_checkout_com_alternative_payments_giropay';
-        $this->title = __("Giropay", 'wc_checkout_com');
+        $this->id = 'wc_checkout_com_alternative_payments_sofort';
+        $this->title = __("Sofort", 'wc_checkout_com');
         $this->has_fields = true;
         $this->supports = array('products', 'refunds');
 
         $this->init_form_fields();
 
         add_action('woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'process_admin_options'));
-
     }
 
     public function payment_fields()
     {   
+
         // get available apms depending on currency
         $apm_available = WC_Checkoutcom_Utility::get_alternative_payment_methods();
-        $message = __("Pay with Giropay. You will be redirected upon place order", 'wc_checkout_com');
+        $message = __("Pay with Sofort. You will be redirected upon place order", 'wc_checkout_com');
         
         ?>
             <p style="margin-bottom: 0;"> <?php echo $message ?> </p>
@@ -30,11 +30,9 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Giropay extends WC_Gateway_Ch
         if (! in_array(self::PAYMENT_METHOD, $apm_available) ) {
             ?>
                 <script>
-                    jQuery('.payment_method_wc_checkout_com_alternative_payments_giropay').hide();
+                    jQuery('.payment_method_wc_checkout_com_alternative_payments_sofort').hide();
                 </script>
             <?php
-        } else {
-             WC_Checkoutcom_Apm_Templates::get_giropay_bank();
         }
 
     }

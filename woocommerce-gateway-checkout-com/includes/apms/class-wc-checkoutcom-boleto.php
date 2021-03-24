@@ -1,42 +1,57 @@
 <?php
 
-class WC_Gateway_Checkout_Com_Alternative_Payments_Giropay extends WC_Gateway_Checkout_Com_Alternative_Payments {
+class WC_Gateway_Checkout_Com_Alternative_Payments_Boleto extends WC_Gateway_Checkout_Com_Alternative_Payments {
 
-    const PAYMENT_METHOD = 'giropay';
+    const PAYMENT_METHOD = 'boleto';
 
     public function __construct()
     {
-        $this->id = 'wc_checkout_com_alternative_payments_giropay';
-        $this->title = __("Giropay", 'wc_checkout_com');
+        $this->id = 'wc_checkout_com_alternative_payments_boleto';
+        $this->method_title = __("Checkout.com", 'wc_checkout_com');
+        $this->method_description = __("The Checkout.com extension allows shop owners to process online payments through the <a href=\"https://www.checkout.com\">Checkout.com Payment Gateway.</a>", 'wc_checkout_com');
+        $this->title = __("Boleto", 'wc_checkout_com');
         $this->has_fields = true;
         $this->supports = array('products', 'refunds');
 
         $this->init_form_fields();
 
         add_action('woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'process_admin_options'));
-
     }
 
     public function payment_fields()
     {   
         // get available apms depending on currency
         $apm_available = WC_Checkoutcom_Utility::get_alternative_payment_methods();
-        $message = __("Pay with Giropay. You will be redirected upon place order", 'wc_checkout_com');
-        
-        ?>
-            <p style="margin-bottom: 0;"> <?php echo $message ?> </p>
-        <?php
 
         if (! in_array(self::PAYMENT_METHOD, $apm_available) ) {
             ?>
                 <script>
-                    jQuery('.payment_method_wc_checkout_com_alternative_payments_giropay').hide();
+                    jQuery('.payment_method_wc_checkout_com_alternative_payments_boleto').hide();
                 </script>
             <?php
         } else {
-             WC_Checkoutcom_Apm_Templates::get_giropay_bank();
-        }
+            WC_Checkoutcom_Apm_Templates::get_boleto_details();
+            ?>
+                <script>
+                // Alter default place order button click
+                jQuery('#place_order').click(function(e) {
+                    // check if apm is selected as payment method
+                    if (jQuery('#payment_method_wc_checkout_com_alternative_payments_boleto').is(':checked')) {
 
+                        if (!jQuery("[name='name']")[0].checkValidity()) {
+                            alert('Please enter your name');
+                            return false;
+                        }
+
+                        if (!jQuery("[name='cpf']")[0].checkValidity()) {
+                            alert('Please enter your CPF');
+                            return false;
+                        }
+                    }
+                });
+                </script>
+            <?php
+        }
     }
 
     public function process_payment( $order_id )

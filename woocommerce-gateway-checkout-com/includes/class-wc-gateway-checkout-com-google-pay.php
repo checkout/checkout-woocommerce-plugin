@@ -83,15 +83,18 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway
                     buttonClass: 'google-pay-button',
                     googleButtonArea: 'method_wc_checkout_com_google_pay',
                     buttonArea: '.form-row.place-order',
-                    placeOrder: '.place_order',
+                    placeOrder: '#place_order',
                     paymentOptionLabel: '#dt_method_checkoutcomgooglepay > label:nth-child(2)',
                     iconSpacer: 'cko-wallet-icon-spacer',
                     token: 'google-cko-card-token',
+                    paymentMethodName: 'wc_checkout_com_google_pay'
                 }
 
                 return {
                     hideDefaultPlaceOrder: function () {
-                        jQuery(DOMStrings.placeOrder).hide();
+                        jQuery("input[name='payment_method']").change(function(e){
+                            jQuery(this).val() == DOMStrings.paymentMethodName ? jQuery(DOMStrings.placeOrder).hide() : jQuery(DOMStrings.placeOrder).show();
+                        })
                     },
                     addGooglePayButton: function (type) {
                         // Create the GooglePayButton
