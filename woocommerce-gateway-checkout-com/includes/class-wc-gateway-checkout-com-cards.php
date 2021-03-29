@@ -503,25 +503,6 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         // save source id for subscription
         WC_Checkoutcom_Subscription::save_source_id($order_id, $order, $result['source']['id']);
 
-        /**
-         * Checks if order object is an instance of subscription
-         * Order is returned as an subscription obj when change payment occurs
-         * for a subscription
-         * 
-         */
-        if($order instanceof WC_Subscription) {
-            update_post_meta($order->id, '_cko_source_id', $result['source']['id']);
-        }
-
-        // Checks for subscription and save source id
-        if ( WC_Subscriptions_Order::order_contains_subscription( $order_id )) { 
-            $subscriptions = wcs_get_subscriptions_for_order( $order );
-
-            foreach($subscriptions as $subscription_obj) {
-                update_post_meta($subscription_obj->id, '_cko_source_id', $result['source']['id']);
-            }
-        }
-
         $order_status = $order->get_status();
 
         $order->add_order_note($message);
