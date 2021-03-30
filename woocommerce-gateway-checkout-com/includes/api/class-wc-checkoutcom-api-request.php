@@ -35,12 +35,13 @@ class WC_Checkoutcom_Api_request
      *
      * @param WC_Order $order
      * @param $arg
+     * @param $subscription subscription renewal flag
      * @return array
      */
-    public static function create_payment( WC_Order $order, $arg, $flag = null )
+    public static function create_payment( WC_Order $order, $arg, $subscription = null )
     {
         // Get payment request parameter
-        $request_param = WC_Checkoutcom_Api_request::get_request_param($order, $arg, $flag);
+        $request_param = WC_Checkoutcom_Api_request::get_request_param($order, $arg, $subscription);
         $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
         $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes' ? true : false;
 
@@ -108,16 +109,17 @@ class WC_Checkoutcom_Api_request
      * Build payment request parameter
      * @param $order
      * @param $card_token
+     * @param $subscription subscription renewal flag
      * @return Payment
      */
-    private static function get_request_param(WC_Order $order, $arg, $flag = null)
+    private static function get_request_param(WC_Order $order, $arg, $subscription = null)
     {
         global $woocommerce, $wp_version;
 
         $auto_capture = WC_Admin_Settings::get_option('ckocom_card_autocap') == 1 ? true : false;
         $amount = $order->get_total();
         $amount_cents = WC_Checkoutcom_Utility::valueToDecimal($amount, $order->get_currency());
-        $three_d = WC_Admin_Settings::get_option('ckocom_card_threed') == 1 && $flag == null ? true : false;
+        $three_d = WC_Admin_Settings::get_option('ckocom_card_threed') == 1 && $subscription == null ? true : false;
         $attempt_no_threeD = WC_Admin_Settings::get_option('ckocom_card_notheed') == 1 ? true : false;
         $dynamic_descriptor = WC_Admin_Settings::get_option('ckocom_card_desctiptor') == 1 ? true : false;
         $mada_enable = WC_Admin_Settings::get_option('ckocom_card_mada') == 1 ? true : false;
@@ -165,7 +167,7 @@ class WC_Checkoutcom_Api_request
             $method = WC_Checkoutcom_Api_request::get_apm_method($postData, $order, $arg);
             
             $payment_option = $method->type;
-        } elseif ( ! is_null($flag) ) {
+        } elseif ( ! is_null($subscription) ) {
 
             $method = new IdSource($arg['source_id']); 
         }
@@ -215,12 +217,13 @@ class WC_Checkoutcom_Api_request
         );
 
         // Check for the subscription flag
-        if (! is_null($flag) ) { 
+        if (! is_null($subscription) ) { 
             $payment->merchant_initiated = true;
             $payment->payment_type = "Recurring";
             $payment->previous_payment_id = get_post_meta( $arg['parent_order_id'], '_cko_payment_id', true ) ?? null;
-        } else {
+        } elseif (wcs_order_contains_subscription( $order, 'parent' )) {
             $payment->merchant_initiated = false;
+            $payment->payment_type = "Recurring";
         }
 
         $three_ds = new ThreeDs($three_d);
