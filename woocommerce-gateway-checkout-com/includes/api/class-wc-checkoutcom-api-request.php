@@ -167,7 +167,7 @@ class WC_Checkoutcom_Api_request
             $payment_option = $method->type;
         } elseif ( ! is_null($flag) ) {
 
-            $method = new IdSource($arg); 
+            $method = new IdSource($arg['source_id']); 
         }
 
         if ($method->type != 'klarna') {
@@ -218,7 +218,7 @@ class WC_Checkoutcom_Api_request
         if (! is_null($flag) ) { 
             $payment->merchant_initiated = true;
             $payment->payment_type = "Recurring";
-            $payment->previous_payment_id = "pay_1234";
+            $payment->previous_payment_id = get_post_meta( $arg['parent_order_id'], '_cko_payment_id', true ) ?? null;
         } else {
             $payment->merchant_initiated = false;
         }

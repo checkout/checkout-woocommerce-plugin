@@ -12,16 +12,19 @@ class WC_Checkoutcom_Subscription {
         // Get renewal order ID
         $order_id = $renewal_order->id;
 
+        $args = array();
+
         // Get subscription object from the order
         if ( wcs_order_contains_subscription( $renewal_order, 'renewal' ) ) {
             $subscriptions_arr = wcs_get_subscriptions_for_order( $renewal_order, array( 'order_type' => 'renewal' ) );
         }
 
         foreach ($subscriptions_arr as $subscriptions_obj) {
-            $source_id = get_post_meta( $subscriptions_obj->id, '_cko_source_id', true );
+            $args['source_id'] = get_post_meta( $subscriptions_obj->id, '_cko_source_id', true );
+            $args['parent_order_id'] = $subscriptions_obj->data['parent_id'];
         }
 
-        $payment_result = (array)  WC_Checkoutcom_Api_request::create_payment($renewal_order, $source_id, 'renewal');
+        $payment_result = (array)  WC_Checkoutcom_Api_request::create_payment($renewal_order, $args, 'renewal');
 
         // Update renewal order status based on payment result
         if (! isset($payment_result['error']) && empty($payment_result['error'])) {
