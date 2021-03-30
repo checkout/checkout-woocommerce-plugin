@@ -4,6 +4,7 @@ include_once('settings/class-wc-checkoutcom-cards-settings.php');
 include_once('settings/admin/class-wc-checkoutcom-admin.php');
 include_once('api/class-wc-checkoutcom-api-request.php');
 include_once ('class-wc-gateway-checkout-com-webhook.php');
+include_once('subscription/class-wc-checkout-com-subscription.php');
 
 use Checkout\Library\Exceptions\CheckoutHttpException;
 use Checkout\Library\Exceptions\CheckoutModelException;
@@ -366,6 +367,9 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
             $this->save_token(get_current_user_id(), $result);
         }
 
+        // save source id for subscription
+        WC_Checkoutcom_Subscription::save_source_id($order_id, $order, $result['source']['id']);
+
         // Set action id as woo transaction id
         update_post_meta($order_id, '_transaction_id', $result['action_id']);
         update_post_meta($order_id, '_cko_payment_id', $result['id']);
@@ -495,6 +499,9 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
             $this->save_token($order->get_user_id(), $result);
             unset($_SESSION['wc-wc_checkout_com_cards-new-payment-method']);
         }
+
+        // save source id for subscription
+        WC_Checkoutcom_Subscription::save_source_id($order_id, $order, $result['source']['id']);
 
         $order_status = $order->get_status();
 
