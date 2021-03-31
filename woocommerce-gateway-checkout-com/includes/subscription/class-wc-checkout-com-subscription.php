@@ -10,7 +10,7 @@ class WC_Checkoutcom_Subscription {
     public static function renewal_payment($renewal_total, $renewal_order) {
 
         // Get renewal order ID
-        $order_id = $renewal_order->id;
+        $order_id = $renewal_order->get_id();
 
         $args = array();
 
@@ -20,7 +20,7 @@ class WC_Checkoutcom_Subscription {
         }
 
         foreach ($subscriptions_arr as $subscriptions_obj) {
-            $args['source_id'] = get_post_meta( $subscriptions_obj->id, '_cko_source_id', true );
+            $args['source_id'] = get_post_meta( $subscriptions_obj->get_id(), '_cko_source_id', true );
             $args['parent_order_id'] = $subscriptions_obj->data['parent_id'];
         }
 
@@ -48,7 +48,7 @@ class WC_Checkoutcom_Subscription {
         $message = __("Checkout.com Payment Authorised " ."</br>". " Action ID : {$payment_result['action_id']} ", 'wc_checkout_com');
 
         // check if payment was flagged
-        if ($result['risk']['flagged']) {
+        if ($payment_result['risk']['flagged']) {
             // Get cko auth status configured in admin
             $status = WC_Admin_Settings::get_option('ckocom_order_flagged');
             $message = __("Checkout.com Payment Flagged " ."</br>". " Action ID : {$payment_result['action_id']} ", 'wc_checkout_com');
@@ -87,7 +87,7 @@ class WC_Checkoutcom_Subscription {
             $subscriptions = wcs_get_subscriptions_for_order( $order );
 
             foreach($subscriptions as $subscription_obj) {
-                update_post_meta($subscription_obj->id, '_cko_source_id', $source_id);
+                update_post_meta($subscription_obj->get_id(), '_cko_source_id', $source_id);
             }
         }
     }
