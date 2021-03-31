@@ -504,7 +504,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         }
 
         // save source id for subscription
-        WC_Checkoutcom_Subscription::save_source_id($order_id, $order, $result['source']['id']);
+        WC_Checkoutcom_Subscription::save_source_id($order_id, $subscription_object, $result['source']['id']);
 
         $order_status = $order->get_status();
 
