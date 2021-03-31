@@ -427,6 +427,9 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         $order_id = $result['metadata']['order_id'];
         $action = $result['actions'];
 
+        // Get object as an instance of WC_Subscription
+        $subscription_object = wc_get_order( $order_id );
+
         $order = new WC_Order( $order_id );
 
         // Query order by order number to check if order exist
