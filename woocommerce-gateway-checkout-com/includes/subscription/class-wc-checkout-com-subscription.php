@@ -68,7 +68,7 @@ class WC_Checkoutcom_Subscription {
         wc_reduce_stock_levels( $order_id );
 
     }
-
+  
     /**
      *  Save source id for each order containing subscription
      *  @param $order_id
@@ -85,7 +85,7 @@ class WC_Checkoutcom_Subscription {
         // check for subscription and save source id
         if ( WC_Subscriptions_Order::order_contains_subscription( $order_id )) { 
             $subscriptions = wcs_get_subscriptions_for_order( $order );
-
+          
             foreach($subscriptions as $subscription_obj) {
                 update_post_meta($subscription_obj->get_id(), '_cko_source_id', $source_id);
             }
