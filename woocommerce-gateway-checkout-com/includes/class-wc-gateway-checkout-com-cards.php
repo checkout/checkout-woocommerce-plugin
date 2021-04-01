@@ -769,6 +769,9 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         $event_type = $data->type;
 
         switch ($event_type){
+            case 'card_verified' :
+                $response = WC_Checkout_Com_Webhook::card_verified($data);
+                break;
             case 'payment_approved':
                 $response = WC_Checkout_Com_Webhook::authorize_payment($data);
                 break;
