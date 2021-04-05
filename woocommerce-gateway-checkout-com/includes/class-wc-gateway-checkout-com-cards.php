@@ -427,6 +427,9 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         $order_id = $result['metadata']['order_id'];
         $action = $result['actions'];
 
+        // Get object as an instance of WC_Subscription
+        $subscription_object = wc_get_order( $order_id );
+
         $order = new WC_Order( $order_id );
 
         // Query order by order number to check if order exist
@@ -501,7 +504,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         }
 
         // save source id for subscription
-        WC_Checkoutcom_Subscription::save_source_id($order_id, $order, $result['source']['id']);
+        WC_Checkoutcom_Subscription::save_source_id($order_id, $subscription_object, $result['source']['id']);
 
         $order_status = $order->get_status();
 
