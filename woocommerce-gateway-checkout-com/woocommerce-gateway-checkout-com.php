@@ -419,3 +419,14 @@ function cko_gateway_icon( $icons, $id ) {
         return false;
     }
 }
+
+/**
+ *  Hooked function to handle subscription renewal payment
+ */
+add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_cards', 'subscriptionPayment', 10, 2);
+function subscriptionPayment($renewal_total, $renewal_order) {
+    include_once('includes/subscription/class-wc-checkout-com-subscription.php');
+
+    WC_Checkoutcom_Subscription::renewal_payment($renewal_total, $renewal_order);
+
+}

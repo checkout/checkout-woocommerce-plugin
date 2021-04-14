@@ -4,6 +4,7 @@ include_once('settings/class-wc-checkoutcom-cards-settings.php');
 include_once('settings/admin/class-wc-checkoutcom-admin.php');
 include_once('api/class-wc-checkoutcom-api-request.php');
 include_once ('class-wc-gateway-checkout-com-webhook.php');
+include_once('subscription/class-wc-checkout-com-subscription.php');
 
 use Checkout\Library\Exceptions\CheckoutHttpException;
 use Checkout\Library\Exceptions\CheckoutModelException;
@@ -27,6 +28,16 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
             'products',
             'refunds',
             'tokenization',
+            'subscriptions',
+            'subscription_cancellation', 
+            'subscription_suspension', 
+            'subscription_reactivation',
+            'subscription_amount_changes',
+            'subscription_date_changes',
+            'subscription_payment_method_change',
+            'subscription_payment_method_change_customer',
+            'subscription_payment_method_change_admin',
+            'multiple_subscriptions',
         );
 
         $this->new_method_label   = __( 'Use a new card', 'wc_checkout_com' );
@@ -356,6 +367,9 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
             $this->save_token(get_current_user_id(), $result);
         }
 
+        // save source id for subscription
+        WC_Checkoutcom_Subscription::save_source_id($order_id, $order, $result['source']['id']);
+
         // Set action id as woo transaction id
         update_post_meta($order_id, '_transaction_id', $result['action_id']);
         update_post_meta($order_id, '_cko_payment_id', $result['id']);
@@ -412,6 +426,9 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 
         $order_id = $result['metadata']['order_id'];
         $action = $result['actions'];
+
+        // Get object as an instance of WC_Subscription
+        $subscription_object = wc_get_order( $order_id );
 
         $order = new WC_Order( $order_id );
 
@@ -485,6 +502,9 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
             $this->save_token($order->get_user_id(), $result);
             unset($_SESSION['wc-wc_checkout_com_cards-new-payment-method']);
         }
+
+        // save source id for subscription
+        WC_Checkoutcom_Subscription::save_source_id($order_id, $subscription_object, $result['source']['id']);
 
         $order_status = $order->get_status();
 
@@ -752,6 +772,9 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         $event_type = $data->type;
 
         switch ($event_type){
+            case 'card_verified' :
+                $response = WC_Checkout_Com_Webhook::card_verified($data);
+                break;
             case 'payment_approved':
                 $response = WC_Checkout_Com_Webhook::authorize_payment($data);
                 break;

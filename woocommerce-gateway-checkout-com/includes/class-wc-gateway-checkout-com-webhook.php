@@ -60,6 +60,40 @@ class WC_Checkout_Com_Webhook
     }
 
     /**
+     * Process webhook for card verification
+     *
+     * @param $data
+     * @return bool
+     */
+    public static function card_verified($data)
+    {
+        $webhook_data = $data->data;
+        $order_id = $webhook_data->metadata->order_id;
+        $action_id = $webhook_data->action_id;
+
+        // return false if no order id
+        if (empty($order_id)) {
+            return false;
+        }
+
+        // Load order form order id
+        $order = self::get_wc_order($order_id);
+        $order_id = $order->get_id();
+
+        $order->add_order_note(__("Checkout.com Card verified webhook received", 'wc_checkout_com'));
+        // Set action id as woo transaction id
+        update_post_meta($order_id, '_transaction_id', $action_id);
+
+        // Get cko capture status configured in admin
+        $status = WC_Admin_Settings::get_option('ckocom_order_captured');
+
+        // update status of the order
+        $order->update_status($status);
+
+        return true;
+    }
+
+    /**
      * Process webhook for captured payment
      *
      * @param $data
