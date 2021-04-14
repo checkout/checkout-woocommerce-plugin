@@ -221,9 +221,8 @@ class WC_Checkoutcom_Api_request
             $payment->merchant_initiated = true;
             $payment->payment_type = "Recurring";
             $payment->previous_payment_id = get_post_meta( $arg['parent_order_id'], '_cko_payment_id', true ) ?? null;
-            if (! $auto_capture) {
-                $payment->capture = true;
-            }
+            $payment->capture = true;
+
         } elseif (wcs_order_contains_subscription( $order, 'parent' )) {
             $payment->merchant_initiated = false;
             $payment->payment_type = "Recurring";
