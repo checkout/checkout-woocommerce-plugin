@@ -163,6 +163,10 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v4.3.0 14 Apr 2021
+. Added support to handle recurring payments via WooCommerce Subscriptions
+. Fixed payment declined webhook
+
 v4.2.2 29 Mar 2021
 . Fixed 3ds redirection when protocol is https
 . Fixed fawry captured webhook
