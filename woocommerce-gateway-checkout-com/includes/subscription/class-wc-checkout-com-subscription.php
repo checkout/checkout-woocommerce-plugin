@@ -80,6 +80,8 @@ class WC_Checkoutcom_Subscription {
         // update source id for subscription payment method change
         if($order instanceof WC_Subscription) {
             update_post_meta($order->get_id(), '_cko_source_id', $source_id);
+        } else {
+            return false;
         }
 
         // check for subscription and save source id
