@@ -163,6 +163,14 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v4.2.2 29 Mar 2021
+. Fixed 3ds redirection when protocol is https
+. Fixed fawry captured webhook
+. Hide default place order button when google pay is selected
+. Refactor Framejs integration
+. Refactor APMs integration
+
+
 v4.2.1 25 Feb 2021
 . Set woo order id in metadata
 . Restrict declined reason in error message in case of risk declined response
@@ -172,10 +180,10 @@ v4.2.1 25 Feb 2021
 . Update post meta with payment_captured when payment response status is captured
 . Add validation to verify payment id when webhook is sent
 . Set order number as reference when capture and refund action happens
-. Fix fawry product mismatch
-. Fix message translation in case of declined errors
 . Fix UI for guest users
 . Change label in Alternative payments setting
+. Fix fawry product mismatch
+. Fix message translation in case of declined errors
 
 
 v4.2.0 25 Nov 2020
