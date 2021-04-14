@@ -75,6 +75,12 @@ class WC_Checkoutcom_Api_request
                     return $response;
                 }
             } else {
+
+                 // Set payment id post meta if the payment id declined
+                 if ($response->status == 'Declined') {
+                    update_post_meta($order->id, '_cko_payment_id', $response->id);
+                }
+
                 $error_message = __("An error has occurred while processing your payment. Please check your card details and try again. ", 'wc_checkout_com');
 
                 // If the merchant enabled gateway response 
@@ -424,6 +430,12 @@ class WC_Checkoutcom_Api_request
             if ($response->isSuccessful()) {
                 return $response;
             } else {
+
+                // Set payment id post meta if the payment id declined
+                if ($response->status == 'Declined') {
+                    update_post_meta($response->metadata['order_id'], '_cko_payment_id', $response->id);
+                }
+
                 $error_message = __("An error has occurred while processing your payment. Please check your card details and try again.", 'wc_checkout_com');
 
                 // check if gateway response is enable from module settings
