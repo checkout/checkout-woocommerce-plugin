@@ -229,9 +229,11 @@ class WC_Checkoutcom_Api_request
             $payment->previous_payment_id = get_post_meta( $arg['parent_order_id'], '_cko_payment_id', true ) ?? null;
             $payment->capture = true;
 
-        } elseif (wcs_order_contains_subscription( $order, 'parent' )) {
-            $payment->merchant_initiated = false;
-            $payment->payment_type = "Recurring";
+        } elseif ( function_exists('wcs_order_contains_subscription')){
+            if(wcs_order_contains_subscription( $order, 'parent' )) {
+                $payment->merchant_initiated = false;
+                $payment->payment_type = "Recurring";
+            }
         }
 
         $three_ds = new ThreeDs($three_d);
