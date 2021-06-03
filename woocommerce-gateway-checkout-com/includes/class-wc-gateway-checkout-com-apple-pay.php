@@ -78,6 +78,9 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway
             echo  $this->get_option( 'description' );
         }
 
+        // get country of current user
+        $current_user_country = wp_get_current_user()->billing_country;
+
         ?>
         <!-- Input needed to sent the card token -->
         <input type="hidden" id="cko-apple-card-token" name="cko-apple-card-token" value="" />
@@ -137,6 +140,13 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway
             });
 
             /**
+             * Add Mada as support networks for SA
+             */
+            function supportedNetworks() {
+                return "<?php echo $current_user_country; ?>" === 'SA' ? ['amex', 'masterCard', 'visa', 'mada'] : ['amex', 'masterCard', 'visa'];
+            }
+
+            /**
              *Get the configuration needed to initialise the ApplePay session
              *
              * @param {function} callback
@@ -144,9 +154,9 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway
             function getApplePayConfig() {
                return {
                    currencyCode: "<?php echo get_woocommerce_currency(); ?>",
-                   countryCode: 'GB',
+                   countryCode: "<?php echo $current_user_country; ?>",
                    merchantCapabilities: ['supports3DS', 'supportsEMV', 'supportsCredit', 'supportsDebit'],
-                   supportedNetworks: ['amex', 'masterCard', 'visa'],
+                   supportedNetworks: supportedNetworks(),
                    total: {
                        label: window.location.host,
                        amount: "<?php echo $woocommerce->cart->total ?>",
