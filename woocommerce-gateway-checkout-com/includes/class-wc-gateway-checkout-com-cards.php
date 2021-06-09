@@ -12,7 +12,7 @@ use Checkout\Library\Exceptions\CheckoutModelException;
 
 class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 {
-    const PLUGIN_VERSION = '4.3.0';
+    const PLUGIN_VERSION = '4.3.1';
 
     /**
      * WC_Gateway_Checkout_Com_Cards constructor.
