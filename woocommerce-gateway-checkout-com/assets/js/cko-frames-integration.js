@@ -19,6 +19,22 @@ jQuery(function () {
     localization: document.getElementById("localization").value,
   });
 
+  let cardholderName =   document.getElementById('billing_first_name')?.value + ' ' + document.getElementById('billing_last_name')?.value
+  Frames.addEventHandler(
+    Frames.Events.CARD_VALIDATION_CHANGED,
+    function (event) {
+      var valid = Frames.isCardValid()
+        if (valid) {
+            if(cardholderName.length > 0) {
+                // Add the card holder name
+                Frames.cardholder = {
+                   name: cardholderName
+                };
+            }
+        }
+    }
+  );
+
   Frames.addEventHandler(Frames.Events.CARD_TOKENIZED, onCardTokenized);
 
   function onCardTokenized(event) {
