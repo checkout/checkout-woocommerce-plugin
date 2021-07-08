@@ -18,11 +18,11 @@ class WC_Checkoutcom_Utility
     /**
      * Format amount in cents
      *
-     * @param $amount
+     * @param $value
      * @param $currencySymbol
      * @return float|int
      */
-    public static function valueToDecimal($amount, $currencySymbol)
+    public static function valueToDecimal($value, $currencySymbol)
     {
         $currency = strtoupper($currencySymbol);
         $threeDecimalCurrencyList = array('BHD', 'LYD', 'JOD', 'IQD', 'KWD', 'OMR', 'TND');
@@ -43,6 +43,9 @@ class WC_Checkoutcom_Utility
             'VUV',
             'VND',
         );
+
+        // check for decimal seperator
+        $amount = str_replace(",",".", $value);
 
         if (in_array($currency, $threeDecimalCurrencyList)) {
             $value = (int) ($amount * 1000);
