@@ -73,18 +73,21 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway
         $checkoutFields = json_encode($woocommerce->checkout->checkout_fields,JSON_HEX_APOS);
         $session_url = str_replace( 'https:', 'https:', add_query_arg( 'wc-api', 'wc_checkoutcom_session', home_url( '/' ) ) );
         $generate_token_url = str_replace( 'https:', 'https:', add_query_arg( 'wc-api', 'wc_checkoutcom_generate_token', home_url( '/' ) ) );
+        $apple_settings = get_option('woocommerce_wc_checkout_com_apple_pay_settings');
+        $mada_enabled = $apple_settings['enable_mada_apple_pay'] == 'yes' ? true : false;
 
         if(!empty($this->get_option( 'description' ))){
             echo  $this->get_option( 'description' );
         }
 
         // get country of current user
-        $current_user_country = wp_get_current_user()->billing_country;
+        $country_code = wp_get_current_user()->billing_country;
         
         $supportedNetworks = ['amex', 'masterCard', 'visa'];
 
-        if ($current_user_country === "SA") {
+        if ($mada_enabled) {
             array_push($supportedNetworks, 'mada');
+            $country_code = 'SA';
         }
 
         ?>
@@ -153,7 +156,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway
             function getApplePayConfig() {
                return {
                    currencyCode: "<?php echo get_woocommerce_currency(); ?>",
-                   countryCode: "<?php echo $current_user_country; ?>",
+                   countryCode: "<?php echo $country_code; ?>",
                    merchantCapabilities: ['supports3DS', 'supportsEMV', 'supportsCredit', 'supportsDebit'],
                    supportedNetworks: "<?php echo $supportedNetworks; ?>",
                    total: {

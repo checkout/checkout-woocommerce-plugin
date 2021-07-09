@@ -454,6 +454,14 @@ class WC_Checkoutcom_Cards_Settings
                 'description' => __('ISO 639-1 value of the language. See suported languages '.'<a href="https://applepaydemo.apple.com/" >here.</a>', 'checkoutcom-cards-settings'),
                 'default'     => '',
             ),
+            'enable_mada' => array(
+                'id' => 'enable_mada_apple_pay',
+                'title'   => __( 'Enable MADA', 'checkoutcom-cards-settings' ),
+                'type'    => 'checkbox',
+                'desc_tip'    => true,
+                'default'     => 'no',
+                'description' => __('Please enable if entity is in Saudi Arabia', 'checkoutcom-cards-settings'),
+            )
         );
 
         return apply_filters( 'wc_checkout_com_apple_pay', $settings );
