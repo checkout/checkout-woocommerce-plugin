@@ -81,7 +81,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway
         }
 
         // get country of current user
-        $country_code = wp_get_current_user()->billing_country;
+        $country_code = WC()->customer->get_billing_country();
         
         $supportedNetworks = ['amex', 'masterCard', 'visa'];
 
@@ -154,17 +154,20 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway
              * @param {function} callback
              */
             function getApplePayConfig() {
-               return {
+
+                var networksSupported = <?php echo json_encode($supportedNetworks); ?>;
+
+                return {
                    currencyCode: "<?php echo get_woocommerce_currency(); ?>",
                    countryCode: "<?php echo $country_code; ?>",
                    merchantCapabilities: ['supports3DS', 'supportsEMV', 'supportsCredit', 'supportsDebit'],
-                   supportedNetworks: "<?php echo $supportedNetworks; ?>",
+                   supportedNetworks: networksSupported,
                    total: {
                        label: window.location.host,
                        amount: "<?php echo $woocommerce->cart->total ?>",
                        type: 'final'
                    }
-               }
+                }    
             }
 
             /**
