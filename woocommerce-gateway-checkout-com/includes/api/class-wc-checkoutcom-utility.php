@@ -44,9 +44,6 @@ class WC_Checkoutcom_Utility
             'VND',
         );
 
-        // check for decimal seperator
-        $amount = str_replace(",",".", $value);
-
         if (in_array($currency, $threeDecimalCurrencyList)) {
             $value = (int) ($amount * 1000);
         } elseif (in_array($currency, $zeroDecimalCurencyList)) {
