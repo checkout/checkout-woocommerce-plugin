@@ -18,11 +18,11 @@ class WC_Checkoutcom_Utility
     /**
      * Format amount in cents
      *
-     * @param $value
+     * @param $amount
      * @param $currencySymbol
      * @return float|int
      */
-    public static function valueToDecimal($value, $currencySymbol)
+    public static function valueToDecimal($amount, $currencySymbol)
     {
         $currency = strtoupper($currencySymbol);
         $threeDecimalCurrencyList = array('BHD', 'LYD', 'JOD', 'IQD', 'KWD', 'OMR', 'TND');
