@@ -57,6 +57,9 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 
         // webhook
         add_action( 'woocommerce_api_wc_checkoutcom_webhook', array( $this, 'webhook_handler' ) );
+
+        // subscription catch up
+        add_action( 'woocommerce_api_wc_checkoutcom_subscription_catchup', array( $this, 'subscription_src_id_handler' ) );
     }
 
     /**
@@ -805,6 +808,58 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         $http_code = $response ? 200 : 400;
 
         return http_response_code($http_code);
+    }
+
+    /**
+     *  Handler to update order with source id
+     */
+    public function subscription_src_id_handler()
+    {
+        // subscription_url_format = http://localhost/wordpress-5.0.2/wordpress/?wc-api=wc_checkoutcom_subscription_catchup
+
+        // Get ordercid and source id data
+        $data = json_decode(file_get_contents('php://input'), true);
+
+        // Return to home page if empty data
+        if (empty($data)) {
+            wp_redirect(get_home_url());
+            exit();
+        }
+
+        // Create apache function if not exist to get header authorization
+        if( !function_exists('apache_request_headers') ) {
+            function apache_request_headers() {
+              $arh = array();
+              $rx_http = '/\AHTTP_/';
+              foreach($_SERVER as $key => $val) {
+                    if( preg_match($rx_http, $key) ) {
+                      $arh_key = preg_replace($rx_http, '', $key);
+                      $rx_matches = array();
+                      $rx_matches = explode('_', $arh_key);
+                      if( count($rx_matches) > 0 and strlen($arh_key) > 2 ) {
+                            foreach($rx_matches as $ak_key => $ak_val) $rx_matches[$ak_key] = ucfirst($ak_val);
+                            $arh_key = implode('-', $rx_matches);
+                      }
+                      $arh[$arh_key] = $val;
+                    }
+              }
+              return( $arh );
+            }
+        }
+
+        $header = apache_request_headers();
+        $header_authorization = $header['Authorization'];
+
+        $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
+
+        // check if cko signature matches
+        if($header_authorization !== $core_settings['ckocom_sk']){
+            return http_response_code(401);
+        }
+
+        $result = WC_Checkoutcom_Subscription::add_src_id($data);
+
+        die($result);
     }
 
     /**

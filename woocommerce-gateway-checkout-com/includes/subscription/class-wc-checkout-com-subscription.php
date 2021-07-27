@@ -91,4 +91,42 @@ class WC_Checkoutcom_Subscription {
             }
         }
     }
+
+    /**
+     *  Save source id for each order containing subscription
+     *  This function is used to perform data catch-up in case src id is not save on orders.
+     *  @param $order_id
+     *  @param string $source_id
+     */
+    public static function add_src_id($data) {
+        
+        // return order id that does not exist
+        $failed_order_id = [];
+        $count = 0;
+
+        foreach($data as $order_id => $source_id) {
+            if (wc_get_order($order_id)) {
+                if ( WC_Subscriptions_Order::order_contains_subscription(wc_get_order($order_id))) {
+                    $subscriptions = wcs_get_subscriptions_for_order( wc_get_order($order_id) );
+                    
+                    foreach($subscriptions as $subscription_obj) {
+                        update_post_meta($subscription_obj->get_id(), '_cko_source_id', $source_id);
+                    }
+                }
+            } else {
+                $failed_order_id[$count] = $order_id;
+                $count ++;
+            }
+        }
+
+        if (sizeof($failed_order_id) > 0) {
+
+            return json_encode([
+                "message" => "The following order ids does not exists",
+                "orders" => $failed_order_id
+            ]);
+        } else {
+            return null;
+        }
+    }
 }
