@@ -82,7 +82,6 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway
 
         // get country of current user
         $country_code = WC()->customer->get_billing_country();
-        
         $supportedNetworks = ['amex', 'masterCard', 'visa'];
 
         if ($mada_enabled) {
@@ -158,6 +157,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway
                 var networksSupported = <?php echo json_encode($supportedNetworks); ?>;
 
                 return {
+                  
                    currencyCode: "<?php echo get_woocommerce_currency(); ?>",
                    countryCode: "<?php echo $country_code; ?>",
                    merchantCapabilities: ['supports3DS', 'supportsEMV', 'supportsCredit', 'supportsDebit'],

@@ -316,6 +316,29 @@ class WC_Checkoutcom_Cards_Settings
      */
     public static function order_settings()
     {
+        wc_enqueue_js( "
+            jQuery( function(){
+                
+                jQuery('#ckocom_order_authorised').on('click', function() {
+
+                    jQuery('#ckocom_order_authorised option').prop('disabled', false);
+                    
+                    const captured_order_status = jQuery('#ckocom_order_captured').val();
+                    jQuery('#ckocom_order_authorised option[value= \"' + captured_order_status + '\"]').prop('disabled', true);
+
+                });
+
+                jQuery('#ckocom_order_captured').on('click', function() {
+
+                    jQuery('#ckocom_order_captured option').prop('disabled', false);
+
+                    const authorized_order_status = jQuery('#ckocom_order_authorised').val();
+                    jQuery('#ckocom_order_captured option[value= \"' + authorized_order_status + '\"]').prop('disabled', true);
+
+                });
+            });
+        ");
+
         $settings = array(
             'order_setting'              => array(
                 'title'       => __( 'Order Management settings', 'checkoutcom-cards-settings' ),

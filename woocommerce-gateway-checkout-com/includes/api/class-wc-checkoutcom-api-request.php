@@ -672,9 +672,10 @@ class WC_Checkoutcom_Api_request
             return array('error' => $error_message);
         }
 
-        $order_amount = $order->get_total();
+        // check for decimal seperator
+        $order_amount = str_replace(",",".", $order->get_total());
         $order_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($order_amount, $order->get_currency());
-        $refund_amount = sanitize_text_field($_POST['refund_amount']);
+        $refund_amount = str_replace(",",".", sanitize_text_field($_POST['refund_amount']));
         $refund_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($refund_amount, $order->get_currency());
 
         // Check if refund amount is less than order amount
