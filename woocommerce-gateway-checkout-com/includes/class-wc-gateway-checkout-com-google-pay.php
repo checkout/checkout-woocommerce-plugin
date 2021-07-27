@@ -250,6 +250,11 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway
                     // disable place order button
                     jQuery('#ckocom_googlePay').show();
                     jQuery('#place_order').prop("disabled",true);
+                } else if(this.value == 'wc_checkout_com_apple_pay') {
+                    jQuery('#ckocom_googlePay').hide();
+                    jQuery(document).ready(function(){
+                        jQuery("#place_order").hide();
+                    });
                 } else {
                     // hide google pay button
                     // enable place order button
