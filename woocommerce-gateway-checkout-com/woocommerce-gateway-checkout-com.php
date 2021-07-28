@@ -8,9 +8,9 @@ Author: Checkout.com
 Author URI: https://www.checkout.com/
 Requires at least: 4.0
 Stable tag: 4.3.2
-Tested up to: 5.5
+Tested up to: 5.8
 
-WC tested up to: 5.1.0
+WC tested up to: 5.4.2
 */
 
 /*
