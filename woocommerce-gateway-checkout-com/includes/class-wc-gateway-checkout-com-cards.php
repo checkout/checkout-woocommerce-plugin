@@ -59,7 +59,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
         add_action( 'woocommerce_api_wc_checkoutcom_webhook', array( $this, 'webhook_handler' ) );
 
         // subscription catch up
-        add_action( 'woocommerce_api_wc_checkoutcom_subscription_catchup', array( $this, 'subscription_src_id_handler' ) );
+        add_action( 'woocommerce_api_wc_checkoutcom_add_source', array( $this, 'add_source_handler' ) );
     }
 
     /**
@@ -813,9 +813,9 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
     /**
      *  Handler to update order with source id
      */
-    public function subscription_src_id_handler()
+    public function add_source_handler()
     {
-        // subscription_url_format = http://localhost/wordpress-5.0.2/wordpress/?wc-api=wc_checkoutcom_subscription_catchup
+        // subscription_url_format = http://localhost/wordpress-5.0.2/wordpress/?wc-api=wc_checkoutcom_add_source
 
         // Get ordercid and source id data
         $data = json_decode(file_get_contents('php://input'), true);
