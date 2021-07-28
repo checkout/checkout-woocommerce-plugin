@@ -131,7 +131,7 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway
             })();
 
             googlePayTransactionController = (function (googlePayUiController) {
-                var environment = '<?php echo $environment ?>' === false ? "PRODUCTION" : "TEST";
+                var environment = '<?php echo $environment ?>' == false ? "PRODUCTION" : "TEST";
                 var publicKey = '<?php echo $core_settings['ckocom_pk'] ?>';
                 var merchantId = '<?php echo $this->get_option( 'ckocom_google_merchant_id' ) ?>';
                 var currencyCode = '<?php echo $currencyCode ?>';
@@ -250,6 +250,11 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway
                     // disable place order button
                     jQuery('#ckocom_googlePay').show();
                     jQuery('#place_order').prop("disabled",true);
+                } else if(this.value == 'wc_checkout_com_apple_pay') {
+                    jQuery('#ckocom_googlePay').hide();
+                    jQuery(document).ready(function(){
+                        jQuery("#place_order").hide();
+                    });
                 } else {
                     // hide google pay button
                     // enable place order button

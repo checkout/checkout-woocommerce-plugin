@@ -4,7 +4,7 @@ Tags: checkout, payments, credit card, Payment gateway, Apple pay, Payment reque
 Requires at least: 4.0
 Stable tag: trunk
 Requires PHP: 5.6
-Tested up to: 5.5
+Tested up to: 5.8
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -163,6 +163,17 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v4.3.2 28 Jul 2021
+. Subscriptions-add payment source id on order
+. Handle refunds with amount having comma seperator
+. Prevent Auth and Capture having same order status on plugin configuration
+. Add validation to handle MADA card for apple pay for Saudi Arabia
+. Hide place order button when apple pay is selected
+. Fix google pay environment
+. handle php notices for php 7.4
+. Include cardholder name in Frames
+. Fix apple pay supported network and country code
+
 v4.3.1 09 Jun 2021
 . Add support for mada on apple pay
 

@@ -3,14 +3,14 @@
 Plugin Name: Checkout.com Payment Gateway
 Plugin URI: https://www.checkout.com/
 Description: Extends WooCommerce by Adding the Checkout.com Gateway.
-Version: 4.3.1
+Version: 4.3.2
 Author: Checkout.com
 Author URI: https://www.checkout.com/
 Requires at least: 4.0
-Stable tag: 4.3.1
-Tested up to: 5.5
+Stable tag: 4.3.2
+Tested up to: 5.8
 
-WC tested up to: 5.1.0
+WC tested up to: 5.4.2
 */
 
 /*
@@ -72,7 +72,7 @@ function get_selected_apms_Class() {
     $selected_apms_class = array();
 
     // check if alternative payment method is enabled
-    if ($apms_settings['enabled'] == 'yes') {
+    if ($apms_settings['enabled'] == true) {
         $apm_selected = $apms_settings['ckocom_apms_selector'];
 
         // get apm selected and add the class name in array
@@ -184,7 +184,7 @@ function callback_for_setting_up_scripts() {
     
     // load cko google pay setting
     $google_settings = get_option('woocommerce_wc_checkout_com_google_pay_settings');
-    $google_pay_enabled = $google_settings['enabled'] == 'yes' ? true : false;
+    $google_pay_enabled = $google_settings['enabled'] == true ? true : false;
 
     // Enqueue google pay script
     if ($google_pay_enabled){
@@ -193,7 +193,7 @@ function callback_for_setting_up_scripts() {
 
     // load cko apm settings
     $apm_settings = get_option('woocommerce_wc_checkout_com_alternative_payments_settings');
-    $apm_enable = $apm_settings['enabled'] == 'yes' ? true : false;
+    $apm_enable = $apm_settings['enabled'] == true ? true : false;
 
     if ($apm_enable) {
         foreach ($apm_settings['ckocom_apms_selector'] as $value) {
