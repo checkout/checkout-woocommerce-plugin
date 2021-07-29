@@ -111,6 +111,7 @@ class WC_Checkoutcom_Subscription {
                     
                     foreach($subscriptions as $subscription_obj) {
                         update_post_meta($subscription_obj->get_id(), '_cko_source_id', $source_id);
+                        $subscription_obj->update_status('active');
                     }
                 }
             } else {
