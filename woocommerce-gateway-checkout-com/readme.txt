@@ -163,6 +163,9 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v4.3.3 29 Jul 2021
+. Fix conflict with subscription class
+
 v4.3.2 28 Jul 2021
 . Subscriptions-add payment source id on order
 . Handle refunds with amount having comma seperator
