@@ -504,7 +504,9 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
         }
 
         // save source id for subscription
-        WC_Checkoutcom_Subscription::save_source_id($order_id, $subscription_object, $result['source']['id']);
+        if (class_exists(WC_Subscriptions_Order)) {
+            WC_Checkoutcom_Subscription::save_source_id($order_id, $subscription_object, $result['source']['id']);
+        }
 
         $order_status = $order->get_status();
 
