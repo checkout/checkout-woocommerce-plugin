@@ -83,7 +83,7 @@ class WC_Checkoutcom_Subscription {
         }
 
         // check for subscription and save source id
-        if (class_exists(WC_Subscriptions_Order)) {
+        if (class_exists("WC_Subscriptions_Order")) {
             if ( WC_Subscriptions_Order::order_contains_subscription( $order_id )) { 
                 $subscriptions = wcs_get_subscriptions_for_order( $order );
             
