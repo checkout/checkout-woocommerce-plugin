@@ -17,10 +17,8 @@
 
 namespace Checkout\Models\Payments;
 
-use Checkout\Library\Model;
-
 /**
- * Payment recipient field model.
+ * Payment method Multibanco.
  *
  * @category SDK
  * @package  Checkout.com
@@ -28,7 +26,7 @@ use Checkout\Library\Model;
  * @license  https://opensource.org/licenses/mit-license.html MIT License
  * @link     https://docs.checkout.com/
  */
-class Recipient extends Model
+class MultibancoSource extends Source
 {
 
     /**
@@ -43,7 +41,7 @@ class Recipient extends Model
      *
      * @var string
      */
-    const MODEL_NAME = 'recipient';
+    const MODEL_NAME = 'multibanco';
 
 
     /**
@@ -51,22 +49,18 @@ class Recipient extends Model
      */
 
     /**
-     * Initialise Payment recipients.
+     * Initialise Multibanco source.
      *
-     * @param string $dob
-     * @param string $account
-     * @param string $zip
-     * @param string $first_name
-     * @param string $last_name
-     * @param string $country
+     * @param string $integrationType   The type of integration. Either direct or redirect.
+     * @param string $country           The billing country.
+     * @param object $payer             The payer.
+     * @param string $description       A description of the order.
      */
-    public function __construct($dob, $account, $zip, $first_name, $last_name, $country)
+    public function __construct($country, $name, $descriptor = '')
     {
-        $this->dob = $dob;
-        $this->account_number = $account;
-        $this->zip = $zip;
-        $this->first_name = $first_name;
-        $this->last_name = $last_name;
-        $this->country = $country;
+        $this->type = static::MODEL_NAME;
+        $this->payment_country = $country;
+        $this->account_holder_name = $name;
+        $this->billing_descriptor = $descriptor;
     }
 }
