@@ -163,6 +163,11 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v4.3.5 15 Dec 2021
+. Update cko php sdk to cater for Klarna
+. Remove warning concerning php class_exists function used for subscription
+. Update Ideal logo
+
 v4.3.4 11 Aug 2021
 . Fix conflict with the woo subscription plugin
 
