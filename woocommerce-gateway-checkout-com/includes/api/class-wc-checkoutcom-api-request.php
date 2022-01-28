@@ -320,6 +320,9 @@ class WC_Checkoutcom_Api_request
         // Set metadata info in payment request
         $payment->metadata = $metadata;
 
+        // Set customer ip address in payment request
+        $payment->payment_ip = $order->get_customer_ip_address();
+
         return $payment;
     }
 
