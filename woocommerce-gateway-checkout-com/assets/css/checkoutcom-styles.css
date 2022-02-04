@@ -336,6 +336,10 @@
     content:url('../images/checkoutcom/alipay.svg')
 }
 
+.cko-multibanco {
+    content:url('../images/checkoutcom/multibanco.svg')
+}
+
 .checkout-saved-card-or-apm {
     display: flex;
     flex-direction: row;
