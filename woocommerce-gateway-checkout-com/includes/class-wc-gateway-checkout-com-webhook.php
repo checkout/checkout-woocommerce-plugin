@@ -373,7 +373,7 @@ class WC_Checkout_Com_Webhook
 
     /**
      * Desc : This function is used to change the status of an order which are created following
-     * Status changed from "pending payment to Cancelled"
+     * Status changed from "pending payment to Failed"
      */
     public static function decline_payment($data)
     {
@@ -392,7 +392,7 @@ class WC_Checkout_Com_Webhook
         $order = self::get_wc_order($order_id);
         $order_id = $order->get_id();
 
-        $status = "wc-cancelled";
+        $status = "wc-failed";
         $message = "Webhook received from checkout.com. Payment declined Reason : ".$response_summary;
 
         try{
