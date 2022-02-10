@@ -5,11 +5,15 @@
  */
 class WC_Checkoutcom_Utility
 {
-     /**
-     * 
-     * *verify cko signature for webhooks
-     * @param event
-     * @param secretKey
+
+    /**
+     * Verify cko signature for webhooks
+     *
+     * @param $event
+     * @param $key
+     * @param $cko_signature
+     *
+     * @return bool
      */
     public static function verifySignature($event, $key, $cko_signature) {
         return hash_hmac('sha256', $event, $key) === $cko_signature ? true : false;
@@ -313,6 +317,10 @@ class WC_Checkoutcom_Utility
 
                 if ($value == 'bancontact' && $currencyCode == 'EUR' && $countryCode == 'BE') {
                     array_push($apmArray, $value);
+                }
+
+                if ( 'multibanco' === $value && 'EUR' === $currencyCode && 'PT' === $countryCode ) {
+                    array_push( $apmArray, $value );
                 }
 
                 if ($value == 'knet' && $currencyCode == 'KWD' && $countryCode == 'KW') {

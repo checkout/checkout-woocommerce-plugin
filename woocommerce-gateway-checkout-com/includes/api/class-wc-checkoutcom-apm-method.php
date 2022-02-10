@@ -18,6 +18,7 @@ use Checkout\Models\Payments\KnetSource;
 use Checkout\Models\Payments\FawrySource;
 use Checkout\Models\Payments\SofortSource;
 use Checkout\Models\Payments\QpaySource;
+use Checkout\Models\Payments\MultibancoSource;
 use Checkout\Models\Sources\SepaAddress;
 use Checkout\Models\Sources\SepaData;
 use Checkout\Models\Sources\Sepa;
@@ -181,6 +182,19 @@ class WC_Gateway_Checkout_Com_APM_Method {
 
         $fawryInfo = self::get_fawry_info();
         $method = new FawrySource($fawryInfo['email'], $fawryInfo['phone'], self::$orderInfo->get_order_number(), $fawryInfo['products']);
+
+        return $method;
+    }
+
+    /**
+     *  @return MultibancoSource
+     */
+    public function multibanco() {
+
+        $accountHolder = self::$post['billing_first_name'] . ' ' . self::$post['billing_last_name'];
+        $countryCode   = self::$post['billing_country'];
+
+        $method = new MultibancoSource( $countryCode, $accountHolder );
 
         return $method;
     }

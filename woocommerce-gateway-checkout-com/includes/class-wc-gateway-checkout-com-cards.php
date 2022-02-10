@@ -492,6 +492,11 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
             $message = __("Checkout.com Payment Flagged " ."</br>". " Action ID : {$action['0']['id']} ", 'wc_checkout_com');
         }
 
+        if ( 'Canceled' === $result['status'] ) {
+            $status  = WC_Admin_Settings::get_option( 'ckocom_order_void' );
+            $message = __( "Checkout.com Payment Canceled" . "</br>" . " Action ID : {$action['0']['id']} ", 'wc_checkout_com' );
+        }
+
         if ($result['status'] == 'Captured') {
             update_post_meta($order_id, 'cko_payment_captured', true);
             $status = WC_Admin_Settings::get_option('ckocom_order_captured');
@@ -818,11 +823,11 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
      */
     public function get_localisation()
     {
-        $woo_locale = str_replace("_", "-", get_locale());
-        $locale = substr($woo_locale, 0, 2);
+        $woo_locale   = str_replace( "_", "-", get_locale() );
+        $locale       = substr( $woo_locale, 0, 2 );
         $localization = "";
 
-        switch ($locale) {
+        switch ( $locale ) {
             case 'en':
                 $localization = "EN-GB";
                 break; 
@@ -838,9 +843,6 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
             case 'de':
                 $localization = "DE-DE";
                 break;
-            case 'it':
-                $localization = "IT-IT";
-                break;
             case 'kr':
                 $localization = "KR-KR";
                 break;
@@ -848,7 +850,7 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
                 $localization = "ES-ES";
                 break;
             default:
-            $localization = WC_Admin_Settings::get_option('ckocom_language_fallback');
+                $localization = WC_Admin_Settings::get_option('ckocom_language_fallback');
         }
         
         return $localization;
