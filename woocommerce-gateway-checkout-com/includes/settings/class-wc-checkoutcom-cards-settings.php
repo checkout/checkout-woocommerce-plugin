@@ -48,13 +48,13 @@ class WC_Checkoutcom_Cards_Settings
             'ckocom_sk' => array(
                 'title' => __('Secret Key', 'checkoutcom-cards-settings'),
                 'type' => 'text',
-                'description' => __('You can '.'<a href="https://docs.checkout.com/docs/update-your-hub-settings#section-manage-the-api-keys">find your secret key </a>'. 'in the Checkout.com Hub', 'checkoutcom-cards-settings'),
+                'description' => __('You can '.'<a href="https://www.checkout.com/docs/the-hub/update-your-hub-settings#Manage_the_API_keys">find your secret key </a>'. 'in the Checkout.com Hub', 'checkoutcom-cards-settings'),
                 'placeholder' => 'sk_xxx'
             ),
             'ckocom_pk' => array(
                 'title' => __('Public Key', 'checkoutcom-cards-settings'),
                 'type' => 'text',
-                'description' => __('You can '.'<a href="https://docs.checkout.com/docs/update-your-hub-settings#section-manage-the-api-keys">find your public key </a>'. 'in the Checkout.com Hub', 'checkoutcom-cards-settings'),
+                'description' => __('You can '.'<a href="https://www.checkout.com/docs/the-hub/update-your-hub-settings#Manage_the_API_keys">find your public key </a>'. 'in the Checkout.com Hub', 'checkoutcom-cards-settings'),
                 'placeholder' => 'pk_xxx'
             )
         );
