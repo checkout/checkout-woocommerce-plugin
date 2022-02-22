@@ -83,14 +83,14 @@ class WC_Checkoutcom_Api_request
 
                 $error_message = __("An error has occurred while processing your payment. Please check your card details and try again. ", 'wc_checkout_com');
 
-                // If the merchant enabled gateway response 
+                // If the merchant enabled gateway response
                 if ($gateway_debug) {
                     // Only show the decline reason in case the response code is not from a risk rule
                     if (! preg_match("/^(?:40)\d+$/", $response->response_code)) {
                         $error_message .= __('Status : ' . $response->status . ', Response summary : ' . $response->response_summary , 'wc_checkout_com');
                     }
                 }
-                
+
                 // Log message
                 WC_Checkoutcom_Utility::logger($error_message , $response);
 
@@ -164,18 +164,22 @@ class WC_Checkoutcom_Api_request
         } elseif ($postData['payment_method'] == 'wc_checkout_com_google_pay') {
             $payment_option = 'Google Pay';
 
-            $method = new TokenSource($arg);
+            $method        = new TokenSource( $arg );
+            $method->token = trim( $method->token );
+
         } elseif ($postData['payment_method'] == 'wc_checkout_com_apple_pay') {
             $payment_option = 'Apple Pay';
 
-            $method = new TokenSource($arg);
+            $method        = new TokenSource( $arg );
+            $method->token = trim( $method->token );
+
         } elseif (in_array ($arg, $apms_selected)) {
             $method = WC_Checkoutcom_Api_request::get_apm_method($postData, $order, $arg);
-            
+
             $payment_option = $method->type;
         } elseif ( ! is_null($subscription) ) {
 
-            $method = new IdSource($arg['source_id']); 
+            $method = new IdSource($arg['source_id']);
         }
 
         if ($method->type != 'klarna') {
@@ -223,7 +227,7 @@ class WC_Checkoutcom_Api_request
         );
 
         // Check for the subscription flag
-        if (! is_null($subscription) ) { 
+        if (! is_null($subscription) ) {
             $payment->merchant_initiated = true;
             $payment->payment_type = "Recurring";
             $payment->previous_payment_id = get_post_meta( $arg['parent_order_id'], '_cko_payment_id', true ) ?? null;
@@ -271,7 +275,7 @@ class WC_Checkoutcom_Api_request
         $payment->failure_url = $redirection_url;
 
         $udf5 = "Platform Data - Wordpress " . $wp_version . "/ Woocommerce " . $woocommerce->version
-        . ", Integration Data - Checkout.com " . WC_Gateway_Checkout_Com_Cards::PLUGIN_VERSION . ", SDK Data - PHP SDK ". CheckoutApi::VERSION . 
+        . ", Integration Data - Checkout.com " . WC_Gateway_Checkout_Com_Cards::PLUGIN_VERSION . ", SDK Data - PHP SDK ". CheckoutApi::VERSION .
         ", Order ID - " . $order->get_order_number() . ", Server - " . get_site_url();
 
         $metadata = array(
@@ -855,7 +859,7 @@ class WC_Checkoutcom_Api_request
         $request_param = WC_Checkoutcom_Api_request::get_request_param($order, $payment_method);
 
         WC_Checkoutcom_Utility::logger('Apm request payload,' , $request_param);
-        
+
         $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
         $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
         $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes' ? true : false;
@@ -935,7 +939,7 @@ class WC_Checkoutcom_Api_request
 
         $obj = new WC_Gateway_Checkout_Com_APM_Method($data, $order);
         $method = $obj->$payment_method();
-      
+
         return $method;
     }
 
@@ -1130,24 +1134,24 @@ class WC_Checkoutcom_Api_request
                 if(WC()->cart->get_shipping_tax() > 0){
                     $shipping_amount = WC()->cart->get_shipping_total() + WC()->cart->get_shipping_tax();
                     $shipping_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($shipping_amount, get_woocommerce_currency());
-    
+
                     $total_tax_amount = WC()->cart->get_shipping_tax();
                     $total_tax_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($total_tax_amount, get_woocommerce_currency());
-    
+
                     $shipping_rates = WC_Tax::get_shipping_tax_rates();
                     $vat            = array_shift( $shipping_rates );
-    
+
                     if ( isset( $vat['rate'] ) ) {
                         $shipping_tax_rate = round( $vat['rate'] * 100 );
                     } else {
                         $shipping_tax_rate = 0;
                     }
-    
+
                 } else {
                     $shipping_tax_rate = 0;
                     $total_tax_amount_cents = 0;
                 }
-    
+
                 $products[] = array(
                     "name" => $chosen_shipping,
                     "quantity" => 1,
@@ -1216,7 +1220,7 @@ class WC_Checkoutcom_Api_request
             return $token->token;
 
         } catch (CheckoutHttpException $ex) {
-            
+
             die('here');
         }
     }
@@ -1231,14 +1235,14 @@ class WC_Checkoutcom_Api_request
     public static function format_fawry_product($products, $amount)
     {
         $arr = [];
-        
+
         foreach($products as $product) {
             $arr['product_id'] = 'All_Products';
             $arr['quantity'] = 1;
             $arr['price'] = $amount;
             $arr['description'] .= $product['description'] . ',';
         }
-        
+
         return $arr;
     }
 }
