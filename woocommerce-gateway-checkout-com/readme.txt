@@ -4,7 +4,7 @@ Tags: checkout, payments, credit card, Payment gateway, Apple pay, Payment reque
 Requires at least: 4.0
 Stable tag: trunk
 Requires PHP: 5.6
-Tested up to: 5.8
+Tested up to: 5.9.1
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -24,7 +24,7 @@ This plugin is an integration of Checkout.com and offers 6 payment modes. This p
 The payment form is embedded and shoppers complete payments without leaving your website. The Frames.js payment form is cross-browser and cross-device compatible, and can accept online payments from all major credit cards.
 
 = Alternative Payments =
-Users can place orders with the following alternative and local payment options used around the world: Alipay, Bancontact, Boleto, EPS, Fawry, Giropay, Ideal, Klarna, KNet, Poli, Sepa, Sofort.
+Users can place orders with the following alternative and local payment options used around the world: Alipay, Bancontact, Boleto, EPS, Fawry, Giropay, Ideal, Klarna, KNet, Poli, Sepa, Sofort, Multibanco.
 
 = Google Pay Payments =
 Users can place orders with a Google Pay wallet.
@@ -163,6 +163,13 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v4.3.6 1st Mar 2022
+- **[feat]** Multibanco payment method added
+- **[tweak]** Ability to pass customer IP address in payment requests
+- **[fix]** WooCommerce Recurring Failed to Authorize and Terminate subscription
+- **[fix]** DOC link '404 error' in core settings has been fixed
+- **[update]** Trimmed token before sending to checkout.com
+
 v4.3.5 15 Dec 2021
 . Update cko php sdk to cater for Klarna
 . Remove warning concerning php class_exists function used for subscription
