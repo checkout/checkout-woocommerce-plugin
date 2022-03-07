@@ -163,6 +163,9 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v4.3.7 7th Mar 2022
+- **[fix]** Fix PHP warning of missing file.
+
 v4.3.6 1st Mar 2022
 - **[feat]** Multibanco payment method added
 - **[tweak]** Ability to pass customer IP address in payment requests
