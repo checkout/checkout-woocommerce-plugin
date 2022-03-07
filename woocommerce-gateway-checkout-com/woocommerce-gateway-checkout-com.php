@@ -3,11 +3,11 @@
 Plugin Name: Checkout.com Payment Gateway
 Plugin URI: https://www.checkout.com/
 Description: Extends WooCommerce by Adding the Checkout.com Gateway.
-Version: 4.3.6
+Version: 4.3.7
 Author: Checkout.com
 Author URI: https://www.checkout.com/
 Requires at least: 4.0
-Stable tag: 4.3.6
+Stable tag: 4.3.7
 Tested up to: 5.9.1
 
 WC tested up to: 5.4.2
