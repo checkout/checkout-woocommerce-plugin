@@ -31,7 +31,7 @@ class WC_Checkout_Com_Webhook
         if ($already_captured) {
             return true;
         }
-        
+
         $already_authorized = get_post_meta($order_id, 'cko_payment_authorized', true);
         $auth_status = WC_Admin_Settings::get_option('ckocom_order_authorised');
         $message = 'Webhook received from checkout.com. Payment Authorized';
@@ -49,12 +49,12 @@ class WC_Checkout_Com_Webhook
         update_post_meta($order_id, '_transaction_id', $action_id);
         update_post_meta($order_id, '_cko_payment_id', $webhook_data->id);
         update_post_meta($order_id, 'cko_payment_authorized', true);
-        
+
         $order_message = __("Checkout.com Payment Authorised " ."</br>". " Action ID : {$action_id} ", 'wc_checkout_com');
-        
+
         $order->add_order_note(__($message, 'wc_checkout_com'));
         $order->update_status($auth_status);
-        
+
 
         return true;
     }
@@ -116,16 +116,16 @@ class WC_Checkout_Com_Webhook
 
         // check if payment is already captured
         $already_captured = get_post_meta($order_id, 'cko_payment_captured', true );
-        $message = 'Webhook received from checkout.com. Payment captured';
+        $message = '.Webhook received from checkout.com Payment captured';
 
         $already_authorized = get_post_meta($order_id, 'cko_payment_authorized', true);
 
         /**
         * We return false here as payment approved webhook is not yet delivered
-        * Gateway will retry sending the captured webhook 
+        * Gateway will retry sending the captured webhook
         */
         if(!$already_authorized) {
-            WC_Checkoutcom_Utility::logger('Payment approved webhook not received yet', null);
+            WC_Checkoutcom_Utility::logger('Payment approved webhook not received yet : ' . $order_id, null);
             return false;
         }
 
@@ -183,7 +183,7 @@ class WC_Checkout_Com_Webhook
         // $order = wc_get_order( $order_id );
         $order = self::get_wc_order($order_id);
         $order_id = $order->get_id();
-        
+
         $message = 'Webhook received from checkout.com. Payment capture declined. Reason : '.$webhook_data->response_summary;
 
         // Add note to order if capture declined
@@ -384,7 +384,7 @@ class WC_Checkout_Com_Webhook
 
         if (empty($order_id)) {
             WC_Checkoutcom_Utility::logger('No order id for payment '.$paymentID , null);
-           
+
             return false;
         }
 
@@ -396,7 +396,7 @@ class WC_Checkout_Com_Webhook
         $message = "Webhook received from checkout.com. Payment declined Reason : ".$response_summary;
 
         try{
-           
+
             // add notes for the order and update status
             $order->add_order_note($message);
             $order->update_status($status);
@@ -420,13 +420,13 @@ class WC_Checkout_Com_Webhook
     }
 
     /**
-     * Load order from order id or 
+     * Load order from order id or
      * Query order by order number
      */
     private static function get_wc_order($order_id)
     {
         $order = wc_get_order( $order_id );
-        
+
         // Query order by order number to check if order exist
         if (!$order) {
             $orders = wc_get_orders( array(

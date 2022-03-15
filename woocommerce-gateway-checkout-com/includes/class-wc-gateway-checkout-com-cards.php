@@ -29,8 +29,8 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
             'refunds',
             'tokenization',
             'subscriptions',
-            'subscription_cancellation', 
-            'subscription_suspension', 
+            'subscription_cancellation',
+            'subscription_suspension',
             'subscription_reactivation',
             'subscription_amount_changes',
             'subscription_date_changes',
@@ -518,7 +518,7 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
         $order_status = $order->get_status();
 
         $order->add_order_note($message);
-        
+
         if($order_status == 'pending') {
             update_post_meta($order_id, 'cko_payment_authorized', true);
             $order->update_status($status);
@@ -760,7 +760,7 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
         $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
         $raw_event = file_get_contents('php://input');
         $signature =  WC_Checkoutcom_Utility::verifySignature($raw_event, $core_settings['ckocom_sk'], $header_signature);
-        
+
         // check if cko signature matches
         if($signature === false){
             return http_response_code(401);
@@ -772,10 +772,10 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
         if($payment_id !== $data->data->id){
             $message = __('order payment Id ('. $payment_id .') does not match that of the webhook ('. $data->data->id .')', 'wc_checkout_com');
             WC_Checkoutcom_Utility::logger($message , null);
-            
+
             return http_response_code(422);
         }
-      
+
 
         // Get webhook event type from data
         $event_type = $data->type;
@@ -818,7 +818,7 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
 
     /**
      * get_localisation
-     * 
+     *
      * @return void
      */
     public function get_localisation()
@@ -830,7 +830,7 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
         switch ( $locale ) {
             case 'en':
                 $localization = "EN-GB";
-                break; 
+                break;
             case 'it':
                 $localization = "IT-IT";
                 break;
@@ -852,7 +852,7 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
             default:
                 $localization = WC_Admin_Settings::get_option('ckocom_language_fallback');
         }
-        
+
         return $localization;
     }
 
