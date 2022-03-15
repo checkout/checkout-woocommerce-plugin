@@ -245,9 +245,9 @@ class WC_Gateway_Checkout_Com_APM_Method {
         }
 
         if ($totalProductAmount !== $orderAmount) {
-            
+
             WC_Checkoutcom_Utility::logger("Total product amount {$totalProductAmount} does not match order amount {$orderAmount}", null);
-            
+
             $product[] = WC_Checkoutcom_Api_request::format_fawry_product($products, $orderAmount);
 
             $products = $product;
@@ -257,13 +257,27 @@ class WC_Gateway_Checkout_Com_APM_Method {
 
         return $fawryInfo;
     }
-    
+
     /**
      * Gather info for sepa payment and create source ID
-     * 
+     *
      * @return IdSource
      */
     public static function get_sepa_info() {
+
+        global $woocommerce;
+        
+        $items           = $woocommerce->cart->get_cart();
+        $is_subscription = false;
+
+        foreach ( $items as $item => $values ) {
+            $_product        = wc_get_product( $values['data']->get_id() );
+            $is_subscription = WC_Subscriptions_Product::is_subscription( $_product );
+
+            if ( $is_subscription ) {
+                break;
+            }
+        }
 
         $customerAddress = self::$post['billing_address_1'] . ' ' . self::$post['billing_address_2'];
         $address = new SepaAddress(
@@ -279,7 +293,7 @@ class WC_Gateway_Checkout_Com_APM_Method {
             self::$post['sepa-iban'],
             self::$post['sepa-bic'],
             "Thanks for shopping.",
-            'single'
+            $is_subscription ? 'recurring' : 'single'
         );
 
         $sepa = new Sepa($address, $data);
@@ -295,6 +309,10 @@ class WC_Gateway_Checkout_Com_APM_Method {
         $details = $checkout->sources()->add($sepa);
         $responseData = $details->response_data;
         WC()->session->set('mandate_reference', $responseData['mandate_reference']);
+
+	    if ( isset( $details->_links['sepa:mandate-cancel']['href'] ) ) {
+		    WC()->session->set( 'mandate_cancel', $details->_links['sepa:mandate-cancel']['href'] );
+	    }
 
         return $details;
     }
@@ -318,9 +336,9 @@ class WC_Gateway_Checkout_Com_APM_Method {
         $billingAddressParam->region = self::$post['billing_city'];
         $billingAddressParam->phone = self::$post['billing_phone'];
         $billingAddressParam->country = self::$post['billing_country'];
- 
+
         $klarnaInfo['billingAddress'] = $billingAddressParam;
-    
+
         return $klarnaInfo;
     }
 }

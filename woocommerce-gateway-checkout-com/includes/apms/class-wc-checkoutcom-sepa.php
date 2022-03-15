@@ -11,7 +11,15 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Sepa extends WC_Gateway_Check
         $this->method_description = __("The Checkout.com extension allows shop owners to process online payments through the <a href=\"https://www.checkout.com\">Checkout.com Payment Gateway.</a>", 'wc_checkout_com');
         $this->title = __("SEPA Direct Debit", 'wc_checkout_com');
         $this->has_fields = true;
-        $this->supports = array('products', 'refunds');
+        $this->supports = array(
+            'products',
+            'refunds',
+            'subscriptions',
+            'subscription_cancellation',
+            'subscription_suspension',
+            'subscription_reactivation',
+            'subscription_date_changes'
+        );
 
         $this->init_form_fields();
 
@@ -19,7 +27,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Sepa extends WC_Gateway_Check
     }
 
     public function payment_fields()
-    {   
+    {
         // get available apms depending on currency
         $apm_available = WC_Checkoutcom_Utility::get_alternative_payment_methods();
 
@@ -79,11 +87,23 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Sepa extends WC_Gateway_Check
             $mandate = WC()->session->get( 'mandate_reference');
 
             update_post_meta($order_id, 'cko_sepa_mandate_reference', $mandate);
+            update_post_meta( $order_id, 'cko_payment_authorized', true );
 
             $message = __("Checkout.com - Sepa payment " ."</br>". " Action ID : {$result['id']} - Sepa mandate reference : {$mandate} ", 'wc_checkout_com');
 
             WC()->session->__unset( 'mandate_reference' );
 
+        }
+
+        // save source id for subscription.
+        if ( class_exists( 'WC_Subscriptions_Order' ) ) {
+            WC_Checkoutcom_Subscription::save_source_id( $order_id, $order, $result['source']['id'] );
+
+            $mandate_cancel = WC()->session->get( 'mandate_cancel');
+            if ( ! empty( $mandate_cancel ) ) {
+                WC_Checkoutcom_Subscription::save_mandate_cancel( $order_id, $order, $mandate_cancel );
+                WC()->session->__unset( 'mandate_cancel' );
+            }
         }
 
         update_post_meta($order_id, '_transaction_id', $result['id']);
@@ -105,6 +125,53 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Sepa extends WC_Gateway_Check
             'redirect' => $this->get_return_url( $order )
         );
 
+    }
+
+    /**
+     * Process refund for the order.
+     *
+     * @param int    $order_id Order ID.
+     * @param int    $amount   Amount to refund.
+     * @param string $reason   Refund reason.
+     *
+     * @return bool
+     */
+    public function process_refund( $order_id, $amount = null, $reason = '' ) {
+
+        $order  = wc_get_order( $order_id );
+        $result = (array) WC_Checkoutcom_Api_request::refund_payment( $order_id, $order );
+
+        // check if result has error and return error message.
+        if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {
+            WC_Checkoutcom_Utility::wc_add_notice_self( __( $result['error'] ), 'error' );
+
+            return false;
+        }
+
+        // Set action id as woo transaction id.
+        update_post_meta( $order_id, '_transaction_id', $result['action_id'] );
+        update_post_meta( $order_id, 'cko_payment_refunded', true );
+
+        // Get cko auth status configured in admin.
+        $status  = WC_Admin_Settings::get_option( 'ckocom_order_refunded' );
+        $message = __( "Checkout.com Payment refunded from Admin " . "</br>" . " Action ID : {$result['action_id']} ", 'wc_checkout_com' );
+
+        if ( isset( $_SESSION['cko-refund-is-less'] ) ) {
+            if ( $_SESSION['cko-refund-is-less'] ) {
+                $status = WC_Admin_Settings::get_option( 'ckocom_order_captured' );
+                $order->add_order_note( __( "Checkout.com Payment Partially refunded from Admin " . "</br>" . " Action ID : {$result['action_id']}", 'wc_checkout_com' ) );
+
+                unset( $_SESSION['cko-refund-is-less'] );
+
+                return true;
+            }
+        }
+
+        // add note for order
+        $order->add_order_note( $message );
+
+        // when true is returned, status is changed to refunded automatically.
+        return true;
     }
 
 }

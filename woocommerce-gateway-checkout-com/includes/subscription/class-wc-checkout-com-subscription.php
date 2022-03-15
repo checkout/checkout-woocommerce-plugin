@@ -43,6 +43,10 @@ class WC_Checkoutcom_Subscription {
         update_post_meta($order_id, '_transaction_id', $payment_result['action_id']);
         update_post_meta($order_id, '_cko_payment_id', $payment_result['id']);
 
+        if ( 'wc_checkout_com_alternative_payments_sepa' === get_post_meta( $order_id, '_payment_method', true ) ) {
+            update_post_meta( $order_id, 'cko_payment_authorized', true );
+        }
+
         // Get cko auth status configured in admin
         $status = WC_Admin_Settings::get_option('ckocom_order_authorised');
         $message = __("Checkout.com Payment Authorised " ."</br>". " Action ID : {$payment_result['action_id']} ", 'wc_checkout_com');
@@ -68,7 +72,7 @@ class WC_Checkoutcom_Subscription {
         wc_reduce_stock_levels( $order_id );
 
     }
-  
+
     /**
      *  Save source id for each order containing subscription
      *  @param $order_id
@@ -76,7 +80,6 @@ class WC_Checkoutcom_Subscription {
      *  @param string $source_id
      */
     public static function save_source_id($order_id, $order, $source_id) {
-        
         // update source id for subscription payment method change
         if($order instanceof WC_Subscription) {
             update_post_meta($order->get_id(), '_cko_source_id', $source_id);
@@ -84,9 +87,9 @@ class WC_Checkoutcom_Subscription {
 
         // check for subscription and save source id
         if (class_exists("WC_Subscriptions_Order")) {
-            if ( WC_Subscriptions_Order::order_contains_subscription( $order_id )) { 
+            if ( WC_Subscriptions_Order::order_contains_subscription( $order_id )) {
                 $subscriptions = wcs_get_subscriptions_for_order( $order );
-            
+
                 foreach($subscriptions as $subscription_obj) {
                     update_post_meta($subscription_obj->get_id(), '_cko_source_id', $source_id);
                 }
@@ -94,5 +97,59 @@ class WC_Checkoutcom_Subscription {
         }
 
         return false;
+    }
+
+    /**
+     * Save source id for each order containing subscription
+     *
+     * @param $subscription WC_Subscription
+     *
+     * @return void
+     */
+    public static function subscription_cancelled( $subscription ) {
+
+        if ( $subscription->get_payment_method() == 'wc_checkout_com_alternative_payments_sepa' ) {
+
+            $mandate_cancel = get_post_meta( $subscription->get_id(), '_cko_mandate_cancel', true );
+
+            if ( $mandate_cancel ) {
+                $is_mandate_cancel = WC_Checkoutcom_Api_request::mandate_cancel_request( $mandate_cancel, $subscription->get_id() );
+
+                if ( $is_mandate_cancel ) {
+                    $subscription->add_order_note( 'Checkout.com mandate cancelled.', false );
+                } else {
+                    $subscription->add_order_note( 'Checkout.com mandate already cancel or failed.', false );
+                }
+            }
+
+        }
+
+    }
+
+    /**
+     * Save mandate cancel URL to order meta.
+     *
+     * @param $order_id
+     * @param $order
+     * @param $url
+     *
+     * @return void
+     */
+    public static function save_mandate_cancel( $order_id, $order, $url ) {
+
+        if ( $order instanceof WC_Subscription ) {
+            update_post_meta( $order->get_id(), '_cko_mandate_cancel', $url );
+        }
+
+        // check for subscription and save source id
+        if ( class_exists( 'WC_Subscriptions_Order' ) ) {
+            if ( WC_Subscriptions_Order::order_contains_subscription( $order_id ) ) {
+                $subscriptions = wcs_get_subscriptions_for_order( $order );
+
+                foreach ( $subscriptions as $subscription_obj ) {
+                    update_post_meta( $subscription_obj->get_id(), '_cko_mandate_cancel', $url );
+                }
+            }
+        }
     }
 }

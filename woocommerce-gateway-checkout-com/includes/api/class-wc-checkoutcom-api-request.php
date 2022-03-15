@@ -47,6 +47,8 @@ class WC_Checkoutcom_Api_request
 
         $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
 
+        $is_sepa_renewal = ( 'wc_checkout_com_alternative_payments_sepa' === $order->get_payment_method() ) && ( ! is_null( $subscription ) );
+
         // Initialize the Checkout Api
         $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
 
@@ -58,6 +60,10 @@ class WC_Checkoutcom_Api_request
             if ($response->isSuccessful()) {
                 // Check if payment is 3Dsecure
                 if ($response->isPending()) {
+					// Check if SEPA renewal order.
+					if ( $is_sepa_renewal ) {
+						return $response;
+					}
                     // Check if redirection link exist
                     if ($response->getRedirection()) {
                         // return 3d redirection url
@@ -1245,4 +1251,43 @@ class WC_Checkoutcom_Api_request
 
         return $arr;
     }
+
+/**
+	 * @param $url
+	 * @param $subscription_id
+	 *
+	 * @return bool
+	 */
+	public static function mandate_cancel_request( $url, $subscription_id ) {
+
+		if ( empty( $url ) || empty( $subscription_id ) ) {
+			return false;
+		}
+
+		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+
+		$wp_request_headers = array(
+			'Authorization' => $core_settings['ckocom_sk']
+		);
+
+		$wp_response = wp_remote_post(
+			$url,
+			[
+				'headers' => $wp_request_headers
+			]
+		);
+
+		if ( 200 !== wp_remote_retrieve_response_code( $wp_response ) ) {
+			WC_Checkoutcom_Utility::logger(
+				sprintf(
+					'An error has occurred while mandate cancel Order # %d request. Response code: %d',
+					$subscription_id,
+					wp_remote_retrieve_response_code( $wp_response )
+				),
+				null
+			);
+		}
+
+		return 'OK' === wp_remote_retrieve_response_message( $wp_response ) && 200 === wp_remote_retrieve_response_code( $wp_response );
+	}
 }

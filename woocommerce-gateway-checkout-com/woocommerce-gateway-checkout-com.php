@@ -64,7 +64,7 @@ function init_checkout_com_gateway_class()
 
 /**
  *  return the class name of the apm selected
- * @return array 
+ * @return array
  */
 function get_selected_apms_Class() {
 
@@ -80,7 +80,7 @@ function get_selected_apms_Class() {
             $selected_apms_class[] = 'WC_Gateway_Checkout_Com_Alternative_Payments'.'_'.$value;
         }
     }
-    
+
     return $selected_apms_class;
 }
 
@@ -142,10 +142,10 @@ add_action('woocommerce_checkout_process', 'cko_check_if_empty');
 function cko_check_if_empty()
 {
     if($_POST['payment_method'] == 'wc_checkout_com_cards'){
-        
+
          // check if require cvv is enable in module setting
-        if(WC_Admin_Settings::get_option('ckocom_card_saved') 
-                && WC_Admin_Settings::get_option('ckocom_card_require_cvv') 
+        if(WC_Admin_Settings::get_option('ckocom_card_saved')
+                && WC_Admin_Settings::get_option('ckocom_card_require_cvv')
                 && $_POST['wc-wc_checkout_com_cards-payment-token'] !== 'new' ){
             // check if cvv is empty on checkout page
             if ( empty( $_POST['wc_checkout_com_cards-card-cvv']  ) ) {
@@ -172,7 +172,7 @@ function callback_for_setting_up_scripts() {
     wp_register_style( 'normalize', $normalize);
     wp_enqueue_style( 'checkoutcom-style' );
     wp_enqueue_style( 'normalize' );
-    
+
 
     if (WC_Admin_Settings::get_option('ckocom_iframe_style') ) {
         wp_register_style( 'frames_style', $multi_frame);
@@ -181,7 +181,7 @@ function callback_for_setting_up_scripts() {
     }
 
     wp_enqueue_style( 'frames_style' );
-    
+
     // load cko google pay setting
     $google_settings = get_option('woocommerce_wc_checkout_com_google_pay_settings');
     $google_pay_enabled = $google_settings['enabled'] == true ? true : false;
@@ -380,7 +380,7 @@ function cko_gateway_icon( $icons, $id ) {
 
     $plugin_url = plugins_url( '/checkout-com-unified-payments-api/assets/images/', __DIR__ );
 
-    /* Check if checkoutcom gateway */ 
+    /* Check if checkoutcom gateway */
     if ($id == 'wc_checkout_com_cards') {
         $display_card_icon = WC_Admin_Settings::get_option('ckocom_display_icon') == 1 ? true : false;
 
@@ -429,4 +429,23 @@ function subscriptionPayment($renewal_total, $renewal_order) {
 
     WC_Checkoutcom_Subscription::renewal_payment($renewal_total, $renewal_order);
 
+}
+
+/**
+ *  Hooked function to handle subscription renewal payment
+ */
+add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_alternative_payments_sepa', 'subscriptionPaymentSepa', 10, 2);
+function subscriptionPaymentSepa($renewal_total, $renewal_order) {
+
+    include_once('includes/subscription/class-wc-checkout-com-subscription.php');
+
+    WC_Checkoutcom_Subscription::renewal_payment($renewal_total, $renewal_order);
+
+}
+
+add_action( 'woocommerce_subscription_status_cancelled', 'subscriptionCancelled', 20 );
+function subscriptionCancelled( $subscription ) {
+	include_once( 'includes/subscription/class-wc-checkout-com-subscription.php' );
+
+	WC_Checkoutcom_Subscription::subscription_cancelled( $subscription );
 }
