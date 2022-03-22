@@ -157,7 +157,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway
                 var networksSupported = <?php echo json_encode($supportedNetworks); ?>;
 
                 return {
-                  
+
                    currencyCode: "<?php echo get_woocommerce_currency(); ?>",
                    countryCode: "<?php echo $country_code; ?>",
                    merchantCapabilities: ['supports3DS', 'supportsEMV', 'supportsCredit', 'supportsDebit'],
@@ -167,7 +167,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway
                        amount: "<?php echo $woocommerce->cart->total ?>",
                        type: 'final'
                    }
-                }    
+                }
             }
 
             /**
@@ -184,8 +184,8 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway
                        session.completeMerchantValidation(merchantSession);
                    });
                };
-            
-            
+
+
                /**
                * An event handler that is called when a new payment method is selected.
                *
@@ -199,7 +199,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway
                        label: window.location.host,
                        amount: "<?php echo $woocommerce->cart->total ?>",
                    };
-            
+
                    var newLineItems = [
                        {
                            type: 'final',
@@ -219,10 +219,10 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway
                    //         amount: "-<?php //echo $this->getPaymentInfo()['discounts'] ?>//"
                    //     })
                    // }
-            
+
                    session.completePaymentMethodSelection(newTotal, newLineItems);
                };
-            
+
                /**
                * An event handler that is called when the user has authorized the Apple Pay payment
                *  with Touch ID, Face ID, or passcode.
@@ -243,7 +243,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway
                       session.completePayment(status);
                    });
                };
-            
+
                /**
                * An event handler that is automatically called when the payment UI is dismissed.
                */
@@ -325,50 +325,48 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway
             * Show the ApplePay payment option on the checkout page
             */
             function showAppleApplePayOption() {
-                jQuery(applePayOptionSelector).show();
-                // jQuery('.apple-pay-button').show();
-                // jQuery(applePayOptionBodySelector).show();
+	            jQuery( applePayOptionSelector ).show();
+	            // jQuery('.apple-pay-button').show();
+	            // jQuery(applePayOptionBodySelector).show();
 
-                if(jQuery('.payment_method_wc_checkout_com_apple_pay').is(':visible')){
-                  
-                  console.log('here');
+	            if ( jQuery( '.payment_method_wc_checkout_com_apple_pay' ).is( ':visible' ) ) {
 
-                  //check if apple pay method is check
-                  if(jQuery('#payment_method_wc_checkout_com_apple_pay').is(':checked')){
-                      // Show apple pay button
-                      // disable place order button
-                      // jQuery('#place_order').prop("disabled",true);
-                      jQuery('#place_order').hide();
-                      jQuery('#ckocom_applePay').show();
-                  } else {
-                      // hide apple pay button
-                      // show default place order button
-                      // jQuery('#place_order').prop("disabled",false);
-                      jQuery('#place_order').show();
-                      jQuery('#ckocom_applePay').hide();
-                  }
+		            //check if Apple Pay method is checked.
+		            if ( jQuery( '#payment_method_wc_checkout_com_apple_pay' ).is( ':checked' ) ) {
+			            // Disable place order button.
+			            // jQuery('#place_order').prop("disabled",true);
+			            jQuery( '#place_order' ).hide();
+			            // Show Apple Pay button.
+			            jQuery( '#ckocom_applePay' ).show();
+		            } else {
+			            // Show default place order button.
+			            jQuery( '#place_order' ).show();
+			            // Hide apple pay button.
+			            // jQuery('#place_order').prop("disabled",false);
+			            jQuery( '#ckocom_applePay' ).hide();
+		            }
 
-                  // On payment radio button click
-                  jQuery("input[name='payment_method']").click(function(){
-                      // Check if payment method is google pay
-                      if(this.value == 'wc_checkout_com_apple_pay'){
-                          // Show apple pay button
-                          // hide default place order button
-                          // jQuery('#place_order').prop("disabled",true);
-                          jQuery('#place_order').hide();
-                          jQuery('#ckocom_applePay').show();
-                          
-                      } else {
-                          // hide apple pay button
-                          // enable place order button
-                          // jQuery('#place_order').prop("disabled",false);
-                          jQuery('#place_order').show();
-                          jQuery('#ckocom_applePay').hide();
-                      }
-                  })
-                } else {
-                  jQuery('#place_order').prop("disabled",false);
-                }
+		            // On payment radio button click.
+		            jQuery( "input[name='payment_method']" ).click( function () {
+			            // Check if payment method is google pay
+			            if ( this.value == 'wc_checkout_com_apple_pay' ) {
+				            // Hide default place order button.
+				            // jQuery('#place_order').prop("disabled",true);
+				            jQuery( '#place_order' ).hide();
+				            // Show Apple Pay button.
+				            jQuery( '#ckocom_applePay' ).show();
+
+			            } else {
+				            // Enable place order button.
+				            // jQuery('#place_order').prop("disabled",false);
+				            jQuery( '#place_order' ).show();
+				            // Hide apple pay button.
+				            jQuery( '#ckocom_applePay' ).hide();
+			            }
+		            } )
+	            } else {
+		            jQuery( '#place_order' ).prop( "disabled", false );
+	            }
             }
 
             // Initialise apple pay when page is ready
@@ -381,11 +379,11 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway
               var result = {error: false, messages: []};
               var fields = JSON.parse(fieldList);
 
-              if(jQuery('#terms').length === 1 && jQuery('#terms:checked').length === 0){ 
+              if(jQuery('#terms').length === 1 && jQuery('#terms:checked').length === 0){
                   result.error = true;
                   result.messages.push({target: 'terms', message : 'You must accept our Terms & Conditions.'});
               }
-              
+
               if (fields) {
                   jQuery.each(fields, function(group, groupValue) {
                       if (group === 'shipping' && jQuery('#ship-to-different-address-checkbox:checked').length === 0) {

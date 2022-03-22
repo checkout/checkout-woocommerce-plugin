@@ -128,22 +128,25 @@ class WC_Checkoutcom_Api_request
     {
         global $woocommerce, $wp_version;
 
-        $auto_capture = WC_Admin_Settings::get_option('ckocom_card_autocap') == 1 ? true : false;
-        $amount = $order->get_total();
-        $amount_cents = WC_Checkoutcom_Utility::valueToDecimal($amount, $order->get_currency());
-        $three_d = WC_Admin_Settings::get_option('ckocom_card_threed') == 1 && $subscription == null ? true : false;
-        $attempt_no_threeD = WC_Admin_Settings::get_option('ckocom_card_notheed') == 1 ? true : false;
-        $dynamic_descriptor = WC_Admin_Settings::get_option('ckocom_card_desctiptor') == 1 ? true : false;
-        $mada_enable = WC_Admin_Settings::get_option('ckocom_card_mada') == 1 ? true : false;
-        $is_save_card = false;
-        $payment_option = 'FramesJs';
-        $apms_settings = get_option('woocommerce_wc_checkout_com_alternative_payments_settings');
-        $apms_selected = $apms_settings['ckocom_apms_selector'];
+	    $auto_capture       = WC_Admin_Settings::get_option( 'ckocom_card_autocap' ) == 1 ? true : false;
+	    $amount             = $order->get_total();
+	    $amount_cents       = WC_Checkoutcom_Utility::valueToDecimal( $amount, $order->get_currency() );
+	    $three_d            = WC_Admin_Settings::get_option( 'ckocom_card_threed' ) == 1 && $subscription == null ? true : false;
+	    $attempt_no_threeD  = WC_Admin_Settings::get_option( 'ckocom_card_notheed' ) == 1 ? true : false;
+	    $dynamic_descriptor = WC_Admin_Settings::get_option( 'ckocom_card_desctiptor' ) == 1 ? true : false;
+	    $mada_enable        = WC_Admin_Settings::get_option( 'ckocom_card_mada' ) == 1 ? true : false;
+	    $google_settings    = get_option( 'woocommerce_wc_checkout_com_google_pay_settings' );
+	    $is_google_threeds  = 1 === absint( $google_settings[ 'ckocom_google_threed' ] );
 
-        $postData = sanitize_post($_POST);
-        $getData = sanitize_post($_GET);
+	    $is_save_card       = false;
+	    $payment_option     = 'FramesJs';
+	    $apms_settings      = get_option( 'woocommerce_wc_checkout_com_alternative_payments_settings' );
+	    $apms_selected      = $apms_settings['ckocom_apms_selector'];
 
-        $customerAddress = WC_Checkoutcom_Api_request::customer_address($postData);
+	    $postData = sanitize_post( $_POST );
+	    $getData  = sanitize_post( $_GET );
+
+	    $customerAddress = WC_Checkoutcom_Api_request::customer_address( $postData );
 
         // Prepare payment parameters
         if($postData['payment_method'] == 'wc_checkout_com_cards'){
@@ -260,7 +263,9 @@ class WC_Checkoutcom_Api_request
         }
 
         // Set 3Ds to payment request
-        $payment->threeDs = $three_ds;
+	    if ( $postData['payment_method'] !== 'wc_checkout_com_google_pay' || $is_google_threeds ) {
+		    $payment->threeDs = $three_ds;
+	    }
 
         // Set shipping Address
         if(!empty($customerAddress['shipping_address_1']) && !empty($customerAddress['shipping_country'])){
