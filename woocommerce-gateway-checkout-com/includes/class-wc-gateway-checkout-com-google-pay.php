@@ -296,7 +296,7 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway
         $google_token = WC_Checkoutcom_Api_request::generate_google_token();
 
         // Check if google token is not empty
-        if(empty($google_token)) {
+        if( empty( $google_token['token'] ) ) {
             WC_Checkoutcom_Utility::wc_add_notice_self(__('There was an issue completing the payment.', 'wc_checkout_com'), 'error');
             return;
         }

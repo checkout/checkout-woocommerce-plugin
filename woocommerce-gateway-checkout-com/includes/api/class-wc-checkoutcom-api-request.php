@@ -173,7 +173,7 @@ class WC_Checkoutcom_Api_request
         } elseif ($postData['payment_method'] == 'wc_checkout_com_google_pay') {
             $payment_option = 'Google Pay';
 
-            $method        = new TokenSource( $arg );
+            $method        = new TokenSource( $arg['token'] );
             $method->token = trim( $method->token );
 
         } elseif ($postData['payment_method'] == 'wc_checkout_com_apple_pay') {
@@ -263,7 +263,7 @@ class WC_Checkoutcom_Api_request
         }
 
         // Set 3Ds to payment request
-	    if ( $postData['payment_method'] !== 'wc_checkout_com_google_pay' || $is_google_threeds ) {
+	    if ( $postData['payment_method'] !== 'wc_checkout_com_google_pay' || ( $is_google_threeds && 'pan_only' === $arg['token_format'] ) ) {
 		    $payment->threeDs = $three_ds;
 	    }
 
@@ -523,7 +523,10 @@ class WC_Checkoutcom_Api_request
         try {
             $token = $checkout->tokens()->request($googlepay);
 
-            return $token->getId();
+            return [
+		        'token'        => $token->getId(),
+		        'token_format' => $token->token_format,
+	        ];
         } catch (CheckoutModelException $ex) {
             $error_message = __('An error has occured while processing your payment.', 'wc_checkout_com' );
             WC_Checkoutcom_Utility::logger($error_message , $ex);
