@@ -262,10 +262,12 @@ class WC_Checkoutcom_Api_request
             $payment->billing_descriptor = $descriptor;
         }
 
-        // Set 3Ds to payment request
-	    if ( $postData['payment_method'] !== 'wc_checkout_com_google_pay' || ( $is_google_threeds && 'pan_only' === $arg['token_format'] ) ) {
-		    $payment->threeDs = $three_ds;
-	    }
+        // Set 3Ds to payment request.
+        if ( 'wc_checkout_com_google_pay' === $postData['payment_method'] && ( $is_google_threeds && 'pan_only' === $arg['token_format'] ) ) {
+            $payment->threeDs = new ThreeDs( true );
+        } else if ( 'wc_checkout_com_google_pay' !== $postData['payment_method'] ) {
+            $payment->threeDs = $three_ds;
+        }
 
         // Set shipping Address
         if(!empty($customerAddress['shipping_address_1']) && !empty($customerAddress['shipping_country'])){
