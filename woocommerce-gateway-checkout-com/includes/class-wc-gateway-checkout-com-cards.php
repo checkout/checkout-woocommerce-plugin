@@ -447,7 +447,7 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
 
         // Redirect to cart if an error occured
         if (isset($result['error']) && !empty($result['error'])) {
-            WC_Checkoutcom_Utility::wc_add_notice_self(__($result['error'],'wc_checkout_com_cards_settings'), 'error');
+            WC_Checkoutcom_Utility::wc_add_notice_self(__($result['error'],'wc_checkout_com'), 'error');
             wp_redirect(wc_get_checkout_url());
             exit();
         }
