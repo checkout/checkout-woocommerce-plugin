@@ -533,6 +533,18 @@ class WC_Checkoutcom_Cards_Settings
                 'desc_tip' => false,
                 'default'     => '01234567890123456789',
             ),
+            'ckocom_google_threed' => array(
+	            'id'          => 'ckocom_google_threed',
+	            'title'       => __( 'Use 3D Secure', 'checkoutcom-cards-settings' ),
+	            'type'        => 'select',
+	            'desc_tip'    => true,
+	            'options'     => array(
+		            0 => __( 'No', 'checkoutcom-cards-settings' ),
+		            1 => __( 'Yes', 'checkoutcom-cards-settings' ),
+	            ),
+	            'default'     => 0,
+	            'description' => '3D secure payment',
+            ),
             'ckocom_google_style' => array(
                 'title'       => __('Button Style', 'checkoutcom-cards-settings'),
                 'type'        => 'select',

@@ -97,15 +97,23 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway
                         })
                     },
                     addGooglePayButton: function (type) {
-                        // Create the GooglePayButton
+                        // Create the Google Pay Button.
                         var button = document.createElement('button');
                         button.id = DOMStrings.buttonId;
-                        // Add button class based on the user configuration
+                        // Add button class based on the user configuration.
                         button.className = DOMStrings.buttonClass + " " + type
-                        // Append the GooglePay button to the GooglePay area
+                        // Append the Google Pay button to the GooglePay area.
                         jQuery('#payment').append(button);
-                        // hide google pay button
+                        // Hide Google Pay button
                         jQuery('#ckocom_googlePay').hide();
+
+						// On page load if Google Pay is selected, show the button.
+						if(jQuery('#payment_method_wc_checkout_com_google_pay').is(':checked')){
+		                    // Disable place order button.
+		                    jQuery('#place_order').hide();
+                            // Show Google Pay button.
+		                    jQuery('#ckocom_googlePay').show();
+	                    }
                     },
                     addIconSpacer: function () {
                         jQuery(DOMStrings.paymentOptionLabel).append("<div class='" + iconSpacer + "'></div>")
@@ -228,47 +236,51 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway
 
             })(googlePayUiController);
 
-            // Initialise google pay
+            // Initialise Google Pay.
             jQuery( document ).ready(function() {
                 googlePayTransactionController.init();
             });
 
-            // check if google pay method is check
-            if(jQuery('#wc_checkout_com_google_pay').is(':checked')){
-                // disable place order button
-                jQuery('#place_order').prop("disabled",true);
+            // Check if Google Pay method is checked.
+            if ( jQuery( '#payment_method_wc_checkout_com_google_pay' ).is( ':checked' ) ) {
+	            // Disable place order button.
+	            jQuery( '#place_order' ).prop( "disabled", true );
+	            jQuery( '#place_order' ).hide();
+	            jQuery( '#ckocom_googlePay' ).show();
             } else {
-                // enable place order button if not google pay
-                jQuery('#place_order').prop("disabled",false);
+	            // Enable place order button if not Google Pay.
+	            jQuery( '#place_order' ).prop( "disabled", false );
+	            jQuery( '#place_order' ).show();
+	            jQuery( '#ckocom_googlePay' ).hide();
             }
 
-            // On payment radio button click
-            jQuery("input[name='payment_method']"). click(function(){
-                // Check if payment method is google pay
-                if(this.value == 'wc_checkout_com_google_pay'){
-                    // Show google pay button
-                    // disable place order button
-                    jQuery('#ckocom_googlePay').show();
-                    jQuery('#place_order').prop("disabled",true);
-                } else if(this.value == 'wc_checkout_com_apple_pay') {
-                    jQuery('#ckocom_googlePay').hide();
-                    jQuery(document).ready(function(){
-                        jQuery("#place_order").hide();
-                    });
-                } else {
-                    // hide google pay button
-                    // enable place order button
-                    jQuery('#ckocom_googlePay').hide();
-                    jQuery('#place_order').prop("disabled",false);
-                }
-            })
+            // On payment radio button click.
+            jQuery( "input[name='payment_method']" ).click( function () {
+	            // Check if payment method is Google Pay.
+	            if ( 'wc_checkout_com_google_pay' === this.value ) {
+		            // Show Google Pay button.
+		            jQuery( '#ckocom_googlePay' ).show();
+		            // Disable place order button.
+		            jQuery( '#place_order' ).prop( "disabled", true );
+	            } else if ( 'wc_checkout_com_apple_pay' === this.value ) {
+		            jQuery( '#ckocom_googlePay' ).hide();
+		            jQuery( document ).ready( function () {
+			            jQuery( "#place_order" ).hide();
+		            } );
+	            } else {
+		            // Hide Google Pay button.
+		            jQuery( '#ckocom_googlePay' ).hide();
+		            // Enable place order button.
+		            jQuery( '#place_order' ).prop( "disabled", false );
+	            }
+            } )
 
         </script>
     <?php
     }
 
     /**
-     * Process payment with google pay
+     * Process payment with Google Pay.
      *
      * @param int $order_id
      * @return array
@@ -284,13 +296,22 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway
         $google_token = WC_Checkoutcom_Api_request::generate_google_token();
 
         // Check if google token is not empty
-        if(empty($google_token)) {
+        if( empty( $google_token['token'] ) ) {
             WC_Checkoutcom_Utility::wc_add_notice_self(__('There was an issue completing the payment.', 'wc_checkout_com'), 'error');
             return;
         }
 
         // Create payment with google token
         $result = (array) (new WC_Checkoutcom_Api_request)->create_payment($order, $google_token);
+
+	    // Redirect to apm if redirection url is available.
+	    if ( isset( $result['3d'] ) && ! empty( $result['3d'] ) ) {
+
+		    return array(
+			    'result'   => 'success',
+			    'redirect' => $result['3d'],
+		    );
+	    }
 
         // check if result has error and return error message
         if (isset($result['error']) && !empty($result['error'])) {
