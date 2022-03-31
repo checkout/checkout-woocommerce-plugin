@@ -1,17 +1,22 @@
 <?php
-/*
-Plugin Name: Checkout.com Payment Gateway
-Plugin URI: https://www.checkout.com/
-Description: Extends WooCommerce by Adding the Checkout.com Gateway.
-Version: 4.3.7
-Author: Checkout.com
-Author URI: https://www.checkout.com/
-Requires at least: 4.0
-Stable tag: 4.3.7
-Tested up to: 5.9.1
+/**
+ * Plugin Name: Checkout.com Payment Gateway
+ * Plugin URI: https://www.checkout.com/
+ * Description: Extends WooCommerce by Adding the Checkout.com Gateway.
+ * Author: Checkout.com
+ * Author URI: https://www.checkout.com/
+ * Version: 4.3.7
+ * Requires at least: 4.0
+ * Stable tag: 4.3.7
+ * Tested up to: 5.9.1
+ * WC tested up to: 5.4.2
+ * Text Domain: wc_checkout_com
+ * Domain Path: /languages
+ */
 
-WC tested up to: 5.4.2
-*/
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
 
 /*
  * This action hook registers our PHP class as a WooCommerce payment gateway
@@ -20,6 +25,8 @@ add_action( 'plugins_loaded', 'init_checkout_com_gateway_class', 0 );
 function init_checkout_com_gateway_class()
 {
     if (!class_exists('WC_Payment_Gateway')) return;
+
+    load_plugin_textdomain( 'wc_checkout_com', false, plugin_basename( dirname( __FILE__ ) ) . '/languages' );
 
     include_once('includes/class-wc-gateway-checkout-com-cards.php');
     include_once('includes/class-wc-gateway-checkout-com-apple-pay.php');
