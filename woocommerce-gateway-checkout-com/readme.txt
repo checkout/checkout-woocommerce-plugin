@@ -24,7 +24,7 @@ This plugin is an integration of Checkout.com and offers 6 payment modes. This p
 The payment form is embedded and shoppers complete payments without leaving your website. The Frames.js payment form is cross-browser and cross-device compatible, and can accept online payments from all major credit cards.
 
 = Alternative Payments =
-Users can place orders with the following alternative and local payment options used around the world: Alipay, Bancontact, Boleto, EPS, Fawry, Giropay, Ideal, Klarna, KNet, Poli, Sepa, Sofort, Multibanco.
+Users can place orders with the following alternative and local payment options used around the world: Alipay, Bancontact, Boleto, EPS, Fawry, Giropay, Ideal, Klarna, KNet, Poli, Sepa (WooCommerce subscription compatible), Sofort, Multibanco.
 
 = Google Pay Payments =
 Users can place orders with a Google Pay wallet.
@@ -67,12 +67,12 @@ Contact us at: partnerships@checkout.com
 = What fees are associated with the gateway? =
 Checkout.com uses Interchange++ which offers more transparency than other pricing models. With Checkout.com there are no minimums, no contracts required and pricing is based on your transaction volume and history.
 
-Other payment processors charge a blended rate. We use the Interchange++ model, a payment processing fee structure that standardizes the commissions collected by card issuers such as Visa and Mastercard. The amount varies based on card type, the customer's issuing bank, merchant location, and other parameters. 
+Other payment processors charge a blended rate. We use the Interchange++ model, a payment processing fee structure that standardizes the commissions collected by card issuers such as Visa and Mastercard. The amount varies based on card type, the customer's issuing bank, merchant location, and other parameters.
 
-Using Interchange++, we pass the fees charged by card brands directly through to you. Checkout.com charges a single, consistent mark-up that never changes, so you’ll have full transparency of your costs and know exactly what you’re paying. There are also no hidden fees, no setup fees and no account maintenance fees. Additionally, you’ll also get: 
+Using Interchange++, we pass the fees charged by card brands directly through to you. Checkout.com charges a single, consistent mark-up that never changes, so you’ll have full transparency of your costs and know exactly what you’re paying. There are also no hidden fees, no setup fees and no account maintenance fees. Additionally, you’ll also get:
 
 * Dedicated account management and service
-* Risk and fraud management tools 
+* Risk and fraud management tools
 * Integration with all major shopping carts
 
 To learn more about our pricing, visit https://www.checkout.com/pricing
@@ -144,6 +144,9 @@ To learn more about our pricing, visit https://www.checkout.com/pricing
 
 **Currencies**  - [150+ transaction currencies](https://docs.checkout.com/resources/codes/currency-codes) are supported in the integration
 
+= Does SEPA support recurring payments like for subscription? =
+Yes
+
 = How do I contact the Payment Provider’s Support? =
 support@checkout.com
 
@@ -163,6 +166,12 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v4.3.8 4th Apr 2022
+- **[feat]** Subscription support for SEPA DD payment method.
+- **[feat]** Text domain support with pot file.
+- **[tweak]** 3Ds support to Google Pay method.
+- **[update]** New 3Ds parameter for card type method.
+
 v4.3.7 7th Mar 2022
 - **[fix]** Fix PHP warning of missing file.
 
