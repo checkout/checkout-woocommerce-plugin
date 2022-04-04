@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2022-03-30T09:55:46+00:00\n"
+"POT-Creation-Date: 2022-04-01T06:35:44+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.6.0\n"
 "X-Domain: wc_checkout_com\n"
@@ -50,43 +50,43 @@ msgid "An error has occurred while processing your payment. Please check your ca
 msgstr ""
 
 #: includes/api/class-wc-checkoutcom-api-request.php:96
-#: includes/api/class-wc-checkoutcom-api-request.php:469
+#: includes/api/class-wc-checkoutcom-api-request.php:478
 msgid "Status : "
 msgstr ""
 
 #: includes/api/class-wc-checkoutcom-api-request.php:106
-#: includes/api/class-wc-checkoutcom-api-request.php:491
+#: includes/api/class-wc-checkoutcom-api-request.php:500
 msgid "An error has occurred while processing your payment. "
 msgstr ""
 
-#: includes/api/class-wc-checkoutcom-api-request.php:463
+#: includes/api/class-wc-checkoutcom-api-request.php:472
 msgid "An error has occurred while processing your payment. Please check your card details and try again."
 msgstr ""
 
-#: includes/api/class-wc-checkoutcom-api-request.php:533
-#: includes/api/class-wc-checkoutcom-api-request.php:536
+#: includes/api/class-wc-checkoutcom-api-request.php:542
+#: includes/api/class-wc-checkoutcom-api-request.php:545
 msgid "An error has occured while processing your payment."
 msgstr ""
 
-#: includes/api/class-wc-checkoutcom-api-request.php:553
-#: includes/api/class-wc-checkoutcom-api-request.php:624
-#: includes/api/class-wc-checkoutcom-api-request.php:694
+#: includes/api/class-wc-checkoutcom-api-request.php:562
+#: includes/api/class-wc-checkoutcom-api-request.php:633
+#: includes/api/class-wc-checkoutcom-api-request.php:703
 msgid "An error has occured. No Cko Payment Id"
 msgstr ""
 
-#: includes/api/class-wc-checkoutcom-api-request.php:572
+#: includes/api/class-wc-checkoutcom-api-request.php:581
 msgid "Payment has already been voided or captured on Checkout.com hub for order Id : "
 msgstr ""
 
-#: includes/api/class-wc-checkoutcom-api-request.php:584
+#: includes/api/class-wc-checkoutcom-api-request.php:593
 msgid "An error has occurred while processing your capture payment on Checkout.com hub. Order Id : "
 msgstr ""
 
-#: includes/api/class-wc-checkoutcom-api-request.php:599
+#: includes/api/class-wc-checkoutcom-api-request.php:608
 msgid "An error has occurred while processing your capture request. "
 msgstr ""
 
-#: includes/api/class-wc-checkoutcom-api-request.php:653
+#: includes/api/class-wc-checkoutcom-api-request.php:662
 msgid "An error has occurred while processing your void payment on Checkout.com hub. Order Id : "
 msgstr ""
 
