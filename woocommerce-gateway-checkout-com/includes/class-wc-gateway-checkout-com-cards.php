@@ -213,10 +213,10 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
         ?>
 <div class="cko-cvv" style="display: none;padding-top: 10px;">
     <p class="validate-required" id="cko-cvv" data-priority="10">
-        <label for="cko-cvv"><?php esc_html_e( 'Card Code', 'wc_checkout_com_cards' ); ?> <span
+        <label for="cko-cvv"><?php esc_html_e( 'Card Code', 'wc_checkout_com' ); ?> <span
                 class="required">*</span></label>
         <input id="cko-cvv" type="text" autocomplete="off" class="input-text"
-            placeholder="<?php esc_attr_e( 'CVV', 'wc_checkout_com_cards' ); ?>"
+            placeholder="<?php esc_attr_e( 'CVV', 'wc_checkout_com' ); ?>"
             name="<?php echo esc_attr( $this->id ); ?>-card-cvv" />
     </p>
 </div>

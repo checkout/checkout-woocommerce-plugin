@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2022-04-04T05:50:19+00:00\n"
+"POT-Creation-Date: 2022-04-06T04:42:37+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.6.0\n"
 "X-Domain: wc_checkout_com\n"
@@ -286,6 +286,14 @@ msgstr ""
 
 #: includes/class-wc-gateway-checkout-com-cards.php:167
 msgid "Please enter your card details."
+msgstr ""
+
+#: includes/class-wc-gateway-checkout-com-cards.php:216
+msgid "Card Code"
+msgstr ""
+
+#: includes/class-wc-gateway-checkout-com-cards.php:219
+msgid "CVV"
 msgstr ""
 
 #: includes/class-wc-gateway-checkout-com-cards.php:458
