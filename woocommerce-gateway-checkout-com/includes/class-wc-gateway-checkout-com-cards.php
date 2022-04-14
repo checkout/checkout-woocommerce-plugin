@@ -392,7 +392,7 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
 
         $order_status = $order->get_status();
 
-        if($order_status == 'pending') {
+        if ( $order_status == 'pending' || $order_status == 'failed' ) {
             update_post_meta($order_id, 'cko_payment_authorized', true);
             $order->update_status($status);
         }
@@ -519,7 +519,7 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
 
         $order->add_order_note($message);
 
-        if($order_status == 'pending') {
+        if ( $order_status == 'pending' || $order_status == 'failed' ) {
             update_post_meta($order_id, 'cko_payment_authorized', true);
             $order->update_status($status);
         }
