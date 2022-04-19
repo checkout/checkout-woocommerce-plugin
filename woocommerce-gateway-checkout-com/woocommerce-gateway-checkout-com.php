@@ -428,6 +428,18 @@ function cko_gateway_icon( $icons, $id ) {
 }
 
 /**
+ * Check if account is NAS.
+ *
+ * @return bool
+ */
+function cko_is_nas_account() {
+
+    $core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+
+    return isset( $core_settings['ckocom_account_type'] ) && str_contains( $core_settings['ckocom_account_type'], 'NAS' );
+}
+
+/**
  *  Hooked function to handle subscription renewal payment
  */
 add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_cards', 'subscriptionPayment', 10, 2);

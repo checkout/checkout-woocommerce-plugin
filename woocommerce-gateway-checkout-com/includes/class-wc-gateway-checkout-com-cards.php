@@ -1,6 +1,7 @@
 <?php
 include_once "lib/checkout-sdk-php/checkout.php";
 include_once('settings/class-wc-checkoutcom-cards-settings.php');
+include_once('settings/class-wc-checkoutcom-webhook.php');
 include_once('settings/admin/class-wc-checkoutcom-admin.php');
 include_once('api/class-wc-checkoutcom-api-request.php');
 include_once ('class-wc-gateway-checkout-com-webhook.php');
@@ -122,6 +123,11 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 
                 echo '<table class="form-table">';
                 WC_Admin_Settings::output_fields( WC_Checkoutcom_Cards_Settings::debug_settings() );
+                echo '</table>';
+            } elseif ('webhook' === $screen) {
+
+                echo '<table class="form-table">';
+                WC_Admin_Settings::output_fields( WC_Checkoutcom_Cards_Settings::webhook_settings() );
                 echo '</table>';
             } else {
 
@@ -351,7 +357,7 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
         if (isset($result['3d']) &&!empty($result['3d'])) {
 
             // check if save card is enable and customer select to save card
-            if($save_card && sanitize_text_field($_POST['wc-wc_checkout_com_cards-new-payment-method'])){
+            if ( $save_card && isset( $_POST['wc-wc_checkout_com_cards-new-payment-method'] ) && sanitize_text_field( $_POST['wc-wc_checkout_com_cards-new-payment-method'] ) ) {
                 // save in session for 3D secure payment
                 $_SESSION['wc-wc_checkout_com_cards-new-payment-method'] = isset($_POST['wc-wc_checkout_com_cards-new-payment-method']);
             }
@@ -392,7 +398,7 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
 
         $order_status = $order->get_status();
 
-        if ( $order_status == 'pending' || $order_status == 'failed' ) {
+	    if ( $order_status == 'pending' || $order_status == 'failed' ) {
             update_post_meta($order_id, 'cko_payment_authorized', true);
             $order->update_status($status);
         }
@@ -505,7 +511,7 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
 
         // save card to db
         $save_card =  WC_Admin_Settings::get_option('ckocom_card_saved');
-        if($save_card && $_SESSION['wc-wc_checkout_com_cards-new-payment-method']){
+        if ( $save_card && isset( $_SESSION['wc-wc_checkout_com_cards-new-payment-method'] ) && $_SESSION['wc-wc_checkout_com_cards-new-payment-method'] ) {
             $this->save_token($order->get_user_id(), $result);
             unset($_SESSION['wc-wc_checkout_com_cards-new-payment-method']);
         }
@@ -550,6 +556,8 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
         $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
         $environment = $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
         $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes' ? true : false;
+
+        $core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
 
         // Initialize the Checkout Api
         $checkout = new Checkout\CheckoutApi($core_settings['ckocom_sk'], $environment);
@@ -674,7 +682,7 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
             $token->set_user_id( $user_id );
 
             // Check if session has is mada and set token metadata
-            if($_SESSION['cko-is-mada']) {
+            if( isset( $_SESSION['cko-is-mada'] ) ) {
                 $token->add_meta_data( 'is_mada', true, true );
                 unset($_SESSION['cko-is-mada']);
             }
@@ -759,6 +767,9 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
 
         $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
         $raw_event = file_get_contents('php://input');
+
+        $core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
+
         $signature =  WC_Checkoutcom_Utility::verifySignature($raw_event, $core_settings['ckocom_sk'], $header_signature);
 
         // check if cko signature matches

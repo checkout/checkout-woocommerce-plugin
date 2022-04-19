@@ -47,6 +47,8 @@ class WC_Checkoutcom_Api_request
 
         $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
 
+        $core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
+
         $is_sepa_renewal = ( 'wc_checkout_com_alternative_payments_sepa' === $order->get_payment_method() ) && ( ! is_null( $subscription ) );
 
         // Initialize the Checkout Api
@@ -256,13 +258,16 @@ class WC_Checkoutcom_Api_request
             $three_ds->attempt_n3d = $attempt_no_threeD;
         }
 
-	    if ( 'wc_checkout_com_cards' === $postData['payment_method']
-	         && $three_d
-	         && $save_card
-	         && sanitize_text_field( $postData['wc-wc_checkout_com_cards-new-payment-method'] )
-	    ) {
-		    $three_ds->challenge_indicator = 'challenge_requested_mandate';
-	    }
+        if ( 'wc_checkout_com_cards' === $postData['payment_method']
+             && $three_d
+             && $save_card
+             && (
+                 isset( $postData['wc-wc_checkout_com_cards-new-payment-method'] )
+                 && sanitize_text_field( $postData['wc-wc_checkout_com_cards-new-payment-method'] )
+             )
+        ) {
+            $three_ds->challenge_indicator = 'challenge_requested_mandate';
+        }
 
         if($dynamic_descriptor){
             $descriptor_name = WC_Admin_Settings::get_option('ckocom_card_desctiptor_name');
@@ -451,6 +456,7 @@ class WC_Checkoutcom_Api_request
         $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
         $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes' ? true : false;
 
+        $core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
         // Initialize the Checkout Api
         $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
 
@@ -570,6 +576,8 @@ class WC_Checkoutcom_Api_request
         $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
         $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes' ? true : false;
 
+        $core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
+
         // Initialize the Checkout Api
         $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
 
@@ -638,6 +646,8 @@ class WC_Checkoutcom_Api_request
         $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
         $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
         $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes' ? true : false;
+
+        $core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
 
         // Initialize the Checkout Api
         $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
@@ -717,6 +727,8 @@ class WC_Checkoutcom_Api_request
         $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
         $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes' ? true : false;
 
+        $core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
+
         // Initialize the Checkout Api
         $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
 
@@ -784,6 +796,8 @@ class WC_Checkoutcom_Api_request
         $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
         $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes' ? true : false;
 
+        $core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
+
         // Initialize the Checkout Api
         $checkout = new CheckoutApi($core_settings['ckocom_pk'], $environment);
 
@@ -815,6 +829,8 @@ class WC_Checkoutcom_Api_request
         $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
         $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
         $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes' ? true : false;
+
+        $core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
 
         // Initialize the Checkout Api
         $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
@@ -849,6 +865,8 @@ class WC_Checkoutcom_Api_request
         $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
         $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
         $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes' ? true : false;
+
+        $core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
 
         // Initialize the Checkout Api
         $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
@@ -888,6 +906,8 @@ class WC_Checkoutcom_Api_request
         $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
         $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
         $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes' ? true : false;
+
+        $core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
 
         // Initialize the Checkout Api
         $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
@@ -1067,6 +1087,8 @@ class WC_Checkoutcom_Api_request
         $woo_locale = str_replace("_", "-", get_locale());
         $locale = substr($woo_locale, 0, 5);
         $country = WC()->customer->get_billing_country();
+
+        $core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
 
         // Initialize the Checkout Api
         $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
@@ -1271,7 +1293,7 @@ class WC_Checkoutcom_Api_request
         return $arr;
     }
 
-/**
+	/**
 	 * @param $url
 	 * @param $subscription_id
 	 *
@@ -1284,6 +1306,8 @@ class WC_Checkoutcom_Api_request
 		}
 
 		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+
+        $core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
 
 		$wp_request_headers = array(
 			'Authorization' => $core_settings['ckocom_sk']

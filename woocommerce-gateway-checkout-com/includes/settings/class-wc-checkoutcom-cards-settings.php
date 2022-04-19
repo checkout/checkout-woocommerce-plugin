@@ -5,19 +5,166 @@
  */
 class WC_Checkoutcom_Cards_Settings
 {
+
+	/**
+	 * Constructor
+	 */
+	public function __construct() {
+
+		/**
+		 * Actions.
+		 */
+		add_action( 'woocommerce_admin_field_checkoutcom_webhook_settings', array( $this, 'checkoutcom_cards_settings_html' ) );
+	}
+
+	/**
+     * Custom markup for webhook settings.
+     *
+	 * @param $value
+	 *
+	 * @return void
+	 */
+	public function checkoutcom_cards_settings_html( $value ) {
+
+		wc_enqueue_js( "
+		    jQuery( function(){
+		        
+		        // Fetch latest webhooks.
+		        jQuery( '#checkoutcom-is-register-webhook' ).on( 'click', function() {
+                    jQuery( this ).attr( 'disabled', 'disabled' );
+                    jQuery( this ).siblings( '.spinner' ).addClass( 'is-active' );
+                    jQuery( '.checkoutcom-is-register-webhook-text' ).html( '' );
+                    jQuery( '#checkoutcom-is-register-webhook' ).siblings( '.dashicons-yes' ).addClass( 'hidden' );
+                    
+                    jQuery.ajax( {
+                        url: '" . admin_url( 'admin-ajax.php' ) . "',
+                        type: 'POST',
+                        data: {
+                            'action': 'wc_checkoutcom_check_webhook',
+                            'security': '" . wp_create_nonce( 'checkoutcom_check_webhook' ) . "'
+                        }
+                    } ).done( function( response ) {
+
+                        if ( response.data.message ) {
+                            jQuery( '#checkoutcom-is-register-webhook' ).siblings( '.dashicons-yes.hidden' ).removeClass( 'hidden' );
+                            jQuery( '.checkoutcom-is-register-webhook-text' ).html( response.data.message );
+                        }
+                         
+                    } ).fail( function( response ) {
+                        alert( '" . esc_html__( 'An error occurred while fetching the webhooks. Please try again.', 'wc_checkout_com' ) . "' );
+                    } ).always( function() {
+                        jQuery( '#checkoutcom-is-register-webhook' ).removeAttr( 'disabled' );
+                        jQuery( '#checkoutcom-is-register-webhook' ).siblings( '.spinner' ).removeClass( 'is-active' );
+                    } );
+                    
+                    
+                } );
+		        
+		        // Register a new webhook.
+		        jQuery( '#checkoutcom-register-webhook' ).on( 'click', function() {
+                    jQuery( this ).attr( 'disabled', 'disabled' );
+                    jQuery( this ).siblings( '.spinner' ).addClass( 'is-active' );
+                    jQuery( '#checkoutcom-register-webhook' ).siblings( '.dashicons-yes' ).addClass( 'hidden' );
+                    
+                    jQuery.ajax( {
+                        url: '" . admin_url( 'admin-ajax.php' ) . "',
+                        type: 'POST',
+                        data: {
+                            'action': 'wc_checkoutcom_register_webhook',
+                            'security': '" . wp_create_nonce( 'checkoutcom_register_webhook' ) . "'
+                        }
+                    } ).done( function( response ) {
+                        jQuery( '#checkoutcom-register-webhook' ).siblings( '.dashicons-yes.hidden' ).removeClass( 'hidden' );
+                    } ).fail( function( response ) {
+                        alert( '" . esc_html__( 'An error occurred while registering the webhook. Please try again.', 'wc_checkout_com' ) . "' );
+                    } ).always( function() {
+                        jQuery( '#checkoutcom-register-webhook' ).removeAttr( 'disabled' );
+                        jQuery( '#checkoutcom-register-webhook' ).siblings( '.spinner' ).removeClass( 'is-active' );
+                    } );
+                } );
+		    } );
+		" );
+
+		?>
+		<tr valign="top">
+			<th scope="row" class="titledesc">
+				<?php esc_html_e( 'Webhook Status', 'wc_checkout_com' ) ?>
+			</th>
+            <td class="forminp forminp-checkoutcom_webhook_settings">
+                <p>
+                    <button type="button" class="button button-primary" id="checkoutcom-is-register-webhook"><?php esc_html_e( 'Run Webhook check', 'wc_checkout_com' ); ?></button>
+                    <span class="dashicons dashicons-yes hidden" style="font-size: 30px;height: 30px;width: 30px;color: #008000;"></span>
+                    <span class="spinner" style="float: none;"></span>
+                    <p><?php esc_html_e( 'This action will check if webhook is configured for current site.', 'wc_checkout_com' ); ?></p>
+                </p>
+                <p class="checkoutcom-is-register-webhook-text"></p>
+            </td>
+		</tr>
+
+        <tr valign="top" class="checkoutcom-new-webhook-setting">
+            <th scope="row" class="titledesc">
+                <?php esc_html_e( 'Register New Webhook', 'wc_checkout_com' ) ?>
+            </th>
+            <td class="forminp forminp-checkoutcom_webhook_settings">
+                <p>
+                    <button type="button" class="button button-primary" id="checkoutcom-register-webhook"><?php esc_html_e( 'Register Webhook', 'wc_checkout_com' ); ?></button>
+                    <span class="dashicons dashicons-yes hidden" style="font-size: 30px;height: 30px;width: 30px;color: #008000;"></span>
+                    <span class="spinner" style="float: none;"></span>
+                </p>
+                <?php
+                printf(
+                    '<p style="margin-top: 10px;">%s</p><br><code>%s</code><div class="cko-ajax-data"></div>',
+                    esc_html__( 'Click above button to register webhook URL', 'wc_checkout_com' ),
+                    esc_url( WC_Checkoutcom_Webhook::get_instance()->generate_current_webhook_url() )
+                );
+                ?>
+            </td>
+        </tr>
+
+		<?php
+	}
+
     /**
      * CKO admin core settings fields
      * @return mixed
      */
     public static function core_settings()
     {
+
+	    $core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+	    $nas_docs      = 'https://www.checkout.com/docs/four/resources/api-authentication/api-keys';
+	    $abc_docs      = 'https://www.checkout.com/docs/the-hub/update-your-hub-settings#Manage_the_API_keys';
+	    $docs_link     = $abc_docs;
+
+	    if ( isset( $core_settings['ckocom_account_type'] ) && $core_settings['ckocom_account_type'] === 'NAS' ) {
+            $docs_link = $nas_docs;
+        }
+
+	    wc_enqueue_js( "
+		    jQuery( function(){
+
+		        let keyDocs = jQuery( '.checkoutcom-key-docs' );
+		        let nasDocs = '" . $nas_docs . "';
+		        let abcDocs = '" . $abc_docs . "';
+
+		        // Handle account type change to update docs link.
+		        jQuery( '#woocommerce_wc_checkout_com_cards_ckocom_account_type' ).change( function( e ) {
+                    if ( 'NAS' === jQuery( this ).val() ) {                       
+                        keyDocs.attr( 'href', nasDocs );
+                    } else {
+                        keyDocs.attr( 'href', abcDocs );
+                    }
+                });
+		    } );
+		" );
+
         $settings = array(
-            'core_setting'       => array(
+            'core_setting'        => array(
                 'title'       => __( 'Core settings', 'wc_checkout_com' ),
                 'type'        => 'title',
                 'description' => '',
             ),
-            'enabled'            => array(
+            'enabled'             => array(
                 'id'          => 'enable',
                 'title'       => __( 'Enable/Disable', 'wc_checkout_com' ),
                 'type'        => 'checkbox',
@@ -26,7 +173,7 @@ class WC_Checkoutcom_Cards_Settings
                 'desc_tip'    => true,
                 'default'     => 'yes',
             ),
-            'ckocom_environment' => array(
+            'ckocom_environment'  => array(
                 'title'       => __( 'Environment', 'wc_checkout_com' ),
                 'type'        => 'select',
                 'description' => __( 'When going to production, make sure to set this to Live', 'wc_checkout_com' ),
@@ -37,7 +184,7 @@ class WC_Checkoutcom_Cards_Settings
                 ),
                 'default'     => 'sandbox',
             ),
-            'title'              => array(
+            'title'               => array(
                 'title'       => __( 'Payment Option Title', 'wc_checkout_com' ),
                 'type'        => 'text',
                 'label'       => __( 'Pay by Card with Checkout.com', 'wc_checkout_com' ),
@@ -45,16 +192,27 @@ class WC_Checkoutcom_Cards_Settings
                 'desc_tip'    => true,
                 'default'     => 'Pay by Card with Checkout.com',
             ),
-            'ckocom_sk'          => array(
+            'ckocom_account_type' => array(
+                'title'       => __( 'Account type', 'wc_checkout_com' ),
+                'type'        => 'select',
+                'description' => __( 'Contact support team to know your account type.', 'wc_checkout_com' ),
+                'desc_tip'    => true,
+                'options'     => array(
+                    'ABC' => __( 'ABC', 'wc_checkout_com' ),
+                    'NAS' => __( 'NAS', 'wc_checkout_com' ),
+                ),
+                'default'     => 'ABC',
+            ),
+            'ckocom_sk'           => array(
                 'title'       => __( 'Secret Key', 'wc_checkout_com' ),
                 'type'        => 'text',
-                'description' => __( 'You can ' . '<a href="https://www.checkout.com/docs/the-hub/update-your-hub-settings#Manage_the_API_keys">find your secret key </a>' . 'in the Checkout.com Hub', 'wc_checkout_com' ),
+                'description' => sprintf( __( 'You can %s find your secret key %s in the Checkout.com Hub', 'wc_checkout_com' ), '<a class="checkoutcom-key-docs" href="' . esc_url( $docs_link ) . '">', '</a>' ),
                 'placeholder' => 'sk_xxx',
             ),
-            'ckocom_pk'          => array(
+            'ckocom_pk'           => array(
                 'title'       => __( 'Public Key', 'wc_checkout_com' ),
                 'type'        => 'text',
-                'description' => __( 'You can ' . '<a href="https://www.checkout.com/docs/the-hub/update-your-hub-settings#Manage_the_API_keys">find your public key </a>' . 'in the Checkout.com Hub', 'wc_checkout_com' ),
+                'description' => sprintf( __( 'You can %s find your public key %s in the Checkout.com Hub', 'wc_checkout_com' ), '<a class="checkoutcom-key-docs" href="' . esc_url( $docs_link ) . '">', '</a>' ),
                 'placeholder' => 'pk_xxx',
             ),
         );
@@ -655,4 +813,26 @@ class WC_Checkoutcom_Cards_Settings
 
         return apply_filters( 'wc_checkout_com_cards', $settings );
     }
+
+	/**
+	 * CKO webhook settings fields.
+     *
+	 * @return mixed
+	 */
+	public static function webhook_settings() {
+
+		$settings = array(
+			'webhook_settings'        => array(
+				'title'       => __( 'Webhook Details', 'wc_checkout_com' ),
+				'type'        => 'title',
+				'description' => '',
+			),
+			'cko_webhook_set'      => array(
+				'id'       => 'cko_webhook_set',
+				'type'     => 'checkoutcom_webhook_settings',
+			),
+		);
+
+		return apply_filters( 'wc_checkout_com_cards', $settings );
+	}
 }

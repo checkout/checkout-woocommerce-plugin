@@ -74,7 +74,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway
         $session_url = str_replace( 'https:', 'https:', add_query_arg( 'wc-api', 'wc_checkoutcom_session', home_url( '/' ) ) );
         $generate_token_url = str_replace( 'https:', 'https:', add_query_arg( 'wc-api', 'wc_checkoutcom_generate_token', home_url( '/' ) ) );
         $apple_settings = get_option('woocommerce_wc_checkout_com_apple_pay_settings');
-        $mada_enabled = $apple_settings['enable_mada_apple_pay'] == 'yes' ? true : false;
+        $mada_enabled = isset( $apple_settings['enable_mada_apple_pay'] ) && ( $apple_settings['enable_mada_apple_pay'] === 'yes' );
 
         if(!empty($this->get_option( 'description' ))){
             echo  $this->get_option( 'description' );

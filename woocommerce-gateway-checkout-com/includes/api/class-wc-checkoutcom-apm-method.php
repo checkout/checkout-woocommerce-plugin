@@ -266,7 +266,7 @@ class WC_Gateway_Checkout_Com_APM_Method {
     public static function get_sepa_info() {
 
         global $woocommerce;
-        
+
         $items           = $woocommerce->cart->get_cart();
         $is_subscription = false;
 
@@ -304,6 +304,9 @@ class WC_Gateway_Checkout_Com_APM_Method {
 
         $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
         $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
+
+        $core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
+
         $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
 
         $details = $checkout->sources()->add($sepa);
