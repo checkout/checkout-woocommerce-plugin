@@ -244,7 +244,10 @@ class WC_Checkout_Com_Webhook
     }
 
     /**
-     * Process webhook for refund payment
+     * Process webhook for refund payment.
+     * Order status will not be changed if it's not fully refunded,
+     * if it's fully refunded, order status will be changed to refunded
+     * status by WC.
      *
      * @param $data
      * @return bool
@@ -292,23 +295,23 @@ class WC_Checkout_Com_Webhook
 
         $refund_amount = WC_Checkoutcom_Utility::decimalToValue($amount, $order->get_currency() );
 
-        // Get cko refund status configured in admin - full refund
-        $status = WC_Admin_Settings::get_option('ckocom_order_refunded');
         $order_message = __("Checkout.com Payment Refunded " ."</br>". " Action ID : {$action_id} ", 'wc_checkout_com');
 
         // Check if webhook amount is less than order amount - partial refund
-        if ($amount < $order_amount_cents) {
+        if ( $amount < $order_amount_cents ) {
             $order_message = __("Checkout.com Payment partially refunded " ."</br>". " Action ID : {$action_id} ", 'wc_checkout_com');
-            $status = WC_Admin_Settings::get_option('ckocom_order_captured');
 
-            // handle partial refund
-            $refund = wc_create_refund(array('amount' => $refund_amount, 'reason' => "", 'order_id' => $order_id, 'line_items' => array()));
+            $refund = wc_create_refund( array( 'amount' => $refund_amount, 'reason' => "", 'order_id' => $order_id, 'line_items' => array(), ) );
 
+        } else if ( $amount == $order_amount_cents ) {
+            // Full refund.
+            $order_message = __( "Checkout.com Payment fully refunded " ."</br>". " Action ID : {$action_id} ", 'wc_checkout_com');
+
+            $refund = wc_create_refund( array( 'amount' => $refund_amount, 'reason' => "", 'order_id' => $order_id, 'line_items' => array(), ) );
         }
 
         // add notes for the order and update status
         $order->add_order_note($order_message);
-        $order->update_status($status);
 
         return true;
     }
