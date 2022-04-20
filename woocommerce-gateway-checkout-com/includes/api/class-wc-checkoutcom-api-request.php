@@ -142,7 +142,7 @@ class WC_Checkoutcom_Api_request
 	    $is_save_card       = false;
 	    $payment_option     = 'FramesJs';
 	    $apms_settings      = get_option( 'woocommerce_wc_checkout_com_alternative_payments_settings' );
-	    $apms_selected      = $apms_settings['ckocom_apms_selector'];
+	    $apms_selected      = ! empty( $apms_settings['ckocom_apms_selector'] ) ? $apms_settings['ckocom_apms_selector'] : array();
 
 	    $postData = sanitize_post( $_POST );
 	    $getData  = sanitize_post( $_GET );
