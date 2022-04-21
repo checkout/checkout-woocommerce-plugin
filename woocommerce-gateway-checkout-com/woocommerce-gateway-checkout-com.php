@@ -80,7 +80,7 @@ function get_selected_apms_Class() {
 
     // check if alternative payment method is enabled
     if ($apms_settings['enabled'] == true) {
-        $apm_selected = $apms_settings['ckocom_apms_selector'];
+        $apm_selected = ! empty( $apms_settings['ckocom_apms_selector'] ) ? $apms_settings['ckocom_apms_selector'] : array();
 
         // get apm selected and add the class name in array
         foreach($apm_selected as $value) {
