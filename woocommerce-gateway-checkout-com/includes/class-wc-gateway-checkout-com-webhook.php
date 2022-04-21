@@ -116,7 +116,7 @@ class WC_Checkout_Com_Webhook
 
         // check if payment is already captured
         $already_captured = get_post_meta($order_id, 'cko_payment_captured', true );
-        $message = '.Webhook received from checkout.com Payment captured';
+        $message = 'Webhook received from checkout.com Payment captured';
 
         $already_authorized = get_post_meta($order_id, 'cko_payment_authorized', true);
 
@@ -329,6 +329,8 @@ class WC_Checkout_Com_Webhook
         $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
         $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
         $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes' ? true : false;
+
+        $core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
 
         // Initialize the Checkout Api
         $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);

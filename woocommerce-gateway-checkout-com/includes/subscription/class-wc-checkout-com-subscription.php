@@ -85,9 +85,9 @@ class WC_Checkoutcom_Subscription {
             update_post_meta($order->get_id(), '_cko_source_id', $source_id);
         }
 
-        // check for subscription and save source id
-        if (class_exists("WC_Subscriptions_Order")) {
-            if ( WC_Subscriptions_Order::order_contains_subscription( $order_id )) {
+        // Check for subscription and save source id.
+        if ( function_exists( 'wcs_order_contains_subscription' ) ) {
+            if ( wcs_order_contains_subscription( $order_id )) {
                 $subscriptions = wcs_get_subscriptions_for_order( $order );
 
                 foreach($subscriptions as $subscription_obj) {
@@ -142,8 +142,8 @@ class WC_Checkoutcom_Subscription {
         }
 
         // check for subscription and save source id
-        if ( class_exists( 'WC_Subscriptions_Order' ) ) {
-            if ( WC_Subscriptions_Order::order_contains_subscription( $order_id ) ) {
+        if ( function_exists('wcs_order_contains_subscription' ) ) {
+            if ( wcs_order_contains_subscription( $order_id ) ) {
                 $subscriptions = wcs_get_subscriptions_for_order( $order );
 
                 foreach ( $subscriptions as $subscription_obj ) {
