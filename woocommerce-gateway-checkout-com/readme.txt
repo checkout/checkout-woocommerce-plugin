@@ -166,6 +166,13 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v4.3.9 21st Apr 2022
+- **[feat]** Add NAS account type support.
+- **[feat]** Add webhook registration and detection settings.
+- **[tweak]** Remove order status change in refund webhook.
+- **[fix]** Fix failed order status update on payment authorization.
+- **[fix]** Fix PHP warnings.
+
 v4.3.8 4th Apr 2022
 - **[feat]** Subscription support for SEPA DD payment method.
 - **[feat]** Text domain support with pot file.
