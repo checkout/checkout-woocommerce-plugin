@@ -28,7 +28,9 @@ class WC_Checkoutcom_Cards_Settings
 
 		wc_enqueue_js( "
 		    jQuery( function(){
-		        
+
+		        jQuery( '.submit .woocommerce-save-button' ).attr( 'disabled', 'disabled' ).hide();
+
 		        // Fetch latest webhooks.
 		        jQuery( '#checkoutcom-is-register-webhook' ).on( 'click', function() {
                     jQuery( this ).attr( 'disabled', 'disabled' );
@@ -56,8 +58,6 @@ class WC_Checkoutcom_Cards_Settings
                         jQuery( '#checkoutcom-is-register-webhook' ).removeAttr( 'disabled' );
                         jQuery( '#checkoutcom-is-register-webhook' ).siblings( '.spinner' ).removeClass( 'is-active' );
                     } );
-                    
-                    
                 } );
 		        
 		        // Register a new webhook.
