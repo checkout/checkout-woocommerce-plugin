@@ -468,3 +468,40 @@ function subscriptionCancelled( $subscription ) {
 
 	WC_Checkoutcom_Subscription::subscription_cancelled( $subscription );
 }
+
+/**
+ *  @TODO : Remove all below functions and logic once product is fixed.
+ */
+if ( cko_is_nas_account() ) {
+    add_filter( 'rewrite_rules_array', 'cko_add_rewrite_rules', -1 );
+    add_filter( 'query_vars', 'cko_add_query_vars' );
+    add_action( 'parse_request', 'cko_set_query_vars', -1, 1 );
+}
+
+function cko_add_rewrite_rules( $rules ) {
+
+    $new_rules = [];
+    foreach ( $rules as $rule => $value ) {
+
+        if ( '(.?.+?)(?:/([0-9]+))?/?$' === $rule ) {
+	        $new_rules['checkoutcom-callback'] = 'index.php?&cko-callback=true';
+        }
+	    $new_rules[ $rule ] = $value;
+    }
+
+    return $new_rules;
+}
+
+function cko_add_query_vars( $vars ) {
+    $vars[] = 'cko-callback';
+    $vars[] = 'cko-session-id';
+
+    return $vars;
+}
+
+function cko_set_query_vars( $wp ) {
+
+    if ( ! empty( $wp->query_vars['cko-callback'] ) ) {
+        $wp->set_query_var( 'wc-api', 'wc_checkoutcom_callback' );
+    }
+}
