@@ -217,8 +217,6 @@ class WC_Checkoutcom_Workflows {
 		if ( ! is_wp_error( $response ) && 201 === wp_remote_retrieve_response_code( $response ) ) {
 			$result = json_decode( wp_remote_retrieve_body( $response ), true );
 
-			error_log( var_export( $result, true ) );
-
 			if ( isset( $result['id'] ) ) {
 				return $response;
 			}
