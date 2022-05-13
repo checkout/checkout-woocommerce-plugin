@@ -6,24 +6,24 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Sepa extends WC_Gateway_Check
 
     public function __construct()
     {
-        $this->id = 'wc_checkout_com_alternative_payments_sepa';
-        $this->method_title = __("Checkout.com", 'wc_checkout_com');
-        $this->method_description = __("The Checkout.com extension allows shop owners to process online payments through the <a href=\"https://www.checkout.com\">Checkout.com Payment Gateway.</a>", 'wc_checkout_com');
-        $this->title = __("SEPA Direct Debit", 'wc_checkout_com');
-        $this->has_fields = true;
-        $this->supports = array(
+        $this->id                 = 'wc_checkout_com_alternative_payments_sepa';
+        $this->method_title       = __( 'Checkout.com', 'wc_checkout_com' );
+        $this->method_description = __( "The Checkout.com extension allows shop owners to process online payments through the <a href=\"https://www.checkout.com\">Checkout.com Payment Gateway.</a>", 'wc_checkout_com' );
+        $this->title              = __( 'SEPA Direct Debit', 'wc_checkout_com' );
+        $this->has_fields         = true;
+        $this->supports           = array(
             'products',
             'refunds',
             'subscriptions',
             'subscription_cancellation',
             'subscription_suspension',
             'subscription_reactivation',
-            'subscription_date_changes'
+            'subscription_date_changes',
         );
 
         $this->init_form_fields();
 
-        add_action('woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'process_admin_options'));
+        add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, array( $this, 'process_admin_options', ) );
     }
 
     public function payment_fields()
@@ -62,34 +62,40 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Sepa extends WC_Gateway_Check
         }
     }
 
-    public function process_payment( $order_id )
-    {
-        if (!session_id()) session_start();
+    public function process_payment( $order_id ) {
+        if ( ! session_id() ) {
+            session_start();
+        }
 
         global $woocommerce;
 
         $order = wc_get_order( $order_id );
 
-        // create alternative payment
-        $result =  (array) WC_Checkoutcom_Api_request::create_apm_payment($order, self::PAYMENT_METHOD);
+        // create alternative payment.
+        $result = (array) WC_Checkoutcom_Api_request::create_apm_payment( $order, self::PAYMENT_METHOD );
 
-        // check if result has error and return error message
-        if (isset($result['error']) && !empty($result['error'])) {
-            WC_Checkoutcom_Utility::wc_add_notice_self(__($result['error']), 'error');
+        // check if result has error and return error message.
+        if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {
+            WC_Checkoutcom_Utility::wc_add_notice_self( __( $result['error'] ) );
+
             return;
         }
 
-        $status = WC_Admin_Settings::get_option('ckocom_order_authorised');
-        $message = "";
+        $status  = WC_Admin_Settings::get_option( 'ckocom_order_authorised' );
+        $message = '';
 
-        if ($result['source']['type'] == self::PAYMENT_METHOD) {
+        if ( ! empty( $result['source'] ) && self::PAYMENT_METHOD === $result['source']['type'] ) {
 
-            $mandate = WC()->session->get( 'mandate_reference');
+            $mandate = WC()->session->get( 'mandate_reference' );
 
-            update_post_meta($order_id, 'cko_sepa_mandate_reference', $mandate);
+            update_post_meta( $order_id, 'cko_sepa_mandate_reference', $mandate );
             update_post_meta( $order_id, 'cko_payment_authorized', true );
 
-            $message = __("Checkout.com - Sepa payment " ."</br>". " Action ID : {$result['id']} - Sepa mandate reference : {$mandate} ", 'wc_checkout_com');
+            $message = sprintf(
+                esc_html__( 'Checkout.com - Sepa payment Action ID : %s - Sepa mandate reference : %s', 'wc_checkout_com' ),
+                $result['id'],
+                $mandate
+            );
 
             WC()->session->__unset( 'mandate_reference' );
 
@@ -97,32 +103,35 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Sepa extends WC_Gateway_Check
 
         // save source id for subscription.
         if ( class_exists( 'WC_Subscriptions_Order' ) ) {
-            WC_Checkoutcom_Subscription::save_source_id( $order_id, $order, $result['source']['id'] );
 
-            $mandate_cancel = WC()->session->get( 'mandate_cancel');
+            if ( ! empty( $result['source'] ) ) {
+                WC_Checkoutcom_Subscription::save_source_id( $order_id, $order, $result['source']['id'] );
+            }
+
+            $mandate_cancel = WC()->session->get( 'mandate_cancel' );
             if ( ! empty( $mandate_cancel ) ) {
                 WC_Checkoutcom_Subscription::save_mandate_cancel( $order_id, $order, $mandate_cancel );
                 WC()->session->__unset( 'mandate_cancel' );
             }
         }
 
-        update_post_meta($order_id, '_transaction_id', $result['id']);
-        update_post_meta($order_id, '_cko_payment_id', $result['id']);
+        update_post_meta( $order_id, '_transaction_id', $result['id'] );
+        update_post_meta( $order_id, '_cko_payment_id', $result['id'] );
 
-        // add notes for the order and update status
-        $order->add_order_note($message);
-        $order->update_status($status);
+        // add notes for the order and update status.
+        $order->add_order_note( $message );
+        $order->update_status( $status );
 
-        // Reduce stock levels
+        // Reduce stock levels.
         wc_reduce_stock_levels( $order_id );
 
-        // Remove cart
+        // Remove cart.
         $woocommerce->cart->empty_cart();
 
-        // Return thank you page
+        // Return thank you page.
         return array(
-            'result' => 'success',
-            'redirect' => $this->get_return_url( $order )
+            'result'   => 'success',
+            'redirect' => $this->get_return_url( $order ),
         );
 
     }

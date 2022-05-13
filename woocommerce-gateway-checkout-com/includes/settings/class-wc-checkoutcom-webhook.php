@@ -2,10 +2,8 @@
 
 include_once 'class-wc-checkoutcom-workflows.php';
 
-use Checkout\CheckoutApi;
-use Checkout\Models\Webhooks\Webhook;
-use Checkout\Library\Exceptions\CheckoutHttpException;
-use Checkout\Library\Exceptions\CheckoutModelException;
+use Checkout\CheckoutApiException;
+use Checkout\Webhooks\WebhookRequest;
 
 /**
  * Class WC_Checkoutcom_Webhook
@@ -30,14 +28,9 @@ class WC_Checkoutcom_Webhook {
 		add_action( 'wp_ajax_wc_checkoutcom_register_webhook', array( $this, 'ajax_register_webhook' ) );
 		add_action( 'wp_ajax_wc_checkoutcom_check_webhook', array( $this, 'ajax_check_webhook' ) );
 
-		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
-		$environment   = $core_settings['ckocom_environment'] === 'sandbox';
+		$this->ACCOUNT_TYPE = cko_is_nas_account() ? 'NAS' : 'ABC';
 
-		$core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
-
-		$this->ACCOUNT_TYPE = isset( $core_settings['ckocom_account_type'] ) ? $core_settings['ckocom_account_type'] : 'ABC';
-
-		$this->checkout = new CheckoutApi( $core_settings['ckocom_sk'], $environment );
+		$this->checkout = new Checkout_SDK();
 	}
 
 	/**
@@ -62,38 +55,33 @@ class WC_Checkoutcom_Webhook {
 
 		check_ajax_referer( 'checkoutcom_register_webhook', 'security' );
 
-		$http_code = false;
+		$w_id = false;
 
 		if ( 'ABC' === $this->ACCOUNT_TYPE ) {
 			$webhook_response = (array) $this->create( $this->generate_current_webhook_url() );
 
-			if ( isset( $webhook_response['error_codes'] ) && ! empty( $webhook_response['error_codes'] ) ) {
-				WC_Checkoutcom_Utility::wc_add_notice_self( $webhook_response['error_codes'], 'error' );
-
-				return;
+			if ( empty( $webhook_response ) || empty( $webhook_response['id'] ) ) {
+				WC_Checkoutcom_Utility::logger( $webhook_response, null );
 			}
 
-			$http_code = $webhook_response['http_code'];
+			$w_id = $webhook_response['id'];
 
 		} else {
 
 			// NAS account type.
-			// @todo: Use SDK to add webhooks or workflows.
-			$webhook_response = (array) WC_Checkoutcom_Workflows::get_instance()->create( $this->generate_current_webhook_url() );
+			$workflow_response = WC_Checkoutcom_Workflows::get_instance()->create( $this->generate_current_webhook_url() );
 
-			if ( isset( $webhook_response['response']['code'] ) && ! empty( $webhook_response['response']['code'] ) ) {
-				WC_Checkoutcom_Utility::wc_add_notice_self( $webhook_response['response']['code'], 'error' );
-
-				return;
+			if ( empty( $workflow_response ) || empty( $workflow_response['id'] ) ) {
+				WC_Checkoutcom_Utility::logger( $workflow_response, null );
 			}
 
-			$http_code = $webhook_response['response']['code'];
+			$w_id = $workflow_response['id'];
 		}
 
-		if ( 201 === $http_code ) {
-			wp_send_json_success();
-		} else {
+		if ( false === $w_id ) {
 			wp_send_json_error( null, 400 );
+		} else {
+			wp_send_json_success();
 		}
 
 		wp_die();
@@ -141,22 +129,21 @@ class WC_Checkoutcom_Webhook {
 		];
 
 		try {
-			$webhook = new Webhook( $url );
+			$webhookRequest = new WebhookRequest();
+			$webhookRequest->url = $url;
+			$webhookRequest->content_type = 'json';
+			$webhookRequest->event_types = $event_types;
+			$webhookRequest->active = true;
 
-			return $this->checkout->webhooks()->register( $webhook, $event_types );
+			return $this->checkout->get_builder()->getWebhooksClient()->registerWebhook( $webhookRequest );
 
-		} catch ( CheckoutModelException $ex ) {
-
-			$error_message = esc_html__( 'An error has occurred while processing your payment.', 'wc_checkout_com' );
-
-			WC_Checkoutcom_Utility::logger( $error_message, $ex );
-		} catch ( CheckoutHttpException $ex ) {
+		} catch ( CheckoutApiException $ex ) {
 			$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
 
 			$error_message = esc_html__( 'An error has occurred while processing webhook request.', 'wc_checkout_com' );
 
 			if ( $gateway_debug ) {
-				$error_message .= esc_html__( $ex->getMessage(), 'wc_checkout_com' );
+				$error_message .= $ex->getMessage();
 			}
 
 			WC_Checkoutcom_Utility::logger( $error_message, $ex );
@@ -180,7 +167,6 @@ class WC_Checkoutcom_Webhook {
 	public function ajax_check_webhook() {
 
 		check_ajax_referer( 'checkoutcom_check_webhook', 'security' );
-
 
 		if ( 'ABC' === $this->ACCOUNT_TYPE ) {
 			$webhook_is_ready = $this->is_registered();
@@ -221,8 +207,8 @@ class WC_Checkoutcom_Webhook {
 		}
 
 		foreach ( $webhooks as $item ) {
-			if ( str_contains( $item->url, $url ) ) {
-				$this->url_is_registered = $item->url;
+			if ( str_contains( $item['url'], $url ) ) {
+				$this->url_is_registered = $item['url'];
 
 				return $this->url_is_registered;
 			}
@@ -243,21 +229,21 @@ class WC_Checkoutcom_Webhook {
 		}
 
 		try {
-			$webhooks = $this->checkout->webhooks()->retrieve();
+			$webhooks = $this->checkout->get_builder()->getWebhooksClient()->retrieveWebhooks();
 
-			if ( isset( $webhooks->list ) && ! empty( $webhooks->list ) ) {
-				$this->list = $webhooks->list;
+			if ( isset( $webhooks ) && ! empty( $webhooks['items'] ) ) {
+				$this->list = $webhooks['items'];
 
 				return $this->list;
 			}
 
-		} catch ( CheckoutHttpException $ex ) {
+		} catch ( CheckoutApiException $ex ) {
 			$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
 
 			$error_message = esc_html__( 'An error has occurred while processing webhook request.', 'wc_checkout_com' );
 
 			if ( $gateway_debug ) {
-				$error_message .= __( $ex->getMessage(), 'wc_checkout_com' );
+				$error_message .= $ex->getMessage();
 			}
 
 			WC_Checkoutcom_Utility::logger( $error_message, $ex );

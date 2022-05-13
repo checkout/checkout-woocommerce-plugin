@@ -1,28 +1,27 @@
 <?php
 
-use Checkout\CheckoutApi;
-use Checkout\Models\Address;
-use Checkout\Models\Phone;
-use Checkout\Models\Payments\IdSource;
-use Checkout\Models\Payments\IdealSource;
-use Checkout\Models\Product;
-use Checkout\Models\Sources\Klarna;
-use Checkout\Models\Payments\KlarnaSource;
-use Checkout\Models\Payments\GiropaySource;
-use Checkout\Models\Payments\BoletoSource;
-use Checkout\Models\Payments\AlipaySource;
-use Checkout\Models\Payments\PoliSource;
-use Checkout\Models\Payments\EpsSource;
-use Checkout\Models\Payments\BancontactSource;
-use Checkout\Models\Payments\KnetSource;
-use Checkout\Models\Payments\FawrySource;
-use Checkout\Models\Payments\SofortSource;
-use Checkout\Models\Payments\QpaySource;
-use Checkout\Models\Payments\MultibancoSource;
-use Checkout\Models\Sources\SepaAddress;
-use Checkout\Models\Sources\SepaData;
-use Checkout\Models\Sources\Sepa;
-
+use Checkout\CheckoutApiException;
+use Checkout\Common\Address;
+use Checkout\Common\CustomerRequest;
+use Checkout\Payments\Payer;
+use Checkout\Payments\Source\Apm\FawryProduct;
+use Checkout\Payments\Source\Apm\IntegrationType;
+use Checkout\Payments\Source\Apm\RequestAlipaySource;
+use Checkout\Payments\Source\Apm\RequestBancontactSource;
+use Checkout\Payments\Source\Apm\RequestBoletoSource;
+use Checkout\Payments\Source\Apm\RequestEpsSource;
+use Checkout\Payments\Source\Apm\RequestFawrySource;
+use Checkout\Payments\Source\Apm\RequestGiropaySource;
+use Checkout\Payments\Source\Apm\RequestIdealSource;
+use Checkout\Payments\Source\Apm\RequestKlarnaSource;
+use Checkout\Payments\Source\Apm\RequestKnetSource;
+use Checkout\Payments\Source\Apm\RequestMultiBancoSource;
+use Checkout\Payments\Source\Apm\RequestPoliSource;
+use Checkout\Payments\Source\Apm\RequestQPaySource;
+use Checkout\Payments\Source\Apm\RequestSepaSource;
+use Checkout\Payments\Source\Apm\RequestSofortSource;
+use Checkout\Sources\SepaSourceRequest;
+use Checkout\Sources\SourceData;
 
 class WC_Gateway_Checkout_Com_APM_Method {
 
@@ -38,76 +37,73 @@ class WC_Gateway_Checkout_Com_APM_Method {
     }
 
     /**
-     *  @return Sofortsource
+     *  @return RequestSofortSource
      */
     public function sofort() {
 
-        $method = new SofortSource();
-
-        return $method;
+	    return new RequestSofortSource();
     }
 
     /**
-     *  @return AlipaySource
+     *  @return RequestAlipaySource
      */
     public function alipay() {
 
-        $method = new AlipaySource();
+        $method = new RequestAlipaySource();
 
         return $method;
     }
 
      /**
-     *  @return PoliSource
+     *  @return RequestPoliSource
      */
     public function poli() {
 
-        $method = new PoliSource();
-
-        return $method;
+	    return new RequestPoliSource();
     }
 
     /**
-     *  @return QpaySource
+     *  @return RequestQPaySource
      */
     public function qpay() {
 
-        $method = new QpaySource(get_bloginfo( 'name' ));
+	    $method              = new RequestQPaySource();
+	    $method->description = get_bloginfo( 'name' );
 
         return $method;
     }
 
     /**
-     *  @return GiropaySource
+     *  @return RequestGiropaySource
      */
     public function giropay() {
 
-        $bic = self::$dataInfo['giropay-bank-details'];
-        $purpose = self::$orderInfo->get_order_number(). '-' . $_SERVER['HTTP_HOST'];
-
-        $method = new GiropaySource($purpose, $bic);
+	    $method          = new RequestGiropaySource();
+	    $method->purpose = self::$orderInfo->get_order_number(). '-' . $_SERVER['HTTP_HOST'];
 
         return $method;
     }
 
     /**
-     *  @return BoletoSource
+     *  @return RequestBoletoSource
      */
     public function boleto() {
 
-        $payer = [
-            'name' => self::$dataInfo['name'],
-            'email' => self::$post['billing_email'],
-            'document' => self::$dataInfo['cpf']
-        ];
+	    $payer           = new Payer();
+	    $payer->name     = self::$dataInfo['name'];
+	    $payer->email    = self::$dataInfo['billing_email'];
+	    $payer->document = self::$dataInfo['cpf'];
 
-        $method = new BoletoSource('redirect', self::$post['billing_country'], $payer);
+	    $method                   = new RequestBoletoSource();
+	    $method->integration_type = IntegrationType::$redirect;
+	    $method->country          = self::$post['billing_country'];
+	    $method->payer            = $payer;
 
-        return $method;
+	    return $method;
     }
 
     /**
-     *  @return KnetSource
+     *  @return RequestKnetSource
      */
     public function knet() {
 
@@ -122,92 +118,104 @@ class WC_Gateway_Checkout_Com_APM_Method {
                 break;
         }
 
-        $method = new KnetSource($language);
+	    $method           = new RequestKnetSource();
+	    $method->language = $language;
 
         return $method;
     }
 
     /**
-     *  @return EpsSource
+     *  @return RequestEpsSource
      */
     public function eps() {
 
-        $purpose = get_bloginfo( 'name' );
-        $method = new EpsSource($purpose);
+	    $method          = new RequestEpsSource();
+	    $method->purpose = get_bloginfo( 'name' );
 
         return $method;
     }
 
      /**
-     *  @return BancontactSource
+     *  @return RequestBancontactSource
      */
     public function bancontact() {
 
-        $accountHolder = self::$post['billing_first_name'] . ' '. self::$post['billing_last_name'];
-        $countryCode = self::$post['billing_country'];
-
-        $method = new BancontactSource($accountHolder, $countryCode);
+	    $method                      = new RequestBancontactSource();
+	    $method->account_holder_name = self::$post['billing_first_name'] . ' '. self::$post['billing_last_name'];
+	    $method->payment_country     = self::$post['billing_country'];
 
         return $method;
     }
 
     /**
-     *  @return IdSource
+     *  @return RequestSepaSource
      */
     public function sepa() {
 
         $details = self::get_sepa_info();
-        $method = new IdSource($details->getId());
+
+	    $method = new RequestSepaSource();
+
+		$method->id = $details['id'];
 
         return $method;
     }
 
     /**
-     *  @return IdealSource
+     *  @return RequestIdealSource
      */
     public function ideal() {
 
-        $bic = self::$dataInfo['issuer-id'];
-        $description = self::$orderInfo->get_order_number();
-
-        $method = new IdealSource($bic, $description);
+		$method              = new RequestIdealSource();
+        $method->bic         = self::$dataInfo['issuer-id'];
+        $method->description = self::$orderInfo->get_order_number();
 
         return $method;
     }
 
     /**
-     *  @return FawrySource
+     *  @return RequestFawrySource
      */
-    public function fawry() {
+	public function fawry() {
 
-        $fawryInfo = self::get_fawry_info();
-        $method = new FawrySource($fawryInfo['email'], $fawryInfo['phone'], self::$orderInfo->get_order_number(), $fawryInfo['products']);
+		$fawryInfo = self::get_fawry_info();
 
-        return $method;
-    }
+		$method                  = new RequestFawrySource();
+		$method->customer_email  = $fawryInfo['email'];
+		$method->customer_mobile = $fawryInfo['phone'];
+		$method->description     = self::$orderInfo->get_order_number();
+		$method->products        = $fawryInfo['products'];
+
+		return $method;
+	}
 
     /**
-     *  @return MultibancoSource
+     *  @return RequestMultiBancoSource
      */
     public function multibanco() {
 
-        $accountHolder = self::$post['billing_first_name'] . ' ' . self::$post['billing_last_name'];
-        $countryCode   = self::$post['billing_country'];
-
-        $method = new MultibancoSource( $countryCode, $accountHolder );
+	    $method                      = new RequestMultiBancoSource();
+	    $method->account_holder_name = self::$post['billing_first_name'] . ' ' . self::$post['billing_last_name'];
+	    $method->payment_country     = self::$post['billing_country'];
 
         return $method;
     }
 
     /**
-     *  @return KlarnaSource
+     *  @return RequestKlarnaSource
      */
     public function klarna() {
 
         $klarnaInfo = self::get_klarna_info();
         $cartInfo = WC_Checkoutcom_Api_request::get_cart_info();
 
-        $method = new KlarnaSource(self::$post['cko-klarna-token'], self::$post['billing_country'], strtolower($cartInfo['locale']), $klarnaInfo['billingAddress'], $cartInfo['order_tax_amount'], $cartInfo['order_lines']);
+	    $method                      = new RequestKlarnaSource();
+	    $method->authorization_token = self::$post['cko-klarna-token'];
+	    $method->purchase_country    = self::$post['billing_country'];
+	    $method->locale              = strtolower( $cartInfo['locale'] );
+	    $method->tax_amount          = $cartInfo['order_tax_amount'];
+	    $method->products            = $cartInfo['order_lines'];
+		$method->billing_address     = $klarnaInfo['billingAddress'];
 
         return $method;
     }
@@ -217,7 +225,9 @@ class WC_Gateway_Checkout_Com_APM_Method {
      */
 
     /**
-     *  Gather fawry info
+     * Gather fawry info.
+     *
+     * @return array
      */
     public static function get_fawry_info() {
 
@@ -233,13 +243,15 @@ class WC_Gateway_Checkout_Com_APM_Method {
         $products = array();
         $totalProductAmount = 0;
 
-        foreach ($productInfo as $item) {
-            $products[] = array(
-                "product_id" => $item['name'],
-                "quantity" => $item['quantity'],
-                "price" => $item['unit_price'],
-                "description" => $item['name'],
-                );
+        foreach ( $productInfo as $item ) {
+
+	        $fawry_product              = new FawryProduct();
+	        $fawry_product->product_id  = $item['name'];
+	        $fawry_product->quantity    = $item['quantity'];
+	        $fawry_product->price       = $item['unit_price'];
+	        $fawry_product->description = $item['name'];
+
+			$products[] = $fawry_product;
 
             $totalProductAmount += $item['unit_price'] * $item['quantity'];
         }
@@ -261,7 +273,7 @@ class WC_Gateway_Checkout_Com_APM_Method {
     /**
      * Gather info for sepa payment and create source ID
      *
-     * @return IdSource
+     * @return array
      */
     public static function get_sepa_info() {
 
@@ -279,45 +291,57 @@ class WC_Gateway_Checkout_Com_APM_Method {
             }
         }
 
-        $customerAddress = self::$post['billing_address_1'] . ' ' . self::$post['billing_address_2'];
-        $address = new SepaAddress(
-            $customerAddress,
-            self::$post['billing_city'],
-            self::$post['billing_postcode'],
-            self::$post['billing_country']
-        );
+	    $address                = new Address();
+	    $address->address_line1 = self::$post['billing_address_1'];
+	    $address->address_line2 = self::$post['billing_address_2'];
+	    $address->city          = self::$post['billing_city'];
+	    $address->zip           = self::$post['billing_postcode'];
+	    $address->country       = self::$post['billing_country'];
 
-        $data = new SepaData(
-            self::$post['billing_first_name'],
-            self::$post['billing_last_name'],
-            self::$post['sepa-iban'],
-            self::$post['sepa-bic'],
-            "Thanks for shopping.",
-            $is_subscription ? 'recurring' : 'single'
-        );
+	    $source_data                     = new SourceData();
+	    $source_data->first_name         = self::$post['billing_first_name'];
+	    $source_data->last_name          = self::$post['billing_last_name'];
+	    $source_data->account_iban       = self::$post['sepa-iban'];
+	    $source_data->bic                = self::$post['sepa-bic'];
+	    $source_data->billing_descriptor = 'Thanks for shopping.';
+	    $source_data->mandate_type       = $is_subscription ? 'recurring' : 'single';
 
-        $sepa = new Sepa($address, $data);
-        $sepa->customer = array(
-          'email' => self::$post['billing_email'],
-          'name' => self::$post['billing_first_name'] . ' ' . self::$post['billing_last_name']
-        );
+	    $customer_request        = new CustomerRequest();
+	    $customer_request->email = self::$post['billing_email'];
+	    $customer_request->name  = self::$post['billing_first_name'] . ' ' . self::$post['billing_last_name'];
 
-        $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
-        $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
+	    $sepa_source_request                  = new SepaSourceRequest();
+	    $sepa_source_request->billing_address = $address;
+	    $sepa_source_request->source_data     = $source_data;
+	    $sepa_source_request->customer        = $customer_request;
 
-        $core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
+	    $checkout = new Checkout_SDK();
 
-        $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
+	    $response = [];
 
-        $details = $checkout->sources()->add($sepa);
-        $responseData = $details->response_data;
-        WC()->session->set('mandate_reference', $responseData['mandate_reference']);
+	    try {
 
-	    if ( isset( $details->_links['sepa:mandate-cancel']['href'] ) ) {
-		    WC()->session->set( 'mandate_cancel', $details->_links['sepa:mandate-cancel']['href'] );
+		    $builder = $checkout->get_builder();
+
+			// SEPA support for ABC AC type only.
+			if ( method_exists( $builder, 'getSourcesClient' ) ) {
+
+				$response = $builder->getSourcesClient()->createSepaSource( $sepa_source_request );
+
+				$response_data = $response['response_data'];
+
+			    WC()->session->set('mandate_reference', $response_data['mandate_reference']);
+
+			    if ( isset( $response['_links']['sepa:mandate-cancel']['href'] ) ) {
+				    WC()->session->set( 'mandate_cancel', $response['_links']['sepa:mandate-cancel']['href'] );
+			    }
+			}
+	    } catch ( CheckoutApiException $ex ) {
+		    $error_message = __( 'An error has occurred while getting sepa info.', 'wc_checkout_com' );
+		    WC_Checkoutcom_Utility::logger( $error_message, $ex );
 	    }
 
-        return $details;
+	    return $response;
     }
 
     /**
@@ -326,22 +350,22 @@ class WC_Gateway_Checkout_Com_APM_Method {
      */
     public static function get_klarna_info() {
 
-        $klarnaInfo = array();
+	    $klarna_info = array();
 
-        // Set Billing address
-        $billingAddressParam = new Address();
-        $billingAddressParam->given_name = self::$post['billing_first_name'];
-        $billingAddressParam->family_name = self::$post['billing_last_name'];
-        $billingAddressParam->email = self::$post['billing_email'];
-        $billingAddressParam->street_address = self::$post['billing_address_1'];
-        $billingAddressParam->postal_code = self::$post['billing_postcode'];
-        $billingAddressParam->city = self::$post['billing_city'];
-        $billingAddressParam->region = self::$post['billing_city'];
-        $billingAddressParam->phone = self::$post['billing_phone'];
-        $billingAddressParam->country = self::$post['billing_country'];
+	    // Set Billing address.
+	    $billing_address_param                 = new Address();
+	    $billing_address_param->given_name     = self::$post['billing_first_name'];
+	    $billing_address_param->family_name    = self::$post['billing_last_name'];
+	    $billing_address_param->email          = self::$post['billing_email'];
+	    $billing_address_param->street_address = self::$post['billing_address_1'];
+	    $billing_address_param->postal_code    = self::$post['billing_postcode'];
+	    $billing_address_param->city           = self::$post['billing_city'];
+	    $billing_address_param->region         = self::$post['billing_city'];
+	    $billing_address_param->phone          = self::$post['billing_phone'];
+	    $billing_address_param->country        = self::$post['billing_country'];
 
-        $klarnaInfo['billingAddress'] = $billingAddressParam;
+	    $klarna_info['billingAddress'] = $billing_address_param;
 
-        return $klarnaInfo;
+	    return $klarna_info;
     }
 }

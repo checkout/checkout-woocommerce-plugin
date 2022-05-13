@@ -1,5 +1,10 @@
 <?php
-include_once "lib/checkout-sdk-php/checkout.php";
+
+include_once "lib/class-checkout-sdk.php";
+
+if ( is_readable( __DIR__ . '/lib/vendor/autoload.php' ) ) {
+	require __DIR__ . '/lib/vendor/autoload.php';
+}
 include_once('settings/class-wc-checkoutcom-cards-settings.php');
 include_once('settings/class-wc-checkoutcom-webhook.php');
 include_once('settings/admin/class-wc-checkoutcom-admin.php');
@@ -7,9 +12,10 @@ include_once('api/class-wc-checkoutcom-api-request.php');
 include_once ('class-wc-gateway-checkout-com-webhook.php');
 include_once('subscription/class-wc-checkout-com-subscription.php');
 
-use Checkout\Library\Exceptions\CheckoutHttpException;
-use Checkout\Library\Exceptions\CheckoutModelException;
-
+use Checkout\CheckoutApiException;
+use Checkout\Common\CustomerRequest;
+use Checkout\Payments\Source\RequestTokenSource;
+use Checkout\Payments\ThreeDsRequest;
 
 class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 {
@@ -307,113 +313,117 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
     }
 
     /**
-     * Process payment with card payment
+     * Process payment with card payment.
      *
      * @param int $order_id
      * @return
      */
     public function process_payment( $order_id )
     {
-        if (!session_id()) session_start();
+	    if ( ! session_id() ) {
+		    session_start();
+	    }
 
-        global $woocommerce;
-        $order = wc_get_order( $order_id );
+	    global $woocommerce;
+	    $order = wc_get_order( $order_id );
 
-        // check if card token or token_id exist
-        if(sanitize_text_field($_POST['wc-wc_checkout_com_cards-payment-token'])) {
-            if(sanitize_text_field($_POST['wc-wc_checkout_com_cards-payment-token']) == 'new') {
-                $arg = sanitize_text_field($_POST['cko-card-token']);
-            } else {
-                $arg = sanitize_text_field($_POST['wc-wc_checkout_com_cards-payment-token']);
-            }
+	    // Check if card token or token_id exist.
+	    if ( sanitize_text_field( $_POST['wc-wc_checkout_com_cards-payment-token'] ) ) {
+		    if ( sanitize_text_field( $_POST['wc-wc_checkout_com_cards-payment-token'] ) == 'new' ) {
+			    $arg = sanitize_text_field( $_POST['cko-card-token'] );
+		    } else {
+			    $arg = sanitize_text_field( $_POST['wc-wc_checkout_com_cards-payment-token'] );
+		    }
+	    }
+
+	    // Check if empty card token and empty token_id.
+	    if ( empty( $arg ) ) {
+		    // check if card token exist.
+		    if ( sanitize_text_field( $_POST['cko-card-token'] ) ) {
+			    $arg = sanitize_text_field( $_POST['cko-card-token'] );
+		    } else {
+			    WC_Checkoutcom_Utility::wc_add_notice_self( __( 'There was an issue completing the payment.', 'wc_checkout_com' ), 'error' );
+
+			    return;
+		    }
+	    }
+
+	    // Create payment with card token.
+	    $result = (array) WC_Checkoutcom_Api_request::create_payment( $order, $arg );
+
+	    // check if result has error and return error message.
+	    if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {
+		    WC_Checkoutcom_Utility::wc_add_notice_self( __( $result['error'] ), 'error' );
+
+		    return;
+	    }
+
+	    // Get save card config from module setting.
+	    $save_card = WC_Admin_Settings::get_option( 'ckocom_card_saved' );
+
+	    // Check if result contains 3d redirection url.
+	    if ( isset( $result['3d'] ) && ! empty( $result['3d'] ) ) {
+
+		    // Check if save card is enable and customer select to save card.
+		    if ( $save_card && isset( $_POST['wc-wc_checkout_com_cards-new-payment-method'] ) && sanitize_text_field( $_POST['wc-wc_checkout_com_cards-new-payment-method'] ) ) {
+			    // Save in session for 3D secure payment.
+			    $_SESSION['wc-wc_checkout_com_cards-new-payment-method'] = isset( $_POST['wc-wc_checkout_com_cards-new-payment-method'] );
+		    }
+
+		    // Redirect to 3D secure page.
+		    return array(
+			    'result'   => 'success',
+			    'redirect' => $result['3d'],
+		    );
+	    }
+
+        // Save card in db.
+	    if ( $save_card && isset( $_POST['wc-wc_checkout_com_cards-new-payment-method'] ) && sanitize_text_field( $_POST['wc-wc_checkout_com_cards-new-payment-method'] ) ) {
+            $this->save_token( get_current_user_id(), $result );
         }
 
-        // Check if empty card token and empty token_id
-        if(empty($arg)){
-            // check if card token exist
-            if(sanitize_text_field($_POST['cko-card-token'])){
-                $arg = sanitize_text_field($_POST['cko-card-token']);
-            } else {
-                WC_Checkoutcom_Utility::wc_add_notice_self(__('There was an issue completing the payment.', 'wc_checkout_com'), 'error');
-                return;
-            }
-        }
+	    // Save source id for subscription.
+	    if ( class_exists( "WC_Subscriptions_Order" ) ) {
+		    WC_Checkoutcom_Subscription::save_source_id( $order_id, $order, $result['source']['id'] );
+	    }
 
-        // Create payment with card token
-        $result = (array)  WC_Checkoutcom_Api_request::create_payment($order, $arg);
+	    // Set action id as woo transaction id.
+	    update_post_meta( $order_id, '_transaction_id', $result['action_id'] );
+	    update_post_meta( $order_id, '_cko_payment_id', $result['id'] );
+
+	    // Get cko auth status configured in admin.
+	    $status  = WC_Admin_Settings::get_option( 'ckocom_order_authorised' );
+	    $message = sprintf( esc_html__( 'Checkout.com Payment Authorised - Action ID : %s', 'wc_checkout_com' ), $result['action_id'] );
 
 
-        // check if result has error and return error message
-        if (isset($result['error']) && !empty($result['error'])) {
-            WC_Checkoutcom_Utility::wc_add_notice_self(__($result['error']), 'error');
-            return;
-        }
+	    // Check if payment was flagged.
+	    if ( $result['risk']['flagged'] ) {
+		    // Get cko auth status configured in admin.
+		    $status  = WC_Admin_Settings::get_option( 'ckocom_order_flagged' );
+		    $message = sprintf( esc_html__( 'Checkout.com Payment Flagged - Action ID : %s', 'wc_checkout_com' ), $result['action_id'] );
+	    }
 
-        // Get save card config from module setting
-        $save_card =  WC_Admin_Settings::get_option('ckocom_card_saved');
+	    // Add notes for the order.
+	    $order->add_order_note( $message );
 
-        // check if result contains 3d redirection url
-        // Redirect to 3D secure page
-        if (isset($result['3d']) &&!empty($result['3d'])) {
-
-            // check if save card is enable and customer select to save card
-            if ( $save_card && isset( $_POST['wc-wc_checkout_com_cards-new-payment-method'] ) && sanitize_text_field( $_POST['wc-wc_checkout_com_cards-new-payment-method'] ) ) {
-                // save in session for 3D secure payment
-                $_SESSION['wc-wc_checkout_com_cards-new-payment-method'] = isset($_POST['wc-wc_checkout_com_cards-new-payment-method']);
-            }
-
-            return array(
-                'result'        => 'success',
-                'redirect'      => $result['3d'],
-            );
-        }
-
-        // save card in db
-        if($save_card && sanitize_text_field($_POST['wc-wc_checkout_com_cards-new-payment-method'])){
-            $this->save_token(get_current_user_id(), $result);
-        }
-
-        // save source id for subscription
-        if (class_exists("WC_Subscriptions_Order")) {
-            WC_Checkoutcom_Subscription::save_source_id($order_id, $order, $result['source']['id']);
-        }
-
-        // Set action id as woo transaction id
-        update_post_meta($order_id, '_transaction_id', $result['action_id']);
-        update_post_meta($order_id, '_cko_payment_id', $result['id']);
-
-        // Get cko auth status configured in admin
-        $status = WC_Admin_Settings::get_option('ckocom_order_authorised');
-        $message = __("Checkout.com Payment Authorised " ."</br>". " Action ID : {$result['action_id']} ", 'wc_checkout_com');
-
-        // check if payment was flagged
-        if ($result['risk']['flagged']) {
-            // Get cko auth status configured in admin
-            $status = WC_Admin_Settings::get_option('ckocom_order_flagged');
-            $message = __("Checkout.com Payment Flagged " ."</br>". " Action ID : {$result['action_id']} ", 'wc_checkout_com');
-        }
-
-        // add notes for the order
-        $order->add_order_note($message);
-
-        $order_status = $order->get_status();
+	    $order_status = $order->get_status();
 
 	    if ( $order_status == 'pending' || $order_status == 'failed' ) {
-            update_post_meta($order_id, 'cko_payment_authorized', true);
-            $order->update_status($status);
-        }
+		    update_post_meta( $order_id, 'cko_payment_authorized', true );
+		    $order->update_status( $status );
+	    }
 
-        // Reduce stock levels
-        wc_reduce_stock_levels( $order_id );
+	    // Reduce stock levels.
+	    wc_reduce_stock_levels( $order_id );
 
-        // Remove cart
-        $woocommerce->cart->empty_cart();
+	    // Remove cart.
+	    $woocommerce->cart->empty_cart();
 
-        // Return thank you page
-        return array(
-            'result' => 'success',
-            'redirect' => $this->get_return_url( $order )
-        );
+	    // Return thank you page.
+	    return array(
+		    'result'   => 'success',
+		    'redirect' => $this->get_return_url( $order ),
+	    );
     }
 
     /**
@@ -542,108 +552,110 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
         exit();
     }
 
-    public function add_payment_method()
-    {
-        // check if cko card token is not empty
-        if (empty($_POST['cko-card-token'])) {
-            return array(
-                'result'   => 'failure', // success
-                'redirect' => wc_get_endpoint_url( 'payment-methods' ),
-            );
-        }
+	/**
+     * Handle add Payment Method from My Account page.
+     *
+	 * @return array
+	 */
+	public function add_payment_method() {
+		// Check if cko card token is not empty.
+		if ( empty( $_POST['cko-card-token'] ) ) {
+			return array(
+				'result'   => 'failure',
+				'redirect' => wc_get_endpoint_url( 'payment-methods' ),
+			);
+		}
 
-        // load module settings
-        $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
-        $environment = $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
-        $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes' ? true : false;
+		$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) == 'yes';
 
-        $core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
+		// Load method with card token.
+		$method        = new RequestTokenSource();
+		$method->token = sanitize_text_field( $_POST['cko-card-token'] );
 
-        // Initialize the Checkout Api
-        $checkout = new Checkout\CheckoutApi($core_settings['ckocom_sk'], $environment);
+		// Initialize the Checkout Api.
+		$checkout          = new Checkout_SDK();
+		$payment           = $checkout->get_payment_request();
+		$payment->source   = $method;
+		$payment->currency = get_woocommerce_currency();
 
-        // Load method with card token
-        $method = new Checkout\Models\Payments\TokenSource(sanitize_text_field($_POST['cko-card-token']));
+		// Load current user.
+		$current_user = wp_get_current_user();
 
-        $payment = new Checkout\Models\Payments\Payment($method, get_woocommerce_currency());
+		// Set customer email and name to payment request.
+		$customer        = new CustomerRequest();
+		$customer->email = $current_user->user_email;
+		$customer->name  = $current_user->first_name . ' ' . $current_user->last_name;
 
-        // Load current user
-        $current_user = wp_get_current_user();
-        // Set customer email and name to payment request
-        $payment->customer = array(
-            'email' => $current_user->user_email,
-            'name' => $current_user->first_name. ' ' . $current_user->last_name
-        );
+		$payment->customer = $customer;
 
-        $metadata = array(
-            'card_verification' => true,
-            'redirection_url' => wc_get_endpoint_url( 'payment-methods' )
-        );
-        // Set Metadata in card verfication request
-        // to use in callback handler
-        $payment->metadata = $metadata;
+		// Set Metadata in card verification request to use in callback handler.
+		$payment->metadata = array(
+			'card_verification' => true,
+			'redirection_url'   => wc_get_endpoint_url( 'payment-methods' ),
+		);
 
-        // Set redirection url in payment request
-        $redirection_url = add_query_arg( 'wc-api', 'wc_checkoutcom_callback', home_url( '/' ) );
-        $payment->success_url = $redirection_url;
-        $payment->failure_url = $redirection_url;
+		// Set redirection url in payment request.
+		$redirection_url      = add_query_arg( 'wc-api', 'wc_checkoutcom_callback', home_url( '/' ) );
+		$payment->success_url = $redirection_url;
+		$payment->failure_url = $redirection_url;
 
-        // to remove
-        $three_ds = new Checkout\Models\Payments\ThreeDs(true);
-        $payment->threeDs = $three_ds;
-        // end to remove
+		// to remove
+		$three_ds          = new ThreeDsRequest();
+		$three_ds->enabled = true;
 
-        try {
-            $response = $checkout->payments()->request($payment);
+		$payment->three_ds = $three_ds;
+		// end to remove
 
-            // Check if payment successful
-            if ($response->isSuccessful()) {
+		try {
+			$response = $checkout->get_builder()->getPaymentsClient()->requestPayment( $payment );
 
-                // Check if payment is 3Dsecure
-                if ($response->isPending()) {
-                    // Check if redirection link exist
-                    if ($response->getRedirection()) {
-                        // return 3d redirection url
-                        wp_redirect($response->getRedirection());
-                        exit();
+			// Check if payment successful.
+			if ( WC_Checkoutcom_Utility::is_successful( $response ) ) {
 
-                    } else {
-                        return array(
-                            'result'   => 'failure',
-                            'redirect' => wc_get_endpoint_url( 'payment-methods' ),
-                        );
-                    }
-                } else {
-                    $this->save_token($current_user->ID ,  (array) $response);
+				// Check if payment is 3D secure.
+				if ( WC_Checkoutcom_Utility::is_pending( $response ) ) {
+					// Check if redirection link exist.
+					if ( WC_Checkoutcom_Utility::getRedirectUrl( $response ) ) {
+						// Return 3d redirection url.
+						wp_redirect( WC_Checkoutcom_Utility::getRedirectUrl( $response ) );
+						exit();
 
-                    return array(
-                        'result'   => 'success',
-                    );
-                }
-            } else {
-                return array(
-                    'result'   => 'failure',
-                    'redirect' => wc_get_endpoint_url( 'payment-methods' ),
-                );
-            }
+					} else {
+						return array(
+							'result'   => 'failure',
+							'redirect' => wc_get_endpoint_url( 'payment-methods' ),
+						);
+					}
+				} else {
+					$this->save_token( $current_user->ID, (array) $response );
 
-        } catch (CheckoutHttpException $ex) {
-            $error_message = "An error has occurred while processing your cancel request.";
+					return array(
+						'result' => 'success',
+					);
+				}
+			} else {
+				return array(
+					'result'   => 'failure',
+					'redirect' => wc_get_endpoint_url( 'payment-methods' ),
+				);
+			}
 
-            // check if gateway response is enable from module settings
-            if ($gateway_debug) {
-                $error_message .= __($ex->getMessage() , 'wc_checkout_com');
-            }
+		} catch ( CheckoutApiException $ex ) {
+			$error_message = esc_html__( 'An error has occurred while processing your cancel request. ', 'wc_checkout_com' );
 
-            // Log message
-            WC_Checkoutcom_Utility::logger($error_message, $ex);
+			// check if gateway response is enabled from module settings.
+			if ( $gateway_debug ) {
+				$error_message .= $ex->getMessage();
+			}
 
-            return array(
-                'result'   => 'failure',
-                'redirect' => wc_get_endpoint_url( 'payment-methods' ),
-            );
-        }
-    }
+			WC_Checkoutcom_Utility::logger( $error_message, $ex );
+
+			return array(
+				'result'   => 'failure',
+				'redirect' => wc_get_endpoint_url( 'payment-methods' ),
+			);
+		}
+	}
 
     /**
      * Save source_id in db
