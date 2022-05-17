@@ -70,9 +70,16 @@ jQuery(function () {
       return logos;
     }
     var errors = {};
-    errors["card-number"] = "Please enter a valid card number";
-    errors["expiry-date"] = "Please enter a valid expiry date";
-    errors["cvv"] = "Please enter a valid cvv code";
+    if ( cko_frames_vars['card-number'] ) {
+      errors["card-number"] = cko_frames_vars["card-number"];
+      errors["expiry-date"] = cko_frames_vars["expiry-date"];
+      errors["cvv"] = cko_frames_vars["cvv"];
+    } else {
+      errors["card-number"] = "Please enter a valid card number";
+      errors["expiry-date"] = "Please enter a valid expiry date";
+      errors["cvv"] = "Please enter a valid cvv code";
+    }
+
 
     Frames.addEventHandler(
       Frames.Events.FRAME_VALIDATION_CHANGED,
