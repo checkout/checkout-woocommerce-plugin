@@ -140,6 +140,14 @@ function cko_frames_js()
 {
     wp_register_script( 'cko-frames-script', 'https://cdn.checkout.com/js/framesv2.min.js', array( 'jquery' ) );
     wp_enqueue_script( 'cko-frames-script' );
+
+	$vars = array(
+		'card-number' => esc_html__( 'Please enter a valid card number', 'wc_checkout_com' ),
+		'expiry-date' => esc_html__( 'Please enter a valid expiry date', 'wc_checkout_com' ),
+		'cvv'         => esc_html__( 'Please enter a valid cvv code', 'wc_checkout_com' ),
+	);
+
+	wp_localize_script( 'cko-frames-script', 'cko_frames_vars', $vars );
 }
 
 /*
@@ -156,7 +164,7 @@ function cko_check_if_empty()
                 && $_POST['wc-wc_checkout_com_cards-payment-token'] !== 'new' ){
             // check if cvv is empty on checkout page
             if ( empty( $_POST['wc_checkout_com_cards-card-cvv']  ) ) {
-                wc_add_notice( 'Please enter a valid cvv.', 'error' );
+                wc_add_notice( esc_html__( 'Please enter a valid cvv.', 'wc_checkout_com' ), 'error' );
             }
         }
     }
