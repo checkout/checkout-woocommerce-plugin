@@ -76,4 +76,45 @@ class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway
             </script>
         <?php
     }
+
+	/**
+	 * Process refund for the order.
+	 *
+	 * @param int    $order_id Order ID.
+	 * @param int    $amount   Amount to refund.
+	 * @param string $reason   Refund reason.
+	 *
+	 * @return bool
+	 */
+    public function process_refund( $order_id, $amount = null, $reason = '' ) {
+
+	    $order  = wc_get_order( $order_id );
+	    $result = (array) WC_Checkoutcom_Api_request::refund_payment( $order_id, $order );
+
+	    // check if result has error and return error message.
+	    if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {
+		    WC_Checkoutcom_Utility::wc_add_notice_self( $result['error'] );
+
+		    return false;
+	    }
+
+	    // Set action id as woo transaction id.
+	    update_post_meta( $order_id, '_transaction_id', $result['action_id'] );
+	    update_post_meta( $order_id, 'cko_payment_refunded', true );
+
+	    if ( isset( $_SESSION['cko-refund-is-less'] ) ) {
+		    if ( $_SESSION['cko-refund-is-less'] ) {
+			    $order->add_order_note( sprintf( __( 'Checkout.com Payment Partially refunded from Admin - Action ID : %s', 'wc_checkout_com' ), $result['action_id'] ) );
+
+			    unset( $_SESSION['cko-refund-is-less'] );
+
+			    return true;
+		    }
+	    }
+
+	    $order->add_order_note( sprintf( __( 'Checkout.com Payment refunded from Admin - Action ID : %s', 'wc_checkout_com' ), $result['action_id'] ) );
+
+	    // when true is returned, status is changed to refunded automatically.
+	    return true;
+    }
 }

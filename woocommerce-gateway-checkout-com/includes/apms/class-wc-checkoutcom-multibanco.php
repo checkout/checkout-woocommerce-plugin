@@ -22,7 +22,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Multibanco extends WC_Gateway
 		$this->method_title       = __( 'Checkout.com', 'wc_checkout_com' );
 		$this->method_description = __( 'The Checkout.com extension allows shop owners to process online payments through the <a href=\"https://www.checkout.com\">Checkout.com Payment Gateway.</a>', 'wc_checkout_com' );
 		$this->title              = __( 'Pay by Multibanco with Checkout.com', 'wc_checkout_com' );
-		$this->supports           = array( 'products', 'refunds' );
+		$this->supports           = array( 'products' );
 		$this->has_fields         = true;
 
 		$this->init_form_fields();

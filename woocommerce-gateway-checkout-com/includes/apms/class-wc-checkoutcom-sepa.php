@@ -147,40 +147,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Sepa extends WC_Gateway_Check
      */
     public function process_refund( $order_id, $amount = null, $reason = '' ) {
 
-        $order  = wc_get_order( $order_id );
-        $result = (array) WC_Checkoutcom_Api_request::refund_payment( $order_id, $order );
-
-        // check if result has error and return error message.
-        if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {
-            WC_Checkoutcom_Utility::wc_add_notice_self( __( $result['error'] ), 'error' );
-
-            return false;
-        }
-
-        // Set action id as woo transaction id.
-        update_post_meta( $order_id, '_transaction_id', $result['action_id'] );
-        update_post_meta( $order_id, 'cko_payment_refunded', true );
-
-        // Get cko auth status configured in admin.
-        $status  = WC_Admin_Settings::get_option( 'ckocom_order_refunded' );
-        $message = __( "Checkout.com Payment refunded from Admin " . "</br>" . " Action ID : {$result['action_id']} ", 'wc_checkout_com' );
-
-        if ( isset( $_SESSION['cko-refund-is-less'] ) ) {
-            if ( $_SESSION['cko-refund-is-less'] ) {
-                $status = WC_Admin_Settings::get_option( 'ckocom_order_captured' );
-                $order->add_order_note( __( "Checkout.com Payment Partially refunded from Admin " . "</br>" . " Action ID : {$result['action_id']}", 'wc_checkout_com' ) );
-
-                unset( $_SESSION['cko-refund-is-less'] );
-
-                return true;
-            }
-        }
-
-        // add note for order
-        $order->add_order_note( $message );
-
-        // when true is returned, status is changed to refunded automatically.
-        return true;
+	    return parent::process_refund( $order_id, $amount, $reason );
     }
 
 }

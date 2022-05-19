@@ -14,7 +14,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway
         $this->method_description   = __("The Checkout.com extension allows shop owners to process online payments through the <a href=\"https://www.checkout.com\">Checkout.com Payment Gateway.</a>", 'wc_checkout_com');
         $this->title                = __("Apple Pay", 'wc_checkout_com');
         $this->has_fields = true;
-        $this->supports = array( 'products' );
+        $this->supports = array( 'products', 'refund' );
 
         $this->init_form_fields();
         $this->init_settings();
@@ -460,118 +460,161 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway
     <?php
   }
 
-  public function applepay_sesion()
-  {
-      $url = $_POST["url"];
-      $domain = $_POST["domain"];
-      $displayName = $_POST["displayName"];
+	public function applepay_sesion() {
+		$url         = $_POST["url"];
+		$domain      = $_POST["domain"];
+		$displayName = $_POST["displayName"];
 
-      $merchantId = $this->get_option( 'ckocom_apple_mercahnt_id' );
-      $certificate = $this->get_option( 'ckocom_apple_certificate' );
-      $certificateKey = $this->get_option( 'ckocom_apple_key' );
+		$merchantId     = $this->get_option( 'ckocom_apple_mercahnt_id' );
+		$certificate    = $this->get_option( 'ckocom_apple_certificate' );
+		$certificateKey = $this->get_option( 'ckocom_apple_key' );
 
-      if (
-          "https" == parse_url($url, PHP_URL_SCHEME) &&
-          substr(parse_url($url, PHP_URL_HOST), -10) == ".apple.com"
-      ) {
-          $ch = curl_init();
+		if (
+			"https" == parse_url( $url, PHP_URL_SCHEME ) &&
+			substr( parse_url( $url, PHP_URL_HOST ), - 10 ) == ".apple.com"
+		) {
+			$ch = curl_init();
 
-          $data =
-              '{
+			$data =
+				'{
                   "merchantIdentifier":"' . $merchantId . '",
                   "domainName":"' . $domain . '",
                   "displayName":"' . $displayName . '"
               }';
 
-          curl_setopt($ch, CURLOPT_URL, $url);
-          curl_setopt($ch, CURLOPT_SSLCERT, $certificate);
-          curl_setopt($ch, CURLOPT_SSLKEY, $certificateKey);
+			curl_setopt( $ch, CURLOPT_URL, $url );
+			curl_setopt( $ch, CURLOPT_SSLCERT, $certificate );
+			curl_setopt( $ch, CURLOPT_SSLKEY, $certificateKey );
 
-          curl_setopt($ch, CURLOPT_POST, 1);
-          curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
+			curl_setopt( $ch, CURLOPT_POST, 1 );
+			curl_setopt( $ch, CURLOPT_POSTFIELDS, $data );
 
-          // TODO: throw error and log it
-          if (curl_exec($ch) === false) {
-              echo '{"curlError":"' . curl_error($ch) . '"}';
-          }
+			// TODO: throw error and log it
+			if ( curl_exec( $ch ) === false ) {
+				echo '{"curlError":"' . curl_error( $ch ) . '"}';
+			}
 
-          // close cURL resource, and free up system resources
-          curl_close($ch);
+			// close cURL resource, and free up system resources
+			curl_close( $ch );
 
-          exit();
-      }
-  }
+			exit();
+		}
+	}
 
-  public function applepay_token()
-  {
-      // Generate apple token
-      $token = WC_Checkoutcom_Api_request::generate_apple_token();
+	public function applepay_token() {
+		// Generate apple token
+		$token = WC_Checkoutcom_Api_request::generate_apple_token();
 
-      echo $token;
+		echo $token;
 
-      exit();
-  }
+		exit();
+	}
 
- /**
-   * Process payment with apple pay
-   *
-   * @param int $order_id
-   * @return array
-   */
-  public function process_payment( $order_id )
-  {
-      if (!session_id()) session_start();
+	/**
+	 * Process payment with apple pay
+	 *
+	 * @param int $order_id
+	 *
+	 * @return array
+	 */
+	public function process_payment( $order_id ) {
+		if ( ! session_id() ) {
+			session_start();
+		}
 
-      global $woocommerce;
-      $order = new WC_Order( $order_id );
+		global $woocommerce;
+		$order = new WC_Order( $order_id );
 
-      // create google token from google payment data
-      $apple_token = $_POST['cko-apple-card-token'];
+		// create google token from google payment data
+		$apple_token = $_POST['cko-apple-card-token'];
 
-      // Check if apple token is not empty
-      if(empty($apple_token)) {
-          WC_Checkoutcom_Utility::wc_add_notice_self(__('There was an issue completing the payment.', 'wc_checkout_com'), 'error');
-          return;
-      }
+		// Check if apple token is not empty
+		if ( empty( $apple_token ) ) {
+			WC_Checkoutcom_Utility::wc_add_notice_self( __( 'There was an issue completing the payment.', 'wc_checkout_com' ), 'error' );
 
-      // Create payment with google token
-      $result = (array) (new WC_Checkoutcom_Api_request)->create_payment($order, $apple_token);
+			return;
+		}
 
-      // check if result has error and return error message
-      if (isset($result['error']) && !empty($result['error'])) {
-          WC_Checkoutcom_Utility::wc_add_notice_self(__($result['error']), 'error');
-          return;
-      }
+		// Create payment with google token
+		$result = (array) ( new WC_Checkoutcom_Api_request )->create_payment( $order, $apple_token );
 
-      // Set action id as woo transaction id
-      update_post_meta($order_id, '_transaction_id', $result['action_id']);
-      update_post_meta($order_id, '_cko_payment_id', $result['id']);
+		// check if result has error and return error message
+		if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {
+			WC_Checkoutcom_Utility::wc_add_notice_self( __( $result['error'] ), 'error' );
 
-      // Get cko auth status configured in admin
-      $status = WC_Admin_Settings::get_option('ckocom_order_authorised');
-      $message = __("Checkout.com Payment Authorised " ."</br>". " Action ID : {$result['action_id']} ", 'wc_checkout_com');
+			return;
+		}
 
-      // check if payment was flagged
-      if ($result['risk']['flagged']) {
-          // Get cko auth status configured in admin
-          $status = WC_Admin_Settings::get_option('ckocom_order_flagged');
-          $message = __("Checkout.com Payment Flagged " ."</br>". " Action ID : {$result['action_id']} ", 'wc_checkout_com');
-      }
+		// Set action id as woo transaction id
+		update_post_meta( $order_id, '_transaction_id', $result['action_id'] );
+		update_post_meta( $order_id, '_cko_payment_id', $result['id'] );
 
-      // add notes for the order and update status
-      $order->add_order_note($message);
-      $order->update_status($status);
+		// Get cko auth status configured in admin
+		$status  = WC_Admin_Settings::get_option( 'ckocom_order_authorised' );
+		$message = __( "Checkout.com Payment Authorised " . "</br>" . " Action ID : {$result['action_id']} ", 'wc_checkout_com' );
 
-      // Reduce stock levels
-      wc_reduce_stock_levels( $order_id );
+		// check if payment was flagged
+		if ( $result['risk']['flagged'] ) {
+			// Get cko auth status configured in admin
+			$status  = WC_Admin_Settings::get_option( 'ckocom_order_flagged' );
+			$message = __( "Checkout.com Payment Flagged " . "</br>" . " Action ID : {$result['action_id']} ", 'wc_checkout_com' );
+		}
 
-      // Remove cart
-      $woocommerce->cart->empty_cart();
+		// add notes for the order and update status
+		$order->add_order_note( $message );
+		$order->update_status( $status );
 
-      // Return thank you page
-      return array(
-          'result' => 'success',
-          'redirect' => $this->get_return_url( $order )
-      );
-  }
+		// Reduce stock levels
+		wc_reduce_stock_levels( $order_id );
+
+		// Remove cart
+		$woocommerce->cart->empty_cart();
+
+		// Return thank you page
+		return array(
+			'result'   => 'success',
+			'redirect' => $this->get_return_url( $order ),
+		);
+	}
+
+	/**
+	 * Process refund for the order.
+	 *
+	 * @param int    $order_id Order ID.
+	 * @param int    $amount   Amount to refund.
+	 * @param string $reason   Refund reason.
+	 *
+	 * @return bool
+	 */
+	public function process_refund( $order_id, $amount = null, $reason = '' ) {
+
+		$order  = wc_get_order( $order_id );
+		$result = (array) WC_Checkoutcom_Api_request::refund_payment( $order_id, $order );
+
+		// check if result has error and return error message.
+		if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {
+			WC_Checkoutcom_Utility::wc_add_notice_self( $result['error'] );
+
+			return false;
+		}
+
+		// Set action id as woo transaction id.
+		update_post_meta( $order_id, '_transaction_id', $result['action_id'] );
+		update_post_meta( $order_id, 'cko_payment_refunded', true );
+
+		if ( isset( $_SESSION['cko-refund-is-less'] ) ) {
+			if ( $_SESSION['cko-refund-is-less'] ) {
+				$order->add_order_note( sprintf( __( 'Checkout.com Payment Partially refunded from Admin - Action ID : %s', 'wc_checkout_com' ), $result['action_id'] ) );
+
+				unset( $_SESSION['cko-refund-is-less'] );
+
+				return true;
+			}
+		}
+
+		$order->add_order_note( sprintf( __( 'Checkout.com Payment refunded from Admin - Action ID : %s', 'wc_checkout_com' ), $result['action_id'] ) );
+
+		// when true is returned, status is changed to refunded automatically.
+		return true;
+	}
 }

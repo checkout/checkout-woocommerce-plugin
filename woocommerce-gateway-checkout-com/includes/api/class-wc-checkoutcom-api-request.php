@@ -786,7 +786,7 @@ class WC_Checkoutcom_Api_request
 				return $response;
 			}
 		} catch ( CheckoutApiException $ex ) {
-			$error_message = esc_html__( 'An error has occurred while processing your refund.', 'wc_checkout_com' );
+			$error_message = esc_html__( 'An error has occurred while processing your refund. ', 'wc_checkout_com' );
 
 			// check if gateway response is enabled from module settings.
 			if ( $gateway_debug ) {

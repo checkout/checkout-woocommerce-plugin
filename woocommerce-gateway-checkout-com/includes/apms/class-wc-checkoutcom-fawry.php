@@ -24,7 +24,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Fawry extends WC_Gateway_Chec
         $apm_available = WC_Checkoutcom_Utility::get_alternative_payment_methods();
         $message = __("Pay with Fawry", 'wc_checkout_com');
 
-        ?>  
+        ?>
             <p style="margin-bottom: 0;"> <?php echo $message ?> </p>
         <?php
 
@@ -54,14 +54,14 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Fawry extends WC_Gateway_Chec
             return;
         }
 
-   
+
         $status = WC_Admin_Settings::get_option('ckocom_order_authorised');
         $message = "";
 
         if ($result['source']['type'] == self::PAYMENT_METHOD) {
             update_post_meta($order_id, 'cko_fawry_reference_number', $result['source']['reference_number']);
             update_post_meta($order_id, 'cko_payment_authorized', true);
-            
+
             // Get cko auth status configured in admin
             $message = __("Checkout.com - Fawry payment " ."</br>". " Action ID : {$result['id']} - Fawry reference number : {$result['source']['reference_number']} ", 'wc_checkout_com');
 
@@ -91,4 +91,17 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Fawry extends WC_Gateway_Chec
         );
     }
 
+	/**
+	 * Process refund for the order.
+	 *
+	 * @param int    $order_id Order ID.
+	 * @param int    $amount   Amount to refund.
+	 * @param string $reason   Refund reason.
+	 *
+	 * @return bool
+	 */
+	public function process_refund( $order_id, $amount = null, $reason = '' ) {
+
+		return parent::process_refund( $order_id, $amount, $reason );
+	}
 }
