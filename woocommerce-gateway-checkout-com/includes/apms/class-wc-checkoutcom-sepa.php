@@ -81,7 +81,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Sepa extends WC_Gateway_Check
             return;
         }
 
-        $status  = WC_Admin_Settings::get_option( 'ckocom_order_authorised' );
+        $status  = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
         $message = '';
 
         if ( ! empty( $result['source'] ) && self::PAYMENT_METHOD === $result['source']['type'] ) {

@@ -31,7 +31,7 @@ class WC_Checkout_Com_Webhook
         }
 
         $already_authorized = get_post_meta($order_id, 'cko_payment_authorized', true);
-        $auth_status = WC_Admin_Settings::get_option('ckocom_order_authorised');
+        $auth_status = WC_Admin_Settings::get_option('ckocom_order_authorised', 'on-hold');
         $message = 'Webhook received from checkout.com. Payment Authorized';
 
         // Add note to order if Authorized already
@@ -82,7 +82,7 @@ class WC_Checkout_Com_Webhook
         update_post_meta($order_id, '_transaction_id', $action_id);
 
         // Get cko capture status configured in admin
-        $status = WC_Admin_Settings::get_option('ckocom_order_captured');
+        $status = WC_Admin_Settings::get_option('ckocom_order_captured', 'processing');
 
         // update status of the order
         $order->update_status($status);
@@ -144,7 +144,7 @@ class WC_Checkout_Com_Webhook
         update_post_meta($order_id, 'cko_payment_captured', true);
 
         // Get cko capture status configured in admin
-        $status = WC_Admin_Settings::get_option('ckocom_order_captured');
+        $status = WC_Admin_Settings::get_option('ckocom_order_captured', 'processing');
         $order_message = __("Checkout.com Payment Captured " ."</br>". " Action ID : {$action_id} ", 'wc_checkout_com');
 
         // Check if webhook amount is less than order amount
@@ -226,7 +226,7 @@ class WC_Checkout_Com_Webhook
         update_post_meta($order_id, 'cko_payment_voided', true);
 
         // Get cko capture status configured in admin
-        $status = WC_Admin_Settings::get_option('ckocom_order_void');
+        $status = WC_Admin_Settings::get_option('ckocom_order_void', 'cancelled');
         $order_message = __("Checkout.com Payment Voided " ."</br>". " Action ID : {$action_id} ", 'wc_checkout_com');
 
         // add notes for the order and update status

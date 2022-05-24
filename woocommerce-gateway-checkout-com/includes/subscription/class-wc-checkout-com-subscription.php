@@ -49,13 +49,13 @@ class WC_Checkoutcom_Subscription {
         }
 
         // Get cko auth status configured in admin
-        $status = WC_Admin_Settings::get_option('ckocom_order_authorised');
+        $status = WC_Admin_Settings::get_option('ckocom_order_authorised', 'on-hold');
         $message = __("Checkout.com Payment Authorised " ."</br>". " Action ID : {$payment_result['action_id']} ", 'wc_checkout_com');
 
         // check if payment was flagged
         if ($payment_result['risk']['flagged']) {
             // Get cko auth status configured in admin
-            $status = WC_Admin_Settings::get_option('ckocom_order_flagged');
+            $status = WC_Admin_Settings::get_option('ckocom_order_flagged', 'flagged');
             $message = __("Checkout.com Payment Flagged " ."</br>". " Action ID : {$payment_result['action_id']} ", 'wc_checkout_com');
         }
 

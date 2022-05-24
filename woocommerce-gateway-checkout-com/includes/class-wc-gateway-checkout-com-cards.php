@@ -392,14 +392,14 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
 	    update_post_meta( $order_id, '_cko_payment_id', $result['id'] );
 
 	    // Get cko auth status configured in admin.
-	    $status  = WC_Admin_Settings::get_option( 'ckocom_order_authorised' );
+	    $status  = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
 	    $message = sprintf( esc_html__( 'Checkout.com Payment Authorised - Action ID : %s', 'wc_checkout_com' ), $result['action_id'] );
 
 
 	    // Check if payment was flagged.
 	    if ( $result['risk']['flagged'] ) {
 		    // Get cko auth status configured in admin.
-		    $status  = WC_Admin_Settings::get_option( 'ckocom_order_flagged' );
+		    $status  = WC_Admin_Settings::get_option( 'ckocom_order_flagged', 'flagged' );
 		    $message = sprintf( esc_html__( 'Checkout.com Payment Flagged - Action ID : %s', 'wc_checkout_com' ), $result['action_id'] );
 	    }
 
@@ -498,24 +498,24 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
         update_post_meta($order_id, '_cko_payment_id', $result['id']);
 
         // Get cko auth status configured in admin
-        $status = WC_Admin_Settings::get_option('ckocom_order_authorised');
+        $status = WC_Admin_Settings::get_option('ckocom_order_authorised', 'on-hold');
         $message = __("Checkout.com Payment Authorised " ."</br>". " Action ID : {$action['0']['id']} ", 'wc_checkout_com');
 
         // check if payment was flagged
         if ($result['risk']['flagged']) {
             // Get cko auth status configured in admin
-            $status = WC_Admin_Settings::get_option('ckocom_order_flagged');
+            $status = WC_Admin_Settings::get_option('ckocom_order_flagged', 'flagged');
             $message = __("Checkout.com Payment Flagged " ."</br>". " Action ID : {$action['0']['id']} ", 'wc_checkout_com');
         }
 
         if ( 'Canceled' === $result['status'] ) {
-            $status  = WC_Admin_Settings::get_option( 'ckocom_order_void' );
+            $status  = WC_Admin_Settings::get_option( 'ckocom_order_void', 'cancelled' );
             $message = __( "Checkout.com Payment Canceled" . "</br>" . " Action ID : {$action['0']['id']} ", 'wc_checkout_com' );
         }
 
         if ($result['status'] == 'Captured') {
             update_post_meta($order_id, 'cko_payment_captured', true);
-            $status = WC_Admin_Settings::get_option('ckocom_order_captured');
+            $status = WC_Admin_Settings::get_option('ckocom_order_captured', 'processing');
             $message = __("Checkout.com Payment Captured" ."</br>". " Action ID : {$action['0']['id']} ", 'wc_checkout_com');
         }
 
@@ -719,12 +719,12 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
         update_post_meta($order_id, 'cko_payment_refunded', true);
 
         // Get cko auth status configured in admin
-        $status = WC_Admin_Settings::get_option('ckocom_order_refunded');
+        $status = WC_Admin_Settings::get_option('ckocom_order_refunded', 'refunded');
         $message = __("Checkout.com Payment refunded from Admin " ."</br>". " Action ID : {$result['action_id']} ", 'wc_checkout_com');
 
         if(isset($_SESSION['cko-refund-is-less'])){
             if($_SESSION['cko-refund-is-less']){
-                $status = WC_Admin_Settings::get_option('ckocom_order_captured');
+                $status = WC_Admin_Settings::get_option('ckocom_order_captured', 'processing');
                 $order->add_order_note( __("Checkout.com Payment Partially refunded from Admin " ."</br>". " Action ID : {$result['action_id']}", 'wc_checkout_com') );
 
                 unset($_SESSION['cko-refund-is-less']);

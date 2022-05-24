@@ -550,13 +550,13 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway
 		update_post_meta( $order_id, '_cko_payment_id', $result['id'] );
 
 		// Get cko auth status configured in admin
-		$status  = WC_Admin_Settings::get_option( 'ckocom_order_authorised' );
+		$status  = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
 		$message = __( "Checkout.com Payment Authorised " . "</br>" . " Action ID : {$result['action_id']} ", 'wc_checkout_com' );
 
 		// check if payment was flagged
 		if ( $result['risk']['flagged'] ) {
 			// Get cko auth status configured in admin
-			$status  = WC_Admin_Settings::get_option( 'ckocom_order_flagged' );
+			$status  = WC_Admin_Settings::get_option( 'ckocom_order_flagged', 'flagged' );
 			$message = __( "Checkout.com Payment Flagged " . "</br>" . " Action ID : {$result['action_id']} ", 'wc_checkout_com' );
 		}
 
