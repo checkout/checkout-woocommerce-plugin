@@ -6,6 +6,6 @@
     },
     "require": {
         "php": ">=5.6",
-        "checkout/checkout-sdk-php": "^2.3"
+        "checkout/checkout-sdk-php": "^2.4"
     }
 }

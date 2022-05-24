@@ -4,20 +4,20 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "c0ae6c9df6cd226e7279c7ec841dd175",
+    "content-hash": "abd58589e50cc6ee5339235e1bda534d",
     "packages": [
         {
             "name": "checkout/checkout-sdk-php",
-            "version": "2.3.0",
+            "version": "2.4.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/checkout/checkout-sdk-php.git",
-                "reference": "0fc453603db9738b70447303cbc3b4f32ac1ebfa"
+                "reference": "8f38a9e476aa7344da77ba65aa9d0515d054581f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/checkout/checkout-sdk-php/zipball/0fc453603db9738b70447303cbc3b4f32ac1ebfa",
-                "reference": "0fc453603db9738b70447303cbc3b4f32ac1ebfa",
+                "url": "https://api.github.com/repos/checkout/checkout-sdk-php/zipball/8f38a9e476aa7344da77ba65aa9d0515d054581f",
+                "reference": "8f38a9e476aa7344da77ba65aa9d0515d054581f",
                 "shasum": ""
             },
             "require": {
@@ -70,9 +70,9 @@
             ],
             "support": {
                 "issues": "https://github.com/checkout/checkout-sdk-php/issues",
-                "source": "https://github.com/checkout/checkout-sdk-php/tree/2.3.0"
+                "source": "https://github.com/checkout/checkout-sdk-php/tree/2.4.0"
             },
-            "time": "2022-05-10T15:31:25+00:00"
+            "time": "2022-05-17T17:58:54+00:00"
         },
         {
             "name": "guzzlehttp/guzzle",
