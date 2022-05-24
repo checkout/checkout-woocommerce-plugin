@@ -1,10 +1,10 @@
 ﻿=== Checkout.com Payment Gateway ===
 Contributors: checkoutintegration
-Tags: checkout, payments, credit card, Payment gateway, Apple pay, Payment request
+Tags: checkout, payments, credit card, payment gateway, apple pay, google pay, payment request
 Requires at least: 4.0
 Stable tag: trunk
-Requires PHP: 5.6
-Tested up to: 5.9.1
+Requires PHP: 7.2
+Tested up to: 5.9.3
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -166,6 +166,12 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v4.4.0 24th May 2022
+- **[feat]** Add refund support for APMs and Apple Pay.
+- **[update]** Upgraded Checkout API SDK to latest version 2.4.0
+- **[fix]** Order status not changing on webhook received.
+- **[fix]** Strings added for translation.
+
 v4.3.9 21st Apr 2022
 - **[feat]** Add NAS account type support.
 - **[feat]** Add webhook registration and detection settings.

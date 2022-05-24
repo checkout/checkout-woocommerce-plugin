@@ -1,15 +1,16 @@
 <?php
 /**
- * Plugin Name: Checkout.com Payment Gateway - DEV
+ * Plugin Name: Checkout.com Payment Gateway
  * Plugin URI: https://www.checkout.com/
  * Description: Extends WooCommerce by Adding the Checkout.com Gateway.
  * Author: Checkout.com
  * Author URI: https://www.checkout.com/
- * Version: 4.3.9
+ * Version: 4.4.0
  * Requires at least: 4.0
- * Stable tag: 4.3.9
+ * Stable tag: 4.4.0
  * Tested up to: 5.9.3
- * WC tested up to: 6.4.1
+ * WC tested up to: 6.5.1
+ * Requires PHP: 7.2
  * Text Domain: wc_checkout_com
  * Domain Path: /languages
  */

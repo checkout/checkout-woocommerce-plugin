@@ -19,7 +19,7 @@ use Checkout\Payments\ThreeDsRequest;
 
 class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 {
-    const PLUGIN_VERSION = '4.3.9';
+    const PLUGIN_VERSION = '4.4.0';
 
     /**
      * WC_Gateway_Checkout_Com_Cards constructor.
