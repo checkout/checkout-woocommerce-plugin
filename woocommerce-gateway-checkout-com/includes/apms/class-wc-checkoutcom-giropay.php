@@ -18,11 +18,11 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Giropay extends WC_Gateway_Ch
     }
 
     public function payment_fields()
-    {   
+    {
         // get available apms depending on currency
         $apm_available = WC_Checkoutcom_Utility::get_alternative_payment_methods();
         $message = __("Pay with Giropay. You will be redirected upon place order", 'wc_checkout_com');
-        
+
         ?>
             <p style="margin-bottom: 0;"> <?php echo $message ?> </p>
         <?php
@@ -33,8 +33,6 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Giropay extends WC_Gateway_Ch
                     jQuery('.payment_method_wc_checkout_com_alternative_payments_giropay').hide();
                 </script>
             <?php
-        } else {
-             WC_Checkoutcom_Apm_Templates::get_giropay_bank();
         }
 
     }

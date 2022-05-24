@@ -1,8 +1,6 @@
 <?php
 
-use Checkout\CheckoutApi;
-use Checkout\Library\Exceptions\CheckoutHttpException;
-use Checkout\Library\Exceptions\CheckoutModelException;
+use Checkout\CheckoutApiException;
 
 class WC_Checkout_Com_Webhook
 {
@@ -10,7 +8,7 @@ class WC_Checkout_Com_Webhook
      * authorize_payment
      *
      * @param  mixed $data
-     * @return void
+     * @return boolean
      */
     public static function authorize_payment($data)
     {
@@ -54,7 +52,6 @@ class WC_Checkout_Com_Webhook
 
         $order->add_order_note(__($message, 'wc_checkout_com'));
         $order->update_status($auth_status);
-
 
         return true;
     }
@@ -110,7 +107,6 @@ class WC_Checkout_Com_Webhook
         }
 
         // Load order form order id
-        // $order = wc_get_order( $order_id );
         $order = self::get_wc_order($order_id);
         $order_id = $order->get_id();
 
@@ -180,9 +176,7 @@ class WC_Checkout_Com_Webhook
         }
 
         // Load order form order id
-        // $order = wc_get_order( $order_id );
         $order = self::get_wc_order($order_id);
-        $order_id = $order->get_id();
 
         $message = 'Webhook received from checkout.com. Payment capture declined. Reason : '.$webhook_data->response_summary;
 
@@ -209,7 +203,6 @@ class WC_Checkout_Com_Webhook
         }
 
         // Load order form order id
-        // $order = wc_get_order( $order_id );
         $order = self::get_wc_order($order_id);
         $order_id = $order->get_id();
 
@@ -324,53 +317,47 @@ class WC_Checkout_Com_Webhook
      */
     public static function cancel_payment($data)
     {
-        $webhook_data = $data->data;
-        $payment_id = $webhook_data->id;
-        $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
-        $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
-        $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes' ? true : false;
+        $webhook_data  = $data->data;
+        $payment_id    = $webhook_data->id;
+        $gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) == 'yes';
 
-        $core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
-
-        // Initialize the Checkout Api
-        $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
+        // Initialize the Checkout Api.
+	    $checkout = new Checkout_SDK();
 
         try {
-            // Check if payment is already voided or captured on checkout.com hub
-            $details = $checkout->payments()->details($payment_id);
+            // Check if payment is already voided or captured on checkout.com hub.
+	        $details = $checkout->get_builder()->getPaymentsClient()->getPaymentDetails( $payment_id );
 
-            $order_id = $details->metadata->order_id;
+            $order_id = ! empty( $details['metadata']['order_id'] ) ? $details['metadata']['order_id'] : null;
 
-            // return false if no order id
-            if (empty($order_id)) {
-                WC_Checkoutcom_Utility::logger('No order id' , null);
+            // Return false if no order id.
+            if ( empty( $order_id ) ) {
+                WC_Checkoutcom_Utility::logger( 'No order id', null );
+
                 return false;
             }
 
-            // Load order form order id
-            // $order = wc_get_order( $order_id );
-            $order = self::get_wc_order($order_id);
-            $order_id = $order->get_id();
+            // Load order form order id.
+            $order = self::get_wc_order( $order_id );
 
-            $status = 'wc-cancelled';
+            $status  = 'wc-cancelled';
             $message = 'Webhook received from checkout.com. Payment cancelled';
 
-            // add notes for the order and update status
-            $order->add_order_note($message);
-            $order->update_status($status);
+            // Add notes for the order and update status.
+            $order->add_order_note( $message );
+            $order->update_status( $status );
 
             return true;
 
-        } catch (CheckoutHttpException $ex) {
-            $error_message = "An error has occurred while processing your cancel request.";
+        } catch ( CheckoutApiException $ex ) {
+            $error_message = 'An error has occurred while processing your cancel request.';
 
-            // check if gateway response is enable from module settings
-            if ($gateway_debug) {
-                $error_message .= __($ex->getMessage() , 'wc_checkout_com');
+            // Check if gateway response is enabled from module settings.
+            if ( $gateway_debug ) {
+                $error_message .= $ex->getMessage();
             }
 
-            // Log message
-            WC_Checkoutcom_Utility::logger($error_message, $ex);
+            WC_Checkoutcom_Utility::logger( $error_message, $ex );
 
             return false;
         }
@@ -380,49 +367,29 @@ class WC_Checkout_Com_Webhook
      * Desc : This function is used to change the status of an order which are created following
      * Status changed from "pending payment to Failed"
      */
-    public static function decline_payment($data)
-    {
-        $webhook_data = $data->data;
-        $order_id = $webhook_data->metadata->order_id;
-        $payment_id = $webhook_data->id;
-        $response_summary = $webhook_data->response_summary;
+	public static function decline_payment( $data ) {
+		$webhook_data     = $data->data;
+		$order_id         = $webhook_data->metadata->order_id;
+		$payment_id       = $webhook_data->id;
+		$response_summary = $webhook_data->response_summary;
 
-        if (empty($order_id)) {
-            WC_Checkoutcom_Utility::logger('No order id for payment '.$paymentID , null);
+		if ( empty( $order_id ) ) {
+			WC_Checkoutcom_Utility::logger( 'No order id for payment ' . $payment_id, null );
 
-            return false;
-        }
+			return false;
+		}
 
-        // $order = wc_get_order( $order_id );
-        $order = self::get_wc_order($order_id);
-        $order_id = $order->get_id();
+		$order = self::get_wc_order( $order_id );
 
-        $status = "wc-failed";
-        $message = "Webhook received from checkout.com. Payment declined Reason : ".$response_summary;
+		$status  = 'wc-failed';
+		$message = 'Webhook received from checkout.com. Payment declined Reason : ' . $response_summary;
 
-        try{
+		// Add notes for the order and update status.
+		$order->add_order_note( $message );
+		$order->update_status( $status );
 
-            // add notes for the order and update status
-            $order->add_order_note($message);
-            $order->update_status($status);
-
-            return true;
-
-        }catch (CheckoutHttpException $ex) {
-            $error_message = "An error has occurred while processing your cancel request.";
-
-            // check if gateway response is enable from module settings
-            if ($gateway_debug) {
-                $error_message .= __($ex->getMessage() , 'wc_checkout_com');
-            }
-
-            // Log message
-            WC_Checkoutcom_Utility::logger($error_message, $ex);
-
-            return false;
-        }
-
-    }
+		return true;
+	}
 
     /**
      * Load order from order id or

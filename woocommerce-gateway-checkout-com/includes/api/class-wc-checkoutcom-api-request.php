@@ -1,31 +1,28 @@
 <?php
 
-include 'class-wc-checkoutcom-utility.php';
+include_once 'class-wc-checkoutcom-utility.php';
 include 'class-wc-checkoutcom-apm-method.php';
 
-use Checkout\CheckoutApi;
-use Checkout\Models\Address;
-use Checkout\Models\Payments\Capture;
-use Checkout\Models\Payments\Payment;
-use Checkout\Models\Payments\Refund;
-use Checkout\Models\Payments\Shipping;
-use Checkout\Models\Payments\ThreeDs;
-use Checkout\Models\Payments\TokenSource;
-use Checkout\Models\Payments\Voids;
-use Checkout\Models\Payments\BillingDescriptor;
-use Checkout\Models\Phone;
-use Checkout\Models\Payments\IdSource;
-use Checkout\Models\Payments\IdealSource;
-use Checkout\Models\Product;
-use Checkout\Models\Sources\Klarna;
-use Checkout\Models\Payments\GiropaySource;
-use Checkout\Models\Payments\EpsSource;
-use Checkout\Models\Tokens\ApplePay;
-use Checkout\Models\Tokens\ApplePayHeader;
-use Checkout\Models\Tokens\GooglePay;
-use Checkout\Models\Sources\Sepa;
-use Checkout\Library\Exceptions\CheckoutHttpException;
-use Checkout\Library\Exceptions\CheckoutModelException;
+use Checkout\Apm\Klarna\CreditSessionRequest;
+use Checkout\CheckoutApiException;
+use Checkout\CheckoutUtils;
+use Checkout\Common\Address;
+use Checkout\Common\ChallengeIndicatorType;
+use Checkout\Common\CustomerRequest;
+use Checkout\Payments\BillingDescriptor;
+use Checkout\Payments\PaymentRequest;
+use Checkout\Payments\PaymentType;
+use Checkout\Payments\RefundRequest;
+use Checkout\Payments\ShippingDetails;
+use Checkout\Payments\Source\Apm\FawryProduct;
+use Checkout\Payments\Source\RequestIdSource;
+use Checkout\Payments\Source\RequestTokenSource;
+use Checkout\Payments\ThreeDsRequest;
+use Checkout\Payments\VoidRequest;
+use Checkout\Tokens\ApplePayTokenData;
+use Checkout\Tokens\ApplePayTokenRequest;
+use Checkout\Tokens\GooglePayTokenData;
+use Checkout\Tokens\GooglePayTokenRequest;
 
 
 class WC_Checkoutcom_Api_request
@@ -41,326 +38,346 @@ class WC_Checkoutcom_Api_request
     public static function create_payment( WC_Order $order, $arg, $subscription = null )
     {
         // Get payment request parameter
-        $request_param = WC_Checkoutcom_Api_request::get_request_param($order, $arg, $subscription);
-        $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
-        $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes' ? true : false;
-
-        $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
-
-        $core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
+	    $request_param = WC_Checkoutcom_Api_request::get_request_param( $order, $arg, $subscription );
+        $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes';
 
         $is_sepa_renewal = ( 'wc_checkout_com_alternative_payments_sepa' === $order->get_payment_method() ) && ( ! is_null( $subscription ) );
 
-        // Initialize the Checkout Api
-        $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
+        // Initialize the Checkout Api.
+	    $checkout = new Checkout_SDK();
 
         try {
-            // Call to create charge
-            $response = $checkout->payments()->request($request_param);
+            // Call to create charge.
+	        $response = $checkout->get_builder()->getPaymentsClient()->requestPayment( $request_param );
 
-            // Check if payment successful
-            if ($response->isSuccessful()) {
-                // Check if payment is 3Dsecure
-                if ($response->isPending()) {
-					// Check if SEPA renewal order.
-					if ( $is_sepa_renewal ) {
-						return $response;
-					}
-                    // Check if redirection link exist
-                    if ($response->getRedirection()) {
-                        // return 3d redirection url
-                        return array('3d' => $response->getRedirection());
+            // Check if payment successful.
+	        if ( WC_Checkoutcom_Utility::is_successful( $response ) ) {
+		        // Check if payment is 3D secure.
+		        if ( WC_Checkoutcom_Utility::is_pending( $response ) ) {
+			        // Check if SEPA renewal order.
+			        if ( $is_sepa_renewal ) {
+				        return $response;
+			        }
+			        // Check if redirection link exist.
+			        if ( WC_Checkoutcom_Utility::getRedirectUrl( $response ) ) {
+				        // return 3d redirection url.
+				        return array( '3d' => WC_Checkoutcom_Utility::getRedirectUrl( $response ) );
 
-                    } else {
-                        $error_message = __("An error has occurred while processing your payment. Redirection link not found", 'wc_checkout_com');
-                        // Log message
-                        WC_Checkoutcom_Utility::logger($error_message , null);
+			        } else {
+				        $error_message = __( 'An error has occurred while processing your payment. Redirection link not found', 'wc_checkout_com' );
 
-                        return array('error' => $error_message);
-                    }
-                } else {
+				        WC_Checkoutcom_Utility::logger( $error_message, null );
 
-                    return $response;
-                }
-            } else {
+				        return array( 'error' => $error_message );
+			        }
+		        } else {
 
-                 // Set payment id post meta if the payment id declined
-                 if ($response->status == 'Declined') {
-                    update_post_meta($order->id, '_cko_payment_id', $response->id);
-                }
+			        return $response;
+		        }
+	        } else {
 
-                $error_message = __("An error has occurred while processing your payment. Please check your card details and try again. ", 'wc_checkout_com');
+		        // Set payment id post meta if the payment id declined.
+		        if ( 'Declined' === $response['status'] ) {
+			        update_post_meta( $order->get_id(), '_cko_payment_id', $response['id'] );
+		        }
 
-                // If the merchant enabled gateway response
-                if ($gateway_debug) {
-                    // Only show the decline reason in case the response code is not from a risk rule
-                    if (! preg_match("/^(?:40)\d+$/", $response->response_code)) {
-                        $error_message .= __('Status : ' . $response->status . ', Response summary : ' . $response->response_summary , 'wc_checkout_com');
-                    }
-                }
+		        $error_message = __( 'An error has occurred while processing your payment. Please check your card details and try again. ', 'wc_checkout_com' );
 
-                // Log message
-                WC_Checkoutcom_Utility::logger($error_message , $response);
+		        // If the merchant enabled gateway response.
+		        if ( $gateway_debug ) {
+			        // Only show the decline reason in case the response code is not from a risk rule
+			        if ( ! preg_match( "/^(?:40)\d+$/", $response['response_code'] ) ) {
+				        $error_message .= sprintf( __( 'Status : %s, Response summary : %s', 'wc_checkout_com' ), $response['status'], $response['response_summary'] );
+			        }
+		        }
 
-                return array('error' => $error_message);
+		        WC_Checkoutcom_Utility::logger( $error_message, $response );
+
+		        return array( 'error' => $error_message );
             }
-        } catch (CheckoutHttpException $ex) {
-            $error_message = __("An error has occurred while processing your payment. ", 'wc_checkout_com');
+        } catch ( CheckoutApiException $ex ) {
+	        $error_message = __( "An error has occurred while processing your payment. ", 'wc_checkout_com' );
 
-            // check if gateway response is enable from module settings
-            if ($gateway_debug) {
-                $error_message .= __($ex->getMessage() , 'wc_checkout_com');
-            }
+	        // check if gateway response is enable from module settings
+	        if ( $gateway_debug ) {
+		        $error_message .= $ex->getMessage();
+	        }
 
-            // Log message
-            WC_Checkoutcom_Utility::logger($error_message, $ex);
+	        WC_Checkoutcom_Utility::logger( $error_message, $ex );
 
-            return array('error' => $error_message);
+	        return array( 'error' => $error_message );
         }
     }
 
     /**
      * Build payment request parameter
+     *
      * @param $order
      * @param $card_token
      * @param $subscription subscription renewal flag
-     * @return Payment
+     *
+     * @return PaymentRequest
      */
-    private static function get_request_param(WC_Order $order, $arg, $subscription = null)
-    {
-        global $woocommerce, $wp_version;
+	private static function get_request_param( WC_Order $order, $arg, $subscription = null ) {
+		global $woocommerce, $wp_version;
 
-	    $auto_capture       = WC_Admin_Settings::get_option( 'ckocom_card_autocap' ) == 1 ? true : false;
-	    $amount             = $order->get_total();
-	    $amount_cents       = WC_Checkoutcom_Utility::valueToDecimal( $amount, $order->get_currency() );
-	    $three_d            = WC_Admin_Settings::get_option( 'ckocom_card_threed' ) == 1 && $subscription == null ? true : false;
-	    $attempt_no_threeD  = WC_Admin_Settings::get_option( 'ckocom_card_notheed' ) == 1 ? true : false;
-	    $dynamic_descriptor = WC_Admin_Settings::get_option( 'ckocom_card_desctiptor' ) == 1 ? true : false;
-	    $mada_enable        = WC_Admin_Settings::get_option( 'ckocom_card_mada' ) == 1 ? true : false;
-	    $save_card          = WC_Admin_Settings::get_option('ckocom_card_saved');
-	    $google_settings    = get_option( 'woocommerce_wc_checkout_com_google_pay_settings' );
-	    $is_google_threeds  = 1 === absint( $google_settings[ 'ckocom_google_threed' ] );
+		$auto_capture       = WC_Admin_Settings::get_option( 'ckocom_card_autocap' ) == 1 ? true : false;
+		$amount             = $order->get_total();
+		$amount_cents       = WC_Checkoutcom_Utility::valueToDecimal( $amount, $order->get_currency() );
+		$three_d            = WC_Admin_Settings::get_option( 'ckocom_card_threed' ) == 1 && $subscription == null ? true : false;
+		$attempt_no_threeD  = WC_Admin_Settings::get_option( 'ckocom_card_notheed' ) == 1 ? true : false;
+		$dynamic_descriptor = WC_Admin_Settings::get_option( 'ckocom_card_desctiptor' ) == 1 ? true : false;
+		$mada_enable        = WC_Admin_Settings::get_option( 'ckocom_card_mada' ) == 1 ? true : false;
+		$save_card          = WC_Admin_Settings::get_option( 'ckocom_card_saved' );
+		$google_settings    = get_option( 'woocommerce_wc_checkout_com_google_pay_settings' );
+		$is_google_threeds  = 1 === absint( $google_settings['ckocom_google_threed'] );
 
-	    $is_save_card       = false;
-	    $payment_option     = 'FramesJs';
-	    $apms_settings      = get_option( 'woocommerce_wc_checkout_com_alternative_payments_settings' );
-	    $apms_selected      = ! empty( $apms_settings['ckocom_apms_selector'] ) ? $apms_settings['ckocom_apms_selector'] : array();
+		$is_save_card   = false;
+		$payment_option = 'FramesJs';
+		$apms_settings  = get_option( 'woocommerce_wc_checkout_com_alternative_payments_settings' );
+		$apms_selected  = ! empty( $apms_settings['ckocom_apms_selector'] ) ? $apms_settings['ckocom_apms_selector'] : array();
 
-	    $postData = sanitize_post( $_POST );
-	    $getData  = sanitize_post( $_GET );
+		$postData = sanitize_post( $_POST );
+		$getData  = sanitize_post( $_GET );
 
-	    $customerAddress = WC_Checkoutcom_Api_request::customer_address( $postData );
+		$customer_address = WC_Checkoutcom_Api_request::customer_address( $postData );
 
-        // Prepare payment parameters
-        if($postData['payment_method'] == 'wc_checkout_com_cards'){
-            if($postData['wc-wc_checkout_com_cards-payment-token']) {
-                if($postData['wc-wc_checkout_com_cards-payment-token'] == 'new') {
-                    $method = new TokenSource($arg);
-                } else {
-                    // load token by id ($arg)
-                    $token = WC_Payment_Tokens::get( $arg );
-                    // Get source_id from $token
-                    $source_id = $token->get_token();
+		// Prepare payment parameters.
+		if ( 'wc_checkout_com_cards' === $postData['payment_method'] ) {
+			if ( $postData['wc-wc_checkout_com_cards-payment-token'] ) {
+				if ( 'new' === $postData['wc-wc_checkout_com_cards-payment-token'] ) {
+					// New card used.
 
-                    $method = new IdSource($source_id);
+					$method        = new RequestTokenSource();
+					$method->token = $arg;
+				} else {
+					// Saved card used.
 
-                    $is_save_card = true;
+					// Load token by id ($arg)
+					$token = WC_Payment_Tokens::get( $arg );
 
-                    if(WC_Admin_Settings::get_option('ckocom_card_require_cvv')) {
-                        $method->cvv = $postData['wc_checkout_com_cards-card-cvv'];
-                    }
-                }
-            } else {
-                $method = new TokenSource($arg);
-            }
-        } elseif ($postData['payment_method'] == 'wc_checkout_com_google_pay') {
-            $payment_option = 'Google Pay';
+					// Get source_id from $token
+					$source_id = $token->get_token();
 
-            $method        = new TokenSource( $arg['token'] );
-            $method->token = trim( $method->token );
+					$method     = new RequestIdSource();
+					$method->id = $source_id;
 
-        } elseif ($postData['payment_method'] == 'wc_checkout_com_apple_pay') {
-            $payment_option = 'Apple Pay';
+					$is_save_card = true;
 
-            $method        = new TokenSource( $arg );
-            $method->token = trim( $method->token );
+					if ( WC_Admin_Settings::get_option( 'ckocom_card_require_cvv' ) ) {
+						$method->cvv = $postData['wc_checkout_com_cards-card-cvv'];
+					}
+				}
+			} else {
+				$method        = new RequestTokenSource();
+				$method->token = $arg;
+			}
+		} elseif ( 'wc_checkout_com_google_pay' === $postData['payment_method'] ) {
+			$payment_option = 'Google Pay';
 
-        } elseif (in_array ($arg, $apms_selected)) {
-            $method = WC_Checkoutcom_Api_request::get_apm_method($postData, $order, $arg);
+			$method        = new RequestTokenSource();
+			$method->token = trim( $arg['token'] );
 
-            $payment_option = $method->type;
-        } elseif ( ! is_null($subscription) ) {
+		} elseif ( 'wc_checkout_com_apple_pay' === $postData['payment_method'] ) {
+			$payment_option = 'Apple Pay';
 
-            $method = new IdSource($arg['source_id']);
-        }
+			$method        = new RequestTokenSource();
+			$method->token = trim( $arg );
 
-        if ($method->type != 'klarna') {
-            // Set billing address in $method
-            if(!empty($customerAddress['billing_address_1']) && !empty($customerAddress['billing_country'])){
-                $billingAddressParam = new Address();
-                $billingAddressParam->address_line1 = $customerAddress['billing_address_1'];
-                $billingAddressParam->address_line2 = $customerAddress['billing_address_2'];
-                $billingAddressParam->city = $customerAddress['billing_city'];
-                $billingAddressParam->state = $customerAddress['billing_state'];
-                $billingAddressParam->zip = $customerAddress['billing_postcode'];
-                $billingAddressParam->country = $customerAddress['billing_country'];
-                $method->billing_address = $billingAddressParam;
-            }
-        }
+		} elseif ( in_array( $arg, $apms_selected ) ) {
+			// Alternative payment method selected.
+			$method = WC_Checkoutcom_Api_request::get_apm_method( $postData, $order, $arg );
 
-        $payment = new Payment($method, $order->get_currency());
-        $payment->capture = $auto_capture;
-        $payment->amount = $amount_cents;
-        $payment->reference = $order->get_order_number();
+			$payment_option = $method->type;
+		} elseif ( ! is_null( $subscription ) ) {
 
-        $email = $postData['billing_email'];
-        $name = $postData['billing_first_name'] . ' ' . $postData['billing_last_name'];
+			$method     = new RequestIdSource();
+			$method->id = $arg['source_id'];
+		}
 
-        // Pay Order Page
-        $isPayOrder = !empty($getData['pay_for_order']) ? (boolean) $getData['pay_for_order'] : false;
+		if ( $method->type !== 'klarna' ) {
+			// Set billing address in $method.
+			if ( ! empty( $customer_address['billing_address_1'] ) && ! empty( $customer_address['billing_country'] ) ) {
+				$billingAddressParam                = new Address();
+				$billingAddressParam->address_line1 = $customer_address['billing_address_1'];
+				$billingAddressParam->address_line2 = $customer_address['billing_address_2'];
+				$billingAddressParam->city          = $customer_address['billing_city'];
+				$billingAddressParam->state         = $customer_address['billing_state'];
+				$billingAddressParam->zip           = $customer_address['billing_postcode'];
+				$billingAddressParam->country       = $customer_address['billing_country'];
+				$method->billing_address            = $billingAddressParam;
+			}
+		}
 
-        if($isPayOrder) {
-            if(!empty($getData['order_id'])) {
-                $order_id    = $getData['order_id'];
-            } else if (!empty($getData['key'])){
-                $order_id    = wc_get_order_id_by_order_key($getData['key']);
-            }
+		$checkout              = new Checkout_SDK();
+		$payment               = $checkout->get_payment_request();
+		$payment->source       = $method;
+		$payment->capture      = $auto_capture;
+		$payment->amount       = $amount_cents;
+		$payment->currency     = $order->get_currency();
+		$payment->reference    = $order->get_order_number();
+		$payment->payment_type = PaymentType::$regular;
 
-            $order = wc_get_order( $order_id );
+		$email = $postData['billing_email'];
+		$name  = $postData['billing_first_name'] . ' ' . $postData['billing_last_name'];
 
-            $email = $order->billing_email;
-            $name = $order->billing_first_name. ' ' . $order->billing_last_name;
-        }
+		// Pay Order Page.
+		$is_pay_order = ! empty( $getData['pay_for_order'] ) ? (boolean) $getData['pay_for_order'] : false;
 
-        // Customer
-        $payment->customer = array(
-          'email' => $email,
-          'name' => $name
-        );
+		if ( $is_pay_order ) {
+			if ( ! empty( $getData['order_id'] ) ) {
+				$order_id = $getData['order_id'];
+			} else if ( ! empty( $getData['key'] ) ) {
+				$order_id = wc_get_order_id_by_order_key( $getData['key'] );
+			}
 
-        // Check for the subscription flag
-        if (! is_null($subscription) ) {
-            $payment->merchant_initiated = true;
-            $payment->payment_type = "Recurring";
-            $payment->previous_payment_id = get_post_meta( $arg['parent_order_id'], '_cko_payment_id', true ) ?? null;
-            $payment->capture = true;
+			$order = wc_get_order( $order_id );
 
-        } elseif ( function_exists('wcs_order_contains_subscription')){
-            if(wcs_order_contains_subscription( $order, 'parent' )) {
-                $payment->merchant_initiated = false;
-                $payment->payment_type = "Recurring";
-            }
-        }
+			$email = $order->get_billing_email();
+			$name  = $order->get_billing_first_name() . ' ' . $order->get_billing_last_name();
+		}
 
-        $three_ds = new ThreeDs($three_d);
+		// Customer.
+		$customer        = new CustomerRequest();
+		$customer->email = $email;
+		$customer->name  = $name;
 
-        if ($three_ds) {
-            $three_ds->attempt_n3d = $attempt_no_threeD;
-        }
+		$payment->customer = $customer;
 
-        if ( 'wc_checkout_com_cards' === $postData['payment_method']
-             && $three_d
-             && $save_card
-             && (
-                 isset( $postData['wc-wc_checkout_com_cards-new-payment-method'] )
-                 && sanitize_text_field( $postData['wc-wc_checkout_com_cards-new-payment-method'] )
-             )
-        ) {
-            $three_ds->challenge_indicator = 'challenge_requested_mandate';
-        }
+		// Check for the subscription flag
+		if ( ! is_null( $subscription ) ) {
+			$payment->merchant_initiated  = true;
+			$payment->payment_type        = 'Recurring';
+			$payment->previous_payment_id = get_post_meta( $arg['parent_order_id'], '_cko_payment_id', true ) ?? null;
+			$payment->capture             = true;
 
-        if($dynamic_descriptor){
-            $descriptor_name = WC_Admin_Settings::get_option('ckocom_card_desctiptor_name');
-            $descriptor_city = WC_Admin_Settings::get_option('ckocom_card_desctiptor_city');
-            $descriptor = new BillingDescriptor($descriptor_name, $descriptor_city);
-            $payment->billing_descriptor = $descriptor;
-        }
+		} elseif ( function_exists( 'wcs_order_contains_subscription' ) ) {
+			if ( wcs_order_contains_subscription( $order, 'parent' ) ) {
+				$payment->merchant_initiated = false;
+				$payment->payment_type       = 'Recurring';
+			}
+		}
 
-        // Set 3Ds to payment request.
-        if ( 'wc_checkout_com_google_pay' === $postData['payment_method'] && ( $is_google_threeds && 'pan_only' === $arg['token_format'] ) ) {
-            $payment->threeDs = new ThreeDs( true );
-        } else if ( 'wc_checkout_com_google_pay' !== $postData['payment_method'] ) {
-            $payment->threeDs = $three_ds;
-        }
+		$three_ds              = new ThreeDsRequest();
+		$three_ds->enabled     = $three_d;
+		$three_ds->attempt_n3d = $attempt_no_threeD;
 
-        // Set shipping Address
-        if(!empty($customerAddress['shipping_address_1']) && !empty($customerAddress['shipping_country'])){
-            $shippingAddressParam = new Address();
-            $shippingAddressParam->address_line1 = $customerAddress['shipping_address_1'];
-            $shippingAddressParam->address_line2 = $customerAddress['shipping_address_2'];
-            $shippingAddressParam->city = $customerAddress['shipping_city'];
-            $shippingAddressParam->state = $customerAddress['shipping_state'];
-            $shippingAddressParam->zip = $customerAddress['shipping_postcode'];
-            $shippingAddressParam->country = $customerAddress['shipping_country'];
+		if ( 'wc_checkout_com_cards' === $postData['payment_method']
+		     && $three_d
+		     && $save_card
+		     && (
+			     isset( $postData['wc-wc_checkout_com_cards-new-payment-method'] )
+			     && sanitize_text_field( $postData['wc-wc_checkout_com_cards-new-payment-method'] )
+		     )
+		) {
+			$three_ds->challenge_indicator = ChallengeIndicatorType::$challenge_requested_mandate;
+		}
 
-            $payment->shipping = new Shipping($shippingAddressParam);
-        }
+		if ( $dynamic_descriptor ) {
+			$descriptor_name = WC_Admin_Settings::get_option( 'ckocom_card_desctiptor_name' );
+			$descriptor_city = WC_Admin_Settings::get_option( 'ckocom_card_desctiptor_city' );
 
-        // Set redirection url in payment request
-        $redirection_url = add_query_arg( 'wc-api', 'wc_checkoutcom_callback', home_url( '/' ) );
+			$descriptor       = new BillingDescriptor();
+			$descriptor->name = $descriptor_name;
+			$descriptor->city = $descriptor_city;
 
-        if ( cko_is_nas_account() ) {
-            $redirection_url = home_url( '/checkoutcom-callback' );
-        }
+			$payment->billing_descriptor = $descriptor;
+		}
 
-        $payment->success_url = $redirection_url;
-        $payment->failure_url = $redirection_url;
+		// Set 3Ds to payment request.
+		if ( 'wc_checkout_com_google_pay' === $postData['payment_method'] && ( $is_google_threeds && 'pan_only' === $arg['token_format'] ) ) {
+			$payment->three_ds = new ThreeDsRequest();
+		} else if ( 'wc_checkout_com_google_pay' !== $postData['payment_method'] ) {
+			$payment->three_ds = $three_ds;
+		}
 
-        $udf5 = "Platform Data - Wordpress " . $wp_version . "/ Woocommerce " . $woocommerce->version
-        . ", Integration Data - Checkout.com " . WC_Gateway_Checkout_Com_Cards::PLUGIN_VERSION . ", SDK Data - PHP SDK ". CheckoutApi::VERSION .
-        ", Order ID - " . $order->get_order_number() . ", Server - " . get_site_url();
+		// Set shipping Address.
+		if ( ! empty( $customer_address['shipping_address_1'] ) && ! empty( $customer_address['shipping_country'] ) ) {
+			$shipping_address_param                = new Address();
+			$shipping_address_param->address_line1 = $customer_address['shipping_address_1'];
+			$shipping_address_param->address_line2 = $customer_address['shipping_address_2'];
+			$shipping_address_param->city          = $customer_address['shipping_city'];
+			$shipping_address_param->state         = $customer_address['shipping_state'];
+			$shipping_address_param->zip           = $customer_address['shipping_postcode'];
+			$shipping_address_param->country       = $customer_address['shipping_country'];
 
-        $metadata = array(
-            'udf5' => $udf5,
-            'order_id' => $order->get_id()
-        );
+			$shipping_details          = new ShippingDetails();
+			$shipping_details->address = $shipping_address_param;
 
-        // set capture delay if payment action is authorise and capture
-        if($auto_capture){
-            $captureDelay =   WC_Checkoutcom_Utility::getDelayedCaptureTimestamp();
-            $payment->capture_on = $captureDelay;
-        }
+			$payment->shipping = $shipping_details;
+		}
 
-        // check if mada is enable in module setting
-        if($mada_enable){
-            $is_mada = false;
+		// Set redirection url in payment request.
+		$redirection_url = add_query_arg( 'wc-api', 'wc_checkoutcom_callback', home_url( '/' ) );
 
-            if(!empty($postData['cko-card-bin'])){
-                $is_mada = WC_Checkoutcom_Utility::isMadaCard($postData['cko-card-bin']);
-            } else {
+		if ( cko_is_nas_account() ) {
+			$redirection_url = home_url( '/checkoutcom-callback' );
+		}
 
-                if($is_save_card) {
-                    // check if souce_id is a mada card
-                    // load token by id ($arg)
-                    $token = WC_Payment_Tokens::get( $arg );
-                    // check if source_id is mada
-                    $is_mada = $token->get_meta('is_mada');
+		$payment->success_url = $redirection_url;
+		$payment->failure_url = $redirection_url;
 
-                    if($is_mada){
-                        $method->cvv = $postData['wc_checkout_com_cards-card-cvv'];
-                    }
-                }
-            }
+		$udf5 = sprintf(
+			'Platform Data - Wordpress %s / Woocommerce %s, Integration Data - Checkout.com %s, SDK Data - PHP SDK %s, Order ID - %s, Server - %s',
+			$wp_version,
+			$woocommerce->version,
+			WC_Gateway_Checkout_Com_Cards::PLUGIN_VERSION,
+			CheckoutUtils::PROJECT_VERSION,
+			$order->get_order_number(),
+			get_site_url()
+		);
 
-            if($is_mada) {
-                $payment->capture = true;
-                $payment->capture_on = null;
-                $payment->threeDs =  new ThreeDs(true);
-                $metadata = array_merge($metadata, array('udf1' => 'Mada'));
-            }
+		$metadata = array(
+			'udf5'     => $udf5,
+			'order_id' => $order->get_id(),
+		);
 
-            // Set is_mada in session
-            $_SESSION['cko-is-mada'] = $is_mada;
-        }
+		// set capture delay if payment action is authorise and capture.
+		if ( $auto_capture ) {
+			$captureDelay        = WC_Checkoutcom_Utility::getDelayedCaptureTimestamp();
+			$payment->capture_on = $captureDelay;
+		}
 
-        // Set metadata info in payment request
-        $payment->metadata = $metadata;
+		// check if mada is enabled in module setting.
+		if ( $mada_enable ) {
+			$is_mada = false;
 
-        // Set customer ip address in payment request
-        $payment->payment_ip = $order->get_customer_ip_address();
+			if ( ! empty( $postData['cko-card-bin'] ) ) {
+				$is_mada = WC_Checkoutcom_Utility::isMadaCard( $postData['cko-card-bin'] );
+			} else {
 
-        return $payment;
-    }
+				if ( $is_save_card ) {
+					// check if souce_id is a mada card.
+					// load token by id ($arg).
+					$token = WC_Payment_Tokens::get( $arg );
+					// check if source_id is mada.
+					$is_mada = $token->get_meta( 'is_mada' );
+
+					if ( $is_mada ) {
+						$method->cvv = $postData['wc_checkout_com_cards-card-cvv'];
+					}
+				}
+			}
+
+			if ( $is_mada ) {
+				$payment->capture    = true;
+				$payment->capture_on = null;
+				$payment->three_ds   = new ThreeDsRequest();
+				$metadata            = array_merge( $metadata, array( 'udf1' => 'Mada' ) );
+			}
+
+			// Set is_mada in session.
+			$_SESSION['cko-is-mada'] = $is_mada;
+		}
+
+		// Set metadata info in payment request.
+		$payment->metadata = $metadata;
+
+		// Set customer ip address in payment request.
+		$payment->payment_ip = $order->get_customer_ip_address();
+
+		return $payment;
+	}
 
     /**
      * @param $data
@@ -451,530 +468,438 @@ class WC_Checkoutcom_Api_request
         );
     }
 
-    /**
-     * @param $session_id
-     * @return array|mixed
-     */
-    public static function verify_session( $session_id )
-    {
-        $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
-        $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
-        $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes' ? true : false;
+	/**
+	 * @param $session_id
+	 *
+	 * @return array|mixed
+	 */
+	public static function verify_session( $session_id ) {
+		$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) == 'yes';
 
-        $core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
-        // Initialize the Checkout Api
-        $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
+		// Initialize the Checkout Api.
+		$checkout = new Checkout_SDK();
 
-        try {
+		try {
 
-            // Get payment response
-            $response = $checkout->payments()->details($session_id);
+			// Get payment response
+			$response = $checkout->get_builder()->getPaymentsClient()->getPaymentDetails( $session_id );
 
-            // Check if payment is successful
-            if ($response->isSuccessful()) {
-                return $response;
-            } else {
+			// Check if payment is successful.
+			if ( WC_Checkoutcom_Utility::is_successful( $response ) ) {
 
-                // Set payment id post meta if the payment id declined
-                if ($response->status == 'Declined') {
-                    update_post_meta($response->metadata['order_id'], '_cko_payment_id', $response->id);
-                }
+				return $response;
+			} else {
 
-                $error_message = __("An error has occurred while processing your payment. Please check your card details and try again.", 'wc_checkout_com');
+				// Set payment id post meta if the payment id declined.
+				if ( 'Declined' === $response['status'] ) {
+					update_post_meta( $response['metadata']['order_id'], '_cko_payment_id', $response['id'] );
+				}
 
-                // check if gateway response is enable from module settings
-                if ($gateway_debug) {
-                    if(isset($response->actions)){
-                        $action = $response->actions[0];
-                        $error_message .= __('Status : ' . $response->status . ', Response summary : ' . $action['response_summary'] , 'wc_checkout_com');
-                    }
-                }
+				$error_message = __( 'An error has occurred while processing your payment. Please check your card details and try again.', 'wc_checkout_com' );
 
-                // Log message
-                WC_Checkoutcom_Utility::logger($error_message, $response);
+				// Check if gateway response is enabled from module settings.
+				if ( $gateway_debug ) {
+					if ( ! empty( $response['actions'] ) ) {
+						$action        = $response['actions'][0];
+						$error_message .= sprintf( __( 'Status : %s, Response summary : %s', 'wc_checkout_com' ), $response['status'], $action['response_summary'] );
+					}
+				}
 
-                $arr = array('error' => $error_message);
+				WC_Checkoutcom_Utility::logger( $error_message, $response );
 
-                $metadata = $response->metadata;
-                // check if card verification
-                if(isset($metadata['card_verification'])){
-                    $arr = array(
-                        'card_verification' => 'error',
-                        'redirection_url' => $metadata['redirection_url']
-                        );
-                }
+				$arr = array( 'error' => $error_message );
 
-                return $arr;
-            }
+				$metadata = $response['metadata'];
 
-        } catch (CheckoutHttpException $ex) {
-            $error_message = _("An error has occurred while processing your payment. ", 'wc_checkout_com');
+				// Check if card verification.
+				if ( isset( $metadata['card_verification'] ) ) {
+					$arr = array(
+						'card_verification' => 'error',
+						'redirection_url'   => $metadata['redirection_url'],
+					);
+				}
 
-            // check if gateway response is enable from module settings
-            if ($gateway_debug) {
-                $error_message .= __($ex->getMessage() , 'wc_checkout_com');
-            }
+				return $arr;
+			}
 
-            // Log message
-            WC_Checkoutcom_Utility::logger($error_message, $ex);
+		} catch ( CheckoutApiException $ex ) {
 
-            return array('error' => $error_message);
-        }
-    }
+			$error_message = __( 'An error has occurred while processing your payment. ', 'wc_checkout_com' );
+
+			// Check if gateway response is enabled from module settings.
+			if ( $gateway_debug ) {
+				$error_message .= $ex->getMessage();
+			}
+
+			WC_Checkoutcom_Utility::logger( $error_message, $ex );
+
+			return array( 'error' => $error_message );
+		}
+	}
 
     /**
-     * Generate the google token from google payment data
+     * Generate the Google token from Google payment data
      * @return mixed
      */
-    public static function generate_google_token()
-    {
-        $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
-        $googleToken = $_REQUEST['token'];
-        $publicKey = $core_settings['ckocom_pk'];
-        $protocolVersion = sanitize_text_field($_POST["cko-google-protocolVersion"]);
-        $signature = sanitize_text_field($_POST["cko-google-signature"]);
-        $signedMessage = stripslashes($_POST['cko-google-signedMessage']);
-        $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
+	public static function generate_google_token() {
+		$protocolVersion = sanitize_text_field( $_POST['cko-google-protocolVersion'] );
+		$signature       = sanitize_text_field( $_POST['cko-google-signature'] );
+		$signedMessage   = stripslashes( $_POST['cko-google-signedMessage'] );
 
-        $checkout = new CheckoutApi();
-        $checkout->configuration()->setPublicKey($publicKey);
-        $checkout->configuration()->setSandbox($environment);
+		$checkout = new Checkout_SDK();
 
-        $googlepay = new GooglePay($protocolVersion, $signature, $signedMessage);
+		$google_pay                  = new GooglePayTokenData();
+		$google_pay->protocolVersion = $protocolVersion;
+		$google_pay->signature       = $signature;
+		$google_pay->signedMessage   = $signedMessage;
 
-        try {
-            $token = $checkout->tokens()->request($googlepay);
+		try {
 
-            return [
-		        'token'        => $token->getId(),
-		        'token_format' => $token->token_format,
-	        ];
-        } catch (CheckoutModelException $ex) {
-            $error_message = __('An error has occured while processing your payment.', 'wc_checkout_com' );
-            WC_Checkoutcom_Utility::logger($error_message , $ex);
-        } catch (CheckoutHttpException $ex) {
-            $error_message = __('An error has occured while processing your payment.', 'wc_checkout_com' );
-            WC_Checkoutcom_Utility::logger($error_message , $ex);
-        }
-    }
+			$google_pay_token_request             = new GooglePayTokenRequest();
+			$google_pay_token_request->token_data = $google_pay;
+
+			$token = $checkout->get_builder()->getTokensClient()->requestWalletToken( $google_pay_token_request );
+
+			return [
+				'token'        => $token['token'],
+				'token_format' => $token['token_format'],
+			];
+		} catch ( CheckoutApiException $ex ) {
+			$error_message = __( 'An error has occurred while processing your Google pay payment.', 'wc_checkout_com' );
+			WC_Checkoutcom_Utility::logger( $error_message, $ex );
+		}
+	}
 
     /**
-     * Perform capture
+     * Perform capture.
      *
      * @return array|mixed
      */
-    public static function capture_payment()
-    {
-        $order_id = sanitize_text_field($_POST['post_ID']);
-        $cko_payment_id = get_post_meta($order_id, '_cko_payment_id', true );
+	public static function capture_payment() {
+		$order_id       = sanitize_text_field( $_POST['post_ID'] );
+		$cko_payment_id = get_post_meta( $order_id, '_cko_payment_id', true );
 
-        // Check if cko_payment_id is empty
-        if(empty($cko_payment_id)){
-            $error_message = __('An error has occured. No Cko Payment Id', 'wc_checkout_com');
-            return array('error' => $error_message);
-        }
+		// Check if cko_payment_id is empty.
+		if ( empty( $cko_payment_id ) ) {
+			$error_message = esc_html__( 'An error has occurred. No Cko Payment Id', 'wc_checkout_com' );
 
-        $order = wc_get_order( $order_id );
-        $amount = $order->get_total();
-        $amount_cents = WC_Checkoutcom_Utility::valueToDecimal($amount, $order->get_currency());
-        $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
-        $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
-        $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes' ? true : false;
+			return array( 'error' => $error_message );
+		}
 
-        $core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
+		$order         = wc_get_order( $order_id );
+		$amount        = $order->get_total();
+		$amount_cents  = WC_Checkoutcom_Utility::valueToDecimal( $amount, $order->get_currency() );
+		$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) == 'yes';
 
-        // Initialize the Checkout Api
-        $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
+		// Initialize the Checkout Api.
+		$checkout = new Checkout_SDK();
 
-        try {
-            // Check if payment is already voided or captured on checkout.com hub
-            $details = $checkout->payments()->details($cko_payment_id);
+		try {
+			// Check if payment is already voided or captured on checkout.com hub.
+			$details = $checkout->get_builder()->getPaymentsClient()->getPaymentDetails( $cko_payment_id );
 
-            if ($details->status == 'Voided' || $details->status == 'Captured') {
-                $error_message = __('Payment has already been voided or captured on Checkout.com hub for order Id : ' . $order_id, 'wc_checkout_com');
+			if ( 'Voided' === $details['status'] || 'Captured' === $details['status'] ) {
+				$error_message = sprintf(
+					esc_html__( 'Payment has already been voided or captured on Checkout.com hub for order Id : %s', 'wc_checkout_com' ),
+					$order_id
+				);
 
-                return array('error' => $error_message);
-            }
+				return array( 'error' => $error_message );
+			}
 
-            $ckoPayment = new Capture($cko_payment_id);
-            $ckoPayment->amount = $amount_cents;
-            $ckoPayment->reference = $order->get_order_number();
+			// Get capture request object for NAS or ABC.
+			$capture_request            = $checkout->get_capture_request();
+			$capture_request->amount    = $amount_cents;
+			$capture_request->reference = $order->get_order_number();
 
-            $response = $checkout->payments()->capture($ckoPayment);
+			$response = $checkout->get_builder()->getPaymentsClient()->capturePayment( $cko_payment_id, $capture_request );
 
-            if (!$response->isSuccessful()) {
-                $error_message = __('An error has occurred while processing your capture payment on Checkout.com hub. Order Id : ' . $order_id, 'wc_checkout_com');
+			if ( ! WC_Checkoutcom_Utility::is_successful( $response ) ) {
+				$error_message = sprintf(
+					esc_html__( 'An error has occurred while processing your capture payment on Checkout.com hub. Order Id : %s', 'wc_checkout_com' ),
+					$order_id
+				);
 
-                // check if gateway response is enable from module settings
-                if ($gateway_debug) {
-                    $error_message .= __($response , 'wc_checkout_com');
-                }
+				// Check if gateway response is enabled from module settings.
+				if ( $gateway_debug ) {
+					$error_message .= $response;
+				}
 
-                // Log message
-                WC_Checkoutcom_Utility::logger($error_message, $response);
+				WC_Checkoutcom_Utility::logger( $error_message, $response );
 
-                return array('error' => $error_message);
-            } else {
-                return $response;
-            }
-        } catch (CheckoutHttpException $ex) {
-            $error_message = __("An error has occurred while processing your capture request. ", 'wc_checkout_com');
+				return array( 'error' => $error_message );
+			} else {
+				return $response;
+			}
+		} catch ( CheckoutApiException $ex ) {
+			$error_message = esc_html__( 'An error has occurred while processing your capture request.', 'wc_checkout_com' );
 
-            // check if gateway response is enable from module settings
-            if ($gateway_debug) {
-                $error_message .= __($ex->getMessage() , 'wc_checkout_com');
-            }
+			// Check if gateway response is enabled from module settings.
+			if ( $gateway_debug ) {
+				$error_message .= $ex->getMessage();
+			}
 
-            // Log message
-            WC_Checkoutcom_Utility::logger($error_message, $ex);
+			WC_Checkoutcom_Utility::logger( $error_message, $ex );
 
-            return array('error' => $error_message);
-        }
-    }
+			return array( 'error' => $error_message );
+		}
+	}
 
     /**
-     * Perform Void
+     * Perform Void.
      * @return array|mixed
      */
-    public static function void_payment()
-    {
-        $order_id = sanitize_text_field($_POST['post_ID']);
-        $cko_payment_id = get_post_meta($order_id, '_cko_payment_id', true );
+	public static function void_payment() {
+		$order_id       = sanitize_text_field( $_POST['post_ID'] );
+		$cko_payment_id = get_post_meta( $order_id, '_cko_payment_id', true );
 
-        // Check if cko_payment_id is empty
-        if(empty($cko_payment_id)){
-            $error_message = __('An error has occured. No Cko Payment Id', 'wc_checkout_com');
-            return array('error' => $error_message);
-        }
+		// Check if cko_payment_id is empty.
+		if ( empty( $cko_payment_id ) ) {
+			$error_message = esc_html__( 'An error has occurred. No Cko Payment Id', 'wc_checkout_com' );
 
-        $order = wc_get_order( $order_id );
-        $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
-        $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
-        $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes' ? true : false;
+			return array( 'error' => $error_message );
+		}
 
-        $core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
+		$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) == 'yes';
 
-        // Initialize the Checkout Api
-        $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
+		// Initialize the Checkout Api.
+		$checkout = new Checkout_SDK();
 
-        try {
-            // Check if payment is already voided or captured on checkout.com hub
-            $details = $checkout->payments()->details($cko_payment_id);
+		try {
+			// Check if payment is already voided or captured on checkout.com hub.
+			$details = $checkout->get_builder()->getPaymentsClient()->getPaymentDetails( $cko_payment_id );
 
-            if ($details->status == 'Voided' || $details->status == 'Captured') {
-                $error_message = 'Payment has already been voided or captured on Checkout.com hub for order Id : ' . $order_id;
+			if ( 'Voided' === $details['status'] || 'Captured' === $details['status'] ) {
+				$error_message = sprintf(
+					esc_html__( 'Payment has already been voided or captured on Checkout.com hub for order Id : %s', 'wc_checkout_com' ),
+					$order_id
+				);
 
-                return array('error' => $error_message);
-            }
+				return array( 'error' => $error_message );
+			}
 
-            // Prepare void payload
-            $ckoPayment = new Voids($cko_payment_id, $order_id);
+			// Prepare void payload.
+			$void_request            = new VoidRequest();
+			$void_request->reference = $order_id;
 
-            // Process void payment on checkout.com
-            $response = $checkout->payments()->void($ckoPayment);
+			// Process void payment on checkout.com
+			$response = $checkout->get_builder()->getPaymentsClient()->voidPayment( $cko_payment_id, $void_request );
 
-            if (!$response->isSuccessful()) {
-                $error_message = __('An error has occurred while processing your void payment on Checkout.com hub. Order Id : ' . $order_id, 'wc_checkout_com');
+			if ( ! WC_Checkoutcom_Utility::is_successful( $response ) ) {
+				$error_message = sprintf(
+					esc_html__( 'An error has occurred while processing your void payment on Checkout.com hub. Order Id : %s', 'wc_checkout_com' ),
+					$order_id
+				);
 
-                // check if gateway response is enable from module settings
-                if ($gateway_debug) {
-                    $error_message .= __($response , 'wc_checkout_com');
-                }
+				// check if gateway response is enabled from module settings.
+				if ( $gateway_debug ) {
+					$error_message .= $response;
+				}
 
-                // Log message
-                WC_Checkoutcom_Utility::logger($error_message, $response);
+				WC_Checkoutcom_Utility::logger( $error_message, $response );
 
-                return array('error' => $error_message);
-            } else {
-                return $response;
-            }
-        } catch (CheckoutHttpException $ex) {
-            $error_message = "An error has occurred while processing your void request.";
+				return array( 'error' => $error_message );
+			} else {
+				return $response;
+			}
+		} catch ( CheckoutApiException $ex ) {
+			$error_message = esc_html__( 'An error has occurred while processing your void request.', 'wc_checkout_com' );
 
-            // check if gateway response is enable from module settings
-            if ($gateway_debug) {
-                $error_message .= __($ex->getMessage() , 'wc_checkout_com');
-            }
+			// Check if gateway response is enabled from module settings.
+			if ( $gateway_debug ) {
+				$error_message .= $ex->getMessage();
+			}
 
-            // Log message
-            WC_Checkoutcom_Utility::logger($error_message, $ex);
+			WC_Checkoutcom_Utility::logger( $error_message, $ex );
 
-            return array('error' => $error_message);
-        }
-    }
+			return array( 'error' => $error_message );
+		}
+	}
 
-    /**
-     * Perform Refund
-     * @param $order_id
-     * @param $order
-     * @return array|mixed
-     */
-    public static function refund_payment($order_id, $order)
-    {
-        $cko_payment_id = get_post_meta($order_id, '_cko_payment_id', true );
+	/**
+	 * Perform Refund
+	 *
+	 * @param $order_id
+	 * @param $order
+	 *
+	 * @return array|mixed
+	 */
+	public static function refund_payment( $order_id, $order ) {
+		$cko_payment_id = get_post_meta( $order_id, '_cko_payment_id', true );
 
-        // Check if cko_payment_id is empty
-        if(empty($cko_payment_id)){
-            $error_message = __('An error has occured. No Cko Payment Id', 'wc_checkout_com');
-            return array('error' => $error_message);
-        }
+		// Check if cko_payment_id is empty.
+		if ( empty( $cko_payment_id ) ) {
+			$error_message = __( 'An error has occurred. No Cko Payment Id', 'wc_checkout_com' );
 
-        // check for decimal seperator
-        $order_amount = str_replace(",",".", $order->get_total());
-        $order_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($order_amount, $order->get_currency());
-        $refund_amount = str_replace(",",".", sanitize_text_field($_POST['refund_amount']));
-        $refund_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($refund_amount, $order->get_currency());
+			return array( 'error' => $error_message );
+		}
 
-        // Check if refund amount is less than order amount
-        $refund_is_less = $refund_amount_cents < $order_amount_cents ? true : false;
+		// check for decimal separator.
+		$order_amount        = str_replace( ',', '.', $order->get_total() );
+		$order_amount_cents  = WC_Checkoutcom_Utility::valueToDecimal( $order_amount, $order->get_currency() );
+		$refund_amount       = str_replace( ',', '.', sanitize_text_field( $_POST['refund_amount'] ) );
+		$refund_amount_cents = WC_Checkoutcom_Utility::valueToDecimal( $refund_amount, $order->get_currency() );
 
-        $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
-        $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
-        $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes' ? true : false;
+		// Check if refund amount is less than order amount.
+		$refund_is_less = $refund_amount_cents < $order_amount_cents;
 
-        $core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
+		$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) == 'yes';
 
-        // Initialize the Checkout Api
-        $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
+		// Initialize the Checkout Api.
+		$checkout = new Checkout_SDK();
 
-        try {
-            // Check if payment is already voided or captured on checkout.com hub
-            $details = $checkout->payments()->details($cko_payment_id);
+		try {
+			// Check if payment is already voided or captured on checkout.com hub.
+			$details = $checkout->get_builder()->getPaymentsClient()->getPaymentDetails( $cko_payment_id );
 
-            if ($details->status == 'Refunded' && !$refund_is_less) {
-                $error_message = 'Payment has already been refunded on Checkout.com hub for order Id : ' . $order_id;
+			if ( 'Refunded' === $details['status'] && ! $refund_is_less ) {
+				$error_message = 'Payment has already been refunded on Checkout.com hub for order Id : ' . $order_id;
 
-                return array('error' => $error_message);
-            }
+				return array( 'error' => $error_message );
+			}
 
-            $ckoPayment = new Refund($cko_payment_id);
+			$refund_request            = new RefundRequest();
+			$refund_request->reference = $order->get_order_number();
 
-            // Process partial refund if amount is less than order amount
-            if ($refund_is_less) {
-                $ckoPayment->amount = $refund_amount_cents;
-                $ckoPayment->reference = $order->get_order_number();
+			// Process partial refund if amount is less than order amount.
+			if ( $refund_is_less ) {
+				$refund_request->amount = $refund_amount_cents;
 
-                // Set is_mada in session
-                $_SESSION['cko-refund-is-less'] = $refund_is_less;
-            }
+				// Set is_mada in session.
+				$_SESSION['cko-refund-is-less'] = $refund_is_less;
+			}
 
-            $response = $checkout->payments()->refund($ckoPayment);
+			$response = $checkout->get_builder()->getPaymentsClient()->refundPayment( $cko_payment_id, $refund_request );
 
-            if (!$response->isSuccessful()) {
-                $error_message = 'An error has occurred while processing your refund payment on Checkout.com hub. Order Id : ' . $order_id;
+			if ( ! WC_Checkoutcom_Utility::is_successful( $response ) ) {
+				$error_message = sprintf( esc_html__( 'An error has occurred while processing your refund payment on Checkout.com hub. Order Id : %s', 'wc_checkout_com' ), $order_id );
 
-                // check if gateway response is enable from module settings
-                if ($gateway_debug) {
-                    $error_message .= __($response , 'wc_checkout_com');
-                }
+				// Check if gateway response is enabled from module settings.
+				if ( $gateway_debug ) {
+					$error_message .= $response;
+				}
 
-                // Log message
-                WC_Checkoutcom_Utility::logger($error_message, $response);
+				WC_Checkoutcom_Utility::logger( $error_message, $response );
 
-                return array('error' => $error_message);
-            } else {
-                return $response;
-            }
-        } catch (CheckoutHttpException $ex) {
-            $error_message = "An error has occurred while processing your refund.";
+				return array( 'error' => $error_message );
+			} else {
+				return $response;
+			}
+		} catch ( CheckoutApiException $ex ) {
+			$error_message = esc_html__( 'An error has occurred while processing your refund.', 'wc_checkout_com' );
 
-            // check if gateway response is enable from module settings
-            if ($gateway_debug) {
-                $error_message .= __($ex->getMessage() , 'wc_checkout_com');
-            }
+			// check if gateway response is enabled from module settings.
+			if ( $gateway_debug ) {
+				$error_message .= $ex->getMessage();
+			}
 
-            // Log message
-            WC_Checkoutcom_Utility::logger($error_message, $ex);
+			WC_Checkoutcom_Utility::logger( $error_message, $ex );
 
-            return array('error' => $error_message);
-        }
-    }
+			return array( 'error' => $error_message );
+		}
+	}
 
     /**
-     * Return ideal banks info
+     * Return ideal banks info.
      *
      * @return array
      */
-    public static function get_ideal_bank()
-    {
-        $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
-        $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
-        $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes' ? true : false;
+    public static function get_ideal_bank() {
+        $gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) == 'yes';
 
-        $core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
-
-        // Initialize the Checkout Api
-        $checkout = new CheckoutApi($core_settings['ckocom_pk'], $environment);
+        // Initialize the Checkout Api.
+        $checkout = new Checkout_SDK();
 
         try {
-            $result = $checkout->payments()->issuers(IdealSource::QUALIFIED_NAME);
 
-            return $result;
+            return $checkout->get_builder()->getIdealClient()->getIssuers();
 
-        } catch (CheckoutHttpException $ex) {
-            $error_message = "An error has occured while retrieving ideal bank details.";
+        } catch ( CheckoutApiException $ex ) {
+            $error_message = __( 'An error has occured while retrieving ideal bank details.', 'wc_checkout_com' );
 
-            // check if gateway response is enable from module settings
-            if ($gateway_debug) {
-                $error_message .= __($ex->getMessage() , 'wc_checkout_com');
+            // check if gateway response is enabled from module settings.
+            if ( $gateway_debug ) {
+                $error_message .= $ex->getMessage();
             }
 
-            // Log message
-            WC_Checkoutcom_Utility::logger($error_message, $ex);
+            WC_Checkoutcom_Utility::logger( $error_message, $ex );
 
-            return array('error' => $error_message);
-        }
-    }
-
-    /**
-     * @return array
-     */
-    public static function get_giropay_bank()
-    {
-        $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
-        $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
-        $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes' ? true : false;
-
-        $core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
-
-        // Initialize the Checkout Api
-        $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
-
-        try {
-            $result = $checkout->payments()->issuers(GiropaySource::QUALIFIED_NAME);
-
-            return $result;
-
-        } catch (CheckoutHttpException $ex) {
-            $error_message = "An error has occured while retrieving giropay bank details..";
-
-            // check if gateway response is enable from module settings
-            if ($gateway_debug) {
-                $error_message .= __($ex->getMessage() , 'wc_checkout_com');
-            }
-
-            // Log message
-            WC_Checkoutcom_Utility::logger($error_message, $ex);
-
-            return array('error' => $error_message);
-        }
-    }
-
-    /**
-     * Return EPS Bank
-     *
-     * @return array
-     */
-    public static function get_eps_bank()
-    {
-        $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
-        $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
-        $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes' ? true : false;
-
-        $core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
-
-        // Initialize the Checkout Api
-        $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
-
-        try {
-            $result = $checkout->payments()->issuers(EpsSource::QUALIFIED_NAME);
-
-            return $result;
-
-        } catch (CheckoutHttpException $ex) {
-            $error_message = "An error has occured while retrieving eps bank details..";
-
-            // check if gateway response is enable from module settings
-            if ($gateway_debug) {
-                $error_message .= __($ex->getMessage() , 'wc_checkout_com');
-            }
-
-            // Log message
-            WC_Checkoutcom_Utility::logger($error_message, $ex);
-
-            return array('error' => $error_message);
+            return array( 'error' => $error_message );
         }
     }
 
     /**
      * @param WC_Order $order
-     * @param $arg
+     * @param $payment_method
      * @return array
      */
-    public static function create_apm_payment(WC_Order $order, $payment_method)
-    {
-        // Get payment request parameter
-        $request_param = WC_Checkoutcom_Api_request::get_request_param($order, $payment_method);
+	public static function create_apm_payment( WC_Order $order, $payment_method ) {
+	    // Get payment request parameter.
+	    $request_param = WC_Checkoutcom_Api_request::get_request_param( $order, $payment_method );
 
-        WC_Checkoutcom_Utility::logger('Apm request payload,' , $request_param);
+	    WC_Checkoutcom_Utility::logger( 'Apm request payload,', $request_param );
 
-        $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
-        $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
-        $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes' ? true : false;
+	    $gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) == 'yes';
 
-        $core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
-
-        // Initialize the Checkout Api
-        $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
-
+	    // Initialize the Checkout Api.
+	    $checkout = new Checkout_SDK();
 
         try {
-            // Call to create charge
-            $response = $checkout->payments()->request($request_param);
+            // Call to create charge.
+	        $response = $checkout->get_builder()->getPaymentsClient()->requestPayment( $request_param );
 
-            // Check if payment successful
-            if ($response->isSuccessful()) {
-                // Check if payment is 3Dsecure
-                if ($response->isPending() || $response->status == 'Authorized') {
-                    // Check if redirection link exist
-                    if ($response->getRedirection()) {
-                        // return apm redirection url
-                        return array('apm_redirection' => $response->getRedirection());
+            // Check if payment successful.
+	         if ( WC_Checkoutcom_Utility::is_successful( $response ) ) {
+                // Check if payment is 3Dsecure.
+                if ( WC_Checkoutcom_Utility::is_pending( $response ) || 'Authorized' === $response['status'] ) {
+                    // Check if redirection link exist.
+                    if ( WC_Checkoutcom_Utility::getRedirectUrl( $response ) ) {
+
+                        // Return apm redirection url.
+                        return array( 'apm_redirection' => WC_Checkoutcom_Utility::getRedirectUrl( $response ) );
 
                     } else {
-                        // Verify payment id
-                        $verifyPayment = $checkout->payments()->details($response->id);
-                        $source = $verifyPayment->source;
 
-                        // Check if payment source if Fawry
-                        if ($source['type'] == 'fawry' || $source['type'] == 'sepa'){
+                        // Verify payment id.
+                        $verifyPayment = $checkout->get_builder()->getPaymentsClient()->getPaymentDetails( $response['id'] );
+                        $source        = $verifyPayment['source'];
 
+                        // Check if payment source is Fawry or SEPA.
+                        if ( 'fawry' === $source['type'] || 'sepa' === $source['type'] ) {
                             return $verifyPayment;
                         }
 
-                        $error_message = "An error has occurred while processing your payment. Redirection link not found";
+                        $error_message = esc_html__( 'An error has occurred while processing your payment. Redirection link not found', 'wc_checkout_com' );
 
-                        return array('error' => $error_message);
+                        return array( 'error' => $error_message );
                     }
                 } else {
 
                     return $response;
                 }
             } else {
-                $error_message = "An error has occurred while processing your payment. Please check your card details and try again.";
+                $error_message = esc_html__( 'An error has occurred while processing your payment. Please check your card details and try again.', 'wc_checkout_com' );
 
-                // check if gateway response is enable from module settings
-                if ($gateway_debug) {
-                    $error_message .= __($response , 'wc_checkout_com');
+                // check if gateway response is enabled from module settings.
+                if ( $gateway_debug ) {
+                    $error_message .= $response;
                 }
 
-                // Log message
-                WC_Checkoutcom_Utility::logger($error_message, $response);
+                WC_Checkoutcom_Utility::logger( $error_message, $response );
 
-                return array('error' => $error_message);
+                return array( 'error' => $error_message );
             }
-        } catch (CheckoutHttpException $ex) {
-            $error_message = "An error has occurred while creating apm payments.";
+        } catch ( CheckoutApiException $ex ) {
+            $error_message = esc_html__( 'An error has occurred while creating apm payments.', 'wc_checkout_com' );
 
-            // check if gateway response is enable from module settings
-            if ($gateway_debug) {
-                $error_message .= __($ex->getMessage() , 'wc_checkout_com');
+            // Check if gateway response is enabled from module settings.
+            if ( $gateway_debug ) {
+                $error_message .= $ex->getMessage();
             }
 
-            // Log message
-            WC_Checkoutcom_Utility::logger($error_message, $ex);
+            WC_Checkoutcom_Utility::logger( $error_message, $ex );
 
-            return array('error' => $error_message);
+            return array( 'error' => $error_message );
         }
     }
 
@@ -1084,40 +1009,43 @@ class WC_Checkoutcom_Api_request
             );
         }
 
-        $total_tax_amount_cents = WC_Checkoutcom_Utility::valueToDecimal(WC()->cart->get_total_tax(), get_woocommerce_currency());
+        $total_tax_amount_cents = WC_Checkoutcom_Utility::valueToDecimal( WC()->cart->get_total_tax(), get_woocommerce_currency() );
 
-        $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
-        $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
-        $gateway_debug = WC_Admin_Settings::get_option('cko_gateway_responses') == 'yes' ? true : false;
-        $woo_locale = str_replace("_", "-", get_locale());
-        $locale = substr($woo_locale, 0, 5);
-        $country = WC()->customer->get_billing_country();
+        $gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) == 'yes';
+        $woo_locale    = str_replace( '_', '-', get_locale() );
+        $locale        = substr( $woo_locale, 0, 5 );
+        $country       = WC()->customer->get_billing_country();
 
-        $core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
+        // Initialize the Checkout Api.
+	    $checkout = new Checkout_SDK();
 
-        // Initialize the Checkout Api
-        $checkout = new CheckoutApi($core_settings['ckocom_sk'], $environment);
+	    try {
+		    $CreditSessionRequest                   = new CreditSessionRequest();
+		    $CreditSessionRequest->purchase_country = $country;
+		    $CreditSessionRequest->currency         = get_woocommerce_currency();
+		    $CreditSessionRequest->locale           = strtolower( $locale );
+		    $CreditSessionRequest->amount           = $amount_cents;
+		    $CreditSessionRequest->tax_amount       = $total_tax_amount_cents;
+		    $CreditSessionRequest->products         = $products;
 
-        try{
-            $klarna = new Klarna($country, get_woocommerce_currency(), strtolower($locale), $amount_cents, $total_tax_amount_cents, $products);
+			$builder = $checkout->get_builder();
 
-            $source = $checkout->sources()
-                ->add($klarna);
+		    // Klarna support for ABC AC type only.
+			if ( method_exists( $builder, 'getKlarnaClient' ) ) {
+		        return $builder->getKlarnaClient()->createCreditSession( $CreditSessionRequest );
+			}
 
-            return $source;
+        } catch ( CheckoutApiException $ex ) {
+            $error_message = esc_html__( 'An error has occurred while creating klarna session.', 'wc_checkout_com' );
 
-        } catch (CheckoutHttpException $ex) {
-            $error_message = "An error has occured while creating klarna session.";
-
-            // check if gateway response is enable from module settings
-            if ($gateway_debug) {
-                $error_message .= __($ex->getMessage() , 'wc_checkout_com');
+            // Check if gateway response is enabled from module settings.
+            if ( $gateway_debug ) {
+                $error_message .= $ex->getMessage();
             }
 
-            // Log message
-            WC_Checkoutcom_Utility::logger($error_message, $ex);
+            WC_Checkoutcom_Utility::logger( $error_message, $ex );
 
-            return array('error' => $error_message);
+            return array( 'error' => $error_message );
         }
     }
 
@@ -1246,57 +1174,63 @@ class WC_Checkoutcom_Api_request
         return $cartInfo;
     }
 
-    public static function generate_apple_token()
-    {
-        $apple_token = $_POST['token'];
-        $transactionId = $apple_token["header"]["transactionId"];
-        $publicKeyHash = $apple_token["header"]["publicKeyHash"];
-        $ephemeralPublicKey = $apple_token["header"]["ephemeralPublicKey"];
-        $version = $apple_token["version"];
-        $signature = $apple_token["signature"];
-        $data = $apple_token["data"];
+	public static function generate_apple_token() {
+		$apple_token          = $_POST['token'];
+		$transaction_id       = $apple_token["header"]["transactionId"];
+		$public_key_hash      = $apple_token["header"]["publicKeyHash"];
+		$ephemeral_public_key = $apple_token["header"]["ephemeralPublicKey"];
+		$version              = $apple_token["version"];
+		$signature            = $apple_token["signature"];
+		$data                 = $apple_token["data"];
 
-        $core_settings = get_option('woocommerce_wc_checkout_com_cards_settings');
-        $publicKey = $core_settings['ckocom_pk'];
-        $environment =  $core_settings['ckocom_environment'] == 'sandbox' ? true : false;
+		$checkout = new Checkout_SDK();
 
-        $checkout = new CheckoutApi();
-        $checkout->configuration()->setPublicKey($publicKey);
-        $checkout->configuration()->setSandbox($environment);
+		$header = array(
+			'transactionId'      => $transaction_id,
+			'publicKeyHash'      => $public_key_hash,
+			'ephemeralPublicKey' => $ephemeral_public_key,
+		);
 
-        $header = new ApplePayHeader($transactionId, $publicKeyHash, $ephemeralPublicKey);
-        $applepay = new ApplePay($version, $signature, $data, $header);
-        try {
-            $token = $checkout->tokens()->request($applepay);
+		try {
+			$apple_pay_token_data            = new ApplePayTokenData();
+			$apple_pay_token_data->data      = $data;
+			$apple_pay_token_data->header    = $header;
+			$apple_pay_token_data->signature = $signature;
+			$apple_pay_token_data->version   = $version;
 
-            return $token->token;
+			$apple_pay_token_request = new ApplePayTokenRequest();
+			$apple_pay_token_request->token_data = $apple_pay_token_data;
 
-        } catch (CheckoutHttpException $ex) {
+			$token = $checkout->get_builder()->getTokensClient()->requestWalletToken( $apple_pay_token_request );
 
-            die('here');
-        }
-    }
+			return $token['token'];
+
+		} catch ( CheckoutApiException $ex ) {
+			$error_message = esc_html__( 'An error has occurred while processing your payment.', 'wc_checkout_com' );
+			WC_Checkoutcom_Utility::logger( $error_message, $ex );
+			die( 'here' );
+		}
+	}
 
     /**
      * format_fawry_product
      *
      * @param  mixed $products
      * @param  mixed $amount
-     * @return void
+     * @return FawryProduct
      */
-    public static function format_fawry_product($products, $amount)
-    {
-        $arr = [];
+	public static function format_fawry_product( $products, $amount ) {
+		$fawry_product = new FawryProduct();
 
-        foreach($products as $product) {
-            $arr['product_id'] = 'All_Products';
-            $arr['quantity'] = 1;
-            $arr['price'] = $amount;
-            $arr['description'] .= $product['description'] . ',';
-        }
+		foreach ( $products as $product ) {
+			$fawry_product->product_id  = 'All_Products';
+			$fawry_product->quantity    = 1;
+			$fawry_product->price       = $amount;
+			$fawry_product->description .= $product['description'] . ',';
+		}
 
-        return $arr;
-    }
+		return $fawry_product;
+	}
 
 	/**
 	 * @param $url

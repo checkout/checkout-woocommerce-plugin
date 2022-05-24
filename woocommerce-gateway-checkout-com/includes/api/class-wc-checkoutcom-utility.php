@@ -18,7 +18,7 @@ class WC_Checkoutcom_Utility
     public static function verifySignature($event, $key, $cko_signature) {
         return hash_hmac('sha256', $event, $key) === $cko_signature ? true : false;
     }
-    
+
     /**
      * Format amount in cents
      *
@@ -120,12 +120,14 @@ class WC_Checkoutcom_Utility
             $hours = floor($totalSeconds / 3600);
             $minutes = floor($totalSeconds / 60 % 60);
             $seconds = floor($totalSeconds % 60);
+
             // Return date and time in UTC with the delays added
-            return gmdate("Y-m-d\TH:i:s\Z", strtotime('+' . $hours . ' hours +' . $minutes . ' minutes +' . $seconds . 'seconds'));
+	        return new DateTime( '+' . $hours . ' hours +' . $minutes . ' minutes +' . $seconds . 'seconds' );
         }
+
         // If the delay is in an invalid format (non-numeric) default to base delay (defaultSecondsDelay)
-        return gmdate("Y-m-d\TH:i:s\Z", strtotime('+' . $defaultSecondsDelay . 'seconds'));
-    }
+	    return new DateTime( '+' . $defaultSecondsDelay . 'seconds' );
+	}
 
     /**
      * @param $bin
@@ -204,13 +206,22 @@ class WC_Checkoutcom_Utility
      */
     public static function get_alternative_payment_methods()
     {
-        $currencyCode = get_woocommerce_currency();
-        $apm_setting = get_option('woocommerce_wc_checkout_com_alternative_payments_settings');
-        $apm = $apm_setting['ckocom_apms_selector'];
-        $countryCode = WC()->customer->get_billing_country();
+	    $currencyCode = get_woocommerce_currency();
+	    $apm_setting  = get_option( 'woocommerce_wc_checkout_com_alternative_payments_settings' );
+	    $apm          = ! empty( $apm_setting['ckocom_apms_selector'] ) ? $apm_setting['ckocom_apms_selector'] : array();
+	    $countryCode  = WC()->customer->get_billing_country();
+
+		$abc_apms = array( 'alipay', 'bancontact', 'boleto', 'eps', 'fawry', 'giropay', 'ideal', 'klarna', 'knet', 'multibanco', 'poli', 'qpay', 'sepa', 'sofort' );
+	    $nas_apms = array( 'ideal', 'bancontact', 'eps', 'fawry', 'giropay', 'knet', 'multibanco', 'qpay', 'sofort' );
+
+		if ( cko_is_nas_account() ) {
+			$apm = array_intersect( $apm, $nas_apms );
+		} else {
+			$apm = array_intersect( $apm, $abc_apms );
+		}
 
         $apmArray = array();
-        if ($apm !== 0) {
+        if ( 0 !== $apm ) {
 
             foreach ($apm as $value) {
                 if ($value == 'ideal' && $currencyCode == 'EUR' && $countryCode == 'NL') {
@@ -305,7 +316,7 @@ class WC_Checkoutcom_Utility
                         || $countryCode == 'RO'
                         || $countryCode == 'SE'
                         || $countryCode == 'CH'
-                        || $countryCode == 'GB'  
+                        || $countryCode == 'GB'
                     ) {
                         array_push($apmArray, $value);
                     }
@@ -343,5 +354,44 @@ class WC_Checkoutcom_Utility
 
         return $apmArray;
     }
+
+	public static function getRedirectUrl( $data ) {
+
+		if ( empty( $data['_links'] ) ) {
+			return false;
+		}
+
+		if ( empty( $data['_links']['redirect'] ) ) {
+			return false;
+		}
+
+		if ( ! empty( $data['_links']['redirect']['href'] ) ) {
+			return $data['_links']['redirect']['href'];
+		}
+
+		return false;
+	}
+
+	public static function is_successful( $data ) {
+
+		if ( ! empty( $data['http_metadata'] ) ) {
+			return $data['http_metadata']->getStatusCode() < 400 && self::is_approved( $data );
+		}
+
+		return false;
+	}
+
+	public static function is_pending( $data ) {
+		return $data['http_metadata']->getStatusCode() === 202;
+	}
+
+	public static function is_approved( $data ) {
+		$approved = true;
+		if ( isset( $data['approved'] ) ) {
+			$approved = $data['approved'];
+		}
+
+		return $approved;
+	}
 
 }

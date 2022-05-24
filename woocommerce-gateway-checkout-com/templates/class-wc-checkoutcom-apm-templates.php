@@ -6,7 +6,7 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_request
     {
         $ideal_banks = WC_Checkoutcom_Api_request::get_ideal_bank();
 
-        $country = $ideal_banks->countries;
+        $country = $ideal_banks['countries'];
         $issuers = $country[0]['issuers'];
 
         foreach ($issuers as $key => $value) {
@@ -17,7 +17,7 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_request
         ?>
             <div class="ideal-bank-info" id="ideal-bank-info">
                 <div class="ideal-heading">
-                    <label>Your Bank</label>
+                    <label><?php esc_html_e( 'Your Bank', 'wc_checkout_com' ); ?></label>
                 </div>
                 <label for="issuer-id">
 
@@ -30,29 +30,6 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_request
                     </input>
                 </label>
             </div>
-        <?php
-    }
-
-    public static function get_giropay_bank()
-    {
-        $giropay_banks = WC_Checkoutcom_Api_request::get_giropay_bank();
-        $banks = $giropay_banks->banks;
-
-        ?>
-        <div class="giropay-bank-info" id="giropay-bank-info" style="display: none;">
-            <div class="giropay-heading">
-                <label> Your Bank</label>
-            </div>
-            <label for="giropay-bank-id">
-                <input name="giropay-bank-details" list="giropay-bank-details" style="width: 80%;">
-                    <datalist id="giropay-bank-details">
-                        <?php foreach ($banks as $key => $value) { ?>
-                            <option value="<?php echo $key; ?>"><?php echo $value;?></option>
-                        <?php } ?>
-                    </datalist>
-                </input>
-            </label>
-        </div>
         <?php
     }
 
@@ -115,7 +92,7 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_request
             $alert = __("Please fill in the required fields.", 'wc_checkout_com');
             ?>
         </div>
-        
+
         <script type="text/javascript">
             jQuery('#sepa-continue').click(function(){
 
@@ -124,7 +101,7 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_request
                 } else {
                     alert('<?php echo $alert; ?>')
                 }
-                
+
             })
         </script>
 

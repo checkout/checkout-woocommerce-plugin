@@ -1,11 +1,19 @@
 <?php
 
+use Checkout\CheckoutApiException;
+use Checkout\Workflows\Actions\WebhookSignature;
+use Checkout\Workflows\Actions\WebhookWorkflowActionRequest;
+use Checkout\Workflows\Conditions\EventWorkflowConditionRequest;
+use Checkout\Workflows\CreateWorkflowRequest;
+
 /**
  * Class WC_Checkoutcom_Workflows
  */
 class WC_Checkoutcom_Workflows {
 
 	private static $instance = null;
+
+	private $checkout = null;
 
 	private $URL;
 
@@ -27,6 +35,8 @@ class WC_Checkoutcom_Workflows {
 
 		$this->SECRET_KEY = $core_settings['ckocom_sk'];
 		$this->URL        = $environment ? 'https://api.sandbox.checkout.com/workflows' : 'https://api.checkout.com/workflows';
+
+		$this->checkout = new Checkout_SDK();
 	}
 
 	/**
@@ -79,28 +89,29 @@ class WC_Checkoutcom_Workflows {
 			return $this->list;
 		}
 
-		$response = wp_remote_get( $this->URL, $this->get_request_args() );
+		try {
 
-		if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) ) {
-			WC_Checkoutcom_Utility::logger(
-				sprintf(
-					'An error has occurred while processing webhook request. Response code: %s',
-					wp_remote_retrieve_response_code( $response )
-				),
-				null
-			);
+			$workflows = $this->checkout->get_builder()->getWorkflowsClient()->getWorkflows();
 
-			return $this->list;
-		}
+			if ( ! is_wp_error( $workflows ) && ! empty( $workflows ) ) {
 
-		if ( ! is_wp_error( $response ) && 200 === wp_remote_retrieve_response_code( $response ) ) {
-			$result = json_decode( wp_remote_retrieve_body( $response ), true );
+				if ( isset( $workflows['data'] ) && ! empty( $workflows['data'] ) ) {
+					$this->list = $workflows['data'];
 
-			if ( isset( $result['data'] ) && ! empty( $result['data'] ) ) {
-				$this->list = $result['data'];
-
-				return $this->list;
+					return $this->list;
+				}
 			}
+
+		} catch ( CheckoutApiException $ex ) {
+			$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
+
+			$error_message = 'An error has occurred while processing workflow request. ';
+
+			if ( $gateway_debug ) {
+				$error_message .= $ex->getMessage();
+			}
+
+			WC_Checkoutcom_Utility::logger( $error_message, $ex );
 		}
 
 		return $this->list;
@@ -139,90 +150,90 @@ class WC_Checkoutcom_Workflows {
 			$url = WC_Checkoutcom_Webhook::get_instance()->generate_current_webhook_url();
 		}
 
-		$event_types = array(
-			'name'       => $url,
-			'conditions' => array(
-				array(
-					'type'   => 'event',
-					'events' => array(
-						'gateway'     => array(
-							'card_verification_declined',
-							'card_verified',
-							'payment_approved',
-							'payment_canceled',
-							'payment_capture_declined',
-							'payment_capture_pending',
-							'payment_captured',
-							'payment_declined',
-							'payment_expired',
-							'payment_paid',
-							'payment_pending',
-							'payment_refund_declined',
-							'payment_refund_pending',
-							'payment_refunded',
-							'payment_void_declined',
-							'payment_voided',
-						),
-						'dispute'     => array(
-							'dispute_canceled',
-							'dispute_evidence_required',
-							'dispute_expired',
-							'dispute_lost',
-							'dispute_resolved',
-							'dispute_won',
-						),
-						'mbccards'    => array(
-							'card_verification_declined',
-							'card_verified',
-							'payment_approved',
-							'payment_capture_declined',
-							'payment_captured',
-							'payment_declined',
-							'payment_refund_declined',
-							'payment_refunded',
-							'payment_void_declined',
-							'payment_voided',
-						),
-						'card_payout' => array(
-							'payment_approved',
-							'payment_declined',
-						),
-					),
-				),
+		$signature = new WebhookSignature();
+		$signature->key = $this->SECRET_KEY;
+		$signature->method = 'HMACSHA256';
+
+		$actionRequest = new WebhookWorkflowActionRequest();
+		$actionRequest->url = $url;
+		$actionRequest->signature = $signature;
+
+		$eventWorkflowConditionRequest = new EventWorkflowConditionRequest();
+		$eventWorkflowConditionRequest->events = [
+			'gateway'     => array(
+				'card_verification_declined',
+				'card_verified',
+				'payment_approved',
+				'payment_canceled',
+				'payment_capture_declined',
+				'payment_capture_pending',
+				'payment_captured',
+				'payment_declined',
+				'payment_expired',
+				'payment_paid',
+				'payment_pending',
+				'payment_refund_declined',
+				'payment_refund_pending',
+				'payment_refunded',
+				'payment_void_declined',
+				'payment_voided',
 			),
-			'actions'    => array(
-				array(
-					'type'      => 'webhook',
-					'url'       => $url,
-					'signature' => array(
-						'method' => 'HMACSHA256',
-						'key'    => $this->SECRET_KEY,
-					),
-				),
+			'dispute'     => array(
+				'dispute_canceled',
+				'dispute_evidence_required',
+				'dispute_expired',
+				'dispute_lost',
+				'dispute_resolved',
+				'dispute_won',
 			),
-		);
+			'mbccards'    => array(
+				'card_verification_declined',
+				'card_verified',
+				'payment_approved',
+				'payment_capture_declined',
+				'payment_captured',
+				'payment_declined',
+				'payment_refund_declined',
+				'payment_refunded',
+				'payment_void_declined',
+				'payment_voided',
+			),
+			'card_payout' => array(
+				'payment_approved',
+				'payment_declined',
+			),
+		];
 
-		$response = wp_remote_post( $this->URL, $this->get_request_args( array( 'body' => json_encode( $event_types ) ) ) );
+		$workflowRequest             = new CreateWorkflowRequest();
+		$workflowRequest->actions    = array( $actionRequest );
+		$workflowRequest->conditions = array( $eventWorkflowConditionRequest );
+		$workflowRequest->name       = $url;
+		$workflowRequest->active     = true;
 
-		if ( is_wp_error( $response ) || 201 !== wp_remote_retrieve_response_code( $response ) ) {
-			WC_Checkoutcom_Utility::logger(
-				sprintf(
-					'An error has occurred while processing webhook request. Response code: %s',
-					wp_remote_retrieve_response_code( $response )
-				),
-				null
-			);
-		}
+		$workflows = [];
+		try {
+			$workflows = $this->checkout->get_builder()->getWorkflowsClient()->createWorkflow( $workflowRequest );
 
-		if ( ! is_wp_error( $response ) && 201 === wp_remote_retrieve_response_code( $response ) ) {
-			$result = json_decode( wp_remote_retrieve_body( $response ), true );
+			if ( ! is_wp_error( $workflows ) && ! empty( $workflows ) ) {
 
-			if ( isset( $result['id'] ) ) {
-				return $response;
+				if ( isset( $workflows['id'] ) ) {
+					return $workflows;
+				}
 			}
+
+		} catch ( CheckoutApiException $ex ) {
+			$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
+
+			$error_message = esc_html__( 'An error has occurred while processing webhook request.', 'wc_checkout_com' );
+
+			if ( $gateway_debug ) {
+				$error_message .= $ex->getMessage();
+			}
+
+			WC_Checkoutcom_Utility::logger( $error_message, $ex );
 		}
 
-		return $response;
+		return $workflows;
 	}
 
 }

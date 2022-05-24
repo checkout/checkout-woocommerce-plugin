@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name: Checkout.com Payment Gateway
+ * Plugin Name: Checkout.com Payment Gateway - DEV
  * Plugin URI: https://www.checkout.com/
  * Description: Extends WooCommerce by Adding the Checkout.com Gateway.
  * Author: Checkout.com
@@ -296,78 +296,80 @@ function action_woocommerce_order_item_add_action_buttons( $order ) {
 /*
  * Do action for capture and void button
  */
-add_action('save_post', 'renew_save_again', 10, 3);
-function renew_save_again($post_id, $post, $update){
-    global $woocommerce;
+add_action( 'save_post', 'renew_save_again', 10, 3 );
 
-    $slug = 'shop_order';
-    if(is_admin()){
-        // If this isn't a 'woocommercer order' post, don't update it.
-        if ( $slug != $post->post_type ) {
+function renew_save_again( $post_id, $post, $update ) {
+
+    if( is_admin() ) {
+        // If this isn't a 'WooCommerce Order' post, don't update it.
+        if ( 'shop_order' !== $post->post_type ) {
             return;
         }
-        if(isset($_POST['cko_payment_action']) && sanitize_text_field($_POST['cko_payment_action'])){
+	    if ( isset( $_POST['cko_payment_action'] ) && sanitize_text_field( $_POST['cko_payment_action'] ) ) {
 
-            $order = wc_get_order( sanitize_text_field($_POST['post_ID']) );
+		    $order = wc_get_order( sanitize_text_field( $_POST['post_ID'] ) );
 
-            WC_Admin_Notices::remove_notice('wc_checkout_com_cards');
+		    WC_Admin_Notices::remove_notice( 'wc_checkout_com_cards' );
 
-            // check if post is capture
-            if(sanitize_text_field($_POST['cko_payment_action']) == 'cko-capture'){
+		    // check if post is capture.
+		    if ( 'cko-capture' === sanitize_text_field( $_POST['cko_payment_action'] ) ) {
 
-                // send capture request to cko
-                $result = (array) WC_Checkoutcom_Api_request::capture_payment();
+			    // send capture request to cko.
+			    $result = (array) WC_Checkoutcom_Api_request::capture_payment();
 
-                if (isset($result['error']) && !empty($result['error'])){
-                    WC_Admin_Notices::add_custom_notice('wc_checkout_com_cards', __($result['error']));
-                    return false;
-                }
+			    if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {
+				    WC_Admin_Notices::add_custom_notice( 'wc_checkout_com_cards', $result['error'] );
 
-                // Set action id as woo transaction id
-                update_post_meta(sanitize_text_field($_POST['post_ID']), '_transaction_id', $result['action_id']);
-                update_post_meta(sanitize_text_field($_POST['post_ID']), 'cko_payment_captured', true);
+				    return false;
+			    }
 
-                // Get cko capture status configured in admin
-                $status = WC_Admin_Settings::get_option('ckocom_order_captured');
-                $message = __("Checkout.com Payment Captured from Admin " ."</br>". " Action ID : {$result['action_id']} ", 'wc_checkout_com');
+			    // Set action id as woo transaction id.
+			    update_post_meta( sanitize_text_field( $_POST['post_ID'] ), '_transaction_id', $result['action_id'] );
+			    update_post_meta( sanitize_text_field( $_POST['post_ID'] ), 'cko_payment_captured', true );
 
-                // add notes for the order and update status
-                $order->add_order_note($message);
-                $order->update_status($status);
+			    // Get cko capture status configured in admin.
+			    $status  = WC_Admin_Settings::get_option( 'ckocom_order_captured' );
+			    $message = sprintf( esc_html__( "Checkout.com Payment Captured from Admin - Action ID : %s", 'wc_checkout_com' ), $result['action_id'] );
 
-                return true;
+			    // add notes for the order and update status.
+			    $order->add_order_note( $message );
+			    $order->update_status( $status );
 
-            } elseif (sanitize_text_field($_POST['cko_payment_action']) == 'cko-void') {
-                // check if post is void
-                // send void request to cko
-                $result = (array) WC_Checkoutcom_Api_request::void_payment();
+			    return true;
 
-                if (isset($result['error']) && !empty($result['error'])){
-                    WC_Admin_Notices::add_custom_notice('wc_checkout_com_cards', __($result['error']));
-                    return false;
-                }
+		    } elseif ( 'cko-void' === sanitize_text_field( $_POST['cko_payment_action'] ) ) {
+			    // check if post is void.
+			    // send void request to cko.
+			    $result = (array) WC_Checkoutcom_Api_request::void_payment();
 
-                // Set action id as woo transaction id
-                update_post_meta(sanitize_text_field($_POST['post_ID']), '_transaction_id', $result['action_id']);
-                update_post_meta(sanitize_text_field($_POST['post_ID']), 'cko_payment_voided', true);
+			    if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {
+				    WC_Admin_Notices::add_custom_notice( 'wc_checkout_com_cards', $result['error'] );
 
-                // Get cko capture status configured in admin
-                $status = WC_Admin_Settings::get_option('ckocom_order_void');
-                $message = __("Checkout.com Payment Voided from Admin " ."</br>". " Action ID : {$result['action_id']} ", 'wc_checkout_com');
+				    return false;
+			    }
 
-                // add notes for the order and update status
-                $order->add_order_note($message);
-                $order->update_status($status);
+			    // Set action id as woo transaction id.
+			    update_post_meta( sanitize_text_field( $_POST['post_ID'] ), '_transaction_id', $result['action_id'] );
+			    update_post_meta( sanitize_text_field( $_POST['post_ID'] ), 'cko_payment_voided', true );
 
-                // increase stock level
-                wc_increase_stock_levels(sanitize_text_field($_POST['post_ID']));
+			    // Get cko capture status configured in admin.
+			    $status  = WC_Admin_Settings::get_option( 'ckocom_order_void' );
+			    $message = sprintf( esc_html__( "Checkout.com Payment Voided from Admin - Action ID : %s", 'wc_checkout_com' ), $result['action_id'] );
 
-                return true;
+			    // add notes for the order and update status.
+			    $order->add_order_note( $message );
+			    $order->update_status( $status );
 
-            } else {
-                WC_Admin_Notices::add_custom_notice('wc_checkout_com_cards', __('An error has occured.', 'wc_checkout_com'));
-                return false;
-            }
+			    // increase stock level.
+			    wc_increase_stock_levels( sanitize_text_field( $_POST['post_ID'] ) );
+
+			    return true;
+
+		    } else {
+			    WC_Admin_Notices::add_custom_notice( 'wc_checkout_com_cards', esc_html__( 'An error has occurred.', 'wc_checkout_com' ) );
+
+			    return false;
+		    }
         }
     }
 }

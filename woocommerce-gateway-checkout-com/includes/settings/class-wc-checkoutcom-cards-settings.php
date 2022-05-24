@@ -206,13 +206,13 @@ class WC_Checkoutcom_Cards_Settings
             'ckocom_sk'           => array(
                 'title'       => __( 'Secret Key', 'wc_checkout_com' ),
                 'type'        => 'text',
-                'description' => sprintf( __( 'You can %s find your secret key %s in the Checkout.com Hub', 'wc_checkout_com' ), '<a class="checkoutcom-key-docs" href="' . esc_url( $docs_link ) . '">', '</a>' ),
+                'description' => sprintf( __( 'You can %s find your secret key %s in the Checkout.com Hub', 'wc_checkout_com' ), '<a class="checkoutcom-key-docs" target="_blank" href="' . esc_url( $docs_link ) . '">', '</a>' ),
                 'placeholder' => 'sk_xxx',
             ),
             'ckocom_pk'           => array(
                 'title'       => __( 'Public Key', 'wc_checkout_com' ),
                 'type'        => 'text',
-                'description' => sprintf( __( 'You can %s find your public key %s in the Checkout.com Hub', 'wc_checkout_com' ), '<a class="checkoutcom-key-docs" href="' . esc_url( $docs_link ) . '">', '</a>' ),
+                'description' => sprintf( __( 'You can %s find your public key %s in the Checkout.com Hub', 'wc_checkout_com' ), '<a class="checkoutcom-key-docs" target="_blank" href="' . esc_url( $docs_link ) . '">', '</a>' ),
                 'placeholder' => 'pk_xxx',
             ),
         );
@@ -559,6 +559,16 @@ class WC_Checkoutcom_Cards_Settings
      */
     public static function apple_settings()
     {
+
+	    $core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+	    $nas_docs      = 'https://www.checkout.com/docs/four/payments/payment-methods/apple-pay';
+	    $abc_docs      = 'https://www.checkout.com/docs/payments/payment-methods/wallets/apple-pay';
+	    $docs_link     = $abc_docs;
+
+	    if ( isset( $core_settings['ckocom_account_type'] ) && $core_settings['ckocom_account_type'] === 'NAS' ) {
+		    $docs_link = $nas_docs;
+	    }
+
         $settings = array(
             'core_setting'             => array(
                 'title'       => __( 'Apple Pay settings', 'wc_checkout_com' ),
@@ -592,7 +602,7 @@ class WC_Checkoutcom_Cards_Settings
             'ckocom_apple_mercahnt_id' => array(
                 'title'       => __( 'Merchant Identifier', 'wc_checkout_com' ),
                 'type'        => 'text',
-                'description' => __( 'You can find this in your developer portal, or to generate one follow this ' . '<a href="https://docs.checkout.com/docs/apple-pay">guide</a>', 'wc_checkout_com' ),
+                'description' => sprintf( __( 'You can find this in your developer portal, or to generate one follow this %s guide %s', 'wc_checkout_com' ), '<a target="_blank" href="' . esc_url( $docs_link ) . '">', '</a>' ),
                 'default'     => '',
             ),
             'ckocom_apple_certificate' => array(
@@ -632,7 +642,7 @@ class WC_Checkoutcom_Cards_Settings
             'ckocom_apple_language'    => array(
                 'title'       => __( 'Button Language', 'wc_checkout_com' ),
                 'type'        => 'text',
-                'description' => __( 'ISO 639-1 value of the language. See suported languages ' . '<a href="https://applepaydemo.apple.com/" >here.</a>', 'wc_checkout_com' ),
+                'description' => sprintf( __( 'ISO 639-1 value of the language. See supported languages %s here. %s', 'wc_checkout_com' ), '<a href="https://applepaydemo.apple.com/" target="_blank">', '</a>' ),
                 'default'     => '',
             ),
             'enable_mada'              => array(
