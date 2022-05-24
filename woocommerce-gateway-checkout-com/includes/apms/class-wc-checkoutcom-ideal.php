@@ -60,4 +60,18 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Ideal extends WC_Gateway_Chec
             );
         }
     }
+
+	/**
+	 * Process refund for the order.
+	 *
+	 * @param int    $order_id Order ID.
+	 * @param int    $amount   Amount to refund.
+	 * @param string $reason   Refund reason.
+	 *
+	 * @return bool
+	 */
+	public function process_refund( $order_id, $amount = null, $reason = '' ) {
+
+		return parent::process_refund( $order_id, $amount, $reason );
+	}
 }

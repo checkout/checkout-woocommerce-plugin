@@ -17,7 +17,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Qpay extends WC_Gateway_Check
     }
 
     public function payment_fields()
-    {   
+    {
         // get available apms depending on currency
         $apm_available = WC_Checkoutcom_Utility::get_alternative_payment_methods();
         $message = __("Pay with QPay. You will be redirected upon place order", 'wc_checkout_com');
@@ -62,4 +62,18 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Qpay extends WC_Gateway_Check
             );
         }
     }
+
+	/**
+	 * Process refund for the order.
+	 *
+	 * @param int    $order_id Order ID.
+	 * @param int    $amount   Amount to refund.
+	 * @param string $reason   Refund reason.
+	 *
+	 * @return bool
+	 */
+	public function process_refund( $order_id, $amount = null, $reason = '' ) {
+
+		return parent::process_refund( $order_id, $amount, $reason );
+	}
 }

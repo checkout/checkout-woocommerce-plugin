@@ -19,7 +19,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Klarna extends WC_Gateway_Che
     }
 
     public function payment_fields()
-    {   
+    {
         // get available apms depending on currency
         $apm_available = WC_Checkoutcom_Utility::get_alternative_payment_methods();
 
@@ -70,7 +70,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Klarna extends WC_Gateway_Che
             WC_Checkoutcom_Utility::wc_add_notice_self(__($result['error']), 'error');
             return;
         }
-       
+
         // redirect to apm if redirection url is available
         if (isset($result['apm_redirection']) &&!empty($result['apm_redirection'])) {
 
@@ -80,4 +80,18 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Klarna extends WC_Gateway_Che
             );
         }
     }
+
+	/**
+	 * Process refund for the order.
+	 *
+	 * @param int    $order_id Order ID.
+	 * @param int    $amount   Amount to refund.
+	 * @param string $reason   Refund reason.
+	 *
+	 * @return bool
+	 */
+	public function process_refund( $order_id, $amount = null, $reason = '' ) {
+
+		return parent::process_refund( $order_id, $amount, $reason );
+	}
 }
