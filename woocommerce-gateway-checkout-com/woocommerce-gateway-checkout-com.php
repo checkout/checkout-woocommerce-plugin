@@ -244,8 +244,8 @@ add_action( 'woocommerce_order_item_add_action_buttons', 'action_woocommerce_ord
 function action_woocommerce_order_item_add_action_buttons( $order ) {
 
     $order_status = $order->get_status();
-    $auth_status = str_replace('wc-', '', WC_Admin_Settings::get_option('ckocom_order_authorised'));
-    $capture_status = str_replace('wc-', '', WC_Admin_Settings::get_option('ckocom_order_captured'));
+    $auth_status = str_replace('wc-', '', WC_Admin_Settings::get_option('ckocom_order_authorised', 'on-hold'));
+    $capture_status = str_replace('wc-', '', WC_Admin_Settings::get_option('ckocom_order_captured', 'processing'));
 
     if($order->get_payment_method() == 'wc_checkout_com_cards'
         || $order->get_payment_method() == 'wc_checkout_com_google_pay') {
@@ -328,7 +328,7 @@ function renew_save_again( $post_id, $post, $update ) {
 			    update_post_meta( sanitize_text_field( $_POST['post_ID'] ), 'cko_payment_captured', true );
 
 			    // Get cko capture status configured in admin.
-			    $status  = WC_Admin_Settings::get_option( 'ckocom_order_captured' );
+			    $status  = WC_Admin_Settings::get_option( 'ckocom_order_captured', 'processing' );
 			    $message = sprintf( esc_html__( "Checkout.com Payment Captured from Admin - Action ID : %s", 'wc_checkout_com' ), $result['action_id'] );
 
 			    // add notes for the order and update status.
@@ -353,7 +353,7 @@ function renew_save_again( $post_id, $post, $update ) {
 			    update_post_meta( sanitize_text_field( $_POST['post_ID'] ), 'cko_payment_voided', true );
 
 			    // Get cko capture status configured in admin.
-			    $status  = WC_Admin_Settings::get_option( 'ckocom_order_void' );
+			    $status  = WC_Admin_Settings::get_option( 'ckocom_order_void', 'cancelled' );
 			    $message = sprintf( esc_html__( "Checkout.com Payment Voided from Admin - Action ID : %s", 'wc_checkout_com' ), $result['action_id'] );
 
 			    // add notes for the order and update status.

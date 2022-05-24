@@ -121,7 +121,7 @@ class WC_Checkoutcom_Api_request
 	private static function get_request_param( WC_Order $order, $arg, $subscription = null ) {
 		global $woocommerce, $wp_version;
 
-		$auto_capture       = WC_Admin_Settings::get_option( 'ckocom_card_autocap' ) == 1 ? true : false;
+		$auto_capture       = WC_Admin_Settings::get_option( 'ckocom_card_autocap', 1 ) == 1;
 		$amount             = $order->get_total();
 		$amount_cents       = WC_Checkoutcom_Utility::valueToDecimal( $amount, $order->get_currency() );
 		$three_d            = WC_Admin_Settings::get_option( 'ckocom_card_threed' ) == 1 && $subscription == null ? true : false;
