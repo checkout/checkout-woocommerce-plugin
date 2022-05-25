@@ -8,7 +8,7 @@
  * Version: 4.4.0
  * Requires at least: 4.0
  * Stable tag: 4.4.0
- * Tested up to: 5.9.3
+ * Tested up to: 6.0
  * WC tested up to: 6.5.1
  * Requires PHP: 7.2
  * Text Domain: wc_checkout_com
