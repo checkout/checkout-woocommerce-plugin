@@ -1,21 +1,21 @@
 # Copyright (C) 2022 Checkout.com
-# This file is distributed under the same license as the Checkout.com Payment Gateway - DEV plugin.
+# This file is distributed under the same license as the Checkout.com Payment Gateway plugin.
 msgid ""
 msgstr ""
-"Project-Id-Version: Checkout.com Payment Gateway - DEV 4.3.9\n"
-"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/checkout-com-unified-payments-api-new\n"
+"Project-Id-Version: Checkout.com Payment Gateway 4.4.0\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/checkout-com-unified-payments-api\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2022-05-13T09:43:12+00:00\n"
+"POT-Creation-Date: 2022-05-24T10:25:38+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.6.0\n"
 "X-Domain: wc_checkout_com\n"
 
 #. Plugin Name of the plugin
-msgid "Checkout.com Payment Gateway - DEV"
+msgid "Checkout.com Payment Gateway"
 msgstr ""
 
 #. Plugin URI of the plugin
@@ -101,7 +101,7 @@ msgid "An error has occurred while processing your refund payment on Checkout.co
 msgstr ""
 
 #: includes/api/class-wc-checkoutcom-api-request.php:789
-msgid "An error has occurred while processing your refund."
+msgid "An error has occurred while processing your refund. "
 msgstr ""
 
 #: includes/api/class-wc-checkoutcom-api-request.php:818
@@ -247,16 +247,6 @@ msgstr ""
 msgid "Checkout.com - Sepa payment Action ID : %s - Sepa mandate reference : %s"
 msgstr ""
 
-#: includes/apms/class-wc-checkoutcom-sepa.php:166
-#: includes/class-wc-gateway-checkout-com-cards.php:723
-msgid "Checkout.com Payment refunded from Admin </br>"
-msgstr ""
-
-#: includes/apms/class-wc-checkoutcom-sepa.php:171
-#: includes/class-wc-gateway-checkout-com-cards.php:728
-msgid "Checkout.com Payment Partially refunded from Admin </br>"
-msgstr ""
-
 #: includes/apms/class-wc-checkoutcom-sofort.php:10
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:773
 msgid "Sofort"
@@ -277,8 +267,18 @@ msgstr ""
 msgid "Other Settings"
 msgstr ""
 
+#: includes/class-wc-gateway-checkout-com-alternative-payments.php:107
+#: includes/class-wc-gateway-checkout-com-apple-pay.php:607
+msgid "Checkout.com Payment Partially refunded from Admin - Action ID : %s"
+msgstr ""
+
+#: includes/class-wc-gateway-checkout-com-alternative-payments.php:115
+#: includes/class-wc-gateway-checkout-com-apple-pay.php:615
+msgid "Checkout.com Payment refunded from Admin - Action ID : %s"
+msgstr ""
+
 #: includes/class-wc-gateway-checkout-com-apple-pay.php:15
-#: includes/settings/admin/class-wc-checkoutcom-admin.php:40
+#: includes/settings/admin/class-wc-checkoutcom-admin.php:61
 msgid "Apple Pay"
 msgstr ""
 
@@ -288,7 +288,7 @@ msgstr ""
 msgid "There was an issue completing the payment."
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-apple-pay.php:552
+#: includes/class-wc-gateway-checkout-com-apple-pay.php:554
 #: includes/class-wc-gateway-checkout-com-cards.php:502
 #: includes/class-wc-gateway-checkout-com-google-pay.php:328
 #: includes/class-wc-gateway-checkout-com-webhook.php:51
@@ -296,7 +296,7 @@ msgstr ""
 msgid "Checkout.com Payment Authorised </br>"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-apple-pay.php:558
+#: includes/class-wc-gateway-checkout-com-apple-pay.php:560
 #: includes/class-wc-gateway-checkout-com-cards.php:508
 #: includes/class-wc-gateway-checkout-com-google-pay.php:334
 #: includes/subscription/class-wc-checkout-com-subscription.php:59
@@ -312,7 +312,7 @@ msgid "Use a new card"
 msgstr ""
 
 #: includes/class-wc-gateway-checkout-com-cards.php:111
-#: woocommerce-gateway-checkout-com.php:100
+#: woocommerce-gateway-checkout-com.php:101
 msgid "Settings"
 msgstr ""
 
@@ -356,12 +356,20 @@ msgstr ""
 msgid "An error has occurred while processing your cancel request. "
 msgstr ""
 
+#: includes/class-wc-gateway-checkout-com-cards.php:723
+msgid "Checkout.com Payment refunded from Admin </br>"
+msgstr ""
+
+#: includes/class-wc-gateway-checkout-com-cards.php:728
+msgid "Checkout.com Payment Partially refunded from Admin </br>"
+msgstr ""
+
 #: includes/class-wc-gateway-checkout-com-cards.php:796
 msgid "order payment Id ("
 msgstr ""
 
 #: includes/class-wc-gateway-checkout-com-google-pay.php:13
-#: includes/settings/admin/class-wc-checkoutcom-admin.php:33
+#: includes/settings/admin/class-wc-checkoutcom-admin.php:58
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:685
 msgid "Google Pay"
 msgstr ""
@@ -410,29 +418,29 @@ msgstr ""
 msgid "Checkout.com Payment fully refunded </br>"
 msgstr ""
 
-#: includes/settings/admin/class-wc-checkoutcom-admin.php:12
+#: includes/settings/admin/class-wc-checkoutcom-admin.php:49
 msgid "Core Settings"
 msgstr ""
 
-#: includes/settings/admin/class-wc-checkoutcom-admin.php:19
+#: includes/settings/admin/class-wc-checkoutcom-admin.php:52
 msgid "Card Settings"
 msgstr ""
 
-#: includes/settings/admin/class-wc-checkoutcom-admin.php:26
+#: includes/settings/admin/class-wc-checkoutcom-admin.php:55
 msgid "Order Settings"
 msgstr ""
 
-#: includes/settings/admin/class-wc-checkoutcom-admin.php:47
+#: includes/settings/admin/class-wc-checkoutcom-admin.php:64
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:757
 msgid "Alternative Payments"
 msgstr ""
 
-#: includes/settings/admin/class-wc-checkoutcom-admin.php:54
+#: includes/settings/admin/class-wc-checkoutcom-admin.php:67
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:794
 msgid "Debug Settings"
 msgstr ""
 
-#: includes/settings/admin/class-wc-checkoutcom-admin.php:61
+#: includes/settings/admin/class-wc-checkoutcom-admin.php:70
 msgid "Webhook"
 msgstr ""
 
@@ -982,18 +990,34 @@ msgstr ""
 msgid "Please fill in the required fields."
 msgstr ""
 
-#: woocommerce-gateway-checkout-com.php:324
+#: woocommerce-gateway-checkout-com.php:146
+msgid "Please enter a valid card number"
+msgstr ""
+
+#: woocommerce-gateway-checkout-com.php:147
+msgid "Please enter a valid expiry date"
+msgstr ""
+
+#: woocommerce-gateway-checkout-com.php:148
+msgid "Please enter a valid cvv code"
+msgstr ""
+
+#: woocommerce-gateway-checkout-com.php:168
+msgid "Please enter a valid cvv."
+msgstr ""
+
+#: woocommerce-gateway-checkout-com.php:333
 msgid "Checkout.com Payment Captured from Admin - Action ID : %s"
 msgstr ""
 
-#: woocommerce-gateway-checkout-com.php:349
+#: woocommerce-gateway-checkout-com.php:358
 msgid "Checkout.com Payment Voided from Admin - Action ID : %s"
 msgstr ""
 
-#: woocommerce-gateway-checkout-com.php:361
+#: woocommerce-gateway-checkout-com.php:370
 msgid "An error has occurred."
 msgstr ""
 
-#: woocommerce-gateway-checkout-com.php:373
+#: woocommerce-gateway-checkout-com.php:382
 msgid "Fawry reference number: "
 msgstr ""
