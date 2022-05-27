@@ -68,7 +68,7 @@ class WC_Checkoutcom_Workflows {
 
 		foreach ( $webhooks as $item ) {
 
-			if ( str_contains( $item['name'], $url ) ) {
+			if ( false !== strpos( $item['name'], $url ) ) {
 				$this->url_is_registered = $item['name'];
 
 				return $this->url_is_registered;
