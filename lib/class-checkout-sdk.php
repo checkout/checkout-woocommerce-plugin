@@ -1,5 +1,5 @@
 <?php
-include_once __DIR__ . '/../api/class-wc-checkoutcom-utility.php';
+include_once dirname(__DIR__) . '/includes/api/class-wc-checkoutcom-utility.php';
 
 use Checkout\CheckoutDefaultSdk;
 use Checkout\CheckoutFourSdk;

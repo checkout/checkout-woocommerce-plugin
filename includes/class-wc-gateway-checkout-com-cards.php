@@ -1,9 +1,9 @@
 <?php
 
-include_once "lib/class-checkout-sdk.php";
+include_once dirname(__DIR__). "/lib/class-checkout-sdk.php";
 
-if ( is_readable( __DIR__ . '/lib/vendor/autoload.php' ) ) {
-	require __DIR__ . '/lib/vendor/autoload.php';
+if ( is_readable( dirname(__DIR__) . '/lib/vendor/autoload.php' ) ) {
+	require dirname(__DIR__) . '/lib/vendor/autoload.php';
 }
 include_once('settings/class-wc-checkoutcom-cards-settings.php');
 include_once('settings/class-wc-checkoutcom-webhook.php');
