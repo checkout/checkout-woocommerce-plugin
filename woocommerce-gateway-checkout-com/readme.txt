@@ -4,7 +4,7 @@ Tags: checkout, payments, credit card, payment gateway, apple pay, google pay, p
 Requires at least: 4.0
 Stable tag: trunk
 Requires PHP: 7.2
-Tested up to: 5.9.3
+Tested up to: 6.0
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
