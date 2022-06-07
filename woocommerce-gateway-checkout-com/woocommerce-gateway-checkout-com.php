@@ -211,7 +211,7 @@ function callback_for_setting_up_scripts() {
     $apm_settings = get_option('woocommerce_wc_checkout_com_alternative_payments_settings');
     $apm_enable = $apm_settings['enabled'] == true ? true : false;
 
-    if ($apm_enable) {
+    if ($apm_enable && !empty($apm_settings['ckocom_apms_selector'])) {
         foreach ($apm_settings['ckocom_apms_selector'] as $value) {
             if($value == 'klarna') {
                 wp_enqueue_script( 'cko-klarna-script', 'https://x.klarnacdn.net/kp/lib/v1/api.js', array( 'jquery' ) );
