@@ -50,6 +50,7 @@ Upon receiving your live credentials from your account manager, here are the req
 - Use required `npm` version.
 - Install the `npm` packages using `npm install`.
 - Install the `composer` packages using `composer install`.
+- During pushing the committing the code the PHPCS check will run at pre-commit hook. **So, till the PHPCS errors are not fixed for during commit we have to use `--no-verify` option in the git commit command.**
 
 
 # Reference 
