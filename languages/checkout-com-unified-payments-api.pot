@@ -2,14 +2,14 @@
 # This file is distributed under the same license as the Checkout.com Payment Gateway plugin.
 msgid ""
 msgstr ""
-"Project-Id-Version: Checkout.com Payment Gateway 4.4.0\n"
+"Project-Id-Version: Checkout.com Payment Gateway 4.4.1\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/checkout-com-unified-payments-api\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2022-05-24T10:25:38+00:00\n"
+"POT-Creation-Date: 2022-06-01T07:11:19+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.6.0\n"
 "X-Domain: wc_checkout_com\n"
@@ -1006,18 +1006,18 @@ msgstr ""
 msgid "Please enter a valid cvv."
 msgstr ""
 
-#: woocommerce-gateway-checkout-com.php:333
+#: woocommerce-gateway-checkout-com.php:338
 msgid "Checkout.com Payment Captured from Admin - Action ID : %s"
 msgstr ""
 
-#: woocommerce-gateway-checkout-com.php:358
+#: woocommerce-gateway-checkout-com.php:363
 msgid "Checkout.com Payment Voided from Admin - Action ID : %s"
 msgstr ""
 
-#: woocommerce-gateway-checkout-com.php:370
+#: woocommerce-gateway-checkout-com.php:375
 msgid "An error has occurred."
 msgstr ""
 
-#: woocommerce-gateway-checkout-com.php:382
+#: woocommerce-gateway-checkout-com.php:387
 msgid "Fawry reference number: "
 msgstr ""

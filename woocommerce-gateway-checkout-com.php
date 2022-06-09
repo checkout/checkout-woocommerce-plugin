@@ -5,9 +5,9 @@
  * Description: Extends WooCommerce by Adding the Checkout.com Gateway.
  * Author: Checkout.com
  * Author URI: https://www.checkout.com/
- * Version: 4.4.0
+ * Version: 4.4.1
  * Requires at least: 4.0
- * Stable tag: 4.4.0
+ * Stable tag: 4.4.1
  * Tested up to: 6.0
  * WC tested up to: 6.5.1
  * Requires PHP: 7.2
@@ -211,7 +211,7 @@ function callback_for_setting_up_scripts() {
     $apm_settings = get_option('woocommerce_wc_checkout_com_alternative_payments_settings');
     $apm_enable = $apm_settings['enabled'] == true ? true : false;
 
-    if ($apm_enable) {
+    if ($apm_enable && !empty($apm_settings['ckocom_apms_selector'])) {
         foreach ($apm_settings['ckocom_apms_selector'] as $value) {
             if($value == 'klarna') {
                 wp_enqueue_script( 'cko-klarna-script', 'https://x.klarnacdn.net/kp/lib/v1/api.js', array( 'jquery' ) );
@@ -243,6 +243,11 @@ function cko_refund() {
  */
 add_action( 'woocommerce_order_item_add_action_buttons', 'action_woocommerce_order_item_add_action_buttons', 10, 1 );
 function action_woocommerce_order_item_add_action_buttons( $order ) {
+
+    // Check order payment method is checkout.
+    if ( false === strpos( $order->get_payment_method(), 'wc_checkout_com_' ) ) {
+        return;
+    }
 
     $order_status = $order->get_status();
     $auth_status = str_replace('wc-', '', WC_Admin_Settings::get_option('ckocom_order_authorised', 'on-hold'));
@@ -447,7 +452,7 @@ function cko_is_nas_account() {
 
     $core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
 
-    return isset( $core_settings['ckocom_account_type'] ) && str_contains( $core_settings['ckocom_account_type'], 'NAS' );
+    return isset( $core_settings['ckocom_account_type'] ) && ( 'NAS' === $core_settings['ckocom_account_type'] );
 }
 
 /**

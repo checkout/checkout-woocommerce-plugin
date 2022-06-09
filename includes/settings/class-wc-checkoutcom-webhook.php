@@ -207,7 +207,7 @@ class WC_Checkoutcom_Webhook {
 		}
 
 		foreach ( $webhooks as $item ) {
-			if ( str_contains( $item['url'], $url ) ) {
+			if ( false !== strpos( $item['url'], $url ) ) {
 				$this->url_is_registered = $item['url'];
 
 				return $this->url_is_registered;

@@ -4,7 +4,7 @@ Tags: checkout, payments, credit card, payment gateway, apple pay, google pay, p
 Requires at least: 4.0
 Stable tag: trunk
 Requires PHP: 7.2
-Tested up to: 5.9.3
+Tested up to: 6.0
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -166,6 +166,10 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v4.4.1 1st June 2022
+- **[tweak]** Add condition to not run code if order payment method is not cko.
+- **[update]** Update function usage from PHP 8 to 7
+
 v4.4.0 24th May 2022
 - **[feat]** Add refund support for APMs and Apple Pay.
 - **[update]** Upgraded Checkout API SDK to latest version 2.4.0
