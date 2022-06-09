@@ -1,8 +1,4 @@
 jQuery(function () {
-  jQuery("input[type=radio][name=wc-wc_checkout_com_cards-payment-token]").prop(
-    "checked",
-    false
-  );
   // Set default ul to auto
   jQuery(".payment_box.payment_method_wc_checkout_com_cards > ul").css(
     "margin",
