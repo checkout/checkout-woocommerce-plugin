@@ -41,6 +41,16 @@ Upon receiving your live credentials from your account manager, here are the req
 - In the plugin settings, input your **Live** keys
 - Switch the _Endpoint URL mode_ to **Live**.
 
+# Development environment Setup
+
+- Clone the repository to in `wp-content/plugins` folder with the name `woocommerce-gateway-checkout-com`
+  `git clone git@github.com:checkout/checkout-woocommerce-plugin.git woocommerce-gateway-checkout-com`
+  or
+  `git clone https://github.com/checkout/checkout-woocommerce-plugin.git woocommerce-gateway-checkout-com`
+- Use required `npm` version.
+- Install the `npm` packages using `npm install`.
+- Install the `composer` packages using `composer install`.
+
 
 # Reference 
 
