@@ -47,17 +47,17 @@ Upon receiving your live credentials from your account manager, here are the req
   `git clone git@github.com:checkout/checkout-woocommerce-plugin.git woocommerce-gateway-checkout-com`
   or
   `git clone https://github.com/checkout/checkout-woocommerce-plugin.git woocommerce-gateway-checkout-com`
-- Use required `npm` version.
+- Use required `npm` version by executing `nvm use`.
 - Install the `npm` packages using `npm install`.
 - Install the `composer` packages using `composer install`.
 - During pushing the committing the code the PHPCS check will run at pre-commit hook. **So, till the PHPCS errors are not fixed for during commit we have to use `--no-verify` option in the git commit command.**
 
 
-# Reference 
+# Reference
 
-You can find our complete Documentation [here](http://docs.checkout.com/).  
-If you would like to be assigned an account manager, please contact us at sales@checkout.com  
-For help during the integration process you can contact us at integration@checkout.com  
+You can find our complete Documentation [here](http://docs.checkout.com/).
+If you would like to be assigned an account manager, please contact us at sales@checkout.com
+For help during the integration process you can contact us at integration@checkout.com
 For support, you can contact us at support@checkout.com
 
 _Checkout.com is authorised and regulated as a Payment institution by the UK Financial Conduct Authority._
