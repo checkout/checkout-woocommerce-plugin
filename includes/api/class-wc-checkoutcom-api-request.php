@@ -321,7 +321,7 @@ class WC_Checkoutcom_Api_request
 			'Platform Data - Wordpress %s / Woocommerce %s, Integration Data - Checkout.com %s, SDK Data - PHP SDK %s, Order ID - %s, Server - %s',
 			$wp_version,
 			$woocommerce->version,
-			WC_Gateway_Checkout_Com_Cards::PLUGIN_VERSION,
+			WC_CHECKOUTCOM_PLUGIN_VERSION,
 			CheckoutUtils::PROJECT_VERSION,
 			$order->get_order_number(),
 			get_site_url()

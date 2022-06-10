@@ -19,7 +19,6 @@ use Checkout\Payments\ThreeDsRequest;
 
 class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 {
-    const PLUGIN_VERSION = '4.4.1';
 
     /**
      * WC_Gateway_Checkout_Com_Cards constructor.
@@ -185,7 +184,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC
 <input type="hidden" id="localization" value='<?php echo $this->get_localisation(); ?>'></input>
 <input type="hidden" id="multiFrame" value='<?php echo $iframe_style; ?>'></input>
 <input type="hidden" id="cko-icons"
-    value='<?php echo  plugins_url ('checkout-com-unified-payments-api/assets/images/card-icons/'); ?>'></input>
+    value='<?php echo  WC_CHECKOUTCOM_PLUGIN_URL . '/assets/images/card-icons/'; ?>'></input>
 <input type="hidden" id="is-mada" value='<?php echo $mada_enable; ?>'></input>
 <input type="hidden" id="mada-token" value='<?php echo $is_mada_token; ?>'></input>
 <input type="hidden" id="user-logged-in" value='<?php echo is_user_logged_in(); ?>'></input>
@@ -249,7 +248,7 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
         <div class="input-container card-number">
             <div class="icon-container">
                 <img id="icon-card-number"
-                    src="<?php echo plugins_url ('checkout-com-unified-payments-api/assets/images/card-icons/card.svg'); ?>"
+                    src="<?php echo WC_CHECKOUTCOM_PLUGIN_URL . '/assets/images/card-icons/card.svg'; ?>"
                     alt="PAN" />
             </div>
             <div class="card-number-frame"></div>
@@ -258,7 +257,7 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
             </div>
             <div class="icon-container">
                 <img id="icon-card-number-error"
-                    src="<?php echo plugins_url ('checkout-com-unified-payments-api/assets/images/card-icons/error.svg'); ?>" />
+                    src="<?php echo WC_CHECKOUTCOM_PLUGIN_URL . '/assets/images/card-icons/error.svg'; ?>" />
             </div>
         </div>
 
@@ -267,13 +266,13 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
                 <div class="input-container expiry-date">
                     <div class="icon-container">
                         <img id="icon-expiry-date"
-                            src="<?php echo plugins_url ('checkout-com-unified-payments-api/assets/images/card-icons/exp-date.svg'); ?>"
+                            src="<?php echo WC_CHECKOUTCOM_PLUGIN_URL . '/assets/images/card-icons/exp-date.svg'; ?>"
                             alt="Expiry date" />
                     </div>
                     <div class="expiry-date-frame"></div>
                     <div class="icon-container">
                         <img id="icon-expiry-date-error"
-                            src="<?php echo plugins_url ('checkout-com-unified-payments-api/assets/images/card-icons/error.svg'); ?>" />
+                            src="<?php echo WC_CHECKOUTCOM_PLUGIN_URL . '/assets/images/card-icons/error.svg'; ?>" />
                     </div>
                 </div>
             </div>
@@ -282,13 +281,13 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
                 <div class="input-container cvv">
                     <div class="icon-container">
                         <img id="icon-cvv"
-                            src="<?php echo plugins_url ('checkout-com-unified-payments-api/assets/images/card-icons/cvv.svg'); ?>"
+                            src="<?php echo WC_CHECKOUTCOM_PLUGIN_URL . '/assets/images/card-icons/cvv.svg'; ?>"
                             alt="CVV" />
                     </div>
                     <div class="cvv-frame"></div>
                     <div class="icon-container">
                         <img id="icon-cvv-error"
-                            src="<?php echo plugins_url ('checkout-com-unified-payments-api/assets/images/card-icons/error.svg'); ?>" />
+                            src="<?php echo WC_CHECKOUTCOM_PLUGIN_URL . '/assets/images/card-icons/error.svg'; ?>" />
                     </div>
                 </div>
             </div>
@@ -297,7 +296,7 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
     <?php } ?>
 
     <!-- frame integration js file -->
-    <script src='<?php echo plugins_url('../assets/js/cko-frames-integration.js',__FILE__) ?>'></script>
+    <script src='<?php echo WC_CHECKOUTCOM_PLUGIN_URL . '/assets/js/cko-frames-integration.js'; ?>'></script>
 
 </div>
 

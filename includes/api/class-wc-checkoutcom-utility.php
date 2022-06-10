@@ -136,7 +136,7 @@ class WC_Checkoutcom_Utility
     public static function isMadaCard($bin)
     {
         // Path to MADA_BIN.csv
-        $csvPath = WP_PLUGIN_DIR. "\checkout-com-unified-payments-api\includes\Files\Mada\MADA_BINS.csv";
+        $csvPath = WC_CHECKOUTCOM_PLUGIN_PATH . "/includes/Files/Mada/MADA_BINS.csv";
 
         $arrayFromCSV =  array_map('str_getcsv', file($csvPath));
 

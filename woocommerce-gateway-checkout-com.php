@@ -19,6 +19,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+/**
+ * Constants.
+ */
+define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '4.4.1' );
+define( 'WC_CHECKOUTCOM_PLUGIN_URL', untrailingslashit( plugins_url( basename( plugin_dir_path( __FILE__ ) ), basename( __FILE__ ) ) ) );
+define( 'WC_CHECKOUTCOM_PLUGIN_PATH', untrailingslashit( plugin_dir_path( __FILE__ ) ) );
+
 /*
  * This action hook registers our PHP class as a WooCommerce payment gateway
  */
@@ -178,10 +185,10 @@ function cko_check_if_empty()
 add_action('wp_enqueue_scripts', 'callback_for_setting_up_scripts');
 function callback_for_setting_up_scripts() {
     // load cko custom css
-    $css_path = plugins_url('/assets/css/checkoutcom-styles.css',__FILE__);
-    $normalize = plugins_url('/assets/css/normalize.css',__FILE__);
-    $frames_style = plugins_url('/assets/css/style.css',__FILE__);
-    $multi_frame = plugins_url('/assets/css/multi-iframe.css',__FILE__);
+	$css_path     = WC_CHECKOUTCOM_PLUGIN_URL . '/assets/css/checkoutcom-styles.css';
+	$normalize    = WC_CHECKOUTCOM_PLUGIN_URL . '/assets/css/normalize.css';
+	$frames_style = WC_CHECKOUTCOM_PLUGIN_URL . '/assets/css/style.css';
+	$multi_frame  = WC_CHECKOUTCOM_PLUGIN_URL . '/assets/css/multi-iframe.css';
 
     // register cko css
     wp_register_style( 'checkoutcom-style', $css_path);
@@ -401,7 +408,7 @@ function addFawryNumber($order_id) {
 add_filter( 'woocommerce_gateway_icon', 'cko_gateway_icon', 10, 2 );
 function cko_gateway_icon( $icons, $id ) {
 
-    $plugin_url = plugins_url( '/checkout-com-unified-payments-api/assets/images/', __DIR__ );
+    $plugin_url = WC_CHECKOUTCOM_PLUGIN_URL . '/assets/images/';
 
     /* Check if checkoutcom gateway */
     if ($id == 'wc_checkout_com_cards') {
