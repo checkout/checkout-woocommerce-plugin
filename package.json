@@ -1,0 +1,31 @@
+{
+  "name": "woocommerce-gateway-checkout-com",
+  "version": "1.0.0",
+  "description": "[![N|Solid](https://cdn.checkout.com/img/checkout-logo-online-payments.jpg)](https://checkout.com/)",
+  "main": "index.js",
+  "directories": {
+    "lib": "lib",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build:i18n": "npm run i18n:makepot",
+    "i18n:makepot": "./vendor/bin/wp i18n make-pot . languages/checkout-com-unified-payments-api.pot --domain=\"wc_checkout_com\"",
+    "lint:php": "./vendor/bin/phpcs --standard=phpcs.xml -n $(git ls-files | grep .php$)",
+    "lint:php-fix": "./vendor/bin/phpcbf --standard=phpcs.xml $(git ls-files | grep .php$)",
+    "prepare": "husky install"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/checkout/checkout-woocommerce-plugin.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/checkout/checkout-woocommerce-plugin/issues"
+  },
+  "homepage": "https://github.com/checkout/checkout-woocommerce-plugin#readme",
+  "devDependencies": {
+    "husky": "^8.0.0"
+  }
+}

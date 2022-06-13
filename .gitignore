@@ -3,3 +3,4 @@ tests/node
 **/node-modules
 node_modules/
 **/**.mp4
+vendor/
