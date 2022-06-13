@@ -284,7 +284,7 @@ function action_woocommerce_order_item_add_action_buttons( $order ) {
                         jQuery('.refund-items').hide();
                         jQuery('#cko-capture').show();
                         jQuery('#cko-void').show();
-                    } else if (order_status == capture_status){
+                    } else if (order_status === capture_status || 'completed' === order_status){
                         jQuery('.refund-items').show();
                     } else {
                         jQuery('.refund-items').hide();
