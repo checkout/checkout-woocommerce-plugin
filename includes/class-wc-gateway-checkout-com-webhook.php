@@ -26,7 +26,7 @@ class WC_Checkout_Com_Webhook
 
         $already_captured = get_post_meta($order_id, 'cko_payment_captured', true);
 
-        if ($already_captured) {
+        if ( $already_captured || $order->get_status() === WC_Admin_Settings::get_option( 'ckocom_order_captured', 'processing' ) ) {
             return true;
         }
 
@@ -126,12 +126,12 @@ class WC_Checkout_Com_Webhook
         }
 
         // Add note to order if captured already
-        if ($already_captured) {
-            $order->add_order_note(__($message, 'wc_checkout_com'));
+        if ( $already_captured && $order->get_status() === WC_Admin_Settings::get_option( 'ckocom_order_captured', 'processing' ) ) {
+            $order->add_order_note( $message );
             return true;
         }
 
-        $order->add_order_note(__("Checkout.com Payment Capture webhook received", 'wc_checkout_com'));
+        $order->add_order_note( __( 'Checkout.com Payment Capture webhook received', 'wc_checkout_com' ) );
 
         // Get action id from webhook data
         $action_id = $webhook_data->action_id;
