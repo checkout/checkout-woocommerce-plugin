@@ -15,14 +15,15 @@ jQuery(function () {
     localization: document.getElementById("localization").value,
   });
 
-  let cardholderName =   document.getElementById('billing_first_name')?.value + ' ' + document.getElementById('billing_last_name')?.value
+  // Triggers when new card details filled to update name for tokenization.
   Frames.addEventHandler(
     Frames.Events.CARD_VALIDATION_CHANGED,
     function (event) {
       var valid = Frames.isCardValid()
         if (valid) {
+            let cardholderName = document.getElementById('billing_first_name')?.value + ' ' + document.getElementById('billing_last_name')?.value
             if(cardholderName.length > 0) {
-                // Add the card holder name
+                // Add the cardholder name
                 Frames.cardholder = {
                    name: cardholderName
                 };
