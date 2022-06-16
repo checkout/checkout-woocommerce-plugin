@@ -72,16 +72,14 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Boleto extends WC_Gateway_Che
 	/**
 	 * Process Boleto APM payment.
 	 *
-	 * @global $woocommerce
 	 * @param int $order_id Order ID.
+	 *
 	 * @return array
 	 */
 	public function process_payment( $order_id ) {
 		if ( ! session_id() ) {
 			session_start();
 		}
-
-		global $woocommerce;
 
 		$order = wc_get_order( $order_id );
 
