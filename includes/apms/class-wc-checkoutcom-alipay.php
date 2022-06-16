@@ -53,16 +53,14 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Alipay extends WC_Gateway_Che
 	/**
 	 * Process Alipay APM payment.
 	 *
-	 * @global $woocommerce
 	 * @param int $order_id Order ID.
+	 *
 	 * @return array
 	 */
 	public function process_payment( $order_id ) {
 		if ( ! session_id() ) {
 			session_start();
 		}
-
-		global $woocommerce;
 
 		$order = wc_get_order( $order_id );
 

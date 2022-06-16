@@ -54,8 +54,8 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Bancontact extends WC_Gateway
 	/**
 	 * Process Bancontact APM payment.
 	 *
-	 * @global $woocommerce
 	 * @param int $order_id Order ID.
+	 *
 	 * @return array
 	 */
 	public function process_payment( $order_id ) {
