@@ -2,14 +2,14 @@
 # This file is distributed under the same license as the Checkout.com Payment Gateway plugin.
 msgid ""
 msgstr ""
-"Project-Id-Version: Checkout.com Payment Gateway 4.4.1\n"
+"Project-Id-Version: Checkout.com Payment Gateway 4.4.2\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/checkout-com-unified-payments-api\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2022-06-01T07:11:19+00:00\n"
+"POT-Creation-Date: 2022-06-16T09:56:36+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.6.0\n"
 "X-Domain: wc_checkout_com\n"
@@ -36,7 +36,7 @@ msgstr ""
 #: includes/apms/class-wc-checkoutcom-sepa.php:10
 #: includes/class-wc-gateway-checkout-com-alternative-payments.php:24
 #: includes/class-wc-gateway-checkout-com-apple-pay.php:13
-#: includes/class-wc-gateway-checkout-com-cards.php:30
+#: includes/class-wc-gateway-checkout-com-cards.php:29
 #: includes/class-wc-gateway-checkout-com-google-pay.php:11
 msgid "Checkout.com"
 msgstr ""
@@ -149,7 +149,7 @@ msgstr ""
 #: includes/apms/class-wc-checkoutcom-sepa.php:11
 #: includes/class-wc-gateway-checkout-com-alternative-payments.php:25
 #: includes/class-wc-gateway-checkout-com-apple-pay.php:14
-#: includes/class-wc-gateway-checkout-com-cards.php:31
+#: includes/class-wc-gateway-checkout-com-cards.php:30
 #: includes/class-wc-gateway-checkout-com-google-pay.php:12
 msgid "The Checkout.com extension allows shop owners to process online payments through the <a href=\"https://www.checkout.com\">Checkout.com Payment Gateway.</a>"
 msgstr ""
@@ -262,7 +262,7 @@ msgstr ""
 
 #: includes/class-wc-gateway-checkout-com-alternative-payments.php:57
 #: includes/class-wc-gateway-checkout-com-apple-pay.php:49
-#: includes/class-wc-gateway-checkout-com-cards.php:82
+#: includes/class-wc-gateway-checkout-com-cards.php:81
 #: includes/class-wc-gateway-checkout-com-google-pay.php:44
 msgid "Other Settings"
 msgstr ""
@@ -283,13 +283,13 @@ msgid "Apple Pay"
 msgstr ""
 
 #: includes/class-wc-gateway-checkout-com-apple-pay.php:533
-#: includes/class-wc-gateway-checkout-com-cards.php:345
+#: includes/class-wc-gateway-checkout-com-cards.php:344
 #: includes/class-wc-gateway-checkout-com-google-pay.php:300
 msgid "There was an issue completing the payment."
 msgstr ""
 
 #: includes/class-wc-gateway-checkout-com-apple-pay.php:554
-#: includes/class-wc-gateway-checkout-com-cards.php:502
+#: includes/class-wc-gateway-checkout-com-cards.php:501
 #: includes/class-wc-gateway-checkout-com-google-pay.php:328
 #: includes/class-wc-gateway-checkout-com-webhook.php:51
 #: includes/subscription/class-wc-checkout-com-subscription.php:53
@@ -297,74 +297,74 @@ msgid "Checkout.com Payment Authorised </br>"
 msgstr ""
 
 #: includes/class-wc-gateway-checkout-com-apple-pay.php:560
-#: includes/class-wc-gateway-checkout-com-cards.php:508
+#: includes/class-wc-gateway-checkout-com-cards.php:507
 #: includes/class-wc-gateway-checkout-com-google-pay.php:334
 #: includes/subscription/class-wc-checkout-com-subscription.php:59
 msgid "Checkout.com Payment Flagged </br>"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:32
+#: includes/class-wc-gateway-checkout-com-cards.php:31
 msgid "Cards payment and general configuration"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:50
+#: includes/class-wc-gateway-checkout-com-cards.php:49
 msgid "Use a new card"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:111
-#: woocommerce-gateway-checkout-com.php:101
+#: includes/class-wc-gateway-checkout-com-cards.php:110
+#: woocommerce-gateway-checkout-com.php:108
 msgid "Settings"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:179
+#: includes/class-wc-gateway-checkout-com-cards.php:178
 msgid "Please enter your card details."
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:228
+#: includes/class-wc-gateway-checkout-com-cards.php:227
 msgid "Card Code"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:231
+#: includes/class-wc-gateway-checkout-com-cards.php:230
 msgid "CVV"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:396
+#: includes/class-wc-gateway-checkout-com-cards.php:395
 msgid "Checkout.com Payment Authorised - Action ID : %s"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:403
+#: includes/class-wc-gateway-checkout-com-cards.php:402
 msgid "Checkout.com Payment Flagged - Action ID : %s"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:474
+#: includes/class-wc-gateway-checkout-com-cards.php:473
 msgid "Unable to add payment method to your account."
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:485
+#: includes/class-wc-gateway-checkout-com-cards.php:484
 msgid "Payment method successfully added."
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:513
+#: includes/class-wc-gateway-checkout-com-cards.php:512
 msgid "Checkout.com Payment Canceled</br>"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:519
+#: includes/class-wc-gateway-checkout-com-cards.php:518
 msgid "Checkout.com Payment Captured</br>"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:644
+#: includes/class-wc-gateway-checkout-com-cards.php:643
 msgid "An error has occurred while processing your cancel request. "
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:723
+#: includes/class-wc-gateway-checkout-com-cards.php:722
 msgid "Checkout.com Payment refunded from Admin </br>"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:728
+#: includes/class-wc-gateway-checkout-com-cards.php:727
 msgid "Checkout.com Payment Partially refunded from Admin </br>"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:796
+#: includes/class-wc-gateway-checkout-com-cards.php:795
 msgid "order payment Id ("
 msgstr ""
 
@@ -990,34 +990,34 @@ msgstr ""
 msgid "Please fill in the required fields."
 msgstr ""
 
-#: woocommerce-gateway-checkout-com.php:146
+#: woocommerce-gateway-checkout-com.php:153
 msgid "Please enter a valid card number"
 msgstr ""
 
-#: woocommerce-gateway-checkout-com.php:147
+#: woocommerce-gateway-checkout-com.php:154
 msgid "Please enter a valid expiry date"
 msgstr ""
 
-#: woocommerce-gateway-checkout-com.php:148
+#: woocommerce-gateway-checkout-com.php:155
 msgid "Please enter a valid cvv code"
 msgstr ""
 
-#: woocommerce-gateway-checkout-com.php:168
+#: woocommerce-gateway-checkout-com.php:175
 msgid "Please enter a valid cvv."
 msgstr ""
 
-#: woocommerce-gateway-checkout-com.php:338
+#: woocommerce-gateway-checkout-com.php:345
 msgid "Checkout.com Payment Captured from Admin - Action ID : %s"
 msgstr ""
 
-#: woocommerce-gateway-checkout-com.php:363
+#: woocommerce-gateway-checkout-com.php:370
 msgid "Checkout.com Payment Voided from Admin - Action ID : %s"
 msgstr ""
 
-#: woocommerce-gateway-checkout-com.php:375
+#: woocommerce-gateway-checkout-com.php:382
 msgid "An error has occurred."
 msgstr ""
 
-#: woocommerce-gateway-checkout-com.php:387
+#: woocommerce-gateway-checkout-com.php:394
 msgid "Fawry reference number: "
 msgstr ""
