@@ -10,7 +10,7 @@ include_once( 'settings/class-wc-checkoutcom-webhook.php' );
 include_once( 'settings/admin/class-wc-checkoutcom-admin.php' );
 include_once( 'api/class-wc-checkoutcom-api-request.php' );
 include_once( 'class-wc-checkout-com-webhook.php' );
-include_once( 'subscription/class-wc-checkout-com-subscription.php' );
+include_once( 'subscription/class-wc-checkoutcom-subscription.php' );
 
 use Checkout\CheckoutApiException;
 use Checkout\Common\CustomerRequest;

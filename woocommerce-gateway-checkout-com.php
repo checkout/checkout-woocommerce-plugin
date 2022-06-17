@@ -528,7 +528,7 @@ add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_cards', 
  * @param WC_Order $renewal_order A WC_Order object created to record the renewal payment.
  */
 function subscription_payment( $renewal_total, $renewal_order ) {
-	include_once( 'includes/subscription/class-wc-checkout-com-subscription.php' );
+	include_once( 'includes/subscription/class-wc-checkoutcom-subscription.php' );
 
 	WC_Checkoutcom_Subscription::renewal_payment( $renewal_total, $renewal_order );
 }
@@ -543,7 +543,7 @@ add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_alternat
  */
 function subscription_payment_sepa( $renewal_total, $renewal_order ) {
 
-	include_once( 'includes/subscription/class-wc-checkout-com-subscription.php' );
+	include_once( 'includes/subscription/class-wc-checkoutcom-subscription.php' );
 
 	WC_Checkoutcom_Subscription::renewal_payment( $renewal_total, $renewal_order );
 }
@@ -558,7 +558,7 @@ add_action( 'woocommerce_subscription_status_cancelled', 'subscription_cancelled
  * @return void
  */
 function subscription_cancelled( $subscription ) {
-	include_once( 'includes/subscription/class-wc-checkout-com-subscription.php' );
+	include_once( 'includes/subscription/class-wc-checkoutcom-subscription.php' );
 
 	WC_Checkoutcom_Subscription::subscription_cancelled( $subscription );
 }
