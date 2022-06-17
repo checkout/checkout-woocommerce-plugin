@@ -467,7 +467,7 @@ function cko_is_nas_account() {
  */
 add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_cards', 'subscriptionPayment', 10, 2);
 function subscriptionPayment($renewal_total, $renewal_order) {
-    include_once('includes/subscription/class-wc-checkout-com-subscription.php');
+    include_once('includes/subscription/class-wc-checkoutcom-subscription.php');
 
     WC_Checkoutcom_Subscription::renewal_payment($renewal_total, $renewal_order);
 
@@ -479,7 +479,7 @@ function subscriptionPayment($renewal_total, $renewal_order) {
 add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_alternative_payments_sepa', 'subscriptionPaymentSepa', 10, 2);
 function subscriptionPaymentSepa($renewal_total, $renewal_order) {
 
-    include_once('includes/subscription/class-wc-checkout-com-subscription.php');
+    include_once('includes/subscription/class-wc-checkoutcom-subscription.php');
 
     WC_Checkoutcom_Subscription::renewal_payment($renewal_total, $renewal_order);
 
@@ -487,7 +487,7 @@ function subscriptionPaymentSepa($renewal_total, $renewal_order) {
 
 add_action( 'woocommerce_subscription_status_cancelled', 'subscriptionCancelled', 20 );
 function subscriptionCancelled( $subscription ) {
-	include_once( 'includes/subscription/class-wc-checkout-com-subscription.php' );
+	include_once( 'includes/subscription/class-wc-checkoutcom-subscription.php' );
 
 	WC_Checkoutcom_Subscription::subscription_cancelled( $subscription );
 }
