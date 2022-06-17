@@ -11,16 +11,48 @@ use Checkout\Workflows\CreateWorkflowRequest;
  */
 class WC_Checkoutcom_Workflows {
 
+	/**
+	 * Current instance of this class.
+	 *
+	 * @var $instance Current instance of this class.
+	 */
 	private static $instance = null;
 
+	/**
+	 * Instance of Checkout_SDK class.
+	 *
+	 * @var $checkout Instance of Checkout_SDK class.
+	 */
 	private $checkout = null;
 
-	private $URL;
+	/**
+	 * Checkout's workflow URL.
+	 *
+	 * This will be different based on the value of ckocom_environment settings.
+	 *
+	 * @var $url Checkout's workflow URL.
+	 */
+	private $url;
 
-	private $SECRET_KEY;
+	/**
+	 * Checkout account's secret key set in the core settings section.
+	 *
+	 * @var $secret_key Checkout account's secret key set in the core settings section.
+	 */
+	private $secret_key;
 
+	/**
+	 * List of all webhooks.
+	 *
+	 * @var $list List of all webhooks.
+	 */
 	private $list = [];
 
+	/**
+	 * The webhooks URL which is registered to the checkout account's detail entered by user.
+	 *
+	 * @var $url_is_registered The webhooks URL which is registered to the checkout account's detail entered by user.
+	 */
 	private $url_is_registered = false;
 
 	/**
@@ -29,12 +61,12 @@ class WC_Checkoutcom_Workflows {
 	public function __construct() {
 
 		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
-		$environment   = $core_settings['ckocom_environment'] === 'sandbox';
+		$environment   = ( 'sandbox' === $core_settings['ckocom_environment'] );
 
 		$core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
 
-		$this->SECRET_KEY = $core_settings['ckocom_sk'];
-		$this->URL        = $environment ? 'https://api.sandbox.checkout.com/workflows' : 'https://api.checkout.com/workflows';
+		$this->secret_key = $core_settings['ckocom_sk'];
+		$this->url        = $environment ? 'https://api.sandbox.checkout.com/workflows' : 'https://api.checkout.com/workflows';
 
 		$this->checkout = new Checkout_SDK();
 	}
@@ -45,7 +77,7 @@ class WC_Checkoutcom_Workflows {
 	 * @return WC_Checkoutcom_Workflows
 	 */
 	public static function get_instance(): WC_Checkoutcom_Workflows {
-		if ( self::$instance == null ) {
+		if ( null === self::$instance ) {
 			self::$instance = new WC_Checkoutcom_Workflows();
 		}
 
@@ -101,7 +133,6 @@ class WC_Checkoutcom_Workflows {
 					return $this->list;
 				}
 			}
-
 		} catch ( CheckoutApiException $ex ) {
 			$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
 
@@ -120,19 +151,19 @@ class WC_Checkoutcom_Workflows {
 	/**
 	 * Get request args.
 	 *
-	 * @param $args
+	 * @param array $args Request Arguments.
 	 *
 	 * @return array|object
 	 */
 	private function get_request_args( $args = [] ) {
 
-		$defaults = array(
-			'headers' => array(
-				'Authorization' => $this->SECRET_KEY,
+		$defaults = [
+			'headers' => [
+				'Authorization' => $this->secret_key,
 				'Content-Type'  => 'application/json;charset=utf-8',
-			),
+			],
 			'timeout' => 30,
-		);
+		];
 
 		return wp_parse_args( $args, $defaults );
 	}
@@ -140,7 +171,7 @@ class WC_Checkoutcom_Workflows {
 	/**
 	 * Register new workflow.
 	 *
-	 * @param $url
+	 * @param string $url Webhook URL.
 	 *
 	 * @return array|WP_Error
 	 */
@@ -150,17 +181,17 @@ class WC_Checkoutcom_Workflows {
 			$url = WC_Checkoutcom_Webhook::get_instance()->generate_current_webhook_url();
 		}
 
-		$signature = new WebhookSignature();
-		$signature->key = $this->SECRET_KEY;
+		$signature         = new WebhookSignature();
+		$signature->key    = $this->secret_key;
 		$signature->method = 'HMACSHA256';
 
-		$actionRequest = new WebhookWorkflowActionRequest();
-		$actionRequest->url = $url;
-		$actionRequest->signature = $signature;
+		$action_request            = new WebhookWorkflowActionRequest();
+		$action_request->url       = $url;
+		$action_request->signature = $signature;
 
-		$eventWorkflowConditionRequest = new EventWorkflowConditionRequest();
-		$eventWorkflowConditionRequest->events = [
-			'gateway'     => array(
+		$event_workflow_condition_request         = new EventWorkflowConditionRequest();
+		$event_workflow_condition_request->events = [
+			'gateway'     => [
 				'card_verification_declined',
 				'card_verified',
 				'payment_approved',
@@ -177,16 +208,16 @@ class WC_Checkoutcom_Workflows {
 				'payment_refunded',
 				'payment_void_declined',
 				'payment_voided',
-			),
-			'dispute'     => array(
+			],
+			'dispute'     => [
 				'dispute_canceled',
 				'dispute_evidence_required',
 				'dispute_expired',
 				'dispute_lost',
 				'dispute_resolved',
 				'dispute_won',
-			),
-			'mbccards'    => array(
+			],
+			'mbccards'    => [
 				'card_verification_declined',
 				'card_verified',
 				'payment_approved',
@@ -197,22 +228,22 @@ class WC_Checkoutcom_Workflows {
 				'payment_refunded',
 				'payment_void_declined',
 				'payment_voided',
-			),
-			'card_payout' => array(
+			],
+			'card_payout' => [
 				'payment_approved',
 				'payment_declined',
-			),
+			],
 		];
 
-		$workflowRequest             = new CreateWorkflowRequest();
-		$workflowRequest->actions    = array( $actionRequest );
-		$workflowRequest->conditions = array( $eventWorkflowConditionRequest );
-		$workflowRequest->name       = $url;
-		$workflowRequest->active     = true;
+		$workflow_request             = new CreateWorkflowRequest();
+		$workflow_request->actions    = [ $action_request ];
+		$workflow_request->conditions = [ $event_workflow_condition_request ];
+		$workflow_request->name       = $url;
+		$workflow_request->active     = true;
 
 		$workflows = [];
 		try {
-			$workflows = $this->checkout->get_builder()->getWorkflowsClient()->createWorkflow( $workflowRequest );
+			$workflows = $this->checkout->get_builder()->getWorkflowsClient()->createWorkflow( $workflow_request );
 
 			if ( ! is_wp_error( $workflows ) && ! empty( $workflows ) ) {
 
@@ -220,7 +251,6 @@ class WC_Checkoutcom_Workflows {
 					return $workflows;
 				}
 			}
-
 		} catch ( CheckoutApiException $ex ) {
 			$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
 
