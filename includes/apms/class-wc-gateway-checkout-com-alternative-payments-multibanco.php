@@ -67,7 +67,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Multibanco extends WC_Gateway
 		$order = wc_get_order( $order_id );
 
 		// Create alternative payment.
-		$result = (array) WC_Checkoutcom_Api_request::create_apm_payment( $order, self::PAYMENT_METHOD );
+		$result = (array) WC_Checkoutcom_Api_Request::create_apm_payment( $order, self::PAYMENT_METHOD );
 
 		// Check if result has error and return error message.
 		if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {

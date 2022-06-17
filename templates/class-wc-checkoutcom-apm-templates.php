@@ -3,7 +3,7 @@
 /**
  * Class for APMs related templates.
  */
-class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_request {
+class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_Request {
 
 	/**
 	 * Render available ideal bank list on checkout.
@@ -11,7 +11,7 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_request {
 	 * @return void
 	 */
 	public static function get_ideal_bank() {
-		$ideal_banks = WC_Checkoutcom_Api_request::get_ideal_bank();
+		$ideal_banks = WC_Checkoutcom_Api_Request::get_ideal_bank();
 
 		$country = $ideal_banks['countries'];
 		$issuers = $country[0]['issuers'];

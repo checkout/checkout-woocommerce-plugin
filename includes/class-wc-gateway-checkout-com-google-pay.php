@@ -299,7 +299,7 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 		$order = new WC_Order( $order_id );
 
 		// create google token from Google payment data.
-		$google_token = WC_Checkoutcom_Api_request::generate_google_token();
+		$google_token = WC_Checkoutcom_Api_Request::generate_google_token();
 
 		// Check if google token is not empty.
 		if ( empty( $google_token['token'] ) ) {
@@ -308,7 +308,7 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 		}
 
 		// Create payment with Google token.
-		$result = (array) ( new WC_Checkoutcom_Api_request )->create_payment( $order, $google_token );
+		$result = (array) ( new WC_Checkoutcom_Api_Request )->create_payment( $order, $google_token );
 
 		// Redirect to apm if redirection url is available.
 		if ( isset( $result['3d'] ) && ! empty( $result['3d'] ) ) {
@@ -372,7 +372,7 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 	 */
 	public function process_refund( $order_id, $amount = null, $reason = '' ) {
 		$order  = wc_get_order( $order_id );
-		$result = (array) WC_Checkoutcom_Api_request::refund_payment( $order_id, $order );
+		$result = (array) WC_Checkoutcom_Api_Request::refund_payment( $order_id, $order );
 
 		// check if result has error and return error message.
 		if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {

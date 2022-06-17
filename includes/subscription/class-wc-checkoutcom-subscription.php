@@ -31,7 +31,7 @@ class WC_Checkoutcom_Subscription {
 			$args['parent_order_id'] = $subscriptions_obj->get_parent_id();
 		}
 
-		$payment_result = (array) WC_Checkoutcom_Api_request::create_payment( $renewal_order, $args, 'renewal' );
+		$payment_result = (array) WC_Checkoutcom_Api_Request::create_payment( $renewal_order, $args, 'renewal' );
 
 		// Update renewal order status based on payment result.
 		if ( ! isset( $payment_result['error'] ) ) {
@@ -131,7 +131,7 @@ class WC_Checkoutcom_Subscription {
 			$mandate_cancel = get_post_meta( $subscription->get_id(), '_cko_mandate_cancel', true );
 
 			if ( $mandate_cancel ) {
-				$is_mandate_cancel = WC_Checkoutcom_Api_request::mandate_cancel_request( $mandate_cancel, $subscription->get_id() );
+				$is_mandate_cancel = WC_Checkoutcom_Api_Request::mandate_cancel_request( $mandate_cancel, $subscription->get_id() );
 
 				if ( $is_mandate_cancel ) {
 					$subscription->add_order_note( 'Checkout.com mandate cancelled.', false );

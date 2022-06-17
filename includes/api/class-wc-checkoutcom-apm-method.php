@@ -24,9 +24,9 @@ use Checkout\Sources\SepaSourceRequest;
 use Checkout\Sources\SourceData;
 
 /**
- * Class WC_Gateway_Checkout_Com_APM_Method gives source class for different APMs.
+ * Class WC_Checkoutcom_APM_Method gives source class for different APMs.
  */
-class WC_Gateway_Checkout_Com_APM_Method {
+class WC_Checkoutcom_APM_Method {
 
 	/**
 	 * Post data.
@@ -50,7 +50,7 @@ class WC_Gateway_Checkout_Com_APM_Method {
 	public static $order_info;
 
 	/**
-	 * WC_Gateway_Checkout_Com_APM_Method constructor.
+	 * WC_Checkoutcom_APM_Method constructor.
 	 *
 	 * @param array    $data Post data.
 	 * @param WC_Order $order Order object.
@@ -259,7 +259,7 @@ class WC_Gateway_Checkout_Com_APM_Method {
 	public function klarna() {
 
 		$klarna_info = self::get_klarna_info();
-		$cart_info   = WC_Checkoutcom_Api_request::get_cart_info();
+		$cart_info   = WC_Checkoutcom_Api_Request::get_cart_info();
 
 		$method                      = new RequestKlarnaSource();
 		$method->authorization_token = self::$post['cko-klarna-token'];
@@ -288,7 +288,7 @@ class WC_Gateway_Checkout_Com_APM_Method {
 		$fawry_info['email'] = self::$post['billing_email'];
 		$fawry_info['phone'] = self::$post['billing_phone'];
 
-		$cart_info = WC_Checkoutcom_Api_request::get_cart_info();
+		$cart_info = WC_Checkoutcom_Api_Request::get_cart_info();
 
 		$product_info         = $cart_info['order_lines'];
 		$order_amount         = $cart_info['order_amount'];
@@ -312,7 +312,7 @@ class WC_Gateway_Checkout_Com_APM_Method {
 
 			WC_Checkoutcom_Utility::logger( "Total product amount {$total_product_amount} does not match order amount {$order_amount}", null );
 
-			$product[] = WC_Checkoutcom_Api_request::format_fawry_product( $products, $order_amount );
+			$product[] = WC_Checkoutcom_Api_Request::format_fawry_product( $products, $order_amount );
 
 			$products = $product;
 		}

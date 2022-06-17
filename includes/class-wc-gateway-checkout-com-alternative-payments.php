@@ -98,7 +98,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway {
 	public function process_refund( $order_id, $amount = null, $reason = '' ) {
 
 		$order  = wc_get_order( $order_id );
-		$result = (array) WC_Checkoutcom_Api_request::refund_payment( $order_id, $order );
+		$result = (array) WC_Checkoutcom_Api_Request::refund_payment( $order_id, $order );
 
 		// check if result has error and return error message.
 		if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {

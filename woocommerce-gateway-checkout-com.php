@@ -13,6 +13,8 @@
  * Requires PHP: 7.2
  * Text Domain: wc_checkout_com
  * Domain Path: /languages
+ *
+ * @package wc_checkout_com
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -365,7 +367,7 @@ function renew_save_again( $post_id, $post ) {
 			if ( 'cko-capture' === sanitize_text_field( $_POST['cko_payment_action'] ) ) {
 
 				// send capture request to cko.
-				$result = (array) WC_Checkoutcom_Api_request::capture_payment();
+				$result = (array) WC_Checkoutcom_Api_Request::capture_payment();
 
 				if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {
 					WC_Admin_Notices::add_custom_notice( 'wc_checkout_com_cards', $result['error'] );
@@ -392,7 +394,7 @@ function renew_save_again( $post_id, $post ) {
 			} elseif ( 'cko-void' === sanitize_text_field( $_POST['cko_payment_action'] ) ) {
 				// check if post is void.
 				// send void request to cko.
-				$result = (array) WC_Checkoutcom_Api_request::void_payment();
+				$result = (array) WC_Checkoutcom_Api_Request::void_payment();
 
 				if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {
 					WC_Admin_Notices::add_custom_notice( 'wc_checkout_com_cards', $result['error'] );

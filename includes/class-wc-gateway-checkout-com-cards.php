@@ -9,7 +9,7 @@ include_once( 'settings/class-wc-checkoutcom-cards-settings.php' );
 include_once( 'settings/class-wc-checkoutcom-webhook.php' );
 include_once( 'settings/admin/class-wc-checkoutcom-admin.php' );
 include_once( 'api/class-wc-checkoutcom-api-request.php' );
-include_once( 'class-wc-gateway-checkout-com-webhook.php' );
+include_once( 'class-wc-checkout-com-webhook.php' );
 include_once( 'subscription/class-wc-checkout-com-subscription.php' );
 
 use Checkout\CheckoutApiException;
@@ -351,7 +351,7 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
 		}
 
 		// Create payment with card token.
-		$result = (array) WC_Checkoutcom_Api_request::create_payment( $order, $arg );
+		$result = (array) WC_Checkoutcom_Api_Request::create_payment( $order, $arg );
 
 		// check if result has error and return error message.
 		if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {
@@ -446,7 +446,7 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
 		}
 
 		// Verify session id.
-		$result = (array) ( new WC_Checkoutcom_Api_request )->verify_session( $cko_session_id );
+		$result = (array) ( new WC_Checkoutcom_Api_Request )->verify_session( $cko_session_id );
 
 		$order_id = $result['metadata']['order_id'];
 		$action   = $result['actions'];
@@ -730,7 +730,7 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
 	 */
 	public function process_refund( $order_id, $amount = null, $reason = '' ) {
 		$order  = wc_get_order( $order_id );
-		$result = (array) WC_Checkoutcom_Api_request::refund_payment( $order_id, $order );
+		$result = (array) WC_Checkoutcom_Api_Request::refund_payment( $order_id, $order );
 
 		// check if result has error and return error message.
 		if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {

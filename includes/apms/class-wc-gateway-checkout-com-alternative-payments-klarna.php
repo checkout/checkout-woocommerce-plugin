@@ -49,14 +49,14 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Klarna extends WC_Gateway_Che
 				</script>
 			<?php
 		} else {
-			$klarna_session            = WC_Checkoutcom_Api_request::klarna_session();
+			$klarna_session            = WC_Checkoutcom_Api_Request::klarna_session();
 			$client_token              = $klarna_session->client_token;
 			$payment_method_categories = $klarna_session->payment_method_categories;
 			WC_Checkoutcom_Apm_Templates::get_klarna( $client_token, $payment_method_categories );
 			?>
 
 			<input type="hidden" id="klarna-client-token" value="<?php echo $client_token; ?>">
-			<div id="cart-info" data-cart='<?php echo json_encode( WC_Checkoutcom_Api_request::get_cart_info() ); ?>'></div>
+			<div id="cart-info" data-cart='<?php echo json_encode( WC_Checkoutcom_Api_Request::get_cart_info() ); ?>'></div>
 
 			<div class="klarna-details"></div>
 			<div id="klarna_container"></div>
@@ -84,7 +84,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Klarna extends WC_Gateway_Che
 		$order = wc_get_order( $order_id );
 
 		// create alternative payment.
-		$result = (array) WC_Checkoutcom_Api_request::create_apm_payment( $order, self::PAYMENT_METHOD );
+		$result = (array) WC_Checkoutcom_Api_Request::create_apm_payment( $order, self::PAYMENT_METHOD );
 
 		// check if result has error and return error message.
 		if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {

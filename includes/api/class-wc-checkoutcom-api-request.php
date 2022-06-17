@@ -25,9 +25,9 @@ use Checkout\Tokens\GooglePayTokenData;
 use Checkout\Tokens\GooglePayTokenRequest;
 
 /**
- * Class WC_Checkoutcom_API_Request handles the API requests.
+ * Class WC_Checkoutcom_Api_Request handles the API requests.
  */
-class WC_Checkoutcom_Api_request {
+class WC_Checkoutcom_Api_Request {
 
 	/**
 	 * Create payment and return response.
@@ -40,7 +40,7 @@ class WC_Checkoutcom_Api_request {
 	 */
 	public static function create_payment( WC_Order $order, $arg, $subscription = null ) {
 		// Get payment request parameter.
-		$request_param = WC_Checkoutcom_Api_request::get_request_param( $order, $arg, $subscription );
+		$request_param = WC_Checkoutcom_Api_Request::get_request_param( $order, $arg, $subscription );
 		$gateway_debug = 'yes' === WC_Admin_Settings::get_option( 'cko_gateway_responses', 'no' );
 
 		$is_sepa_renewal = ( 'wc_checkout_com_alternative_payments_sepa' === $order->get_payment_method() ) && ( ! is_null( $subscription ) );
@@ -143,7 +143,7 @@ class WC_Checkoutcom_Api_request {
 		$post_data = sanitize_post( $_POST );
 		$get_data  = sanitize_post( $_GET );
 
-		$customer_address = WC_Checkoutcom_Api_request::customer_address( $post_data );
+		$customer_address = WC_Checkoutcom_Api_Request::customer_address( $post_data );
 
 		// Prepare payment parameters.
 		if ( 'wc_checkout_com_cards' === $post_data['payment_method'] ) {
@@ -189,7 +189,7 @@ class WC_Checkoutcom_Api_request {
 
 		} elseif ( in_array( $arg, $apms_selected, true ) ) {
 			// Alternative payment method selected.
-			$method = WC_Checkoutcom_Api_request::get_apm_method( $post_data, $order, $arg );
+			$method = WC_Checkoutcom_Api_Request::get_apm_method( $post_data, $order, $arg );
 
 			$payment_option = $method->type;
 		} elseif ( ! is_null( $subscription ) ) {
@@ -555,10 +555,13 @@ class WC_Checkoutcom_Api_request {
 
 		$checkout = new Checkout_SDK();
 
-		$google_pay                  = new GooglePayTokenData();
+		$google_pay            = new GooglePayTokenData();
+		$google_pay->signature = $signature;
+
+		// PHPCS:disable WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
 		$google_pay->protocolVersion = $protocol_version;
-		$google_pay->signature       = $signature;
 		$google_pay->signedMessage   = $signed_message;
+		// PHPCS:enable WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
 
 		try {
 
@@ -851,7 +854,7 @@ class WC_Checkoutcom_Api_request {
 	 */
 	public static function create_apm_payment( WC_Order $order, $payment_method ) {
 		// Get payment request parameter.
-		$request_param = WC_Checkoutcom_Api_request::get_request_param( $order, $payment_method );
+		$request_param = WC_Checkoutcom_Api_Request::get_request_param( $order, $payment_method );
 
 		WC_Checkoutcom_Utility::logger( 'Apm request payload,', $request_param );
 
@@ -933,7 +936,7 @@ class WC_Checkoutcom_Api_request {
 			session_start();
 		}
 
-		$obj    = new WC_Gateway_Checkout_Com_APM_Method( $data, $order );
+		$obj    = new WC_Checkoutcom_APM_Method( $data, $order );
 		$method = $obj->$payment_method();
 
 		return $method;

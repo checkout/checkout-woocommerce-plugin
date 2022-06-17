@@ -506,7 +506,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 	 */
 	public function applepay_token() {
 		// Generate apple token.
-		$token = WC_Checkoutcom_Api_request::generate_apple_token();
+		$token = WC_Checkoutcom_Api_Request::generate_apple_token();
 
 		echo $token;
 
@@ -539,7 +539,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		}
 
 		// Create payment with google token.
-		$result = (array) ( new WC_Checkoutcom_Api_request )->create_payment( $order, $apple_token );
+		$result = (array) ( new WC_Checkoutcom_Api_Request )->create_payment( $order, $apple_token );
 
 		// check if result has error and return error message.
 		if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {
@@ -596,7 +596,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 	public function process_refund( $order_id, $amount = null, $reason = '' ) {
 
 		$order  = wc_get_order( $order_id );
-		$result = (array) WC_Checkoutcom_Api_request::refund_payment( $order_id, $order );
+		$result = (array) WC_Checkoutcom_Api_Request::refund_payment( $order_id, $order );
 
 		// check if result has error and return error message.
 		if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {

@@ -276,12 +276,12 @@ class WC_Checkout_Com_Webhook {
 		$order_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $order_amount, $order->get_currency() );
 		$get_transaction_id = get_post_meta( $order_id, '_transaction_id', true );
 
-		if ( $get_transaction_id == $action_id ) {
+		if ( $get_transaction_id == $action_id ) { // PHPCS:ignore WordPress.PHP.StrictComparisons.LooseComparison
 			return true;
 		}
 
 		// Add note to order if refunded already.
-		if ( $order->get_total_refunded() == $order_amount ) {
+		if ( $order->get_total_refunded() == $order_amount ) { // PHPCS:ignore WordPress.PHP.StrictComparisons.LooseComparison
 			$order->add_order_note( $message );
 			return true;
 		}
@@ -311,7 +311,7 @@ class WC_Checkout_Com_Webhook {
 				]
 			);
 
-		} elseif ( $amount == $order_amount_cents ) {
+		} elseif ( $amount == $order_amount_cents ) { // PHPCS:ignore WordPress.PHP.StrictComparisons.LooseComparison
 			// Full refund.
 			/* translators: %s: Action ID. */
 			$order_message = sprintf( esc_html__( 'Checkout.com Payment fully refunded - Action ID : %s', 'wc_checkout_com' ), $action_id );
