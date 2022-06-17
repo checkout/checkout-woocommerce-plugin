@@ -1,19 +1,19 @@
 <?php
 include_once __DIR__."/../templates/class-wc-checkoutcom-apm-templates.php";
-include_once __DIR__."/apms/class-wc-checkoutcom-ideal.php";
-include_once __DIR__."/apms/class-wc-checkoutcom-alipay.php";
-include_once __DIR__."/apms/class-wc-checkoutcom-qpay.php";
-include_once __DIR__."/apms/class-wc-checkoutcom-boleto.php";
-include_once __DIR__."/apms/class-wc-checkoutcom-sepa.php";
-include_once __DIR__."/apms/class-wc-checkoutcom-knet.php";
-include_once __DIR__."/apms/class-wc-checkoutcom-bancontact.php";
-include_once __DIR__."/apms/class-wc-checkoutcom-eps.php";
-include_once __DIR__."/apms/class-wc-checkoutcom-poli.php";
-include_once __DIR__."/apms/class-wc-checkoutcom-klarna.php";
-include_once __DIR__."/apms/class-wc-checkoutcom-sofort.php";
-include_once __DIR__."/apms/class-wc-checkoutcom-fawry.php";
-include_once __DIR__."/apms/class-wc-checkoutcom-giropay.php";
-include_once __DIR__."/apms/class-wc-checkoutcom-multibanco.php";
+include_once __DIR__."/apms/class-wc-gateway-checkout-com-alternative-payments-ideal.php";
+include_once __DIR__."/apms/class-wc-gateway-checkout-com-alternative-payments-alipay.php";
+include_once __DIR__."/apms/class-wc-gateway-checkout-com-alternative-payments-qpay.php";
+include_once __DIR__."/apms/class-wc-gateway-checkout-com-alternative-payments-boleto.php";
+include_once __DIR__."/apms/class-wc-gateway-checkout-com-alternative-payments-sepa.php";
+include_once __DIR__."/apms/class-wc-gateway-checkout-com-alternative-payments-knet.php";
+include_once __DIR__."/apms/class-wc-gateway-checkout-com-alternative-payments-bancontact.php";
+include_once __DIR__."/apms/class-wc-gateway-checkout-com-alternative-payments-eps.php";
+include_once __DIR__."/apms/class-wc-gateway-checkout-com-alternative-payments-poli.php";
+include_once __DIR__."/apms/class-wc-gateway-checkout-com-alternative-payments-klarna.php";
+include_once __DIR__."/apms/class-wc-gateway-checkout-com-alternative-payments-sofort.php";
+include_once __DIR__."/apms/class-wc-gateway-checkout-com-alternative-payments-fawry.php";
+include_once __DIR__."/apms/class-wc-gateway-checkout-com-alternative-payments-giropay.php";
+include_once __DIR__."/apms/class-wc-gateway-checkout-com-alternative-payments-multibanco.php";
 
 class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway
 {
