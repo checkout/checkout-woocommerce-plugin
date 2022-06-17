@@ -137,7 +137,7 @@ class WC_Checkout_Com_Webhook
         $action_id = $webhook_data->action_id;
         $amount = $webhook_data->amount;
         $order_amount = $order->get_total();
-        $order_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($order_amount, $order->get_currency() );
+        $order_amount_cents = WC_Checkoutcom_Utility::value_to_decimal($order_amount, $order->get_currency() );
 
         // Set action id as woo transaction id
         update_post_meta($order_id, '_transaction_id', $action_id);
@@ -267,7 +267,7 @@ class WC_Checkout_Com_Webhook
         $action_id = $webhook_data->action_id;
         $amount = $webhook_data->amount;
         $order_amount = $order->get_total();
-        $order_amount_cents = WC_Checkoutcom_Utility::valueToDecimal($order_amount, $order->get_currency() );
+        $order_amount_cents = WC_Checkoutcom_Utility::value_to_decimal($order_amount, $order->get_currency() );
         $get_transaction_id = get_post_meta( $order_id, '_transaction_id', true );
 
         if ($get_transaction_id == $action_id) {
@@ -286,7 +286,7 @@ class WC_Checkout_Com_Webhook
         update_post_meta($order_id, '_transaction_id', $action_id);
         update_post_meta($order_id, 'cko_payment_refunded', true);
 
-        $refund_amount = WC_Checkoutcom_Utility::decimalToValue($amount, $order->get_currency() );
+        $refund_amount = WC_Checkoutcom_Utility::decimal_to_value($amount, $order->get_currency() );
 
         $order_message = __("Checkout.com Payment Refunded " ."</br>". " Action ID : {$action_id} ", 'wc_checkout_com');
 

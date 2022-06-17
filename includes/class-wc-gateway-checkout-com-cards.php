@@ -614,9 +614,9 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
 				// Check if payment is 3D secure.
 				if ( WC_Checkoutcom_Utility::is_pending( $response ) ) {
 					// Check if redirection link exist.
-					if ( WC_Checkoutcom_Utility::getRedirectUrl( $response ) ) {
+					if ( WC_Checkoutcom_Utility::get_redirect_url( $response ) ) {
 						// Return 3d redirection url.
-						wp_redirect( WC_Checkoutcom_Utility::getRedirectUrl( $response ) );
+						wp_redirect( WC_Checkoutcom_Utility::get_redirect_url( $response ) );
 						exit();
 
 					} else {
@@ -781,7 +781,7 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
 
         $core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
 
-        $signature =  WC_Checkoutcom_Utility::verifySignature($raw_event, $core_settings['ckocom_sk'], $header_signature);
+        $signature =  WC_Checkoutcom_Utility::verify_signature($raw_event, $core_settings['ckocom_sk'], $header_signature);
 
         // check if cko signature matches
         if($signature === false){
