@@ -10,25 +10,50 @@ use Checkout\Webhooks\WebhookRequest;
  */
 class WC_Checkoutcom_Webhook {
 
+	/**
+	 * Current instance of this class.
+	 *
+	 * @var $instance Current instance of this class.
+	 */
 	private static $instance = null;
 
+	/**
+	 * Instance of Checkout_SDK class.
+	 *
+	 * @var $checkout Instance of Checkout_SDK class.
+	 */
 	private $checkout = null;
 
+	/**
+	 * List of all webhooks.
+	 *
+	 * @var $list List of all webhooks.
+	 */
 	private $list = [];
 
+	/**
+	 * The webhooks URL which is registered to the checkout account's detail entered by user.
+	 *
+	 * @var $url_is_registered The webhooks URL which is registered to the checkout account's detail entered by user.
+	 */
 	private $url_is_registered = false;
 
-	private $ACCOUNT_TYPE = 'ABC';
+	/**
+	 * Account type.
+	 *
+	 * @var $account_type Account type.
+	 */
+	private $account_type = 'ABC';
 
 	/**
 	 * Constructor.
 	 */
 	public function __construct() {
 
-		add_action( 'wp_ajax_wc_checkoutcom_register_webhook', array( $this, 'ajax_register_webhook' ) );
-		add_action( 'wp_ajax_wc_checkoutcom_check_webhook', array( $this, 'ajax_check_webhook' ) );
+		add_action( 'wp_ajax_wc_checkoutcom_register_webhook', [ $this, 'ajax_register_webhook' ] );
+		add_action( 'wp_ajax_wc_checkoutcom_check_webhook', [ $this, 'ajax_check_webhook' ] );
 
-		$this->ACCOUNT_TYPE = cko_is_nas_account() ? 'NAS' : 'ABC';
+		$this->account_type = cko_is_nas_account() ? 'NAS' : 'ABC';
 
 		$this->checkout = new Checkout_SDK();
 	}
@@ -39,7 +64,7 @@ class WC_Checkoutcom_Webhook {
 	 * @return WC_Checkoutcom_Webhook
 	 */
 	public static function get_instance(): WC_Checkoutcom_Webhook {
-		if ( self::$instance == null ) {
+		if ( null === self::$instance ) {
 			self::$instance = new WC_Checkoutcom_Webhook();
 		}
 
@@ -57,7 +82,7 @@ class WC_Checkoutcom_Webhook {
 
 		$w_id = false;
 
-		if ( 'ABC' === $this->ACCOUNT_TYPE ) {
+		if ( 'ABC' === $this->account_type ) {
 			$webhook_response = (array) $this->create( $this->generate_current_webhook_url() );
 
 			if ( empty( $webhook_response ) || empty( $webhook_response['id'] ) ) {
@@ -90,7 +115,7 @@ class WC_Checkoutcom_Webhook {
 	/**
 	 * Register new webhook.
 	 *
-	 * @param $url
+	 * @param string $url Webhook URL.
 	 *
 	 * @return mixed|WP_Error
 	 */
@@ -129,13 +154,13 @@ class WC_Checkoutcom_Webhook {
 		];
 
 		try {
-			$webhookRequest = new WebhookRequest();
-			$webhookRequest->url = $url;
-			$webhookRequest->content_type = 'json';
-			$webhookRequest->event_types = $event_types;
-			$webhookRequest->active = true;
+			$webhook_request               = new WebhookRequest();
+			$webhook_request->url          = $url;
+			$webhook_request->content_type = 'json';
+			$webhook_request->event_types  = $event_types;
+			$webhook_request->active       = true;
 
-			return $this->checkout->get_builder()->getWebhooksClient()->registerWebhook( $webhookRequest );
+			return $this->checkout->get_builder()->getWebhooksClient()->registerWebhook( $webhook_request );
 
 		} catch ( CheckoutApiException $ex ) {
 			$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
@@ -162,13 +187,13 @@ class WC_Checkoutcom_Webhook {
 	/**
 	 * AJAX request handler for checking webhook.
 	 *
-	 * @return string
+	 * @return string|void
 	 */
 	public function ajax_check_webhook() {
 
 		check_ajax_referer( 'checkoutcom_check_webhook', 'security' );
 
-		if ( 'ABC' === $this->ACCOUNT_TYPE ) {
+		if ( 'ABC' === $this->account_type ) {
 			$webhook_is_ready = $this->is_registered();
 
 			$message = esc_html__( 'Webhook is configured at this URL:', 'wc_checkout_com' );
@@ -189,7 +214,7 @@ class WC_Checkoutcom_Webhook {
 			$message = esc_html__( 'Webhook is not configured with the current site or there is some issue with connection, Please check logs or try again.', 'wc_checkout_com' );
 		}
 
-		wp_send_json_success( array( 'message' => $message ) );
+		wp_send_json_success( [ 'message' => $message ] );
 	}
 
 	/**
@@ -236,7 +261,6 @@ class WC_Checkoutcom_Webhook {
 
 				return $this->list;
 			}
-
 		} catch ( CheckoutApiException $ex ) {
 			$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
 
