@@ -1,4 +1,9 @@
 <?php
+/**
+ * Webhook handler class.
+ *
+ * @package wc_checkout_com
+ */
 
 use Checkout\CheckoutApiException;
 
@@ -276,7 +281,7 @@ class WC_Checkout_Com_Webhook {
 		$order_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $order_amount, $order->get_currency() );
 		$get_transaction_id = get_post_meta( $order_id, '_transaction_id', true );
 
-		if ( $get_transaction_id == $action_id ) { // PHPCS:ignore WordPress.PHP.StrictComparisons.LooseComparison
+		if ( $get_transaction_id === $action_id ) {
 			return true;
 		}
 

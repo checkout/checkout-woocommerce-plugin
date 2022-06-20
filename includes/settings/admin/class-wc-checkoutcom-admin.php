@@ -1,4 +1,9 @@
 <?php
+/**
+ * Plugin admin settings class.
+ *
+ * @package wc_checkout_com
+ */
 
 /**
  * The admin-specific functionality of the plugin.

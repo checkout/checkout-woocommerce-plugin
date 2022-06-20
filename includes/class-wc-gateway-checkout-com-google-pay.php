@@ -1,4 +1,11 @@
 <?php
+/**
+ * Google Pay method class.
+ *
+ * @package wc_checkout_com
+ */
+
+defined( 'ABSPATH' ) || exit;
 
 /**
  * Class WC_Gateway_Checkout_Com_Google_Pay for Google Pay payment method.

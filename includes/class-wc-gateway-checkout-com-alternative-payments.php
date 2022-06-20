@@ -1,4 +1,12 @@
 <?php
+/**
+ * APMs main class.
+ *
+ * @package wc_checkout_com
+ */
+
+defined( 'ABSPATH' ) || exit;
+
 include_once __DIR__ . '/../templates/class-wc-checkoutcom-apm-templates.php';
 include_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-ideal.php';
 include_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-alipay.php';

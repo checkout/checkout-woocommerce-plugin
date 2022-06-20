@@ -1,9 +1,14 @@
 <?php
-
-include_once 'class-wc-checkoutcom-workflows.php';
+/**
+ * Webhook class.
+ *
+ * @package wc_checkout_com
+ */
 
 use Checkout\CheckoutApiException;
 use Checkout\Webhooks\WebhookRequest;
+
+include_once 'class-wc-checkoutcom-workflows.php';
 
 /**
  * Class WC_Checkoutcom_Webhook

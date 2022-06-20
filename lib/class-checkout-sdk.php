@@ -1,10 +1,16 @@
 <?php
-include_once dirname( __DIR__ ) . '/includes/api/class-wc-checkoutcom-utility.php';
+/**
+ * Checkout SDK wrapper class.
+ *
+ * @package wc_checkout_com
+ */
 
 use Checkout\CheckoutDefaultSdk;
 use Checkout\CheckoutFourSdk;
 use Checkout\Environment;
 use Checkout\CheckoutArgumentException;
+
+include_once dirname( __DIR__ ) . '/includes/api/class-wc-checkoutcom-utility.php';
 
 /**
  * Wrapper class around the Checkout.com SDK.

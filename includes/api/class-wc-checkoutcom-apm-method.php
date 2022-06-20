@@ -1,4 +1,9 @@
 <?php
+/**
+ * APMs source generate class.
+ *
+ * @package wc_checkout_com
+ */
 
 use Checkout\CheckoutApiException;
 use Checkout\Common\Address;

@@ -14,7 +14,6 @@
 	<!-- Rules -->
 	<rule ref="WordPress-Core">
 		<exclude name="Generic.Arrays.DisallowShortArraySyntax.Found"/>
-		<exclude name="Squiz.Commenting.FileComment.Missing"/>
 	</rule>
 	<rule ref="WordPress-Docs" />
 

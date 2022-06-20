@@ -1,4 +1,9 @@
 <?php
+/**
+ * Card payment method settings class.
+ *
+ * @package wc_checkout_com
+ */
 
 /**
  * Class WC_Checkoutcom_Cards_Settings

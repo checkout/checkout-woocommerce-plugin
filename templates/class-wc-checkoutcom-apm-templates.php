@@ -1,4 +1,9 @@
 <?php
+/**
+ * APMs templates class.
+ *
+ * @package wc_checkout_com
+ */
 
 /**
  * Class for APMs related templates.

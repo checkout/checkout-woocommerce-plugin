@@ -1,7 +1,9 @@
 <?php
-
-include_once 'class-wc-checkoutcom-utility.php';
-include 'class-wc-checkoutcom-apm-method.php';
+/**
+ * API request class.
+ *
+ * @package wc_checkout_com
+ */
 
 use Checkout\Apm\Klarna\CreditSessionRequest;
 use Checkout\CheckoutApiException;
@@ -23,6 +25,9 @@ use Checkout\Tokens\ApplePayTokenData;
 use Checkout\Tokens\ApplePayTokenRequest;
 use Checkout\Tokens\GooglePayTokenData;
 use Checkout\Tokens\GooglePayTokenRequest;
+
+include_once 'class-wc-checkoutcom-utility.php';
+include 'class-wc-checkoutcom-apm-method.php';
 
 /**
  * Class WC_Checkoutcom_Api_Request handles the API requests.

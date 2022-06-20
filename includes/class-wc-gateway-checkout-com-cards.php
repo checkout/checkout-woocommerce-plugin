@@ -1,4 +1,14 @@
 <?php
+/**
+ * Card payment method main class.
+ *
+ * @package wc_checkout_com
+ */
+
+use Checkout\CheckoutApiException;
+use Checkout\Common\CustomerRequest;
+use Checkout\Payments\Source\RequestTokenSource;
+use Checkout\Payments\ThreeDsRequest;
 
 include_once dirname( __DIR__ ) . '/lib/class-checkout-sdk.php';
 
@@ -11,11 +21,6 @@ include_once( 'settings/admin/class-wc-checkoutcom-admin.php' );
 include_once( 'api/class-wc-checkoutcom-api-request.php' );
 include_once( 'class-wc-checkout-com-webhook.php' );
 include_once( 'subscription/class-wc-checkoutcom-subscription.php' );
-
-use Checkout\CheckoutApiException;
-use Checkout\Common\CustomerRequest;
-use Checkout\Payments\Source\RequestTokenSource;
-use Checkout\Payments\ThreeDsRequest;
 
 /**
  * Class WC_Gateway_Checkout_Com_Cards for Card payment method.

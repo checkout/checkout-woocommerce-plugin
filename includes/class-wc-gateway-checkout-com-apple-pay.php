@@ -1,4 +1,11 @@
 <?php
+/**
+ * Apple Pay method class.
+ *
+ * @package wc_checkout_com
+ */
+
+defined( 'ABSPATH' ) || exit;
 
 include_once( 'settings/class-wc-checkoutcom-cards-settings.php' );
 

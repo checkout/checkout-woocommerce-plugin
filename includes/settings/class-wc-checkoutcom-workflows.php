@@ -1,4 +1,9 @@
 <?php
+/**
+ * Workflow class.
+ *
+ * @package wc_checkout_com
+ */
 
 use Checkout\CheckoutApiException;
 use Checkout\Workflows\Actions\WebhookSignature;
