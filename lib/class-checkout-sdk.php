@@ -1,15 +1,21 @@
 <?php
-include_once dirname(__DIR__) . '/includes/api/class-wc-checkoutcom-utility.php';
+/**
+ * Checkout SDK wrapper class.
+ *
+ * @package wc_checkout_com
+ */
 
 use Checkout\CheckoutDefaultSdk;
 use Checkout\CheckoutFourSdk;
 use Checkout\Environment;
 use Checkout\CheckoutArgumentException;
 
+include_once dirname( __DIR__ ) . '/includes/api/class-wc-checkoutcom-utility.php';
+
 /**
  * Wrapper class around the Checkout.com SDK.
  *
- * https://github.com/checkout/checkout-sdk-php/
+ * Ref: https://github.com/checkout/checkout-sdk-php/
  */
 class Checkout_SDK {
 
@@ -33,7 +39,7 @@ class Checkout_SDK {
 	public function __construct() {
 
 		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
-		$environment   = $core_settings['ckocom_environment'] === 'sandbox' ? Environment::sandbox() : Environment::production();
+		$environment   = 'sandbox' === $core_settings['ckocom_environment'] ? Environment::sandbox() : Environment::production();
 
 		$this->nas_account_type = cko_is_nas_account();
 
