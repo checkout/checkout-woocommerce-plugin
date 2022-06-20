@@ -20,9 +20,9 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Ideal extends WC_Gateway_Chec
 	 */
 	public function __construct() {
 		$this->id                 = 'wc_checkout_com_alternative_payments_ideal';
-		$this->method_title       = __( 'Checkout.com', 'wc_checkout_com' );
-		$this->method_description = __( 'The Checkout.com extension allows shop owners to process online payments through the <a href="https://www.checkout.com">Checkout.com Payment Gateway.</a>', 'wc_checkout_com' );
-		$this->title              = __( 'Ideal', 'wc_checkout_com' );
+		$this->method_title       = __( 'Checkout.com', 'checkout-com-unified-payments-api' );
+		$this->method_description = __( 'The Checkout.com extension allows shop owners to process online payments through the <a href="https://www.checkout.com">Checkout.com Payment Gateway.</a>', 'checkout-com-unified-payments-api' );
+		$this->title              = __( 'Ideal', 'checkout-com-unified-payments-api' );
 		$this->has_fields         = true;
 		$this->supports           = [ 'products', 'refunds' ];
 

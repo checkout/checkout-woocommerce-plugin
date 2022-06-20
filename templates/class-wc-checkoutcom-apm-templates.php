@@ -24,7 +24,7 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_Request {
 		?>
 			<div class="ideal-bank-info" id="ideal-bank-info">
 				<div class="ideal-heading">
-					<label><?php esc_html_e( 'Your Bank', 'wc_checkout_com' ); ?></label>
+					<label><?php esc_html_e( 'Your Bank', 'checkout-com-unified-payments-api' ); ?></label>
 				</div>
 				<label for="issuer-id">
 
@@ -63,7 +63,7 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_Request {
 					<?php } ?>
 					<?php
 				} else {
-					echo  __( 'Klarna is not offering any payment options for this purchase. Please choose another payment method.', 'wc_checkout_com' );
+					echo  __( 'Klarna is not offering any payment options for this purchase. Please choose another payment method.', 'checkout-com-unified-payments-api' );
 				}
 				?>
 			</div>
@@ -83,12 +83,12 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_Request {
 			<div class="input-group">
 				<label class="icon" for="name">
 					<span class="ckojs ckojs-card"></label>
-				<input type="text" id="name" name="name" placeholder="<?php echo ( __( 'Nome', 'wc_checkout_com' ) ); ?>" class="input-control" required style="width: 100%;">
+				<input type="text" id="name" name="name" placeholder="<?php echo ( __( 'Nome', 'checkout-com-unified-payments-api' ) ); ?>" class="input-control" required style="width: 100%;">
 			</div>
 			<div class="input-group">
 				<label class="icon" for="cpf">
 					<span class="ckojs ckojs-card"></label>
-				<input type="text" id="cpf" name="cpf" placeholder="<?php echo ( __( 'Cadastro de Pessoas Físicas', 'wc_checkout_com' ) ); ?>" class="input-control" required style="width: 100%;">
+				<input type="text" id="cpf" name="cpf" placeholder="<?php echo ( __( 'Cadastro de Pessoas Físicas', 'checkout-com-unified-payments-api' ) ); ?>" class="input-control" required style="width: 100%;">
 			</div>
 		</div>
 		<?php
@@ -108,7 +108,7 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_Request {
 			<div class="input-group">
 				<label class="icon" for="sepa-iban">
 					<span class="ckojs ckojs-card"></label>
-				<input type="text" id="sepa-iban" name="sepa-iban" placeholder="<?php echo ( __( 'IBAN', 'wc_checkout_com' ) ); ?>" class="input-control" required style="width: 100%;">
+				<input type="text" id="sepa-iban" name="sepa-iban" placeholder="<?php echo ( __( 'IBAN', 'checkout-com-unified-payments-api' ) ); ?>" class="input-control" required style="width: 100%;">
 			</div>
 			<div class="sepa-continue-btn">
 				<input type="button" id="sepa-continue" name="sepa-continue" value="Continue">
@@ -116,7 +116,7 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_Request {
 
 			<?php
 			self::get_sepa_mandate( $current_user );
-			$alert = esc_html__( 'Please fill in the required fields.', 'wc_checkout_com' );
+			$alert = esc_html__( 'Please fill in the required fields.', 'checkout-com-unified-payments-api' );
 			?>
 		</div>
 

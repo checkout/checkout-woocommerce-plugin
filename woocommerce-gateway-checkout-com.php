@@ -11,7 +11,7 @@
  * Tested up to: 6.0
  * WC tested up to: 6.5.1
  * Requires PHP: 7.2
- * Text Domain: wc_checkout_com
+ * Text Domain: checkout-com-unified-payments-api
  * Domain Path: /languages
  *
  * @package wc_checkout_com
@@ -38,7 +38,7 @@ function init_checkout_com_gateway_class() {
 		return;
 	}
 
-	load_plugin_textdomain( 'wc_checkout_com', false, plugin_basename( dirname( __FILE__ ) ) . '/languages' );
+	load_plugin_textdomain( 'checkout-com-unified-payments-api', false, plugin_basename( dirname( __FILE__ ) ) . '/languages' );
 
 	include_once( 'includes/class-wc-gateway-checkout-com-cards.php' );
 	include_once( 'includes/class-wc-gateway-checkout-com-apple-pay.php' );
@@ -125,7 +125,7 @@ add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), 'checkout_com_
  */
 function checkout_com_action_links( $links ) {
 	$plugin_links = [
-		'<a href="' . admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards' ) . '">' . __( 'Settings', 'wc_checkout_com' ) . '</a>',
+		'<a href="' . admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards' ) . '">' . __( 'Settings', 'checkout-com-unified-payments-api' ) . '</a>',
 	];
 
 	return array_merge( $plugin_links, $links );
@@ -141,13 +141,13 @@ function register_cko_new_order_statuses() {
 	register_post_status(
 		'wc-flagged',
 		[
-			'label'                     => _x( 'Suspected Fraud', 'Order status', 'wc_checkout_com' ),
+			'label'                     => _x( 'Suspected Fraud', 'Order status', 'checkout-com-unified-payments-api' ),
 			'public'                    => true,
 			'exclude_from_search'       => false,
 			'show_in_admin_all_list'    => true,
 			'show_in_admin_status_list' => true,
 			/* translators: %s: number of orders */
-			'label_count'               => _n_noop( 'Suspected Fraud <span class="count">(%s)</span>', 'Suspected Frauds <span class="count">(%s)</span>', 'wc_checkout_com' ),
+			'label_count'               => _n_noop( 'Suspected Fraud <span class="count">(%s)</span>', 'Suspected Frauds <span class="count">(%s)</span>', 'checkout-com-unified-payments-api' ),
 		]
 	);
 }
@@ -163,7 +163,7 @@ add_filter( 'wc_order_statuses', 'my_new_wc_order_statuses' );
  * @return array
  */
 function my_new_wc_order_statuses( $order_statuses ) {
-	$order_statuses['wc-flagged'] = _x( 'Suspected Fraud', 'Order status', 'wc_checkout_com' );
+	$order_statuses['wc-flagged'] = _x( 'Suspected Fraud', 'Order status', 'checkout-com-unified-payments-api' );
 
 	return $order_statuses;
 }
@@ -178,9 +178,9 @@ function cko_frames_js() {
 	wp_enqueue_script( 'cko-frames-script' );
 
 	$vars = [
-		'card-number' => esc_html__( 'Please enter a valid card number', 'wc_checkout_com' ),
-		'expiry-date' => esc_html__( 'Please enter a valid expiry date', 'wc_checkout_com' ),
-		'cvv'         => esc_html__( 'Please enter a valid cvv code', 'wc_checkout_com' ),
+		'card-number' => esc_html__( 'Please enter a valid card number', 'checkout-com-unified-payments-api' ),
+		'expiry-date' => esc_html__( 'Please enter a valid expiry date', 'checkout-com-unified-payments-api' ),
+		'cvv'         => esc_html__( 'Please enter a valid cvv code', 'checkout-com-unified-payments-api' ),
 	];
 
 	wp_localize_script( 'cko-frames-script', 'cko_frames_vars', $vars );
@@ -200,7 +200,7 @@ function cko_check_if_empty() {
 			&& 'new' !== $_POST['wc-wc_checkout_com_cards-payment-token'] ) {
 			// check if cvv is empty on checkout page.
 			if ( empty( $_POST['wc_checkout_com_cards-card-cvv'] ) ) {
-				wc_add_notice( esc_html__( 'Please enter a valid cvv.', 'wc_checkout_com' ), 'error' );
+				wc_add_notice( esc_html__( 'Please enter a valid cvv.', 'checkout-com-unified-payments-api' ), 'error' );
 			}
 		}
 	}
@@ -383,7 +383,7 @@ function renew_save_again( $post_id, $post ) {
 				$status = WC_Admin_Settings::get_option( 'ckocom_order_captured', 'processing' );
 
 				/* translators: %s: Action id. */
-				$message = sprintf( esc_html__( 'Checkout.com Payment Captured from Admin - Action ID : %s', 'wc_checkout_com' ), $result['action_id'] );
+				$message = sprintf( esc_html__( 'Checkout.com Payment Captured from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
 
 				// add notes for the order and update status.
 				$order->add_order_note( $message );
@@ -410,7 +410,7 @@ function renew_save_again( $post_id, $post ) {
 				$status = WC_Admin_Settings::get_option( 'ckocom_order_void', 'cancelled' );
 
 				/* translators: %s: Action id. */
-				$message = sprintf( esc_html__( 'Checkout.com Payment Voided from Admin - Action ID : %s', 'wc_checkout_com' ), $result['action_id'] );
+				$message = sprintf( esc_html__( 'Checkout.com Payment Voided from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
 
 				// add notes for the order and update status.
 				$order->add_order_note( $message );
@@ -422,7 +422,7 @@ function renew_save_again( $post_id, $post ) {
 				return true;
 
 			} else {
-				WC_Admin_Notices::add_custom_notice( 'wc_checkout_com_cards', esc_html__( 'An error has occurred.', 'wc_checkout_com' ) );
+				WC_Admin_Notices::add_custom_notice( 'wc_checkout_com_cards', esc_html__( 'An error has occurred.', 'checkout-com-unified-payments-api' ) );
 
 				return false;
 			}
@@ -441,7 +441,7 @@ add_action( 'woocommerce_thankyou', 'add_fawry_number' );
  */
 function add_fawry_number( $order_id ) {
 	$fawry_number = get_post_meta( $order_id, 'cko_fawry_reference_number', $single = true );
-	$fawry        = __( 'Fawry reference number: ', 'wc_checkout_com' );
+	$fawry        = __( 'Fawry reference number: ', 'checkout-com-unified-payments-api' );
 	if ( $fawry_number ) {
 		wc_enqueue_js(
 			"

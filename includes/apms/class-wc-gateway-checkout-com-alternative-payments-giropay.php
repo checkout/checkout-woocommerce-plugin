@@ -20,7 +20,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Giropay extends WC_Gateway_Ch
 	 */
 	public function __construct() {
 		$this->id         = 'wc_checkout_com_alternative_payments_giropay';
-		$this->title      = __( 'Giropay', 'wc_checkout_com' );
+		$this->title      = __( 'Giropay', 'checkout-com-unified-payments-api' );
 		$this->has_fields = true;
 		$this->supports   = [ 'products', 'refunds' ];
 
@@ -36,7 +36,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Giropay extends WC_Gateway_Ch
 	public function payment_fields() {
 		// get available apms depending on currency.
 		$apm_available = WC_Checkoutcom_Utility::get_alternative_payment_methods();
-		$message       = __( 'Pay with Giropay. You will be redirected upon place order', 'wc_checkout_com' );
+		$message       = __( 'Pay with Giropay. You will be redirected upon place order', 'checkout-com-unified-payments-api' );
 
 		?>
 			<p style="margin-bottom: 0;"> <?php echo $message; ?> </p>

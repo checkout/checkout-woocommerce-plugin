@@ -71,7 +71,7 @@ class WC_Checkoutcom_Api_Request {
 						return [ '3d' => WC_Checkoutcom_Utility::get_redirect_url( $response ) ];
 
 					} else {
-						$error_message = __( 'An error has occurred while processing your payment. Redirection link not found', 'wc_checkout_com' );
+						$error_message = __( 'An error has occurred while processing your payment. Redirection link not found', 'checkout-com-unified-payments-api' );
 
 						WC_Checkoutcom_Utility::logger( $error_message, null );
 
@@ -88,14 +88,14 @@ class WC_Checkoutcom_Api_Request {
 					update_post_meta( $order->get_id(), '_cko_payment_id', $response['id'] );
 				}
 
-				$error_message = __( 'An error has occurred while processing your payment. Please check your card details and try again. ', 'wc_checkout_com' );
+				$error_message = __( 'An error has occurred while processing your payment. Please check your card details and try again. ', 'checkout-com-unified-payments-api' );
 
 				// If the merchant enabled gateway response.
 				if ( $gateway_debug ) {
 					// Only show the decline reason in case the response code is not from a risk rule.
 					if ( ! preg_match( '/^(?:40)\d+$/', $response['response_code'] ) ) {
 						/* translators: 1: Response status, 2: Summary. */
-						$error_message .= sprintf( __( 'Status : %1$s, Response summary : %2$s', 'wc_checkout_com' ), $response['status'], $response['response_summary'] );
+						$error_message .= sprintf( __( 'Status : %1$s, Response summary : %2$s', 'checkout-com-unified-payments-api' ), $response['status'], $response['response_summary'] );
 					}
 				}
 
@@ -104,7 +104,7 @@ class WC_Checkoutcom_Api_Request {
 				return [ 'error' => $error_message ];
 			}
 		} catch ( CheckoutApiException $ex ) {
-			$error_message = __( 'An error has occurred while processing your payment. ', 'wc_checkout_com' );
+			$error_message = __( 'An error has occurred while processing your payment. ', 'checkout-com-unified-payments-api' );
 
 			// Check if gateway response is enabled from module settings.
 			if ( $gateway_debug ) {
@@ -505,7 +505,7 @@ class WC_Checkoutcom_Api_Request {
 					update_post_meta( $response['metadata']['order_id'], '_cko_payment_id', $response['id'] );
 				}
 
-				$error_message = __( 'An error has occurred while processing your payment. Please check your card details and try again.', 'wc_checkout_com' );
+				$error_message = __( 'An error has occurred while processing your payment. Please check your card details and try again.', 'checkout-com-unified-payments-api' );
 
 				// Check if gateway response is enabled from module settings.
 				if ( $gateway_debug ) {
@@ -513,7 +513,7 @@ class WC_Checkoutcom_Api_Request {
 						$action = $response['actions'][0];
 
 						/* translators: 1: Response status, 2: Summary. */
-						$error_message .= sprintf( __( 'Status : %1$s, Response summary : %2$s', 'wc_checkout_com' ), $response['status'], $action['response_summary'] );
+						$error_message .= sprintf( __( 'Status : %1$s, Response summary : %2$s', 'checkout-com-unified-payments-api' ), $response['status'], $action['response_summary'] );
 					}
 				}
 
@@ -535,7 +535,7 @@ class WC_Checkoutcom_Api_Request {
 			}
 		} catch ( CheckoutApiException $ex ) {
 
-			$error_message = __( 'An error has occurred while processing your payment. ', 'wc_checkout_com' );
+			$error_message = __( 'An error has occurred while processing your payment. ', 'checkout-com-unified-payments-api' );
 
 			// Check if gateway response is enabled from module settings.
 			if ( $gateway_debug ) {
@@ -580,7 +580,7 @@ class WC_Checkoutcom_Api_Request {
 				'token_format' => $token['token_format'],
 			];
 		} catch ( CheckoutApiException $ex ) {
-			$error_message = __( 'An error has occurred while processing your Google pay payment.', 'wc_checkout_com' );
+			$error_message = __( 'An error has occurred while processing your Google pay payment.', 'checkout-com-unified-payments-api' );
 			WC_Checkoutcom_Utility::logger( $error_message, $ex );
 		}
 	}
@@ -596,7 +596,7 @@ class WC_Checkoutcom_Api_Request {
 
 		// Check if cko_payment_id is empty.
 		if ( empty( $cko_payment_id ) ) {
-			$error_message = esc_html__( 'An error has occurred. No Cko Payment Id', 'wc_checkout_com' );
+			$error_message = esc_html__( 'An error has occurred. No Cko Payment Id', 'checkout-com-unified-payments-api' );
 
 			return [ 'error' => $error_message ];
 		}
@@ -616,7 +616,7 @@ class WC_Checkoutcom_Api_Request {
 			if ( 'Voided' === $details['status'] || 'Captured' === $details['status'] ) {
 				$error_message = sprintf(
 					/* translators: 1: Order ID. */
-					esc_html__( 'Payment has already been voided or captured on Checkout.com hub for order Id : %s', 'wc_checkout_com' ),
+					esc_html__( 'Payment has already been voided or captured on Checkout.com hub for order Id : %s', 'checkout-com-unified-payments-api' ),
 					$order_id
 				);
 
@@ -633,7 +633,7 @@ class WC_Checkoutcom_Api_Request {
 			if ( ! WC_Checkoutcom_Utility::is_successful( $response ) ) {
 				$error_message = sprintf(
 					/* translators: 1: Order ID. */
-					esc_html__( 'An error has occurred while processing your capture payment on Checkout.com hub. Order Id : %s', 'wc_checkout_com' ),
+					esc_html__( 'An error has occurred while processing your capture payment on Checkout.com hub. Order Id : %s', 'checkout-com-unified-payments-api' ),
 					$order_id
 				);
 
@@ -649,7 +649,7 @@ class WC_Checkoutcom_Api_Request {
 				return $response;
 			}
 		} catch ( CheckoutApiException $ex ) {
-			$error_message = esc_html__( 'An error has occurred while processing your capture request.', 'wc_checkout_com' );
+			$error_message = esc_html__( 'An error has occurred while processing your capture request.', 'checkout-com-unified-payments-api' );
 
 			// Check if gateway response is enabled from module settings.
 			if ( $gateway_debug ) {
@@ -673,7 +673,7 @@ class WC_Checkoutcom_Api_Request {
 
 		// Check if cko_payment_id is empty.
 		if ( empty( $cko_payment_id ) ) {
-			$error_message = esc_html__( 'An error has occurred. No Cko Payment Id', 'wc_checkout_com' );
+			$error_message = esc_html__( 'An error has occurred. No Cko Payment Id', 'checkout-com-unified-payments-api' );
 
 			return [ 'error' => $error_message ];
 		}
@@ -690,7 +690,7 @@ class WC_Checkoutcom_Api_Request {
 			if ( 'Voided' === $details['status'] || 'Captured' === $details['status'] ) {
 				$error_message = sprintf(
 					/* translators: 1: Order ID. */
-					esc_html__( 'Payment has already been voided or captured on Checkout.com hub for order Id : %s', 'wc_checkout_com' ),
+					esc_html__( 'Payment has already been voided or captured on Checkout.com hub for order Id : %s', 'checkout-com-unified-payments-api' ),
 					$order_id
 				);
 
@@ -707,7 +707,7 @@ class WC_Checkoutcom_Api_Request {
 			if ( ! WC_Checkoutcom_Utility::is_successful( $response ) ) {
 				$error_message = sprintf(
 					/* translators: 1: Order ID. */
-					esc_html__( 'An error has occurred while processing your void payment on Checkout.com hub. Order Id : %s', 'wc_checkout_com' ),
+					esc_html__( 'An error has occurred while processing your void payment on Checkout.com hub. Order Id : %s', 'checkout-com-unified-payments-api' ),
 					$order_id
 				);
 
@@ -723,7 +723,7 @@ class WC_Checkoutcom_Api_Request {
 				return $response;
 			}
 		} catch ( CheckoutApiException $ex ) {
-			$error_message = esc_html__( 'An error has occurred while processing your void request.', 'wc_checkout_com' );
+			$error_message = esc_html__( 'An error has occurred while processing your void request.', 'checkout-com-unified-payments-api' );
 
 			// Check if gateway response is enabled from module settings.
 			if ( $gateway_debug ) {
@@ -749,7 +749,7 @@ class WC_Checkoutcom_Api_Request {
 
 		// Check if cko_payment_id is empty.
 		if ( empty( $cko_payment_id ) ) {
-			$error_message = __( 'An error has occurred. No Cko Payment Id', 'wc_checkout_com' );
+			$error_message = __( 'An error has occurred. No Cko Payment Id', 'checkout-com-unified-payments-api' );
 
 			return [ 'error' => $error_message ];
 		}
@@ -793,7 +793,7 @@ class WC_Checkoutcom_Api_Request {
 
 			if ( ! WC_Checkoutcom_Utility::is_successful( $response ) ) {
 				/* translators: 1: Order ID. */
-				$error_message = sprintf( esc_html__( 'An error has occurred while processing your refund payment on Checkout.com hub. Order Id : %s', 'wc_checkout_com' ), $order_id );
+				$error_message = sprintf( esc_html__( 'An error has occurred while processing your refund payment on Checkout.com hub. Order Id : %s', 'checkout-com-unified-payments-api' ), $order_id );
 
 				// Check if gateway response is enabled from module settings.
 				if ( $gateway_debug ) {
@@ -807,7 +807,7 @@ class WC_Checkoutcom_Api_Request {
 				return $response;
 			}
 		} catch ( CheckoutApiException $ex ) {
-			$error_message = esc_html__( 'An error has occurred while processing your refund. ', 'wc_checkout_com' );
+			$error_message = esc_html__( 'An error has occurred while processing your refund. ', 'checkout-com-unified-payments-api' );
 
 			// check if gateway response is enabled from module settings.
 			if ( $gateway_debug ) {
@@ -836,7 +836,7 @@ class WC_Checkoutcom_Api_Request {
 			return $checkout->get_builder()->getIdealClient()->getIssuers();
 
 		} catch ( CheckoutApiException $ex ) {
-			$error_message = __( 'An error has occured while retrieving ideal bank details.', 'wc_checkout_com' );
+			$error_message = __( 'An error has occured while retrieving ideal bank details.', 'checkout-com-unified-payments-api' );
 
 			// check if gateway response is enabled from module settings.
 			if ( $gateway_debug ) {
@@ -893,7 +893,7 @@ class WC_Checkoutcom_Api_Request {
 							return $verify_payment;
 						}
 
-						$error_message = esc_html__( 'An error has occurred while processing your payment. Redirection link not found', 'wc_checkout_com' );
+						$error_message = esc_html__( 'An error has occurred while processing your payment. Redirection link not found', 'checkout-com-unified-payments-api' );
 
 						return [ 'error' => $error_message ];
 					}
@@ -902,7 +902,7 @@ class WC_Checkoutcom_Api_Request {
 					return $response;
 				}
 			} else {
-				$error_message = esc_html__( 'An error has occurred while processing your payment. Please check your card details and try again.', 'wc_checkout_com' );
+				$error_message = esc_html__( 'An error has occurred while processing your payment. Please check your card details and try again.', 'checkout-com-unified-payments-api' );
 
 				// check if gateway response is enabled from module settings.
 				if ( $gateway_debug ) {
@@ -914,7 +914,7 @@ class WC_Checkoutcom_Api_Request {
 				return [ 'error' => $error_message ];
 			}
 		} catch ( CheckoutApiException $ex ) {
-			$error_message = esc_html__( 'An error has occurred while creating apm payments.', 'wc_checkout_com' );
+			$error_message = esc_html__( 'An error has occurred while creating apm payments.', 'checkout-com-unified-payments-api' );
 
 			// Check if gateway response is enabled from module settings.
 			if ( $gateway_debug ) {
@@ -1060,7 +1060,7 @@ class WC_Checkoutcom_Api_Request {
 				return $builder->getKlarnaClient()->createCreditSession( $credit_session_request );
 			}
 		} catch ( CheckoutApiException $ex ) {
-			$error_message = esc_html__( 'An error has occurred while creating klarna session.', 'wc_checkout_com' );
+			$error_message = esc_html__( 'An error has occurred while creating klarna session.', 'checkout-com-unified-payments-api' );
 
 			// Check if gateway response is enabled from module settings.
 			if ( $gateway_debug ) {
@@ -1227,7 +1227,7 @@ class WC_Checkoutcom_Api_Request {
 			return $token['token'];
 
 		} catch ( CheckoutApiException $ex ) {
-			$error_message = esc_html__( 'An error has occurred while processing your payment.', 'wc_checkout_com' );
+			$error_message = esc_html__( 'An error has occurred while processing your payment.', 'checkout-com-unified-payments-api' );
 			WC_Checkoutcom_Utility::logger( $error_message, $ex );
 			die( 'here' );
 		}

@@ -20,9 +20,9 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Fawry extends WC_Gateway_Chec
 	 */
 	public function __construct() {
 		$this->id                 = 'wc_checkout_com_alternative_payments_fawry';
-		$this->method_title       = __( 'Checkout.com', 'wc_checkout_com' );
-		$this->method_description = __( 'The Checkout.com extension allows shop owners to process online payments through the <a href="https://www.checkout.com">Checkout.com Payment Gateway.</a>', 'wc_checkout_com' );
-		$this->title              = __( 'Fawry', 'wc_checkout_com' );
+		$this->method_title       = __( 'Checkout.com', 'checkout-com-unified-payments-api' );
+		$this->method_description = __( 'The Checkout.com extension allows shop owners to process online payments through the <a href="https://www.checkout.com">Checkout.com Payment Gateway.</a>', 'checkout-com-unified-payments-api' );
+		$this->title              = __( 'Fawry', 'checkout-com-unified-payments-api' );
 		$this->supports           = [ 'products', 'refunds' ];
 		$this->has_fields         = true;
 
@@ -37,7 +37,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Fawry extends WC_Gateway_Chec
 	public function payment_fields() {
 		// get available apms depending on currency.
 		$apm_available = WC_Checkoutcom_Utility::get_alternative_payment_methods();
-		$message       = __( 'Pay with Fawry', 'wc_checkout_com' );
+		$message       = __( 'Pay with Fawry', 'checkout-com-unified-payments-api' );
 
 		?>
 			<p style="margin-bottom: 0;"> <?php echo $message; ?> </p>
@@ -87,7 +87,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Fawry extends WC_Gateway_Chec
 			// Get cko auth status configured in admin.
 			$message = sprintf(
 				/* translators: 1: Result ID, 2: Payment reference number. */
-				esc_html__( 'Checkout.com - Fawry payment - Action ID : %1$s - Fawry reference number : %2$s', 'wc_checkout_com' ),
+				esc_html__( 'Checkout.com - Fawry payment - Action ID : %1$s - Fawry reference number : %2$s', 'checkout-com-unified-payments-api' ),
 				$result['id'],
 				$result['source']['reference_number']
 			);
@@ -96,7 +96,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Fawry extends WC_Gateway_Chec
 				$status  = WC_Admin_Settings::get_option( 'ckocom_order_captured', 'processing' );
 				$message = sprintf(
 					/* translators: %s: Result ID. */
-					esc_html__( 'Checkout.com Payment Captured - Action ID - %s', 'wc_checkout_com' ),
+					esc_html__( 'Checkout.com Payment Captured - Action ID - %s', 'checkout-com-unified-payments-api' ),
 					$result['id']
 				);
 			}
