@@ -17,9 +17,9 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 	 */
 	public function __construct() {
 		$this->id                 = 'wc_checkout_com_google_pay';
-		$this->method_title       = __( 'Checkout.com', 'wc_checkout_com' );
-		$this->method_description = __( 'The Checkout.com extension allows shop owners to process online payments through the <a href="https://www.checkout.com">Checkout.com Payment Gateway.</a>', 'wc_checkout_com' );
-		$this->title              = __( 'Google Pay', 'wc_checkout_com' );
+		$this->method_title       = __( 'Checkout.com', 'checkout-com-unified-payments-api' );
+		$this->method_description = __( 'The Checkout.com extension allows shop owners to process online payments through the <a href="https://www.checkout.com">Checkout.com Payment Gateway.</a>', 'checkout-com-unified-payments-api' );
+		$this->title              = __( 'Google Pay', 'checkout-com-unified-payments-api' );
 
 		$this->has_fields = true;
 		$this->supports   = [ 'products', 'refunds' ];
@@ -51,7 +51,7 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 				'screen_button' => [
 					'id'    => 'screen_button',
 					'type'  => 'screen_button',
-					'title' => __( 'Other Settings', 'wc_checkout_com' ),
+					'title' => __( 'Other Settings', 'checkout-com-unified-payments-api' ),
 				],
 			]
 		);
@@ -310,7 +310,7 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 
 		// Check if google token is not empty.
 		if ( empty( $google_token['token'] ) ) {
-			WC_Checkoutcom_Utility::wc_add_notice_self( __( 'There was an issue completing the payment.', 'wc_checkout_com' ), 'error' );
+			WC_Checkoutcom_Utility::wc_add_notice_self( __( 'There was an issue completing the payment.', 'checkout-com-unified-payments-api' ), 'error' );
 			return;
 		}
 
@@ -340,7 +340,7 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 		$status = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
 
 		/* translators: %s: Action ID. */
-		$message = sprintf( esc_html__( 'Checkout.com Payment Authorised - Action ID : %s', 'wc_checkout_com' ), $result['action_id'] );
+		$message = sprintf( esc_html__( 'Checkout.com Payment Authorised - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
 
 		// check if payment was flagged.
 		if ( $result['risk']['flagged'] ) {
@@ -348,7 +348,7 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 			$status = WC_Admin_Settings::get_option( 'ckocom_order_flagged', 'flagged' );
 
 			/* translators: %s: Action ID. */
-			$message = sprintf( esc_html__( 'Checkout.com Payment Flagged - Action ID : %s', 'wc_checkout_com' ), $result['action_id'] );
+			$message = sprintf( esc_html__( 'Checkout.com Payment Flagged - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
 		}
 
 		// add notes for the order and update status.
@@ -394,12 +394,12 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 		$status = WC_Admin_Settings::get_option( 'ckocom_order_refunded', 'refunded' );
 
 		/* translators: %s: Action ID. */
-		$message = sprintf( esc_html__( 'Checkout.com Payment refunded - Action ID : %s', 'wc_checkout_com' ), $result['action_id'] );
+		$message = sprintf( esc_html__( 'Checkout.com Payment refunded - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
 
 		if ( isset( $_SESSION['cko-refund-is-less'] ) ) {
 			if ( $_SESSION['cko-refund-is-less'] ) {
 				/* translators: %s: Action ID. */
-				$order->add_order_note( sprintf( esc_html__( 'Checkout.com Payment Partially refunded - Action ID : %s', 'wc_checkout_com' ), $result['action_id'] ) );
+				$order->add_order_note( sprintf( esc_html__( 'Checkout.com Payment Partially refunded - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] ) );
 
 				unset( $_SESSION['cko-refund-is-less'] );
 

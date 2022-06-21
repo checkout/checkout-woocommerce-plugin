@@ -32,9 +32,9 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 	 */
 	public function __construct() {
 		$this->id                 = 'wc_checkout_com_cards';
-		$this->method_title       = __( 'Checkout.com', 'wc_checkout_com' );
-		$this->method_description = __( 'The Checkout.com extension allows shop owners to process online payments through the <a href="https://www.checkout.com">Checkout.com Payment Gateway.</a>', 'wc_checkout_com' );
-		$this->title              = __( 'Cards payment and general configuration', 'wc_checkout_com' );
+		$this->method_title       = __( 'Checkout.com', 'checkout-com-unified-payments-api' );
+		$this->method_description = __( 'The Checkout.com extension allows shop owners to process online payments through the <a href="https://www.checkout.com">Checkout.com Payment Gateway.</a>', 'checkout-com-unified-payments-api' );
+		$this->title              = __( 'Cards payment and general configuration', 'checkout-com-unified-payments-api' );
 		$this->has_fields         = true;
 		$this->supports           = [
 			'products',
@@ -52,7 +52,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 			'multiple_subscriptions',
 		];
 
-		$this->new_method_label = __( 'Use a new card', 'wc_checkout_com' );
+		$this->new_method_label = __( 'Use a new card', 'checkout-com-unified-payments-api' );
 
 		$this->init_form_fields();
 		$this->init_settings();
@@ -85,7 +85,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 				'screen_button' => [
 					'id'    => 'screen_button',
 					'type'  => 'screen_button',
-					'title' => __( 'Other Settings', 'wc_checkout_com' ),
+					'title' => __( 'Other Settings', 'checkout-com-unified-payments-api' ),
 				],
 			]
 		);
@@ -115,7 +115,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 				'screen_button' => [
 					'id'    => 'screen_button',
 					'type'  => 'screen_button',
-					'title' => __( 'Settings', 'wc_checkout_com' ),
+					'title' => __( 'Settings', 'checkout-com-unified-payments-api' ),
 				],
 			];
 
@@ -182,7 +182,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		$mada_enable           = '1' === WC_Admin_Settings::get_option( 'ckocom_card_mada', '0' );
 		$require_cvv           = WC_Admin_Settings::get_option( 'ckocom_card_require_cvv' );
 		$is_mada_token         = false;
-		$card_validation_alert = __( 'Please enter your card details.', 'wc_checkout_com' );
+		$card_validation_alert = __( 'Please enter your card details.', 'checkout-com-unified-payments-api' );
 		$iframe_style          = WC_Admin_Settings::get_option( 'ckocom_iframe_style', '0' );
 
 		?>
@@ -231,10 +231,10 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
 			?>
 <div class="cko-cvv" style="display: none;padding-top: 10px;">
 	<p class="validate-required" id="cko-cvv" data-priority="10">
-		<label for="cko-cvv"><?php esc_html_e( 'Card Code', 'wc_checkout_com' ); ?> <span
+		<label for="cko-cvv"><?php esc_html_e( 'Card Code', 'checkout-com-unified-payments-api' ); ?> <span
 				class="required">*</span></label>
 		<input id="cko-cvv" type="text" autocomplete="off" class="input-text"
-			placeholder="<?php esc_attr_e( 'CVV', 'wc_checkout_com' ); ?>"
+			placeholder="<?php esc_attr_e( 'CVV', 'checkout-com-unified-payments-api' ); ?>"
 			name="<?php echo esc_attr( $this->id ); ?>-card-cvv" />
 	</p>
 </div>
@@ -349,7 +349,7 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
 			if ( sanitize_text_field( $_POST['cko-card-token'] ) ) {
 				$arg = sanitize_text_field( $_POST['cko-card-token'] );
 			} else {
-				WC_Checkoutcom_Utility::wc_add_notice_self( __( 'There was an issue completing the payment.', 'wc_checkout_com' ), 'error' );
+				WC_Checkoutcom_Utility::wc_add_notice_self( __( 'There was an issue completing the payment.', 'checkout-com-unified-payments-api' ), 'error' );
 
 				return;
 			}
@@ -402,7 +402,7 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
 		$status = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
 
 		/* translators: %s: Action ID. */
-		$message = sprintf( esc_html__( 'Checkout.com Payment Authorised - Action ID : %s', 'wc_checkout_com' ), $result['action_id'] );
+		$message = sprintf( esc_html__( 'Checkout.com Payment Authorised - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
 
 		// Check if payment was flagged.
 		if ( $result['risk']['flagged'] ) {
@@ -410,7 +410,7 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
 			$status = WC_Admin_Settings::get_option( 'ckocom_order_flagged', 'flagged' );
 
 			/* translators: %s: Action ID. */
-			$message = sprintf( esc_html__( 'Checkout.com Payment Flagged - Action ID : %s', 'wc_checkout_com' ), $result['action_id'] );
+			$message = sprintf( esc_html__( 'Checkout.com Payment Flagged - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
 		}
 
 		// Add notes for the order.
@@ -453,6 +453,13 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
 		// Verify session id.
 		$result = (array) ( new WC_Checkoutcom_Api_Request )->verify_session( $cko_session_id );
 
+		// Redirect to cart if an error occurred.
+		if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {
+			WC_Checkoutcom_Utility::wc_add_notice_self( $result['error'] );
+			wp_redirect( wc_get_checkout_url() );
+			exit();
+		}
+
 		$order_id = $result['metadata']['order_id'];
 		$action   = $result['actions'];
 
@@ -473,17 +480,10 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
 			$order_id = $order->get_id();
 		}
 
-		// Redirect to cart if an error occurred.
-		if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {
-			WC_Checkoutcom_Utility::wc_add_notice_self( $result['error'] );
-			wp_redirect( wc_get_checkout_url() );
-			exit();
-		}
-
 		// Redirect to my-account/payment-method if card verification failed.
 		// show error to customer.
 		if ( 'error' === isset( $result['card_verification'] ) ) {
-			WC_Checkoutcom_Utility::wc_add_notice_self( __( 'Unable to add payment method to your account.', 'wc_checkout_com' ), 'error' );
+			WC_Checkoutcom_Utility::wc_add_notice_self( __( 'Unable to add payment method to your account.', 'checkout-com-unified-payments-api' ), 'error' );
 			wp_redirect( $result['redirection_url'] );
 			exit;
 		}
@@ -494,7 +494,7 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
 
 			$this->save_token( get_current_user_id(), $result );
 
-			WC_Checkoutcom_Utility::wc_add_notice_self( __( 'Payment method successfully added.', 'wc_checkout_com' ), 'notice' );
+			WC_Checkoutcom_Utility::wc_add_notice_self( __( 'Payment method successfully added.', 'checkout-com-unified-payments-api' ), 'notice' );
 			wp_redirect( $result['metadata']['redirection_url'] );
 			exit;
 		}
@@ -513,7 +513,7 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
 		$status = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
 
 		/* translators: %s: Action ID. */
-		$message = sprintf( esc_html__( 'Checkout.com Payment Authorised - Action ID : %s', 'wc_checkout_com' ), $action['0']['id'] );
+		$message = sprintf( esc_html__( 'Checkout.com Payment Authorised - Action ID : %s', 'checkout-com-unified-payments-api' ), $action['0']['id'] );
 
 		// check if payment was flagged.
 		if ( $result['risk']['flagged'] ) {
@@ -521,14 +521,14 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
 			$status = WC_Admin_Settings::get_option( 'ckocom_order_flagged', 'flagged' );
 
 			/* translators: %s: Action ID. */
-			$message = sprintf( esc_html__( 'Checkout.com Payment Flagged - Action ID : %s', 'wc_checkout_com' ), $action['0']['id'] );
+			$message = sprintf( esc_html__( 'Checkout.com Payment Flagged - Action ID : %s', 'checkout-com-unified-payments-api' ), $action['0']['id'] );
 		}
 
 		if ( 'Canceled' === $result['status'] ) {
 			$status = WC_Admin_Settings::get_option( 'ckocom_order_void', 'cancelled' );
 
 			/* translators: %s: Action ID. */
-			$message = sprintf( esc_html__( 'Checkout.com Payment Canceled - Action ID : %s', 'wc_checkout_com' ), $action['0']['id'] );
+			$message = sprintf( esc_html__( 'Checkout.com Payment Canceled - Action ID : %s', 'checkout-com-unified-payments-api' ), $action['0']['id'] );
 		}
 
 		if ( 'Captured' === $result['status'] ) {
@@ -536,7 +536,7 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
 			$status = WC_Admin_Settings::get_option( 'ckocom_order_captured', 'processing' );
 
 			/* translators: %s: Action ID. */
-			$message = sprintf( esc_html__( 'Checkout.com Payment Captured - Action ID : %s', 'wc_checkout_com' ), $action['0']['id'] );
+			$message = sprintf( esc_html__( 'Checkout.com Payment Captured - Action ID : %s', 'checkout-com-unified-payments-api' ), $action['0']['id'] );
 		}
 
 		// save card to db.
@@ -660,7 +660,7 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
 				];
 			}
 		} catch ( CheckoutApiException $ex ) {
-			$error_message = esc_html__( 'An error has occurred while processing your cancel request. ', 'wc_checkout_com' );
+			$error_message = esc_html__( 'An error has occurred while processing your cancel request. ', 'checkout-com-unified-payments-api' );
 
 			// check if gateway response is enabled from module settings.
 			if ( $gateway_debug ) {
@@ -748,12 +748,12 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
 		update_post_meta( $order_id, 'cko_payment_refunded', true );
 
 		/* translators: %s: Action ID. */
-		$message = sprintf( esc_html__( 'Checkout.com Payment refunded from Admin - Action ID : %s', 'wc_checkout_com' ), $result['action_id'] );
+		$message = sprintf( esc_html__( 'Checkout.com Payment refunded from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
 
 		if ( isset( $_SESSION['cko-refund-is-less'] ) ) {
 			if ( $_SESSION['cko-refund-is-less'] ) {
 				/* translators: %s: Action ID. */
-				$order->add_order_note( sprintf( esc_html__( 'Checkout.com Payment Partially refunded from Admin - Action ID : %s', 'wc_checkout_com' ), $result['action_id'] ) );
+				$order->add_order_note( sprintf( esc_html__( 'Checkout.com Payment Partially refunded from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] ) );
 
 				unset( $_SESSION['cko-refund-is-less'] );
 
@@ -834,7 +834,7 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
 		// check if payment ID matches that of the webhook.
 		if ( $payment_id !== $data->data->id ) {
 			/* translators: 1: Payment ID, 2: Webhook ID. */
-			$message = sprintf( esc_html__( 'Order payment Id (%1$s) does not match that of the webhook (%2$s)', 'wc_checkout_com' ), $payment_id, $data->data->id );
+			$message = sprintf( esc_html__( 'Order payment Id (%1$s) does not match that of the webhook (%2$s)', 'checkout-com-unified-payments-api' ), $payment_id, $data->data->id );
 
 			WC_Checkoutcom_Utility::logger( $message, null );
 

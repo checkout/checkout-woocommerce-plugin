@@ -394,7 +394,7 @@ class WC_Checkoutcom_APM_Method {
 				}
 			}
 		} catch ( CheckoutApiException $ex ) {
-			$error_message = __( 'An error has occurred while getting sepa info.', 'wc_checkout_com' );
+			$error_message = __( 'An error has occurred while getting sepa info.', 'checkout-com-unified-payments-api' );
 			WC_Checkoutcom_Utility::logger( $error_message, $ex );
 		}
 

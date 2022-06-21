@@ -259,7 +259,7 @@ class WC_Checkoutcom_Workflows {
 		} catch ( CheckoutApiException $ex ) {
 			$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
 
-			$error_message = esc_html__( 'An error has occurred while processing webhook request.', 'wc_checkout_com' );
+			$error_message = esc_html__( 'An error has occurred while processing webhook request.', 'checkout-com-unified-payments-api' );
 
 			if ( $gateway_debug ) {
 				$error_message .= $ex->getMessage();

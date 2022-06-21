@@ -51,28 +51,28 @@ class WC_Checkoutcom_Admin {
 			<ul>
 				<li><a href="<?php echo esc_url( admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards' ) ); ?>"
 						class="<?php echo 'wc_checkout_com_cards' === $screen ? 'current' : null; ?>">
-						<?php esc_html_e( 'Core Settings', 'wc_checkout_com' ); ?></a> | </li>
+						<?php esc_html_e( 'Core Settings', 'checkout-com-unified-payments-api' ); ?></a> | </li>
 				<li><a href="<?php echo esc_url( admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards&screen=card_settings' ) ); ?>"
 						class="<?php echo 'card_settings' === $screen ? 'current' : null; ?>">
-						<?php esc_html_e( 'Card Settings', 'wc_checkout_com' ); ?></a> | </li>
+						<?php esc_html_e( 'Card Settings', 'checkout-com-unified-payments-api' ); ?></a> | </li>
 				<li><a href="<?php echo esc_url( admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards&screen=orders_settings' ) ); ?>"
 						class="<?php echo 'orders_settings' === $screen ? 'current' : null; ?>">
-						<?php esc_html_e( 'Order Settings', 'wc_checkout_com' ); ?></a> | </li>
+						<?php esc_html_e( 'Order Settings', 'checkout-com-unified-payments-api' ); ?></a> | </li>
 				<li><a href="<?php echo esc_url( admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_google_pay' ) ); ?>"
 						class="<?php echo 'wc_checkout_com_google_pay' === $screen ? 'current' : null; ?>">
-						<?php esc_html_e( 'Google Pay', 'wc_checkout_com' ); ?></a> | </li>
+						<?php esc_html_e( 'Google Pay', 'checkout-com-unified-payments-api' ); ?></a> | </li>
 				<li><a href="<?php echo esc_url( admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_apple_pay' ) ); ?>"
 						class="<?php echo 'wc_checkout_com_apple_pay' === $screen ? 'current' : null; ?>">
-						<?php esc_html_e( 'Apple Pay', 'wc_checkout_com' ); ?></a> | </li>
+						<?php esc_html_e( 'Apple Pay', 'checkout-com-unified-payments-api' ); ?></a> | </li>
 				<li><a href="<?php echo esc_url( admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_alternative_payments' ) ); ?>"
 						class="<?php echo 'wc_checkout_com_alternative_payments' === $screen ? 'current' : null; ?>">
-						<?php esc_html_e( 'Alternative Payments', 'wc_checkout_com' ); ?></a> | </li>
+						<?php esc_html_e( 'Alternative Payments', 'checkout-com-unified-payments-api' ); ?></a> | </li>
 				<li><a href="<?php echo esc_url( admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards&screen=debug_settings' ) ); ?>"
 						class="<?php echo 'debug_settings' === $screen ? 'current' : null; ?>">
-						<?php esc_html_e( 'Debug Settings', 'wc_checkout_com' ); ?></a> | </li>
+						<?php esc_html_e( 'Debug Settings', 'checkout-com-unified-payments-api' ); ?></a> | </li>
 				<li><a href="<?php echo esc_url( admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards&screen=webhook' ) ); ?>"
 						class="<?php echo 'webhook' === $screen ? 'current' : null; ?>">
-						<?php esc_html_e( 'Webhook', 'wc_checkout_com' ); ?></a></li>
+						<?php esc_html_e( 'Webhook', 'checkout-com-unified-payments-api' ); ?></a></li>
 			</ul>
 		</div>
 		<?php

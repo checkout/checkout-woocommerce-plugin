@@ -24,7 +24,7 @@
 
 	<rule ref="WordPress.WP.I18n">
 		<properties>
-			<property name="text_domain" type="array" value="wc_checkout_com" />
+			<property name="text_domain" type="array" value="checkout-com-unified-payments-api" />
 		</properties>
 	</rule>
 </ruleset>

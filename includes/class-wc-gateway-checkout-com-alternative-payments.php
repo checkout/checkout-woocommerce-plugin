@@ -33,9 +33,9 @@ class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway {
 	 */
 	public function __construct() {
 		$this->id                 = 'wc_checkout_com_alternative_payments';
-		$this->method_title       = __( 'Checkout.com', 'wc_checkout_com' );
-		$this->method_description = __( 'The Checkout.com extension allows shop owners to process online payments through the <a href="https://www.checkout.com">Checkout.com Payment Gateway.</a>', 'wc_checkout_com' );
-		$this->title              = __( 'Alternative Payment', 'wc_checkout_com' );
+		$this->method_title       = __( 'Checkout.com', 'checkout-com-unified-payments-api' );
+		$this->method_description = __( 'The Checkout.com extension allows shop owners to process online payments through the <a href="https://www.checkout.com">Checkout.com Payment Gateway.</a>', 'checkout-com-unified-payments-api' );
+		$this->title              = __( 'Alternative Payment', 'checkout-com-unified-payments-api' );
 
 		$this->has_fields = true;
 		$this->supports   = [ 'products', 'refunds' ];
@@ -67,7 +67,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway {
 				'screen_button' => [
 					'id'    => 'screen_button',
 					'type'  => 'screen_button',
-					'title' => __( 'Other Settings', 'wc_checkout_com' ),
+					'title' => __( 'Other Settings', 'checkout-com-unified-payments-api' ),
 				],
 			]
 		);
@@ -122,7 +122,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway {
 		if ( isset( $_SESSION['cko-refund-is-less'] ) ) {
 			if ( $_SESSION['cko-refund-is-less'] ) {
 				/* translators: %s: Action ID. */
-				$order->add_order_note( sprintf( esc_html__( 'Checkout.com Payment Partially refunded from Admin - Action ID : %s', 'wc_checkout_com' ), $result['action_id'] ) );
+				$order->add_order_note( sprintf( esc_html__( 'Checkout.com Payment Partially refunded from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] ) );
 
 				unset( $_SESSION['cko-refund-is-less'] );
 
@@ -131,7 +131,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway {
 		}
 
 		/* translators: %s: Action ID. */
-		$order->add_order_note( sprintf( esc_html__( 'Checkout.com Payment refunded from Admin - Action ID : %s', 'wc_checkout_com' ), $result['action_id'] ) );
+		$order->add_order_note( sprintf( esc_html__( 'Checkout.com Payment refunded from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] ) );
 
 		// when true is returned, status is changed to refunded automatically.
 		return true;

@@ -20,9 +20,9 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Boleto extends WC_Gateway_Che
 	 */
 	public function __construct() {
 		$this->id                 = 'wc_checkout_com_alternative_payments_boleto';
-		$this->method_title       = __( 'Checkout.com', 'wc_checkout_com' );
-		$this->method_description = __( 'The Checkout.com extension allows shop owners to process online payments through the <a href="https://www.checkout.com">Checkout.com Payment Gateway.</a>', 'wc_checkout_com' );
-		$this->title              = __( 'Boleto', 'wc_checkout_com' );
+		$this->method_title       = __( 'Checkout.com', 'checkout-com-unified-payments-api' );
+		$this->method_description = __( 'The Checkout.com extension allows shop owners to process online payments through the <a href="https://www.checkout.com">Checkout.com Payment Gateway.</a>', 'checkout-com-unified-payments-api' );
+		$this->title              = __( 'Boleto', 'checkout-com-unified-payments-api' );
 		$this->has_fields         = true;
 		$this->supports           = [ 'products', 'refunds' ];
 

@@ -170,7 +170,7 @@ class WC_Checkoutcom_Webhook {
 		} catch ( CheckoutApiException $ex ) {
 			$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
 
-			$error_message = esc_html__( 'An error has occurred while processing webhook request.', 'wc_checkout_com' );
+			$error_message = esc_html__( 'An error has occurred while processing webhook request.', 'checkout-com-unified-payments-api' );
 
 			if ( $gateway_debug ) {
 				$error_message .= $ex->getMessage();
@@ -201,22 +201,22 @@ class WC_Checkoutcom_Webhook {
 		if ( 'ABC' === $this->account_type ) {
 			$webhook_is_ready = $this->is_registered();
 
-			$message = esc_html__( 'Webhook is configured at this URL:', 'wc_checkout_com' );
+			$message = esc_html__( 'Webhook is configured at this URL:', 'checkout-com-unified-payments-api' );
 		} else {
 			// NAS account type.
 			// @todo: Use SDK to get webhooks or workflows.
 			$webhook_is_ready = WC_Checkoutcom_Workflows::get_instance()->is_registered();
 
-			$message = esc_html__( 'Webhook is configured with this name:', 'wc_checkout_com' );
+			$message = esc_html__( 'Webhook is configured with this name:', 'checkout-com-unified-payments-api' );
 		}
 
 		if ( $webhook_is_ready ) {
 
-			$message = $message ? $message : esc_html__( 'Webhook is configured at this URL:', 'wc_checkout_com' );
+			$message = $message ? $message : esc_html__( 'Webhook is configured at this URL:', 'checkout-com-unified-payments-api' );
 			$message = sprintf( '%s <code>%s</code>', $message, $webhook_is_ready );
 		} else {
 
-			$message = esc_html__( 'Webhook is not configured with the current site or there is some issue with connection, Please check logs or try again.', 'wc_checkout_com' );
+			$message = esc_html__( 'Webhook is not configured with the current site or there is some issue with connection, Please check logs or try again.', 'checkout-com-unified-payments-api' );
 		}
 
 		wp_send_json_success( [ 'message' => $message ] );
@@ -269,7 +269,7 @@ class WC_Checkoutcom_Webhook {
 		} catch ( CheckoutApiException $ex ) {
 			$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
 
-			$error_message = esc_html__( 'An error has occurred while processing webhook request.', 'wc_checkout_com' );
+			$error_message = esc_html__( 'An error has occurred while processing webhook request.', 'checkout-com-unified-payments-api' );
 
 			if ( $gateway_debug ) {
 				$error_message .= $ex->getMessage();

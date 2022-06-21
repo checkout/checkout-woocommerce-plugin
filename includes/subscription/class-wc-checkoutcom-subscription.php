@@ -67,7 +67,7 @@ class WC_Checkoutcom_Subscription {
 		$status  = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
 		$message = sprintf(
 			/* translators: %s: Payment result ID. */
-			__( 'Checkout.com Payment Authorised - Action ID : %s ', 'wc_checkout_com' ),
+			__( 'Checkout.com Payment Authorised - Action ID : %s ', 'checkout-com-unified-payments-api' ),
 			$payment_result['action_id']
 		);
 
@@ -77,7 +77,7 @@ class WC_Checkoutcom_Subscription {
 			$status  = WC_Admin_Settings::get_option( 'ckocom_order_flagged', 'flagged' );
 			$message = sprintf(
 				/* translators: %s: Payment result ID. */
-				__( 'Checkout.com Payment Flagged - Action ID : %s ', 'wc_checkout_com' ),
+				__( 'Checkout.com Payment Flagged - Action ID : %s ', 'checkout-com-unified-payments-api' ),
 				$payment_result['action_id']
 			);
 		}
