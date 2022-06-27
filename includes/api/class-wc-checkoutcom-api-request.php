@@ -14,6 +14,8 @@ use Checkout\Common\CustomerRequest;
 use Checkout\Payments\BillingDescriptor;
 use Checkout\Payments\PaymentRequest;
 use Checkout\Payments\PaymentType;
+use Checkout\Payments\PreferredSchema;
+use Checkout\Payments\ProcessingSettings;
 use Checkout\Payments\RefundRequest;
 use Checkout\Payments\ShippingDetails;
 use Checkout\Payments\Source\Apm\FawryProduct;
@@ -148,6 +150,14 @@ class WC_Checkoutcom_Api_Request {
 		$post_data = sanitize_post( $_POST );
 		$get_data  = sanitize_post( $_GET );
 
+		// Cartes Bancaires card scheme.
+		$card_scheme = null;
+		if ( isset( $post_data['cko-card-scheme'] ) ) {
+			$card_scheme = $post_data['cko-card-scheme'];
+		} elseif ( isset( $arg['preferred_scheme'] ) ) {
+			$card_scheme = $arg['preferred_scheme'];
+		}
+
 		$customer_address = WC_Checkoutcom_Api_Request::customer_address( $post_data );
 
 		// Prepare payment parameters.
@@ -163,6 +173,8 @@ class WC_Checkoutcom_Api_Request {
 
 					// Load token by id ($arg).
 					$token = WC_Payment_Tokens::get( $arg );
+
+					$card_scheme = $token->get_meta( 'preferred_scheme' );
 
 					// Get source_id from $token.
 					$source_id = $token->get_token();
@@ -375,6 +387,24 @@ class WC_Checkoutcom_Api_Request {
 
 			// Set is_mada in session.
 			$_SESSION['cko-is-mada'] = $is_mada;
+		}
+
+		// Cartes Bancaires card scheme.
+		if ( ! empty( $card_scheme ) ) {
+			$processing_settings = new ProcessingSettings();
+
+			if ( in_array(
+				$card_scheme,
+				[
+					PreferredSchema::$visa,
+					PreferredSchema::$mastercard,
+					PreferredSchema::$cartes_bancaires,
+				],
+				true
+			) ) {
+				$processing_settings->preferred_scheme = $card_scheme;
+				$payment->processing                   = $processing_settings;
+			}
 		}
 
 		// Set metadata info in payment request.

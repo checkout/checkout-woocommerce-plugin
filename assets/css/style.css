@@ -79,6 +79,11 @@ iframe {
   box-shadow: 0 2px 5px 0 rgba(217,104,48,0.15);
 }
 
+.scheme-choice-frame {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
 .error-message {
   color: #C9501C;
   font-size: .9rem;
@@ -102,6 +107,11 @@ iframe {
   }
 
   .card-frame {
+    width: 318px;
+    margin-bottom: 0;
+  }
+
+  .scheme-choice-frame {
     width: 318px;
     margin-bottom: 0;
   }
