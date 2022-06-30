@@ -1,19 +1,30 @@
 jQuery(function () {
   // Set default ul to auto
-  jQuery(".payment_box.payment_method_wc_checkout_com_cards > ul").css(
-    "margin",
-    "auto"
-  );
+  jQuery(".payment_box.payment_method_wc_checkout_com_cards > ul").css( "margin", "auto" );
 
   if (typeof Frames != "undefined") {
     Frames.removeAllEventHandlers();
   }
 
-  Frames.init({
-    debug: document.getElementById("debug").value === "yes" ? true : false,
-    publicKey: document.getElementById("public-key").value,
-    localization: document.getElementById("localization").value,
-  });
+  function initFrames() {
+    Frames.init({
+      debug: document.getElementById( "debug" ).value === "yes",
+      publicKey: document.getElementById("public-key").value,
+      localization: document.getElementById("localization").value,
+    });
+  }
+  initFrames();
+
+  jQuery( document.body ).on( 'updated_checkout', function() {
+    initFrames();
+
+    // Show CC input if new card is selected.
+    if ( jQuery("#wc-wc_checkout_com_cards-payment-token-new").is(':checked') ) {
+      jQuery(".cko-form").show();
+      checkUserLoggedIn();
+      jQuery(".cko-cvv").hide();
+    }
+  } );
 
   // Triggers when new card details filled to update name for tokenization.
   Frames.addEventHandler(
@@ -188,10 +199,10 @@ jQuery(function () {
     ) {
       jQuery(".cko-form").hide();
 
-      jQuery(
-        "input[type=radio][name=wc-wc_checkout_com_cards-payment-token]"
-      ).change(function () {
-        if (this.value == "new") {
+      // jQuery( "input[type=radio][name=wc-wc_checkout_com_cards-payment-token]" ).change(function () {
+      jQuery(document).on( 'change', "input[type=radio][name=wc-wc_checkout_com_cards-payment-token]", function () {
+        // if ( this.value === "new" ) {
+        if ( this.value === "new" && jQuery(this).is(':checked') ) {
           // display frames if new card is selected
           jQuery(".cko-form").show();
           checkUserLoggedIn();
@@ -229,7 +240,7 @@ jQuery(function () {
     }
 
     // hook place order button
-    jQuery("#place_order").on("click", function (e) {
+    jQuery(document.body).on("click","#place_order", function (e) {
       // check if checkout.com is selected
       if (jQuery("#payment_method_wc_checkout_com_cards").is(":checked")) {
         // check if new card exist

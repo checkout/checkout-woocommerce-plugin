@@ -103,7 +103,7 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 
 				return {
 					hideDefaultPlaceOrder: function () {
-						jQuery("input[name='payment_method']").change(function(e){
+						jQuery("input[name='payment_method']").on( 'change', function(e){
 							jQuery(this).val() == DOMStrings.paymentMethodName ? jQuery(DOMStrings.placeOrder).hide() : jQuery(DOMStrings.placeOrder).show();
 						})
 					},
@@ -266,7 +266,7 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 			}
 
 			// On payment radio button click.
-			jQuery( "input[name='payment_method']" ).click( function () {
+			jQuery( "input[name='payment_method']" ).on( 'click', function () {
 				// Check if payment method is Google Pay.
 				if ( 'wc_checkout_com_google_pay' === this.value ) {
 					// Show Google Pay button.

@@ -30,67 +30,6 @@ class WC_Checkoutcom_Cards_Settings {
 	 */
 	public function checkoutcom_cards_settings_html( $value ) {
 
-		wc_enqueue_js(
-			"
-		    jQuery( function(){
-
-		        jQuery( '.submit .woocommerce-save-button' ).attr( 'disabled', 'disabled' ).hide();
-
-		        // Fetch latest webhooks.
-		        jQuery( '#checkoutcom-is-register-webhook' ).on( 'click', function() {
-                    jQuery( this ).attr( 'disabled', 'disabled' );
-                    jQuery( this ).siblings( '.spinner' ).addClass( 'is-active' );
-                    jQuery( '.checkoutcom-is-register-webhook-text' ).html( '' );
-                    jQuery( '#checkoutcom-is-register-webhook' ).siblings( '.dashicons-yes' ).addClass( 'hidden' );
-
-                    jQuery.ajax( {
-                        url: '" . admin_url( 'admin-ajax.php' ) . "',
-                        type: 'POST',
-                        data: {
-                            'action': 'wc_checkoutcom_check_webhook',
-                            'security': '" . wp_create_nonce( 'checkoutcom_check_webhook' ) . "'
-                        }
-                    } ).done( function( response ) {
-
-                        if ( response.data.message ) {
-                            jQuery( '#checkoutcom-is-register-webhook' ).siblings( '.dashicons-yes.hidden' ).removeClass( 'hidden' );
-                            jQuery( '.checkoutcom-is-register-webhook-text' ).html( response.data.message );
-                        }
-
-                    } ).fail( function( response ) {
-                        alert( '" . esc_html__( 'An error occurred while fetching the webhooks. Please try again.', 'checkout-com-unified-payments-api' ) . "' );
-                    } ).always( function() {
-                        jQuery( '#checkoutcom-is-register-webhook' ).removeAttr( 'disabled' );
-                        jQuery( '#checkoutcom-is-register-webhook' ).siblings( '.spinner' ).removeClass( 'is-active' );
-                    } );
-                } );
-
-		        // Register a new webhook.
-		        jQuery( '#checkoutcom-register-webhook' ).on( 'click', function() {
-                    jQuery( this ).attr( 'disabled', 'disabled' );
-                    jQuery( this ).siblings( '.spinner' ).addClass( 'is-active' );
-                    jQuery( '#checkoutcom-register-webhook' ).siblings( '.dashicons-yes' ).addClass( 'hidden' );
-
-                    jQuery.ajax( {
-                        url: '" . admin_url( 'admin-ajax.php' ) . "',
-                        type: 'POST',
-                        data: {
-                            'action': 'wc_checkoutcom_register_webhook',
-                            'security': '" . wp_create_nonce( 'checkoutcom_register_webhook' ) . "'
-                        }
-                    } ).done( function( response ) {
-                        jQuery( '#checkoutcom-register-webhook' ).siblings( '.dashicons-yes.hidden' ).removeClass( 'hidden' );
-                    } ).fail( function( response ) {
-                        alert( '" . esc_html__( 'An error occurred while registering the webhook. Please try again.', 'checkout-com-unified-payments-api' ) . "' );
-                    } ).always( function() {
-                        jQuery( '#checkoutcom-register-webhook' ).removeAttr( 'disabled' );
-                        jQuery( '#checkoutcom-register-webhook' ).siblings( '.spinner' ).removeClass( 'is-active' );
-                    } );
-                } );
-		    } );
-		"
-		);
-
 		?>
 		<tr valign="top">
 			<th scope="row" class="titledesc">
@@ -144,26 +83,6 @@ class WC_Checkoutcom_Cards_Settings {
 		if ( isset( $core_settings['ckocom_account_type'] ) && 'NAS' === $core_settings['ckocom_account_type'] ) {
 			$docs_link = $nas_docs;
 		}
-
-		wc_enqueue_js(
-			"
-		    jQuery( function(){
-
-		        let keyDocs = jQuery( '.checkoutcom-key-docs' );
-		        let nasDocs = '" . $nas_docs . "';
-		        let abcDocs = '" . $abc_docs . "';
-
-		        // Handle account type change to update docs link.
-		        jQuery( '#woocommerce_wc_checkout_com_cards_ckocom_account_type' ).change( function( e ) {
-                    if ( 'NAS' === jQuery( this ).val() ) {
-                        keyDocs.attr( 'href', nasDocs );
-                    } else {
-                        keyDocs.attr( 'href', abcDocs );
-                    }
-                });
-		    } );
-		"
-		);
 
 		$settings = [
 			'core_setting'        => [
@@ -235,77 +154,6 @@ class WC_Checkoutcom_Cards_Settings {
 	 * @return mixed|void
 	 */
 	public static function cards_settings() {
-		/**
-		 * Script to hide and show fields
-		 */
-		wc_enqueue_js(
-			"
-            jQuery( function(){
-                if(jQuery('#ckocom_card_autocap').val() == 0){
-                    $( ckocom_card_cap_delay ).closest( 'tr' ).hide();
-                }
-
-                jQuery('#ckocom_card_autocap').on('change', function() {
-                    if(this.value == 0){
-                        $( ckocom_card_cap_delay ).closest( 'tr' ).hide();
-                    } else {
-                        $( ckocom_card_cap_delay ).closest( 'tr' ).show();
-                    }
-                })
-
-                if(jQuery('#ckocom_card_threed').val() == 0){
-                    $( ckocom_card_notheed ).closest( 'tr' ).hide();
-                }
-
-                jQuery('#ckocom_card_threed').on('change', function() {
-                    if(this.value == 0){
-                        $( ckocom_card_notheed ).closest( 'tr' ).hide();
-                    } else {
-                        $( ckocom_card_notheed ).closest( 'tr' ).show();
-                    }
-                })
-
-                if(jQuery('#ckocom_card_saved').val() == 0){
-                    $( ckocom_card_require_cvv ).closest( 'tr' ).hide();
-                }
-
-                jQuery('#ckocom_card_saved').on('change', function() {
-                    if(this.value == 0){
-                        $( ckocom_card_require_cvv ).closest( 'tr' ).hide();
-                    } else {
-                        $( ckocom_card_require_cvv ).closest( 'tr' ).show();
-                    }
-                })
-
-                if(jQuery('#ckocom_card_desctiptor').val() == 0){
-                    $( ckocom_card_desctiptor_name ).closest( 'tr' ).hide();
-                    $( ckocom_card_desctiptor_city ).closest( 'tr' ).hide();
-                }
-
-                jQuery('#ckocom_card_desctiptor').on('change', function() {
-                    if(this.value == 0){
-                        $( ckocom_card_desctiptor_name ).closest( 'tr' ).hide();
-                        $( ckocom_card_desctiptor_city ).closest( 'tr' ).hide();
-                    } else {
-                        $( ckocom_card_desctiptor_name ).closest( 'tr' ).show();
-                        $( ckocom_card_desctiptor_city ).closest( 'tr' ).show();
-                    }
-                })
-
-                if(jQuery('#ckocom_display_icon').val() == 0){
-                    $( ckocom_card_icons ).closest( 'tr' ).hide();
-                }
-
-                jQuery('#ckocom_display_icon').on('change', function() {
-                    if(this.value == 0){
-                        $( ckocom_card_icons ).closest( 'tr' ).hide();
-                    } else {
-                        $( ckocom_card_icons ).closest( 'tr' ).show();
-                    }
-                })
-            });
-        "
-		);
 
 		$settings = [
 			'card_setting'                => [
@@ -485,30 +333,6 @@ class WC_Checkoutcom_Cards_Settings {
 	 * @return mixed
 	 */
 	public static function order_settings() {
-		wc_enqueue_js(
-			"
-            jQuery( function(){
-
-                jQuery('#ckocom_order_authorised').on('click', function() {
-
-                    jQuery('#ckocom_order_authorised option').prop('disabled', false);
-
-                    const captured_order_status = jQuery('#ckocom_order_captured').val();
-                    jQuery('#ckocom_order_authorised option[value= \"' + captured_order_status + '\"]').prop('disabled', true);
-
-                });
-
-                jQuery('#ckocom_order_captured').on('click', function() {
-
-                    jQuery('#ckocom_order_captured option').prop('disabled', false);
-
-                    const authorized_order_status = jQuery('#ckocom_order_authorised').val();
-                    jQuery('#ckocom_order_captured option[value= \"' + authorized_order_status + '\"]').prop('disabled', true);
-
-                });
-            });
-        "
-		);
 
 		$settings = [
 			'order_setting'           => [

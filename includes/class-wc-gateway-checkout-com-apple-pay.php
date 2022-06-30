@@ -347,7 +347,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 					}
 
 					// On payment radio button click.
-					jQuery( "input[name='payment_method']" ).click( function () {
+					jQuery( "input[name='payment_method']" ).on( 'click', function () {
 						// Check if payment method is Google Pay.
 						if ( this.value == 'wc_checkout_com_apple_pay' ) {
 							// Hide default place order button.
