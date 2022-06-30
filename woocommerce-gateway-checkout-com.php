@@ -213,15 +213,6 @@ function callback_for_setting_up_scripts() {
 	wp_enqueue_style( 'checkoutcom-style' );
 	wp_enqueue_style( 'normalize' );
 
-	// Load cko google pay setting.
-	$google_settings    = get_option( 'woocommerce_wc_checkout_com_google_pay_settings' );
-	$google_pay_enabled = ! empty( $google_settings['enabled'] ) && 'yes' === $google_settings['enabled'];
-
-	// Enqueue google pay script.
-	if ( $google_pay_enabled ) {
-		wp_enqueue_script( 'cko-google-script', 'https://pay.google.com/gp/p/js/pay.js', [ 'jquery' ] );
-	}
-
 	// load cko apm settings.
 	$apm_settings = get_option( 'woocommerce_wc_checkout_com_alternative_payments_settings' );
 	$apm_enable   = ! empty( $apms_settings['enabled'] ) && 'yes' === $apms_settings['enabled'];
