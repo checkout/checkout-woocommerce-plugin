@@ -34,8 +34,47 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 
 		add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, [ $this, 'process_admin_options' ] );
 
-		// Generate token.
-		add_action( 'woocommerce_api_wc_checkoutcom_googlepay_token', [ $this, 'generate_token' ] );
+		// Payment scripts.
+		add_action( 'wp_enqueue_scripts', [ $this, 'payment_scripts' ] );
+	}
+
+	/**
+	 * Outputs scripts used for checkout payment.
+	 */
+	public function payment_scripts() {
+		// Load on Cart, Checkout, pay for order or add payment method pages.
+		if ( ! is_cart() && ! is_checkout() && ! isset( $_GET['pay_for_order'] ) && ! is_add_payment_method_page() ) {
+			return;
+		}
+
+		// Load cko google pay setting.
+		$google_settings    = get_option( 'woocommerce_wc_checkout_com_google_pay_settings' );
+		$google_pay_enabled = ! empty( $google_settings['enabled'] ) && 'yes' === $google_settings['enabled'];
+
+		wp_register_script( 'cko-google-script', 'https://pay.google.com/gp/p/js/pay.js', [ 'jquery' ] );
+		wp_register_script( 'cko-google-pay-integration-script', WC_CHECKOUTCOM_PLUGIN_URL . '/assets/js/cko-google-pay-integration.js', [ 'jquery', 'cko-google-script' ] );
+
+		// Enqueue google pay script.
+		if ( $google_pay_enabled ) {
+
+			$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+			$environment   = 'sandbox' === $core_settings['ckocom_environment'];
+			$currency_code = get_woocommerce_currency();
+			$total_price   = WC()->cart->total;
+
+			$vars = [
+				'environment'   => $environment ? 'TEST' : 'PRODUCTION',
+				'public_key'    => $core_settings['ckocom_pk'],
+				'merchant_id'   => $this->get_option( 'ckocom_google_merchant_id' ),
+				'currency_code' => $currency_code,
+				'total_price'   => $total_price,
+				'button_type'   => $this->get_option( 'ckocom_google_style' ),
+			];
+
+			wp_localize_script( 'cko-google-pay-integration-script', 'cko_google_pay_vars', $vars );
+
+			wp_enqueue_script( 'cko-google-pay-integration-script' );
+		}
 	}
 
 	/**
@@ -71,13 +110,6 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 	 * Show frames js on checkout page.
 	 */
 	public function payment_fields() {
-		global $woocommerce;
-
-		$core_settings      = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
-		$environment        = 'sandbox' === $core_settings['ckocom_environment'];
-		$currency_code      = get_woocommerce_currency();
-		$total_price        = $woocommerce->cart->total;
-		$generate_token_url = str_replace( 'https:', 'http:', add_query_arg( 'wc-api', 'wc_checkoutcom_googlepay_token', home_url( '/' ) ) );
 
 		if ( ! empty( $this->get_option( 'description' ) ) ) {
 			echo  $this->get_option( 'description' );
@@ -87,206 +119,6 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 		<input type="hidden" id="cko-google-signature" name="cko-google-signature" value="" />
 		<input type="hidden" id="cko-google-protocolVersion" name="cko-google-protocolVersion" value="" />
 		<input type="hidden" id="cko-google-signedMessage" name="cko-google-signedMessage" value="" />
-		<script>
-			googlePayUiController = (function () {
-				var DOMStrings = {
-					buttonId: 'ckocom_googlePay',
-					buttonClass: 'google-pay-button',
-					googleButtonArea: 'method_wc_checkout_com_google_pay',
-					buttonArea: '.form-row.place-order',
-					placeOrder: '#place_order',
-					paymentOptionLabel: '#dt_method_checkoutcomgooglepay > label:nth-child(2)',
-					iconSpacer: 'cko-wallet-icon-spacer',
-					token: 'google-cko-card-token',
-					paymentMethodName: 'wc_checkout_com_google_pay'
-				}
-
-				return {
-					hideDefaultPlaceOrder: function () {
-						jQuery("input[name='payment_method']").change(function(e){
-							jQuery(this).val() == DOMStrings.paymentMethodName ? jQuery(DOMStrings.placeOrder).hide() : jQuery(DOMStrings.placeOrder).show();
-						})
-					},
-					addGooglePayButton: function (type) {
-						// Create the Google Pay Button.
-						var button = document.createElement('button');
-						button.id = DOMStrings.buttonId;
-						// Add button class based on the user configuration.
-						button.className = DOMStrings.buttonClass + " " + type
-						// Append the Google Pay button to the GooglePay area.
-						jQuery('#payment').append(button);
-						// Hide Google Pay button
-						jQuery('#ckocom_googlePay').hide();
-
-						// On page load if Google Pay is selected, show the button.
-						if(jQuery('#payment_method_wc_checkout_com_google_pay').is(':checked')){
-							// Disable place order button.
-							jQuery('#place_order').hide();
-							// Show Google Pay button.
-							jQuery('#ckocom_googlePay').show();
-						}
-					},
-					addIconSpacer: function () {
-						jQuery(DOMStrings.paymentOptionLabel).append("<div class='" + iconSpacer + "'></div>")
-					},
-					getElements: function () {
-						return {
-							googlePayButtonId: jQuery(DOMStrings.buttonId),
-							googlePayButtonClass: jQuery(DOMStrings.buttonClass),
-							placeOrder: jQuery(DOMStrings.defaultPlaceOrder),
-							buttonArea: jQuery(DOMStrings.buttonArea),
-						};
-					},
-					getSelectors: function () {
-						return {
-							googlePayButtonId: DOMStrings.buttonId,
-							googlePayButtonClass: DOMStrings.buttonClass,
-							placeOrder: DOMStrings.defaultPlaceOrder,
-							buttonArea: DOMStrings.buttonArea,
-							token: DOMStrings.token,
-						};
-					}
-				}
-			})();
-
-			googlePayTransactionController = (function (googlePayUiController) {
-				var environment = '<?php echo $environment; ?>' == false ? "PRODUCTION" : "TEST";
-				var publicKey = '<?php echo $core_settings['ckocom_pk']; ?>';
-				var merchantId = '<?php echo $this->get_option( 'ckocom_google_merchant_id' ); ?>';
-				var currencyCode = '<?php echo $currency_code; ?>';
-				var totalPrice = '<?php echo $total_price; ?>';
-				var buttonType = '<?php echo $this->get_option( 'ckocom_google_style' ); ?>';
-
-				var generateTokenPath = '<?php echo $generate_token_url; ?>';
-				var allowedPaymentMethods = ['CARD', 'TOKENIZED_CARD'];
-				var allowedCardNetworks = ["AMEX", "DISCOVER", "JCB", "MASTERCARD", "VISA"];
-
-				var _setupClickListeners = function () {
-					jQuery(document).on('click', '#' + googlePayUiController.getSelectors().googlePayButtonId, function (e) {
-						e.preventDefault();
-						_startPaymentDataRequest();
-					});
-				}
-
-				var _getGooglePaymentDataConfiguration = function () {
-					return {
-						merchantId: merchantId,
-						paymentMethodTokenizationParameters: {
-							tokenizationType: 'PAYMENT_GATEWAY',
-							parameters: {
-								'gateway': 'checkoutltd',
-								'gatewayMerchantId': publicKey
-							}
-						},
-						allowedPaymentMethods: allowedPaymentMethods,
-						cardRequirements: {
-							allowedCardNetworks: allowedCardNetworks
-						}
-					};
-				}
-
-				var _getGoogleTransactionInfo = function () {
-					return {
-						currencyCode: currencyCode,
-						totalPriceStatus: 'FINAL',
-						totalPrice: totalPrice
-					};
-				}
-
-				var _getGooglePaymentsClient = function () {
-					return (new google.payments.api.PaymentsClient({ environment: environment }));
-				}
-
-				var _generateCheckoutToken = function (token, callback) {
-					var data = JSON.parse(token.paymentMethodToken.token);
-					jQuery.ajax({
-						type: 'POST',
-						url : generateTokenPath,
-						data: {
-							token: {
-								protocolVersion: data.protocolVersion,
-								signature: data.signature,
-								signedMessage: data.signedMessage
-							}
-						},
-						success: function (outcome) {
-							callback(outcome);
-						},
-						error: function (err) {
-							console.log(err);
-						}
-					});
-				}
-
-				var _startPaymentDataRequest = function () {
-					var paymentDataRequest = _getGooglePaymentDataConfiguration();
-					paymentDataRequest.transactionInfo = _getGoogleTransactionInfo();
-
-					var paymentsClient = _getGooglePaymentsClient();
-					paymentsClient.loadPaymentData(paymentDataRequest)
-						.then(function (paymentData) {
-							document.getElementById('cko-google-signature').value = JSON.parse(paymentData.paymentMethodToken.token).signature;
-							document.getElementById('cko-google-protocolVersion').value = JSON.parse(paymentData.paymentMethodToken.token).protocolVersion;
-							document.getElementById('cko-google-signedMessage').value = JSON.parse(paymentData.paymentMethodToken.token).signedMessage;
-
-							jQuery('#place_order').prop("disabled",false);
-							jQuery('#place_order').trigger('click');
-						})
-						.catch(function (err) {
-							console.error(err);
-						});
-				}
-
-				return {
-					init: function () {
-						_setupClickListeners();
-						googlePayUiController.hideDefaultPlaceOrder();
-						googlePayUiController.addGooglePayButton(buttonType);
-					}
-				}
-
-			})(googlePayUiController);
-
-			// Initialise Google Pay.
-			jQuery( document ).ready(function() {
-				googlePayTransactionController.init();
-			});
-
-			// Check if Google Pay method is checked.
-			if ( jQuery( '#payment_method_wc_checkout_com_google_pay' ).is( ':checked' ) ) {
-				// Disable place order button.
-				jQuery( '#place_order' ).prop( "disabled", true );
-				jQuery( '#place_order' ).hide();
-				jQuery( '#ckocom_googlePay' ).show();
-			} else {
-				// Enable place order button if not Google Pay.
-				jQuery( '#place_order' ).prop( "disabled", false );
-				jQuery( '#place_order' ).show();
-				jQuery( '#ckocom_googlePay' ).hide();
-			}
-
-			// On payment radio button click.
-			jQuery( "input[name='payment_method']" ).click( function () {
-				// Check if payment method is Google Pay.
-				if ( 'wc_checkout_com_google_pay' === this.value ) {
-					// Show Google Pay button.
-					jQuery( '#ckocom_googlePay' ).show();
-					// Disable place order button.
-					jQuery( '#place_order' ).prop( "disabled", true );
-				} else if ( 'wc_checkout_com_apple_pay' === this.value ) {
-					jQuery( '#ckocom_googlePay' ).hide();
-					jQuery( document ).ready( function () {
-						jQuery( "#place_order" ).hide();
-					} );
-				} else {
-					// Hide Google Pay button.
-					jQuery( '#ckocom_googlePay' ).hide();
-					// Enable place order button.
-					jQuery( '#place_order' ).prop( "disabled", false );
-				}
-			} )
-
-		</script>
 		<?php
 	}
 

@@ -47,27 +47,6 @@ function init_checkout_com_gateway_class() {
 
 	// Load payment gateway class.
 	add_filter( 'woocommerce_payment_gateways', 'checkout_com_add_gateway' );
-
-	// Hide Apple Pay, Google Pay from payment method tab.
-	wc_enqueue_js(
-		"
-		jQuery( function()
-		{
-			setTimeout(function(){ 
-				if(jQuery('[data-gateway_id=\"wc_checkout_com_apple_pay\"]').length > 0) {
-					jQuery('[data-gateway_id=\"wc_checkout_com_apple_pay\"]').hide();
-				}
-				if(jQuery('[data-gateway_id=\"wc_checkout_com_google_pay\"]').length > 0) {
-					jQuery('[data-gateway_id=\"wc_checkout_com_google_pay\"]').hide();
-				}
-				
-				if(jQuery('[data-gateway_id*=\"wc_checkout_com_alternative_payments\"]').length > 0) {
-					jQuery('[data-gateway_id*=\"wc_checkout_com_alternative_payments\"]').hide();
-				}
-			}, 1500);
-		});
-	"
-	);
 }
 
 /**
@@ -168,24 +147,6 @@ function my_new_wc_order_statuses( $order_statuses ) {
 	return $order_statuses;
 }
 
-add_action( 'wp_head', 'cko_frames_js' );
-
-/**
- * Load frames js on checkout page.
- */
-function cko_frames_js() {
-	wp_register_script( 'cko-frames-script', 'https://cdn.checkout.com/js/framesv2.min.js', [ 'jquery' ] );
-	wp_enqueue_script( 'cko-frames-script' );
-
-	$vars = [
-		'card-number' => esc_html__( 'Please enter a valid card number', 'checkout-com-unified-payments-api' ),
-		'expiry-date' => esc_html__( 'Please enter a valid expiry date', 'checkout-com-unified-payments-api' ),
-		'cvv'         => esc_html__( 'Please enter a valid cvv code', 'checkout-com-unified-payments-api' ),
-	];
-
-	wp_localize_script( 'cko-frames-script', 'cko_frames_vars', $vars );
-}
-
 add_action( 'woocommerce_checkout_process', 'cko_check_if_empty' );
 
 /**
@@ -206,41 +167,51 @@ function cko_check_if_empty() {
 	}
 }
 
+add_action( 'admin_enqueue_scripts', 'cko_admin_enqueue_scripts' );
+
+/**
+ * Load admin scripts.
+ *
+ * @return void
+ */
+function cko_admin_enqueue_scripts() {
+	// Load admin scripts.
+	wp_enqueue_script( 'cko-admin-script', WC_CHECKOUTCOM_PLUGIN_URL . '/assets/js/admin.js', [ 'jquery' ] );
+
+	$vars = [
+		'nas_docs'                           => 'https://www.checkout.com/docs/four/resources/api-authentication/api-keys',
+		'abc_docs'                           => 'https://www.checkout.com/docs/the-hub/update-your-hub-settings#Manage_the_API_keys',
+
+		'webhook_check_error'                => esc_html__( 'An error occurred while fetching the webhooks. Please try again.', 'checkout-com-unified-payments-api' ),
+		'webhook_register_error'             => esc_html__( 'An error occurred while registering the webhook. Please try again.', 'checkout-com-unified-payments-api' ),
+
+		'checkoutcom_check_webhook_nonce'    => wp_create_nonce( 'checkoutcom_check_webhook' ),
+		'checkoutcom_register_webhook_nonce' => wp_create_nonce( 'checkoutcom_register_webhook' ),
+	];
+
+	wp_localize_script( 'cko-admin-script', 'cko_admin_vars', $vars );
+}
+
 add_action( 'wp_enqueue_scripts', 'callback_for_setting_up_scripts' );
 
 /**
  * Load checkout.com style sheet.
  * Load Google Pay js.
+ *
+ * Only on Checkout related pages.
  */
 function callback_for_setting_up_scripts() {
-	// load cko custom css.
-	$css_path     = WC_CHECKOUTCOM_PLUGIN_URL . '/assets/css/checkoutcom-styles.css';
-	$normalize    = WC_CHECKOUTCOM_PLUGIN_URL . '/assets/css/normalize.css';
-	$frames_style = WC_CHECKOUTCOM_PLUGIN_URL . '/assets/css/style.css';
-	$multi_frame  = WC_CHECKOUTCOM_PLUGIN_URL . '/assets/css/multi-iframe.css';
 
-	// register cko css.
-	wp_register_style( 'checkoutcom-style', $css_path );
-	wp_register_style( 'normalize', $normalize );
+	// Load on Cart, Checkout, pay for order or add payment method pages.
+	if ( ! is_cart() && ! is_checkout() && ! isset( $_GET['pay_for_order'] ) && ! is_add_payment_method_page() ) {
+		return;
+	}
+
+	// Register adn enqueue checkout css.
+	wp_register_style( 'checkoutcom-style', WC_CHECKOUTCOM_PLUGIN_URL . '/assets/css/checkoutcom-styles.css' );
+	wp_register_style( 'normalize', WC_CHECKOUTCOM_PLUGIN_URL . '/assets/css/normalize.css' );
 	wp_enqueue_style( 'checkoutcom-style' );
 	wp_enqueue_style( 'normalize' );
-
-	if ( WC_Admin_Settings::get_option( 'ckocom_iframe_style' ) ) {
-		wp_register_style( 'frames_style', $multi_frame );
-	} else {
-		wp_register_style( 'frames_style', $frames_style );
-	}
-
-	wp_enqueue_style( 'frames_style' );
-
-	// Load cko google pay setting.
-	$google_settings    = get_option( 'woocommerce_wc_checkout_com_google_pay_settings' );
-	$google_pay_enabled = ! empty( $google_settings['enabled'] ) && 'yes' === $google_settings['enabled'];
-
-	// Enqueue google pay script.
-	if ( $google_pay_enabled ) {
-		wp_enqueue_script( 'cko-google-script', 'https://pay.google.com/gp/p/js/pay.js', [ 'jquery' ] );
-	}
 
 	// load cko apm settings.
 	$apm_settings = get_option( 'woocommerce_wc_checkout_com_alternative_payments_settings' );
@@ -255,25 +226,6 @@ function callback_for_setting_up_scripts() {
 	}
 
 }
-
-add_action( 'woocommerce_order_item_add_line_buttons', 'cko_refund' );
-
-/**
- * Disable cko refund button to prevent refund of 0.00
- */
-function cko_refund() {
-	wc_enqueue_js(
-		"
-		// disable button by default
-		const refund_button = document.getElementsByClassName('button-primary do-api-refund')[0];
-		refund_button.disabled = true
-
-		$('#refund_amount').on('change', function(){
-			$(this).val() <= 0 ?  refund_button.disabled = true : refund_button.disabled = false;
-	   });
-	"
-	);
-};
 
 add_action( 'woocommerce_order_item_add_action_buttons', 'action_woocommerce_order_item_add_action_buttons', 10, 1 );
 
@@ -296,48 +248,20 @@ function action_woocommerce_order_item_add_action_buttons( $order ) {
 
 	if ( $order->get_payment_method() === 'wc_checkout_com_cards' || $order->get_payment_method() === 'wc_checkout_com_google_pay' ) {
 		?>
+
+<script type="text/javascript">
+	var ckoCustomButtonValues = {
+		order_status: "<?php echo $order_status; ?>",
+		auth_status: "<?php echo $auth_status; ?>",
+		capture_status: "<?php echo $capture_status; ?>"
+	}
+</script>
+
 <input type="hidden" value="" name="cko_payment_action" id="cko_payment_action" />
 <button class="button" id="cko-capture" style="display:none;">Capture</button>
 <button class="button" id="cko-void" style="display:none;">Void</button>
 		<?php
 	}
-
-	wc_enqueue_js(
-		"
-			jQuery( function(){
-				setTimeout(function(){
-					
-					var order_status = '$order_status';
-					var auth_status = '$auth_status';
-					var capture_status = '$capture_status';
-				  
-					// check if order status is same as auth status in cko settings
-					// hide refund button and show capture and void button
-					if(order_status == auth_status){
-						jQuery('.refund-items').hide();
-						jQuery('#cko-capture').show();
-						jQuery('#cko-void').show();
-					} else if (order_status === capture_status || 'completed' === order_status){
-						jQuery('.refund-items').show();
-					} else {
-						jQuery('.refund-items').hide();
-					}
-				
-					if(jQuery('#cko-void').length > 0){
-						 jQuery('#cko-void').click(function(){
-							document.getElementById('cko_payment_action').value = this.id;
-						 })
-					}
-					
-					if(jQuery('#cko-capture').length > 0){
-						 jQuery('#cko-capture').click(function(){
-							document.getElementById('cko_payment_action').value = this.id;
-						 })
-					}
-				}, 1500);
-			});
-		"
-	);
 };
 
 add_action( 'save_post', 'renew_save_again', 10, 2 );

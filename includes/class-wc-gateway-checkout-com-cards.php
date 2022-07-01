@@ -69,6 +69,52 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 
 		// Webhook handler hook.
 		add_action( 'woocommerce_api_wc_checkoutcom_webhook', [ $this, 'webhook_handler' ] );
+
+		// Payment scripts.
+		add_action( 'wp_enqueue_scripts', [ $this, 'payment_scripts' ] );
+	}
+
+	/**
+	 * Outputs scripts used for checkout payment.
+	 */
+	public function payment_scripts() {
+
+		$core_settings    = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$card_pay_enabled = ! empty( $core_settings['enabled'] ) && 'yes' === $core_settings['enabled'];
+
+		// Return if card payment is disabled.
+		if ( ! $card_pay_enabled ) {
+			return;
+		}
+
+		// Load on Cart, Checkout, pay for order or add payment method pages.
+		if ( ! is_cart() && ! is_checkout() && ! isset( $_GET['pay_for_order'] ) && ! is_add_payment_method_page() ) {
+			return;
+		}
+
+		// Styles.
+		if ( WC_Admin_Settings::get_option( 'ckocom_iframe_style', '0' ) ) {
+			wp_register_style( 'frames_style', WC_CHECKOUTCOM_PLUGIN_URL . '/assets/css/multi-iframe.css' );
+		} else {
+			wp_register_style( 'frames_style', WC_CHECKOUTCOM_PLUGIN_URL . '/assets/css/style.css' );
+		}
+
+		wp_enqueue_style( 'frames_style' );
+
+		// Scripts.
+		wp_register_script( 'cko-frames-script', 'https://cdn.checkout.com/js/framesv2.min.js', [ 'jquery' ] );
+		wp_enqueue_script( 'cko-frames-script' );
+
+		$vars = [
+			'card-number' => esc_html__( 'Please enter a valid card number', 'checkout-com-unified-payments-api' ),
+			'expiry-date' => esc_html__( 'Please enter a valid expiry date', 'checkout-com-unified-payments-api' ),
+			'cvv'         => esc_html__( 'Please enter a valid cvv code', 'checkout-com-unified-payments-api' ),
+		];
+
+		wp_localize_script( 'cko-frames-script', 'cko_frames_vars', $vars );
+
+		wp_register_script( 'cko-frames-integration-script', WC_CHECKOUTCOM_PLUGIN_URL . '/assets/js/cko-frames-integration.js', [ 'cko-frames-script', 'jquery' ] );
+		wp_enqueue_script( 'cko-frames-integration-script' );
 	}
 
 	/**
@@ -175,7 +221,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 	}
 
 	/**
-	 * Show frames js on checkout page
+	 * Show frames js on checkout page.
 	 */
 	public function payment_fields() {
 		$save_card             = WC_Admin_Settings::get_option( 'ckocom_card_saved' );
@@ -186,26 +232,22 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		$iframe_style          = WC_Admin_Settings::get_option( 'ckocom_iframe_style', '0' );
 
 		?>
-<input type="hidden" id="debug" value='<?php echo WC_Admin_Settings::get_option( 'cko_console_logging' ); ?>' ;></input>
-<input type="hidden" id="public-key" value='<?php echo $this->get_option( 'ckocom_pk' ); ?>'></input>
-<input type="hidden" id="localization" value='<?php echo $this->get_localisation(); ?>'></input>
-<input type="hidden" id="multiFrame" value='<?php echo $iframe_style; ?>'></input>
-<input type="hidden" id="cko-icons"
-	value='<?php echo  WC_CHECKOUTCOM_PLUGIN_URL . '/assets/images/card-icons/'; ?>'></input>
-<input type="hidden" id="is-mada" value='<?php echo $mada_enable; ?>'></input>
-<input type="hidden" id="mada-token" value='<?php echo $is_mada_token; ?>'></input>
-<input type="hidden" id="user-logged-in" value='<?php echo is_user_logged_in(); ?>'></input>
-<input type="hidden" id="card-validation-alert" value='<?php echo $card_validation_alert; ?>'></input>
-		<?php
+		<input type="hidden" id="debug" value='<?php echo WC_Admin_Settings::get_option( 'cko_console_logging' ); ?>' />
+		<input type="hidden" id="public-key" value='<?php echo $this->get_option( 'ckocom_pk' ); ?>'/>
+		<input type="hidden" id="localization" value='<?php echo $this->get_localisation(); ?>'/>
+		<input type="hidden" id="multiFrame" value='<?php echo $iframe_style; ?>'/>
+		<input type="hidden" id="cko-icons" value='<?php echo WC_CHECKOUTCOM_PLUGIN_URL . '/assets/images/card-icons/'; ?>'/>
+		<input type="hidden" id="is-mada" value='<?php echo $mada_enable; ?>'/>
+		<input type="hidden" id="mada-token" value='<?php echo $is_mada_token; ?>'/>
+		<input type="hidden" id="user-logged-in" value='<?php echo is_user_logged_in(); ?>'/>
+		<input type="hidden" id="card-validation-alert" value='<?php echo $card_validation_alert; ?>'/>
 
-		// check if user is logged-in or a guest.
-		if ( ! is_user_logged_in() ) {
-			?>
-<script>
-jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
-</script>
-			<?php
-		}
+		<?php if ( ! is_user_logged_in() ) : ?>
+		<script>
+			jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
+		</script>
+		<?php endif; ?>
+		<?php
 
 		// check if saved card enable from module setting.
 		if ( $save_card ) {
@@ -226,101 +268,118 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
 			}
 		}
 
-		// Check if require cvv or mada is enabled from module setting.
+		// Check require cvv or mada is enabled from module setting.
 		if ( $require_cvv || $mada_enable ) {
-			?>
-<div class="cko-cvv" style="display: none;padding-top: 10px;">
-	<p class="validate-required" id="cko-cvv" data-priority="10">
-		<label for="cko-cvv"><?php esc_html_e( 'Card Code', 'checkout-com-unified-payments-api' ); ?> <span
-				class="required">*</span></label>
-		<input id="cko-cvv" type="text" autocomplete="off" class="input-text"
-			placeholder="<?php esc_attr_e( 'CVV', 'checkout-com-unified-payments-api' ); ?>"
-			name="<?php echo esc_attr( $this->id ); ?>-card-cvv" />
-	</p>
-</div>
-<?php } ?>
-<div class="cko-form" style="display: none; padding-top: 10px;padding-bottom: 5px;">
-	<input type="hidden" id="cko-card-token" name="cko-card-token" value="" />
-	<input type="hidden" id="cko-card-bin" name="cko-card-bin" value="" />
-	<input type="hidden" id="cko-card-scheme" name="cko-card-scheme" value="" />
-
-		<?php
-		if ( '0' === $iframe_style ) {
-			?>
-	<div class="one-liner">
-		<!-- frames will be loaded here -->
-		<div class="card-frame"></div>
-	</div>
-	<div class="scheme-choice-frame"></div>
-			<?php
-		} else {
-			?>
-	<div class="multi-frame">
-		<div class="input-container card-number">
-			<div class="icon-container">
-				<img id="icon-card-number"
-					src="<?php echo WC_CHECKOUTCOM_PLUGIN_URL . '/assets/images/card-icons/card.svg'; ?>"
-					alt="PAN" />
-			</div>
-			<div class="card-number-frame"></div>
-			<div class="icon-container payment-method">
-				<img id="logo-payment-method" />
-			</div>
-			<div class="icon-container">
-				<img id="icon-card-number-error"
-					src="<?php echo WC_CHECKOUTCOM_PLUGIN_URL . '/assets/images/card-icons/error.svg'; ?>" />
-			</div>
-		</div>
-
-		<div class="date-and-code">
-			<div>
-				<div class="input-container expiry-date">
-					<div class="icon-container">
-						<img id="icon-expiry-date"
-							src="<?php echo WC_CHECKOUTCOM_PLUGIN_URL . '/assets/images/card-icons/exp-date.svg'; ?>"
-							alt="Expiry date" />
-					</div>
-					<div class="expiry-date-frame"></div>
-					<div class="icon-container">
-						<img id="icon-expiry-date-error"
-							src="<?php echo WC_CHECKOUTCOM_PLUGIN_URL . '/assets/images/card-icons/error.svg'; ?>" />
-					</div>
-				</div>
-			</div>
-
-			<div>
-				<div class="input-container cvv">
-					<div class="icon-container">
-						<img id="icon-cvv"
-							src="<?php echo WC_CHECKOUTCOM_PLUGIN_URL . '/assets/images/card-icons/cvv.svg'; ?>"
-							alt="CVV" />
-					</div>
-					<div class="cvv-frame"></div>
-					<div class="icon-container">
-						<img id="icon-cvv-error"
-							src="<?php echo WC_CHECKOUTCOM_PLUGIN_URL . '/assets/images/card-icons/error.svg'; ?>" />
-					</div>
-				</div>
-			</div>
-		</div>
-
-		<div class="scheme-choice-frame"></div>
-	</div>
-	<?php } ?>
-
-	<!-- frame integration js file -->
-	<script src='<?php echo WC_CHECKOUTCOM_PLUGIN_URL . '/assets/js/cko-frames-integration.js'; ?>'></script>
-
-</div>
-
-<!-- Show save card checkbox if this is selected on admin-->
-<div class="cko-save-card-checkbox" style="display: none">
-		<?php
-		if ( $save_card ) {
-			$this->save_payment_method_checkbox();
+			$this->element_form_cvv();
 		}
+
+		// Render Card input fields.
+		$this->element_form( $iframe_style );
+
+		// Render Save Card input.
+		$this->element_form_save_card( $save_card );
+	}
+
+	/**
+	 * Renders the checkout frame elements form.
+	 *
+	 * @param string $iframe_style Type of iFrame style.
+	 *
+	 * @return void
+	 */
+	public function element_form( $iframe_style ) {
 		?>
-</div>
+		<div class="cko-form" style="display: none; padding-top: 10px;padding-bottom: 5px;">
+			<input type="hidden" id="cko-card-token" name="cko-card-token" value="" />
+			<input type="hidden" id="cko-card-bin" name="cko-card-bin" value="" />
+			<input type="hidden" id="cko-card-scheme" name="cko-card-scheme" value="" />
+
+			<?php if ( '0' === $iframe_style ) : ?>
+				<div class="one-liner">
+					<!-- frames will be loaded here -->
+					<div class="card-frame"></div>
+				</div>
+				<div class="scheme-choice-frame"></div>
+			<?php else : ?>
+				<div class="multi-frame">
+					<div class="input-container card-number">
+						<div class="icon-container">
+							<img id="icon-card-number" src="<?php echo esc_url( WC_CHECKOUTCOM_PLUGIN_URL . '/assets/images/card-icons/card.svg' ); ?>" alt="<?php esc_attr_e( 'PAN', 'checkout-com-unified-payments-api' ); ?>"/>
+						</div>
+						<div class="card-number-frame"></div>
+						<div class="icon-container payment-method">
+							<img id="logo-payment-method" />
+						</div>
+						<div class="icon-container">
+							<img id="icon-card-number-error" src="<?php echo esc_url( WC_CHECKOUTCOM_PLUGIN_URL . '/assets/images/card-icons/error.svg' ); ?>" alt="<?php esc_attr_e( 'PAN error', 'checkout-com-unified-payments-api' ); ?>"/>
+						</div>
+					</div>
+
+					<div class="date-and-code">
+						<div>
+							<div class="input-container expiry-date">
+								<div class="icon-container">
+									<img id="icon-expiry-date" src="<?php echo esc_url( WC_CHECKOUTCOM_PLUGIN_URL . '/assets/images/card-icons/exp-date.svg' ); ?>" alt="<?php esc_attr_e( 'Expiry date', 'checkout-com-unified-payments-api' ); ?>" />
+								</div>
+								<div class="expiry-date-frame"></div>
+								<div class="icon-container">
+									<img id="icon-expiry-date-error" src="<?php echo esc_url( WC_CHECKOUTCOM_PLUGIN_URL . '/assets/images/card-icons/error.svg' ); ?>" alt="<?php esc_attr_e( 'Expiry error', 'checkout-com-unified-payments-api' ); ?>"/>
+								</div>
+							</div>
+						</div>
+
+						<div>
+							<div class="input-container cvv">
+								<div class="icon-container">
+									<img id="icon-cvv" src="<?php echo esc_url( WC_CHECKOUTCOM_PLUGIN_URL . '/assets/images/card-icons/cvv.svg' ); ?>" alt="<?php esc_attr_e( 'CVV', 'checkout-com-unified-payments-api' ); ?>" />
+								</div>
+								<div class="cvv-frame"></div>
+								<div class="icon-container">
+									<img id="icon-cvv-error" src="<?php echo esc_url( WC_CHECKOUTCOM_PLUGIN_URL . '/assets/images/card-icons/error.svg' ); ?>" alt="<?php esc_attr_e( 'CVV error', 'checkout-com-unified-payments-api' ); ?>" />
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="scheme-choice-frame"></div>
+			<?php endif; ?>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Renders the cvv elements form.
+	 *
+	 * @return void
+	 */
+	public function element_form_cvv() {
+		?>
+		<div class="cko-cvv" style="display: none;padding-top: 10px;">
+			<p class="validate-required" id="cko-cvv" data-priority="10">
+				<label for="cko-cvv"><?php esc_html_e( 'Card Code', 'checkout-com-unified-payments-api' ); ?> <span class="required">*</span></label>
+				<input id="cko-cvv" type="text" autocomplete="off" class="input-text" placeholder="<?php esc_attr_e( 'CVV', 'checkout-com-unified-payments-api' ); ?>" name="<?php echo esc_attr( $this->id ); ?>-card-cvv"/>
+			</p>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Renders the save card markup.
+	 *
+	 * @param string $save_card Save card enable.
+	 *
+	 * @return void
+	 */
+	public function element_form_save_card( $save_card ) {
+		?>
+		<!-- Show save card checkbox if this is selected on admin-->
+		<div class="cko-save-card-checkbox" style="display: none">
+			<?php
+			if ( $save_card ) {
+				$this->save_payment_method_checkbox();
+			}
+			?>
+		</div>
 		<?php
 	}
 

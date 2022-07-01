@@ -49,9 +49,6 @@ class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway {
 		}
 
 		add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, [ $this, 'process_admin_options' ] );
-
-		// Generate token.
-		add_action( 'woocommerce_api_wc_checkoutcom_googlepay_token', [ $this, 'generate_token' ] );
 	}
 
 	/**

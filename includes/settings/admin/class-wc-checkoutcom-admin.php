@@ -71,7 +71,7 @@ class WC_Checkoutcom_Admin {
 						class="<?php echo 'debug_settings' === $screen ? 'current' : null; ?>">
 						<?php esc_html_e( 'Debug Settings', 'checkout-com-unified-payments-api' ); ?></a> | </li>
 				<li><a href="<?php echo esc_url( admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards&screen=webhook' ) ); ?>"
-						class="<?php echo 'webhook' === $screen ? 'current' : null; ?>">
+						class="<?php echo 'webhook' === $screen ? 'current cko-webhook' : null; ?>">
 						<?php esc_html_e( 'Webhook', 'checkout-com-unified-payments-api' ); ?></a></li>
 			</ul>
 		</div>
