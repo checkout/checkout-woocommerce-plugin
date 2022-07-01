@@ -242,6 +242,7 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
 <div class="cko-form" style="display: none; padding-top: 10px;padding-bottom: 5px;">
 	<input type="hidden" id="cko-card-token" name="cko-card-token" value="" />
 	<input type="hidden" id="cko-card-bin" name="cko-card-bin" value="" />
+	<input type="hidden" id="cko-card-scheme" name="cko-card-scheme" value="" />
 
 		<?php
 		if ( '0' === $iframe_style ) {
@@ -250,6 +251,7 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
 		<!-- frames will be loaded here -->
 		<div class="card-frame"></div>
 	</div>
+	<div class="scheme-choice-frame"></div>
 			<?php
 		} else {
 			?>
@@ -301,6 +303,8 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
 				</div>
 			</div>
 		</div>
+
+		<div class="scheme-choice-frame"></div>
 	</div>
 	<?php } ?>
 
@@ -355,6 +359,15 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
 			}
 		}
 
+		if ( class_exists( 'WC_Subscriptions_Order' ) ) {
+
+			$card_scheme = sanitize_text_field( $_POST['cko-card-scheme'] );
+
+			if ( ! empty( $card_scheme ) ) {
+				WC()->session->set( '_cko_preferred_scheme', $card_scheme );
+			}
+		}
+
 		// Create payment with card token.
 		$result = (array) WC_Checkoutcom_Api_Request::create_payment( $order, $arg );
 
@@ -389,9 +402,17 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
 			$this->save_token( get_current_user_id(), $result );
 		}
 
-		// Save source id for subscription.
 		if ( class_exists( 'WC_Subscriptions_Order' ) ) {
+			// Save source id for subscription.
 			WC_Checkoutcom_Subscription::save_source_id( $order_id, $order, $result['source']['id'] );
+
+			// save Cartes Bancaires card scheme for subscription.
+			$card_scheme = WC()->session->get( '_cko_preferred_scheme' );
+
+			if ( ! empty( $card_scheme ) ) {
+				$this->save_preferred_card_scheme( $order_id, $order, $card_scheme );
+				WC()->session->__unset( '_cko_preferred_scheme' );
+			}
 		}
 
 		// Set action id as woo transaction id.
@@ -546,9 +567,17 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
 			unset( $_SESSION['wc-wc_checkout_com_cards-new-payment-method'] );
 		}
 
-		// save source id for subscription.
 		if ( class_exists( 'WC_Subscriptions_Order' ) ) {
+			// save source id for subscription.
 			WC_Checkoutcom_Subscription::save_source_id( $order_id, $subscription_object, $result['source']['id'] );
+
+			// save Cartes Bancaires card scheme for subscription.
+			$card_scheme = WC()->session->get( '_cko_preferred_scheme' );
+
+			if ( ! empty( $card_scheme ) ) {
+				$this->save_preferred_card_scheme( $order_id, $order, $card_scheme );
+				WC()->session->__unset( '_cko_preferred_scheme' );
+			}
 		}
 
 		$order_status = $order->get_status();
@@ -720,8 +749,46 @@ jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide()
 				unset( $_SESSION['cko-is-mada'] );
 			}
 
+			$card_scheme = WC()->session->get( '_cko_preferred_scheme' );
+
+			if ( $card_scheme ) {
+				$token->add_meta_data( 'preferred_scheme', $card_scheme, true );
+			}
+
 			$token->save();
 		}
+	}
+
+	/**
+	 * This function save card scheme for recurring payment like subscription renewal.
+	 *
+	 * @param int      $order_id Order ID.
+	 * @param WC_Order $order Order object.
+	 * @param string   $card_scheme Card Scheme.
+	 *
+	 * @return void
+	 */
+	public function save_preferred_card_scheme( $order_id, $order, $card_scheme ) {
+
+		if ( empty( $card_scheme ) ) {
+			return;
+		}
+
+		if ( $order instanceof WC_Subscription && ! empty( $card_scheme ) ) {
+			update_post_meta( $order->get_id(), '_cko_preferred_scheme', $card_scheme );
+		}
+
+		// Check for subscription and save source id.
+		if ( function_exists( 'wcs_order_contains_subscription' ) ) {
+			if ( wcs_order_contains_subscription( $order_id ) ) {
+				$subscriptions = wcs_get_subscriptions_for_order( $order );
+
+				foreach ( $subscriptions as $subscription_obj ) {
+					update_post_meta( $subscription_obj->get_id(), '_cko_preferred_scheme', $card_scheme );
+				}
+			}
+		}
+
 	}
 
 	/**
