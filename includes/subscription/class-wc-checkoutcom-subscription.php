@@ -17,8 +17,8 @@ class WC_Checkoutcom_Subscription {
 	/**
 	 * Create a renewal payment.
 	 *
-	 * @param int    $renewal_total Renewal total amount.
-	 * @param object $renewal_order Order object to be renewed.
+	 * @param int      $renewal_total Renewal total amount.
+	 * @param WC_Order $renewal_order Order object to be renewed.
 	 */
 	public static function renewal_payment( $renewal_total, $renewal_order ) {
 
@@ -34,8 +34,9 @@ class WC_Checkoutcom_Subscription {
 		}
 
 		foreach ( $subscriptions_arr as $subscriptions_obj ) {
-			$args['source_id']       = get_post_meta( $subscriptions_obj->get_id(), '_cko_source_id', true );
-			$args['parent_order_id'] = $subscriptions_obj->get_parent_id();
+			$args['source_id']        = get_post_meta( $subscriptions_obj->get_id(), '_cko_source_id', true );
+			$args['parent_order_id']  = $subscriptions_obj->get_parent_id();
+			$args['preferred_scheme'] = get_post_meta( $subscriptions_obj->get_id(), '_cko_preferred_scheme', true );
 		}
 
 		$payment_result = (array) WC_Checkoutcom_Api_Request::create_payment( $renewal_order, $args, 'renewal' );

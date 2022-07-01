@@ -18,6 +18,11 @@
   height: 38px !important;
 }
 
+.scheme-choice-frame {
+  width: 280px;
+  margin-bottom: 8px;
+}
+
 /* label {
   display: block;
   height: 10px;
