@@ -65,6 +65,7 @@ class WC_Checkoutcom_Subscription {
 			get_post_meta( $order_id, '_payment_method', true ),
 			[
 				'wc_checkout_com_google_pay',
+				'wc_checkout_com_apple_pay',
 				'wc_checkout_com_alternative_payments_sepa',
 			],
 			true

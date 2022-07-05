@@ -444,30 +444,17 @@ function cko_is_nas_account() {
 }
 
 add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_cards', 'subscription_payment', 10, 2 );
+add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_alternative_payments_sepa', 'subscription_payment', 10, 2 );
+add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_google_pay', 'subscription_payment', 10, 2 );
+add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_apple_pay', 'subscription_payment', 10, 2 );
 
 /**
- * Function to handle subscription renewal payment for card.
+ * Function to handle subscription renewal payment for card, SEPA APM, Google Pay & Apple Pay.
  *
  * @param float    $renewal_total The amount to charge.
  * @param WC_Order $renewal_order A WC_Order object created to record the renewal payment.
  */
 function subscription_payment( $renewal_total, $renewal_order ) {
-	include_once( 'includes/subscription/class-wc-checkoutcom-subscription.php' );
-
-	WC_Checkoutcom_Subscription::renewal_payment( $renewal_total, $renewal_order );
-}
-
-add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_alternative_payments_sepa', 'subscription_payment_sepa', 10, 2 );
-add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_google_pay', 'subscription_payment_sepa', 10, 2 );
-
-/**
- * Function to handle subscription renewal payment for APM SEPA.
- *
- * @param float    $renewal_total The amount to charge.
- * @param WC_Order $renewal_order A WC_Order object created to record the renewal payment.
- */
-function subscription_payment_sepa( $renewal_total, $renewal_order ) {
-
 	include_once( 'includes/subscription/class-wc-checkoutcom-subscription.php' );
 
 	WC_Checkoutcom_Subscription::renewal_payment( $renewal_total, $renewal_order );
