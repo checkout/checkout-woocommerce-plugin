@@ -93,7 +93,9 @@ jQuery( function ( $ ) {
 		var allowedCardNetworks = ["AMEX", "DISCOVER", "JCB", "MASTERCARD", "VISA"];
 
 		var _setupClickListeners = function () {
-			jQuery( document ).unbind( "click" ).on( 'click', '#' + googlePayUiController.getSelectors().googlePayButtonId, function ( e ) {
+			jQuery( document ).off( 'click', '#' + googlePayUiController.getSelectors().googlePayButtonId );
+
+			jQuery( document ).on( 'click', '#' + googlePayUiController.getSelectors().googlePayButtonId, function ( e ) {
 				e.preventDefault();
 				_startPaymentDataRequest();
 			} );

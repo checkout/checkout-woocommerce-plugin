@@ -152,7 +152,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			};
 
 			// Listen for when the Apple Pay button is pressed.
-			jQuery(document.body).unbind("click").on('click', '#' + applePayButtonId, function () {
+			jQuery(document).unbind("click").on('click', '#' + applePayButtonId, function () {
 				var checkoutFields = '<?php echo $checkout_fields; ?>';
 				var result = isValidFormField(checkoutFields);
 
