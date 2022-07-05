@@ -235,7 +235,7 @@ jQuery( function ( $ ) {
 					type: 'POST',
 					data: {
 						'action': 'wc_checkoutcom_register_webhook',
-						'security': cko_admin_vars.checkoutcom_check_webhook_nonce
+						'security': cko_admin_vars.checkoutcom_register_webhook_nonce
 					}
 				} ).done( function ( response ) {
 					$( '#checkoutcom-register-webhook' ).siblings( '.dashicons-yes.hidden' ).removeClass( 'hidden' );

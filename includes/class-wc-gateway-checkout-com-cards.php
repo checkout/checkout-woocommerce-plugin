@@ -394,7 +394,6 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 			session_start();
 		}
 
-		global $woocommerce;
 		$order = wc_get_order( $order_id );
 
 		// Check if card token or token_id exist.
@@ -507,7 +506,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		wc_reduce_stock_levels( $order_id );
 
 		// Remove cart.
-		$woocommerce->cart->empty_cart();
+		WC()->cart->empty_cart();
 
 		// Return thank you page.
 		return [
@@ -523,8 +522,6 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		if ( ! session_id() ) {
 			session_start();
 		}
-
-		global $woocommerce;
 
 		if ( $_REQUEST['cko-session-id'] ) {
 			$cko_session_id = $_REQUEST['cko-session-id'];
@@ -652,7 +649,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		wc_reduce_stock_levels( $order_id );
 
 		// Remove cart.
-		$woocommerce->cart->empty_cart();
+		WC()->cart->empty_cart();
 
 		$url = esc_url( $order->get_checkout_order_received_url() );
 		wp_redirect( $url );

@@ -150,7 +150,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Sepa extends WC_Gateway_Check
 		wc_reduce_stock_levels( $order_id );
 
 		// Remove cart.
-		$woocommerce->cart->empty_cart();
+		WC()->cart->empty_cart();
 
 		// Return thank you page.
 		return [
