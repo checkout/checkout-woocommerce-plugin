@@ -458,6 +458,7 @@ function subscription_payment( $renewal_total, $renewal_order ) {
 }
 
 add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_alternative_payments_sepa', 'subscription_payment_sepa', 10, 2 );
+add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_google_pay', 'subscription_payment_sepa', 10, 2 );
 
 /**
  * Function to handle subscription renewal payment for APM SEPA.

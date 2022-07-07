@@ -52,6 +52,8 @@ class WC_Checkoutcom_Api_Request {
 
 		$is_sepa_renewal = ( 'wc_checkout_com_alternative_payments_sepa' === $order->get_payment_method() ) && ( ! is_null( $subscription ) );
 
+		$is_google_pay_renewal = ( 'wc_checkout_com_google_pay' === $order->get_payment_method() ) && ( ! is_null( $subscription ) );
+
 		// Initialize the Checkout Api.
 		$checkout = new Checkout_SDK();
 
@@ -64,7 +66,8 @@ class WC_Checkoutcom_Api_Request {
 				// Check if payment is 3D secure.
 				if ( WC_Checkoutcom_Utility::is_pending( $response ) ) {
 					// Check if SEPA renewal order.
-					if ( $is_sepa_renewal ) {
+					if ( $is_sepa_renewal || $is_google_pay_renewal ) {
+
 						return $response;
 					}
 					// Check if redirection link exist.
@@ -140,7 +143,7 @@ class WC_Checkoutcom_Api_Request {
 		$mada_enable        = '1' === WC_Admin_Settings::get_option( 'ckocom_card_mada', '0' );
 		$save_card          = WC_Admin_Settings::get_option( 'ckocom_card_saved' );
 		$google_settings    = get_option( 'woocommerce_wc_checkout_com_google_pay_settings' );
-		$is_google_threeds  = 1 === absint( $google_settings['ckocom_google_threed'] );
+		$is_google_threeds  = 1 === absint( $google_settings['ckocom_google_threed'] ) && null === $subscription;
 
 		$is_save_card   = false;
 		$payment_option = 'FramesJs';

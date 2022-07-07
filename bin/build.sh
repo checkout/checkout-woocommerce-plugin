@@ -21,5 +21,8 @@ cp "woocommerce-gateway-checkout-com.php" "$PLUGIN_SLUG/woocommerce-gateway-chec
 echo "Generating zip file..."
 zip -q -r "${PLUGIN_SLUG}.zip" "$PLUGIN_SLUG/"
 
+echo "Removing folder $PLUGIN_SLUG"
+rm -r "$PLUGIN_SLUG"
+
 echo "${PLUGIN_SLUG}.zip file generated!"
 echo "Build done!"

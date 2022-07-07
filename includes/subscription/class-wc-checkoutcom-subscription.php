@@ -60,7 +60,15 @@ class WC_Checkoutcom_Subscription {
 		update_post_meta( $order_id, '_transaction_id', $payment_result['action_id'] );
 		update_post_meta( $order_id, '_cko_payment_id', $payment_result['id'] );
 
-		if ( 'wc_checkout_com_alternative_payments_sepa' === get_post_meta( $order_id, '_payment_method', true ) ) {
+		// Set Authorize meta key to true if renewal order.
+		if ( in_array(
+			get_post_meta( $order_id, '_payment_method', true ),
+			[
+				'wc_checkout_com_google_pay',
+				'wc_checkout_com_alternative_payments_sepa',
+			],
+			true
+		) ) {
 			update_post_meta( $order_id, 'cko_payment_authorized', true );
 		}
 

@@ -582,7 +582,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		wc_reduce_stock_levels( $order_id );
 
 		// Remove cart.
-		$woocommerce->cart->empty_cart();
+		WC()->cart->empty_cart();
 
 		// Return thank you page.
 		return [
