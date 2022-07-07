@@ -54,6 +54,8 @@ class WC_Checkoutcom_Api_Request {
 
 		$is_google_pay_renewal = ( 'wc_checkout_com_google_pay' === $order->get_payment_method() ) && ( ! is_null( $subscription ) );
 
+		$is_apple_pay_renewal = ( 'wc_checkout_com_apple_pay' === $order->get_payment_method() ) && ( ! is_null( $subscription ) );
+
 		// Initialize the Checkout Api.
 		$checkout = new Checkout_SDK();
 
@@ -66,7 +68,7 @@ class WC_Checkoutcom_Api_Request {
 				// Check if payment is 3D secure.
 				if ( WC_Checkoutcom_Utility::is_pending( $response ) ) {
 					// Check if SEPA renewal order.
-					if ( $is_sepa_renewal || $is_google_pay_renewal ) {
+					if ( $is_sepa_renewal || $is_google_pay_renewal || $is_apple_pay_renewal ) {
 
 						return $response;
 					}

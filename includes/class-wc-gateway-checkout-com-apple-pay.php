@@ -23,7 +23,15 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		$this->method_description = __( 'The Checkout.com extension allows shop owners to process online payments through the <a href="https://www.checkout.com">Checkout.com Payment Gateway.</a>', 'checkout-com-unified-payments-api' );
 		$this->title              = __( 'Apple Pay', 'checkout-com-unified-payments-api' );
 		$this->has_fields         = true;
-		$this->supports           = [ 'products', 'refund' ];
+		$this->supports           = [
+			'products',
+			'refunds',
+			'subscriptions',
+			'subscription_cancellation',
+			'subscription_suspension',
+			'subscription_reactivation',
+			'subscription_date_changes',
+		];
 
 		$this->init_form_fields();
 		$this->init_settings();
@@ -553,6 +561,11 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			WC_Checkoutcom_Utility::wc_add_notice_self( $result['error'] );
 
 			return;
+		}
+
+		if ( class_exists( 'WC_Subscriptions_Order' ) ) {
+			// Save source id for subscription.
+			WC_Checkoutcom_Subscription::save_source_id( $order_id, $order, $result['source']['id'] );
 		}
 
 		// Set action id as woo transaction id.

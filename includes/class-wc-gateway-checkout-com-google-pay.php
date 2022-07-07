@@ -20,9 +20,8 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 		$this->method_title       = __( 'Checkout.com', 'checkout-com-unified-payments-api' );
 		$this->method_description = __( 'The Checkout.com extension allows shop owners to process online payments through the <a href="https://www.checkout.com">Checkout.com Payment Gateway.</a>', 'checkout-com-unified-payments-api' );
 		$this->title              = __( 'Google Pay', 'checkout-com-unified-payments-api' );
-
-		$this->has_fields = true;
-		$this->supports   = [
+		$this->has_fields         = true;
+		$this->supports           = [
 			'products',
 			'refunds',
 			'subscriptions',
