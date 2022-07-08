@@ -166,6 +166,14 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v4.4.3 7th July 2022
+- **[feat]** Support for Carte Bancaire card.
+- **[feat]** Google Pay and Apple Pay subscription support added.
+- **[update]** Upgraded Checkout API SDK to latest version 2.5.1
+- **[tweak]** Changed translation domain to match with plugin slug.
+- **[tweak]** Improved frame and related script enqueue.
+- **[tweak]** Refactoring code and fix PHPCS error in plugin.
+
 v4.4.2 16th June 2022
 - **[tweak]** Show refund button of completed orders.
 - **[fix]** Default saved card deselects.
