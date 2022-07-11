@@ -313,6 +313,8 @@ function renew_save_again( $post_id, $post ) {
 				$order->add_order_note( $message );
 				$order->update_status( $status );
 
+				do_action( 'checkout_com_payment_captured', $order->get_id(), $order, $result );
+
 				return true;
 
 			} elseif ( 'cko-void' === sanitize_text_field( $_POST['cko_payment_action'] ) ) {

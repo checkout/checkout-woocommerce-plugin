@@ -614,6 +614,8 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 
 			/* translators: %s: Action ID. */
 			$message = sprintf( esc_html__( 'Checkout.com Payment Captured - Action ID : %s', 'checkout-com-unified-payments-api' ), $action['0']['id'] );
+
+			$is_captured = true;
 		}
 
 		// save card to db.
@@ -643,6 +645,10 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		if ( 'pending' === $order_status || 'failed' === $order_status ) {
 			update_post_meta( $order_id, 'cko_payment_authorized', true );
 			$order->update_status( $status );
+
+			if ( isset( $is_captured ) ) {
+				do_action( 'checkout_com_payment_captured', $order_id, $order, $result );
+			}
 		}
 
 		// Reduce stock levels.
