@@ -567,7 +567,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 
 		// Redirect to my-account/payment-method if card verification successful.
 		// show notice to customer.
-		if ( 'Card Verified' === isset( $result['status'] ) && isset( $result['metadata']['card_verification'] ) ) {
+		if ( 'Card Verified' === $result['status'] && isset( $result['metadata']['card_verification'] ) ) {
 
 			$this->save_token( get_current_user_id(), $result );
 
