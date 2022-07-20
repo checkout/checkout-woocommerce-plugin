@@ -39,7 +39,7 @@ jQuery(function () {
     initFrames();
 
     // Show CC input if new card is selected.
-    if ( jQuery("#wc-wc_checkout_com_cards-payment-token-new").is(':checked') ) {
+    if ( ! jQuery("#wc-wc_checkout_com_cards-payment-token-new").length || jQuery("#wc-wc_checkout_com_cards-payment-token-new").is(':checked') ) {
       jQuery(".cko-form").show();
       checkUserLoggedIn();
       jQuery(".cko-cvv").hide();
