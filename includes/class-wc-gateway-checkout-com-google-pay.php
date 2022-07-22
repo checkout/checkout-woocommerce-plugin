@@ -59,7 +59,7 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 		$google_pay_enabled = ! empty( $google_settings['enabled'] ) && 'yes' === $google_settings['enabled'];
 
 		wp_register_script( 'cko-google-script', 'https://pay.google.com/gp/p/js/pay.js', [ 'jquery' ] );
-		wp_register_script( 'cko-google-pay-integration-script', WC_CHECKOUTCOM_PLUGIN_URL . '/assets/js/cko-google-pay-integration.js', [ 'jquery', 'cko-google-script' ] );
+		wp_register_script( 'cko-google-pay-integration-script', WC_CHECKOUTCOM_PLUGIN_URL . '/assets/js/cko-google-pay-integration.js', [ 'jquery', 'cko-google-script' ], WC_CHECKOUTCOM_PLUGIN_VERSION );
 
 		// Enqueue google pay script.
 		if ( $google_pay_enabled ) {

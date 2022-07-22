@@ -94,15 +94,15 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 
 		// Styles.
 		if ( WC_Admin_Settings::get_option( 'ckocom_iframe_style', '0' ) ) {
-			wp_register_style( 'frames_style', WC_CHECKOUTCOM_PLUGIN_URL . '/assets/css/multi-iframe.css' );
+			wp_register_style( 'frames_style', WC_CHECKOUTCOM_PLUGIN_URL . '/assets/css/multi-iframe.css', [], WC_CHECKOUTCOM_PLUGIN_VERSION );
 		} else {
-			wp_register_style( 'frames_style', WC_CHECKOUTCOM_PLUGIN_URL . '/assets/css/style.css' );
+			wp_register_style( 'frames_style', WC_CHECKOUTCOM_PLUGIN_URL . '/assets/css/style.css', [], WC_CHECKOUTCOM_PLUGIN_VERSION );
 		}
 
 		wp_enqueue_style( 'frames_style' );
 
 		// Scripts.
-		wp_register_script( 'cko-frames-script', 'https://cdn.checkout.com/js/framesv2.min.js', [ 'jquery' ] );
+		wp_register_script( 'cko-frames-script', 'https://cdn.checkout.com/js/framesv2.min.js', [ 'jquery' ], WC_CHECKOUTCOM_PLUGIN_VERSION );
 		wp_enqueue_script( 'cko-frames-script' );
 
 		$vars = [
@@ -114,7 +114,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 
 		wp_localize_script( 'cko-frames-script', 'cko_frames_vars', $vars );
 
-		wp_register_script( 'cko-frames-integration-script', WC_CHECKOUTCOM_PLUGIN_URL . '/assets/js/cko-frames-integration.js', [ 'cko-frames-script', 'jquery' ] );
+		wp_register_script( 'cko-frames-integration-script', WC_CHECKOUTCOM_PLUGIN_URL . '/assets/js/cko-frames-integration.js', [ 'cko-frames-script', 'jquery' ], WC_CHECKOUTCOM_PLUGIN_VERSION );
 		wp_enqueue_script( 'cko-frames-integration-script' );
 	}
 
