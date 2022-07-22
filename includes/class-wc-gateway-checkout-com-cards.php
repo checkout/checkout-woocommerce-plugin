@@ -560,7 +560,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 
 		// Redirect to my-account/payment-method if card verification failed.
 		// show error to customer.
-		if ( 'error' === isset( $result['card_verification'] ) ) {
+		if ( 'error' === $result['card_verification'] ) {
 			WC_Checkoutcom_Utility::wc_add_notice_self( __( 'Unable to add payment method to your account.', 'checkout-com-unified-payments-api' ), 'error' );
 			wp_redirect( $result['redirection_url'] );
 			exit;
