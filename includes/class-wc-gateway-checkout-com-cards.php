@@ -106,9 +106,10 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		wp_enqueue_script( 'cko-frames-script' );
 
 		$vars = [
-			'card-number' => esc_html__( 'Please enter a valid card number', 'checkout-com-unified-payments-api' ),
-			'expiry-date' => esc_html__( 'Please enter a valid expiry date', 'checkout-com-unified-payments-api' ),
-			'cvv'         => esc_html__( 'Please enter a valid cvv code', 'checkout-com-unified-payments-api' ),
+			'card-number'           => esc_html__( 'Please enter a valid card number', 'checkout-com-unified-payments-api' ),
+			'expiry-date'           => esc_html__( 'Please enter a valid expiry date', 'checkout-com-unified-payments-api' ),
+			'cvv'                   => esc_html__( 'Please enter a valid cvv code', 'checkout-com-unified-payments-api' ),
+			'is-add-payment-method' => is_wc_endpoint_url( 'add-payment-method' ) ? 'yes' : 'no',
 		];
 
 		wp_localize_script( 'cko-frames-script', 'cko_frames_vars', $vars );

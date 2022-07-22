@@ -1,5 +1,11 @@
-/* global Frames */
+/* global Frames, cko_frames_vars */
 jQuery(function () {
+
+  if ( 'yes' === cko_frames_vars['is-add-payment-method'] ) {
+    jQuery("#wc-wc_checkout_com_cards-payment-token-new").prop( "checked", true );
+  }
+
+
   // Set default ul to auto
   jQuery(".payment_box.payment_method_wc_checkout_com_cards > ul").css( "margin", "auto" );
 
