@@ -445,7 +445,9 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 			// Check if save card is enable and customer select to save card.
 			if ( $save_card && isset( $_POST['wc-wc_checkout_com_cards-new-payment-method'] ) && sanitize_text_field( $_POST['wc-wc_checkout_com_cards-new-payment-method'] ) ) {
 				// Save in session for 3D secure payment.
-				$_SESSION['wc-wc_checkout_com_cards-new-payment-method'] = isset( $_POST['wc-wc_checkout_com_cards-new-payment-method'] );
+				WC()->session->set( 'wc-wc_checkout_com_cards-new-payment-method', 'yes' );
+			} else {
+				WC()->session->set( 'wc-wc_checkout_com_cards-new-payment-method', 'no' );
 			}
 
 			// Redirect to 3D secure page.
@@ -567,7 +569,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 
 		// Redirect to my-account/payment-method if card verification successful.
 		// show notice to customer.
-		if ( 'Card Verified' === isset( $result['status'] ) && isset( $result['metadata']['card_verification'] ) ) {
+		if ( 'Card Verified' === $result['status'] && isset( $result['metadata']['card_verification'] ) ) {
 
 			$this->save_token( get_current_user_id(), $result );
 
@@ -618,9 +620,9 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 
 		// save card to db.
 		$save_card = WC_Admin_Settings::get_option( 'ckocom_card_saved' );
-		if ( $save_card && isset( $_SESSION['wc-wc_checkout_com_cards-new-payment-method'] ) && $_SESSION['wc-wc_checkout_com_cards-new-payment-method'] ) {
+		if ( $save_card && 'yes' === WC()->session->get( 'wc-wc_checkout_com_cards-new-payment-method' ) ) {
 			$this->save_token( $order->get_user_id(), $result );
-			unset( $_SESSION['wc-wc_checkout_com_cards-new-payment-method'] );
+			WC()->session->__unset( 'wc-wc_checkout_com_cards-new-payment-method' );
 		}
 
 		if ( class_exists( 'WC_Subscriptions_Order' ) ) {
