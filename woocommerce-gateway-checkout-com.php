@@ -176,7 +176,7 @@ add_action( 'admin_enqueue_scripts', 'cko_admin_enqueue_scripts' );
  */
 function cko_admin_enqueue_scripts() {
 	// Load admin scripts.
-	wp_enqueue_script( 'cko-admin-script', WC_CHECKOUTCOM_PLUGIN_URL . '/assets/js/admin.js', [ 'jquery' ] );
+	wp_enqueue_script( 'cko-admin-script', WC_CHECKOUTCOM_PLUGIN_URL . '/assets/js/admin.js', [ 'jquery' ], WC_CHECKOUTCOM_PLUGIN_VERSION );
 
 	$vars = [
 		'nas_docs'                           => 'https://www.checkout.com/docs/four/resources/api-authentication/api-keys',
@@ -208,8 +208,8 @@ function callback_for_setting_up_scripts() {
 	}
 
 	// Register adn enqueue checkout css.
-	wp_register_style( 'checkoutcom-style', WC_CHECKOUTCOM_PLUGIN_URL . '/assets/css/checkoutcom-styles.css' );
-	wp_register_style( 'normalize', WC_CHECKOUTCOM_PLUGIN_URL . '/assets/css/normalize.css' );
+	wp_register_style( 'checkoutcom-style', WC_CHECKOUTCOM_PLUGIN_URL . '/assets/css/checkoutcom-styles.css', [], WC_CHECKOUTCOM_PLUGIN_VERSION );
+	wp_register_style( 'normalize', WC_CHECKOUTCOM_PLUGIN_URL . '/assets/css/normalize.css', [], WC_CHECKOUTCOM_PLUGIN_VERSION );
 	wp_enqueue_style( 'checkoutcom-style' );
 	wp_enqueue_style( 'normalize' );
 
