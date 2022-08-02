@@ -64,6 +64,9 @@ class WC_Checkoutcom_Admin {
 				<li><a href="<?php echo esc_url( admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_apple_pay' ) ); ?>"
 						class="<?php echo 'wc_checkout_com_apple_pay' === $screen ? 'current' : null; ?>">
 						<?php esc_html_e( 'Apple Pay', 'checkout-com-unified-payments-api' ); ?></a> | </li>
+				<li><a href="<?php echo esc_url( admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_paypal' ) ); ?>"
+							class="<?php echo 'wc_checkout_com_paypal' === $screen ? 'current' : null; ?>">
+						<?php esc_html_e( 'PayPal', 'checkout-com-unified-payments-api' ); ?></a> | </li>
 				<li><a href="<?php echo esc_url( admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_alternative_payments' ) ); ?>"
 						class="<?php echo 'wc_checkout_com_alternative_payments' === $screen ? 'current' : null; ?>">
 						<?php esc_html_e( 'Alternative Payments', 'checkout-com-unified-payments-api' ); ?></a> | </li>
