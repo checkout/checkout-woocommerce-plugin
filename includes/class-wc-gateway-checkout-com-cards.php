@@ -582,8 +582,8 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		// Set action id as woo transaction id.
 		update_post_meta( $order_id, '_transaction_id', $action['0']['id'] );
 
-		// if no action id and source is boleto.
-		if ( null == $action['0']['id'] && 'boleto' === $result['source']['type'] ) { // phpcs:ignore WordPress.PHP.StrictComparisons.LooseComparison -- Deliberate loose comparison.
+		// if no action id and source is boleto or paypal.
+		if ( null == $action['0']['id'] && in_array( $result['source']['type'], [ 'paypal', 'boleto' ], true ) ) { // phpcs:ignore WordPress.PHP.StrictComparisons.LooseComparison -- Deliberate loose comparison.
 			update_post_meta( $order_id, '_transaction_id', $result['id'] );
 		}
 

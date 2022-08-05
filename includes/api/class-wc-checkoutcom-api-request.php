@@ -11,6 +11,7 @@ use Checkout\CheckoutUtils;
 use Checkout\Common\Address;
 use Checkout\Common\ChallengeIndicatorType;
 use Checkout\Common\CustomerRequest;
+use Checkout\Common\Four\Product;
 use Checkout\Payments\BillingDescriptor;
 use Checkout\Payments\PaymentRequest;
 use Checkout\Payments\PaymentType;
@@ -19,6 +20,7 @@ use Checkout\Payments\ProcessingSettings;
 use Checkout\Payments\RefundRequest;
 use Checkout\Payments\ShippingDetails;
 use Checkout\Payments\Source\Apm\FawryProduct;
+use Checkout\Payments\Source\Apm\RequestPayPalSource;
 use Checkout\Payments\Source\RequestIdSource;
 use Checkout\Payments\Source\RequestTokenSource;
 use Checkout\Payments\ThreeDsRequest;
@@ -48,13 +50,15 @@ class WC_Checkoutcom_Api_Request {
 	public static function create_payment( WC_Order $order, $arg, $subscription = null ) {
 		// Get payment request parameter.
 		$request_param = WC_Checkoutcom_Api_Request::get_request_param( $order, $arg, $subscription );
+
 		$gateway_debug = 'yes' === WC_Admin_Settings::get_option( 'cko_gateway_responses', 'no' );
 
-		$is_sepa_renewal = ( 'wc_checkout_com_alternative_payments_sepa' === $order->get_payment_method() ) && ( ! is_null( $subscription ) );
+		$order_payment_method = $order->get_payment_method();
 
-		$is_google_pay_renewal = ( 'wc_checkout_com_google_pay' === $order->get_payment_method() ) && ( ! is_null( $subscription ) );
-
-		$is_apple_pay_renewal = ( 'wc_checkout_com_apple_pay' === $order->get_payment_method() ) && ( ! is_null( $subscription ) );
+		$is_sepa_renewal       = ( 'wc_checkout_com_alternative_payments_sepa' === $order_payment_method ) && ( ! is_null( $subscription ) );
+		$is_google_pay_renewal = ( 'wc_checkout_com_google_pay' === $order_payment_method ) && ( ! is_null( $subscription ) );
+		$is_apple_pay_renewal  = ( 'wc_checkout_com_apple_pay' === $order_payment_method ) && ( ! is_null( $subscription ) );
+		$is_paypal_renewal     = ( 'wc_checkout_com_paypal' === $order_payment_method ) && ( ! is_null( $subscription ) );
 
 		// Initialize the Checkout Api.
 		$checkout = new Checkout_SDK();
@@ -68,7 +72,7 @@ class WC_Checkoutcom_Api_Request {
 				// Check if payment is 3D secure.
 				if ( WC_Checkoutcom_Utility::is_pending( $response ) ) {
 					// Check if SEPA renewal order.
-					if ( $is_sepa_renewal || $is_google_pay_renewal || $is_apple_pay_renewal ) {
+					if ( $is_sepa_renewal || $is_google_pay_renewal || $is_apple_pay_renewal || $is_paypal_renewal ) {
 
 						return $response;
 					}
@@ -146,6 +150,7 @@ class WC_Checkoutcom_Api_Request {
 		$save_card          = WC_Admin_Settings::get_option( 'ckocom_card_saved' );
 		$google_settings    = get_option( 'woocommerce_wc_checkout_com_google_pay_settings' );
 		$is_google_threeds  = 1 === absint( $google_settings['ckocom_google_threed'] ) && null === $subscription;
+		$is_paypal_renewal  = ( 'wc_checkout_com_paypal' === $order->get_payment_method() ) && ( ! is_null( $subscription ) );
 
 		$is_save_card   = false;
 		$payment_option = 'FramesJs';
@@ -208,6 +213,11 @@ class WC_Checkoutcom_Api_Request {
 
 			$method        = new RequestTokenSource();
 			$method->token = trim( $arg );
+
+		} elseif ( 'wc_checkout_com_paypal' === $post_data['payment_method'] ) {
+			$payment_option = 'PayPal';
+
+			$method = new RequestPayPalSource();
 
 		} elseif ( in_array( $arg, $apms_selected, true ) ) {
 			// Alternative payment method selected.
@@ -280,6 +290,11 @@ class WC_Checkoutcom_Api_Request {
 			if ( wcs_order_contains_subscription( $order, 'parent' ) ) {
 				$payment->merchant_initiated = false;
 				$payment->payment_type       = 'Recurring';
+
+				// For PayPal subscription order.
+				if ( 'paypal' === $method->type ) {
+					$method->plan = [ 'type' => 'MERCHANT_INITIATED_BILLING' ];
+				}
 			}
 		}
 
@@ -410,6 +425,11 @@ class WC_Checkoutcom_Api_Request {
 				$processing_settings->preferred_scheme = $card_scheme;
 				$payment->processing                   = $processing_settings;
 			}
+		}
+
+		// PayPal add items to payment.
+		if ( 'paypal' === $method->type || $is_paypal_renewal ) {
+			$payment->items = self::get_paypal_products( $order );
 		}
 
 		// Set metadata info in payment request.
@@ -1109,11 +1129,16 @@ class WC_Checkoutcom_Api_Request {
 	}
 
 	/**
-	 * Return cart information
+	 * Return cart information.
 	 *
 	 * @return array
 	 */
 	public static function get_cart_info() {
+
+		if ( ! WC()->cart ) {
+			return [];
+		}
+
 		$items    = WC()->cart->get_cart();
 		$products = [];
 
@@ -1223,6 +1248,61 @@ class WC_Checkoutcom_Api_Request {
 			'order_tax_amount'  => $total_tax_amount_cents,
 			'order_lines'       => $products,
 		];
+	}
+
+	/**
+	 * Return order product information.
+	 * Docs: https://www.checkout.com/docs/payments/payment-methods/paypal#Request_example
+	 *
+	 * @param WC_Order $order Order object.
+	 *
+	 * @return array
+	 */
+	public static function get_paypal_products( $order ) {
+		$cart_info = WC_Checkoutcom_Api_Request::get_cart_info();
+		$products  = [];
+
+		if ( $cart_info ) {
+			// Subscription parent order.
+			$product_info         = $cart_info['order_lines'];
+			$order_amount         = $cart_info['order_amount'];
+			$total_product_amount = 0;
+
+			foreach ( $product_info as $item ) {
+
+				$product             = new Product();
+				$product->name       = $item['name'];
+				$product->unit_price = $item['unit_price'];
+				$product->quantity   = $item['quantity'];
+
+				$products[] = $product;
+
+				$total_product_amount += $item['unit_price'] * $item['quantity'];
+			}
+
+			if ( $total_product_amount !== $order_amount ) {
+
+				$product             = new Product();
+				$product->name       = 'All Products';
+				$product->unit_price = $order_amount;
+				$product->quantity   = 1;
+
+				$products = [ $product ];
+			}
+		} else {
+			// Subscription renewal.
+			$total_amount = $order->get_total();
+			$amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $total_amount, get_woocommerce_currency() );
+
+			$product             = new Product();
+			$product->name       = 'All Products';
+			$product->unit_price = $amount_cents;
+			$product->quantity   = 1;
+
+			$products = [ $product ];
+		}
+
+		return $products;
 	}
 
 	/**

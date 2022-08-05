@@ -43,6 +43,7 @@ function init_checkout_com_gateway_class() {
 	include_once( 'includes/class-wc-gateway-checkout-com-cards.php' );
 	include_once( 'includes/class-wc-gateway-checkout-com-apple-pay.php' );
 	include_once( 'includes/class-wc-gateway-checkout-com-google-pay.php' );
+	include_once( 'includes/class-wc-gateway-checkout-com-paypal.php' );
 	include_once( 'includes/class-wc-gateway-checkout-com-alternative-payments.php' );
 
 	// Load payment gateway class.
@@ -63,6 +64,7 @@ function checkout_com_add_gateway( $methods ) {
 	$methods[] = 'WC_Gateway_Checkout_Com_Cards';
 	$methods[] = 'WC_Gateway_Checkout_Com_Apple_Pay';
 	$methods[] = 'WC_Gateway_Checkout_Com_Google_Pay';
+	$methods[] = 'WC_Gateway_Checkout_Com_PayPal';
 	$methods[] = 'WC_Gateway_Checkout_Com_Alternative_Payments';
 
 	$methods = sizeof( $array ) > 0 ? array_merge( $methods, $array ) : $methods;
@@ -447,6 +449,7 @@ add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_cards', 
 add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_alternative_payments_sepa', 'subscription_payment', 10, 2 );
 add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_google_pay', 'subscription_payment', 10, 2 );
 add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_apple_pay', 'subscription_payment', 10, 2 );
+add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_paypal', 'subscription_payment', 10, 2 );
 
 /**
  * Function to handle subscription renewal payment for card, SEPA APM, Google Pay & Apple Pay.

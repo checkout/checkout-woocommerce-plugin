@@ -570,6 +570,47 @@ class WC_Checkoutcom_Cards_Settings {
 	}
 
 	/**
+	 * CKO admin paypal setting fields
+	 *
+	 * @return mixed|void
+	 */
+	public static function paypal_settings() {
+		$settings = [
+			'google_setting' => [
+				'title'       => __( 'PayPal Settings', 'checkout-com-unified-payments-api' ),
+				'type'        => 'title',
+				'description' => '',
+			],
+			'enabled'        => [
+				'id'          => 'enable',
+				'title'       => __( 'Enable/Disable', 'checkout-com-unified-payments-api' ),
+				'type'        => 'checkbox',
+				'label'       => __( 'Enable Checkout.com', 'checkout-com-unified-payments-api' ),
+				'description' => __( 'This enables PayPal as a payment method', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => true,
+				'default'     => 'no',
+			],
+			'title'          => [
+				'title'       => __( 'Title', 'checkout-com-unified-payments-api' ),
+				'type'        => 'text',
+				'label'       => __( 'PayPal', 'checkout-com-unified-payments-api' ),
+				'description' => __( 'Title that will be displayed on the checkout page', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => true,
+				'default'     => 'PayPal',
+			],
+			'description'    => [
+				'title'       => __( 'Description', 'checkout-com-unified-payments-api' ),
+				'type'        => 'text',
+				'description' => __( 'This controls the description which the user sees during checkout.', 'checkout-com-unified-payments-api' ),
+				'default'     => 'Pay with PayPal.',
+				'desc_tip'    => true,
+			],
+		];
+
+		return apply_filters( 'wc_checkout_com_paypal', $settings );
+	}
+
+	/**
 	 * Alternative payment methods settings fields.
 	 *
 	 * @return mixed
