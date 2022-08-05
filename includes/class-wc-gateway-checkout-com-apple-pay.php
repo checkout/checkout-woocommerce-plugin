@@ -86,7 +86,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		global $woocommerce;
 
 		$chosen_methods     = wc_get_chosen_shipping_method_ids();
-		$chosen_shipping    = $chosen_methods[0];
+		$chosen_shipping    = $chosen_methods[0] ?? '';
 		$shipping_amount    = WC()->cart->get_shipping_total();
 		$checkout_fields    = json_encode( $woocommerce->checkout->checkout_fields, JSON_HEX_APOS );
 		$session_url        = str_replace( 'https:', 'https:', add_query_arg( 'wc-api', 'wc_checkoutcom_session', home_url( '/' ) ) );
