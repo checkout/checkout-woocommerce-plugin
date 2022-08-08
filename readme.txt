@@ -166,6 +166,10 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v4.4.6 8th August 2022
+- **[feat]** Add PayPal payment method.
+- **[fix]** Fix MADA card not working Apple Pay.
+
 v4.4.5 22nd July 2022
 - **[tweak]** Add version number to all script enqueue.
 - **[tweak]** Use WC session for save card on checkout.
