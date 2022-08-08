@@ -32,6 +32,9 @@ Users can place orders with a Google Pay wallet.
 = Apple Pay Payments =
 Users can place orders with an Apple Pay wallet.
 
+= PayPal Payments =
+Users can place orders with an PayPal wallet.
+
 = Saved Cards Payments =
 Users can place orders with a payment card saved in their account.
 
@@ -43,6 +46,7 @@ Merchant can send invoice email to customers for payment.
 * Credit Cards
 * Google Pay
 * Apple Pay
+* PayPal
 * ACH Payments
 * DS 2.0
 * Local Payment Methods
@@ -59,6 +63,7 @@ Contact us at: partnerships@checkout.com
 1. Installation
 2. Configuration
 3. Checkout
+4. Webhook
 
 
 == Frequently Asked Questions ==
