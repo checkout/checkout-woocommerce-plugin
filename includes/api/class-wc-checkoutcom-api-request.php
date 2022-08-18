@@ -427,6 +427,12 @@ class WC_Checkoutcom_Api_Request {
 			}
 		}
 
+		// If this is MOTO order(Created via admin paid by customer from email).
+		if ( $order->is_created_via( 'admin' ) ) {
+			$payment->payment_type = PaymentType::$moto;
+			unset( $payment->three_ds );
+		}
+
 		// PayPal add items to payment.
 		if ( 'paypal' === $method->type || $is_paypal_renewal ) {
 			$payment->items = self::get_paypal_products( $order );
