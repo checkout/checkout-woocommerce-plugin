@@ -27,7 +27,9 @@
     }],
     "require": {
         "php": ">=5.6",
-        "checkout/checkout-sdk-php": "2.5.1-a"
+        "checkout/checkout-sdk-php": "2.5.1-a",
+        "guzzlehttp/guzzle": "6.5.8",
+        "monolog/monolog": "2.7.0"
     },
     "require-dev": {
         "squizlabs/php_codesniffer": "^3.6",
