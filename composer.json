@@ -7,9 +7,27 @@
             "dealerdirect/phpcodesniffer-composer-installer": true
         }
     },
+    "repositories": [{
+        "type": "package",
+        "package": {
+            "name": "checkout/checkout-sdk-php",
+            "version": "2.5.1-a",
+            "type": "library",
+            "source": {
+                "url": "https://github.com/jackie217330/uprise-payment-sdk-php.git",
+                "type": "git",
+                "reference": "2.5.1-a"
+            },
+            "autoload": {
+                "psr-4": {
+                    "Checkout\\": "lib/Checkout"
+                }
+            }
+        }
+    }],
     "require": {
         "php": ">=5.6",
-        "checkout/checkout-sdk-php": "2.5.1"
+        "checkout/checkout-sdk-php": "2.5.1-a"
     },
     "require-dev": {
         "squizlabs/php_codesniffer": "^3.6",

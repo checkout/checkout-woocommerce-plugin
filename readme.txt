@@ -171,6 +171,9 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v4.4.7-a 27th September 2022
+- **[feat]** Uprise-payment override
+
 v4.4.7 18th August 2022
 - **[fix]** Apple Pay MADA support.
 - **[fix]** Fix MOTO payment type.
