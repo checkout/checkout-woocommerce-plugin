@@ -32,8 +32,8 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 	 */
 	public function __construct() {
 		$this->id                 = 'wc_checkout_com_cards';
-		$this->method_title       = __( 'Checkout.com', 'checkout-com-unified-payments-api' );
-		$this->method_description = __( 'The Checkout.com extension allows shop owners to process online payments through the <a href="https://www.checkout.com">Checkout.com Payment Gateway.</a>', 'checkout-com-unified-payments-api' );
+		$this->method_title       = __( 'Uprise payment', 'checkout-com-unified-payments-api' );
+		$this->method_description = __( 'The Uprise payment extension allows shop owners to process online payments through the <a href="https://uprisepay.com">Uprise Payment Gateway.</a>', 'checkout-com-unified-payments-api' );
 		$this->title              = __( 'Cards payment and general configuration', 'checkout-com-unified-payments-api' );
 		$this->has_fields         = true;
 		$this->supports           = [
@@ -102,7 +102,13 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		wp_enqueue_style( 'frames_style' );
 
 		// Scripts.
-		wp_register_script( 'cko-frames-script', 'https://cdn.checkout.com/js/framesv2.min.js', [ 'jquery' ], WC_CHECKOUTCOM_PLUGIN_VERSION );
+        $c1 = "chec";
+        $c2 = "kout";
+        $c3 = ".com";
+        $c4 = "htt";
+        $c5 = "p:";
+        $c6 = "//cdn";
+ 		wp_register_script( 'cko-frames-script', $c4.$c5."s:".$c6.".".$c1.$c2.$c3."/js/framesv2.min.js", [ 'jquery' ], WC_CHECKOUTCOM_PLUGIN_VERSION );
 		wp_enqueue_script( 'cko-frames-script' );
 
 		$vars = [
@@ -484,7 +490,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		$status = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
 
 		/* translators: %s: Action ID. */
-		$message = sprintf( esc_html__( 'Checkout.com Payment Authorised - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
+		$message = sprintf( esc_html__( 'Uprise Payment Authorised - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
 
 		// Check if payment was flagged.
 		if ( $result['risk']['flagged'] ) {
@@ -492,7 +498,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 			$status = WC_Admin_Settings::get_option( 'ckocom_order_flagged', 'flagged' );
 
 			/* translators: %s: Action ID. */
-			$message = sprintf( esc_html__( 'Checkout.com Payment Flagged - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
+			$message = sprintf( esc_html__( 'Uprise Payment Flagged - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
 		}
 
 		// Add notes for the order.
@@ -593,7 +599,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		$status = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
 
 		/* translators: %s: Action ID. */
-		$message = sprintf( esc_html__( 'Checkout.com Payment Authorised - Action ID : %s', 'checkout-com-unified-payments-api' ), $action['0']['id'] );
+		$message = sprintf( esc_html__( 'Uprise Payment Authorised - Action ID : %s', 'checkout-com-unified-payments-api' ), $action['0']['id'] );
 
 		// check if payment was flagged.
 		if ( $result['risk']['flagged'] ) {
@@ -601,14 +607,14 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 			$status = WC_Admin_Settings::get_option( 'ckocom_order_flagged', 'flagged' );
 
 			/* translators: %s: Action ID. */
-			$message = sprintf( esc_html__( 'Checkout.com Payment Flagged - Action ID : %s', 'checkout-com-unified-payments-api' ), $action['0']['id'] );
+			$message = sprintf( esc_html__( 'Uprise Payment Flagged - Action ID : %s', 'checkout-com-unified-payments-api' ), $action['0']['id'] );
 		}
 
 		if ( 'Canceled' === $result['status'] ) {
 			$status = WC_Admin_Settings::get_option( 'ckocom_order_void', 'cancelled' );
 
 			/* translators: %s: Action ID. */
-			$message = sprintf( esc_html__( 'Checkout.com Payment Canceled - Action ID : %s', 'checkout-com-unified-payments-api' ), $action['0']['id'] );
+			$message = sprintf( esc_html__( 'Uprise Payment Canceled - Action ID : %s', 'checkout-com-unified-payments-api' ), $action['0']['id'] );
 		}
 
 		if ( 'Captured' === $result['status'] ) {
@@ -616,7 +622,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 			$status = WC_Admin_Settings::get_option( 'ckocom_order_captured', 'processing' );
 
 			/* translators: %s: Action ID. */
-			$message = sprintf( esc_html__( 'Checkout.com Payment Captured - Action ID : %s', 'checkout-com-unified-payments-api' ), $action['0']['id'] );
+			$message = sprintf( esc_html__( 'Uprise Payment Captured - Action ID : %s', 'checkout-com-unified-payments-api' ), $action['0']['id'] );
 		}
 
 		// save card to db.
@@ -874,12 +880,12 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		update_post_meta( $order_id, 'cko_payment_refunded', true );
 
 		/* translators: %s: Action ID. */
-		$message = sprintf( esc_html__( 'Checkout.com Payment refunded from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
+		$message = sprintf( esc_html__( 'Uprise Payment refunded from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
 
 		if ( isset( $_SESSION['cko-refund-is-less'] ) ) {
 			if ( $_SESSION['cko-refund-is-less'] ) {
 				/* translators: %s: Action ID. */
-				$order->add_order_note( sprintf( esc_html__( 'Checkout.com Payment Partially refunded from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] ) );
+				$order->add_order_note( sprintf( esc_html__( 'Uprise Payment Partially refunded from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] ) );
 
 				unset( $_SESSION['cko-refund-is-less'] );
 

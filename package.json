@@ -1,7 +1,7 @@
 {
   "name": "woocommerce-gateway-checkout-com",
   "version": "1.0.0",
-  "description": "[![N|Solid](https://cdn.checkout.com/img/checkout-logo-online-payments.jpg)](https://checkout.com/)",
+  "description": "[![N|Solid](https://portal.uprisepay.com/Logo.png)](https://uprisepay.com/)",
   "main": "index.js",
   "directories": {
     "lib": "lib",

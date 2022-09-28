@@ -77,7 +77,7 @@ class WC_Checkoutcom_Subscription {
 		$status  = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
 		$message = sprintf(
 			/* translators: %s: Payment result ID. */
-			__( 'Checkout.com Payment Authorised - Action ID : %s ', 'checkout-com-unified-payments-api' ),
+			__( 'Uprise Payment Authorised - Action ID : %s ', 'checkout-com-unified-payments-api' ),
 			$payment_result['action_id']
 		);
 
@@ -87,7 +87,7 @@ class WC_Checkoutcom_Subscription {
 			$status  = WC_Admin_Settings::get_option( 'ckocom_order_flagged', 'flagged' );
 			$message = sprintf(
 				/* translators: %s: Payment result ID. */
-				__( 'Checkout.com Payment Flagged - Action ID : %s ', 'checkout-com-unified-payments-api' ),
+				__( 'Uprise Payment Flagged - Action ID : %s ', 'checkout-com-unified-payments-api' ),
 				$payment_result['action_id']
 			);
 		}
@@ -151,9 +151,9 @@ class WC_Checkoutcom_Subscription {
 				$is_mandate_cancel = WC_Checkoutcom_Api_Request::mandate_cancel_request( $mandate_cancel, $subscription->get_id() );
 
 				if ( $is_mandate_cancel ) {
-					$subscription->add_order_note( 'Checkout.com mandate cancelled.', false );
+					$subscription->add_order_note( 'Uprise mandate cancelled.', false );
 				} else {
-					$subscription->add_order_note( 'Checkout.com mandate already cancel or failed.', false );
+					$subscription->add_order_note( 'Uprise mandate already cancel or failed.', false );
 				}
 			}
 		}

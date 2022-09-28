@@ -17,8 +17,8 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 	 */
 	public function __construct() {
 		$this->id                 = 'wc_checkout_com_paypal';
-		$this->method_title       = __( 'Checkout.com', 'checkout-com-unified-payments-api' );
-		$this->method_description = __( 'The Checkout.com extension allows shop owners to process online payments through the <a href="https://www.checkout.com">Checkout.com Payment Gateway.</a>', 'checkout-com-unified-payments-api' );
+		$this->method_title       = __( 'Uprise payment', 'checkout-com-unified-payments-api' );
+		$this->method_description = __( 'The Uprise payment extension allows shop owners to process online payments through the <a href="https://uprisepay.com">Uprise Payment Gateway.</a>', 'checkout-com-unified-payments-api' );
 		$this->title              = __( 'PayPal', 'checkout-com-unified-payments-api' );
 		$this->has_fields         = true;
 		$this->supports           = [
@@ -126,7 +126,7 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 		$status = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
 
 		/* translators: %s: Action ID. */
-		$message = sprintf( esc_html__( 'Checkout.com Payment Authorised - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
+		$message = sprintf( esc_html__( 'Uprise Payment Authorised - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
 
 		// check if payment was flagged.
 		if ( $result['risk']['flagged'] ) {
@@ -134,7 +134,7 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 			$status = WC_Admin_Settings::get_option( 'ckocom_order_flagged', 'flagged' );
 
 			/* translators: %s: Action ID. */
-			$message = sprintf( esc_html__( 'Checkout.com Payment Flagged - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
+			$message = sprintf( esc_html__( 'Uprise Payment Flagged - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
 		}
 
 		// add notes for the order and update status.
@@ -180,12 +180,12 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 		$status = WC_Admin_Settings::get_option( 'ckocom_order_refunded', 'refunded' );
 
 		/* translators: %s: Action ID. */
-		$message = sprintf( esc_html__( 'Checkout.com Payment refunded - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
+		$message = sprintf( esc_html__( 'Uprise Payment refunded - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
 
 		if ( isset( $_SESSION['cko-refund-is-less'] ) ) {
 			if ( $_SESSION['cko-refund-is-less'] ) {
 				/* translators: %s: Action ID. */
-				$order->add_order_note( sprintf( esc_html__( 'Checkout.com Payment Partially refunded - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] ) );
+				$order->add_order_note( sprintf( esc_html__( 'Uprise Payment Partially refunded - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] ) );
 
 				unset( $_SESSION['cko-refund-is-less'] );
 

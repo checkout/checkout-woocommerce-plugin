@@ -20,8 +20,8 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Sepa extends WC_Gateway_Check
 	 */
 	public function __construct() {
 		$this->id                 = 'wc_checkout_com_alternative_payments_sepa';
-		$this->method_title       = __( 'Checkout.com', 'checkout-com-unified-payments-api' );
-		$this->method_description = __( 'The Checkout.com extension allows shop owners to process online payments through the <a href="https://www.checkout.com">Checkout.com Payment Gateway.</a>', 'checkout-com-unified-payments-api' );
+		$this->method_title       = __( 'Uprise payment', 'checkout-com-unified-payments-api' );
+		$this->method_description = __( 'The Uprise payment extension allows shop owners to process online payments through the <a href="https://uprisepay.com">Uprise Payment Gateway.</a>', 'checkout-com-unified-payments-api' );
 		$this->title              = __( 'SEPA Direct Debit', 'checkout-com-unified-payments-api' );
 		$this->has_fields         = true;
 		$this->supports           = [
@@ -116,7 +116,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Sepa extends WC_Gateway_Check
 
 			$message = sprintf(
 				/* translators: 1: Result ID, 2: Mandate reference. */
-				esc_html__( 'Checkout.com - Sepa payment Action ID : %1$s - Sepa mandate reference : %2$s', 'checkout-com-unified-payments-api' ),
+				esc_html__( 'Uprise - Sepa payment Action ID : %1$s - Sepa mandate reference : %2$s', 'checkout-com-unified-payments-api' ),
 				$result['id'],
 				$mandate
 			);

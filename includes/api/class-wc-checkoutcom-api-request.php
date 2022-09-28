@@ -358,7 +358,7 @@ class WC_Checkoutcom_Api_Request {
 		$payment->failure_url = $redirection_url;
 
 		$udf5 = sprintf(
-			'Platform Data - WordPress %s / Woocommerce %s, Integration Data - Checkout.com %s, SDK Data - PHP SDK %s, Order ID - %s, Server - %s',
+			'Platform Data - WordPress %s / Woocommerce %s, Integration Data - Uprise payment %s, SDK Data - PHP SDK %s, Order ID - %s, Server - %s',
 			$wp_version,
 			$woocommerce->version,
 			WC_CHECKOUTCOM_PLUGIN_VERSION,
@@ -671,13 +671,13 @@ class WC_Checkoutcom_Api_Request {
 		$checkout = new Checkout_SDK();
 
 		try {
-			// Check if payment is already voided or captured on checkout.com hub.
+			// Check if payment is already voided or captured on Uprise portal.
 			$details = $checkout->get_builder()->getPaymentsClient()->getPaymentDetails( $cko_payment_id );
 
 			if ( 'Voided' === $details['status'] || 'Captured' === $details['status'] ) {
 				$error_message = sprintf(
 					/* translators: 1: Order ID. */
-					esc_html__( 'Payment has already been voided or captured on Checkout.com hub for order Id : %s', 'checkout-com-unified-payments-api' ),
+					esc_html__( 'Payment has already been voided or captured on Uprise portal for order Id : %s', 'checkout-com-unified-payments-api' ),
 					$order_id
 				);
 
@@ -694,7 +694,7 @@ class WC_Checkoutcom_Api_Request {
 			if ( ! WC_Checkoutcom_Utility::is_successful( $response ) ) {
 				$error_message = sprintf(
 					/* translators: 1: Order ID. */
-					esc_html__( 'An error has occurred while processing your capture payment on Checkout.com hub. Order Id : %s', 'checkout-com-unified-payments-api' ),
+					esc_html__( 'An error has occurred while processing your capture payment on Uprise portal. Order Id : %s', 'checkout-com-unified-payments-api' ),
 					$order_id
 				);
 
@@ -745,13 +745,13 @@ class WC_Checkoutcom_Api_Request {
 		$checkout = new Checkout_SDK();
 
 		try {
-			// Check if payment is already voided or captured on checkout.com hub.
+			// Check if payment is already voided or captured on Uprise portal.
 			$details = $checkout->get_builder()->getPaymentsClient()->getPaymentDetails( $cko_payment_id );
 
 			if ( 'Voided' === $details['status'] || 'Captured' === $details['status'] ) {
 				$error_message = sprintf(
 					/* translators: 1: Order ID. */
-					esc_html__( 'Payment has already been voided or captured on Checkout.com hub for order Id : %s', 'checkout-com-unified-payments-api' ),
+					esc_html__( 'Payment has already been voided or captured on Uprise portal for order Id : %s', 'checkout-com-unified-payments-api' ),
 					$order_id
 				);
 
@@ -762,13 +762,13 @@ class WC_Checkoutcom_Api_Request {
 			$void_request            = new VoidRequest();
 			$void_request->reference = $order_id;
 
-			// Process void payment on checkout.com.
+			// Process void payment on Uprise.
 			$response = $checkout->get_builder()->getPaymentsClient()->voidPayment( $cko_payment_id, $void_request );
 
 			if ( ! WC_Checkoutcom_Utility::is_successful( $response ) ) {
 				$error_message = sprintf(
 					/* translators: 1: Order ID. */
-					esc_html__( 'An error has occurred while processing your void payment on Checkout.com hub. Order Id : %s', 'checkout-com-unified-payments-api' ),
+					esc_html__( 'An error has occurred while processing your void payment on Uprise portal. Order Id : %s', 'checkout-com-unified-payments-api' ),
 					$order_id
 				);
 
@@ -830,11 +830,11 @@ class WC_Checkoutcom_Api_Request {
 		$checkout = new Checkout_SDK();
 
 		try {
-			// Check if payment is already voided or captured on checkout.com hub.
+			// Check if payment is already voided or captured on Uprise portal.
 			$details = $checkout->get_builder()->getPaymentsClient()->getPaymentDetails( $cko_payment_id );
 
 			if ( 'Refunded' === $details['status'] && ! $refund_is_less ) {
-				$error_message = 'Payment has already been refunded on Checkout.com hub for order Id : ' . $order_id;
+				$error_message = 'Payment has already been refunded on Uprise portal for order Id : ' . $order_id;
 
 				return [ 'error' => $error_message ];
 			}
@@ -854,7 +854,7 @@ class WC_Checkoutcom_Api_Request {
 
 			if ( ! WC_Checkoutcom_Utility::is_successful( $response ) ) {
 				/* translators: 1: Order ID. */
-				$error_message = sprintf( esc_html__( 'An error has occurred while processing your refund payment on Checkout.com hub. Order Id : %s', 'checkout-com-unified-payments-api' ), $order_id );
+				$error_message = sprintf( esc_html__( 'An error has occurred while processing your refund payment on Uprise portal. Order Id : %s', 'checkout-com-unified-payments-api' ), $order_id );
 
 				// Check if gateway response is enabled from module settings.
 				if ( $gateway_debug ) {
@@ -1258,7 +1258,7 @@ class WC_Checkoutcom_Api_Request {
 
 	/**
 	 * Return order product information.
-	 * Docs: https://www.checkout.com/docs/payments/payment-methods/paypal#Request_example
+	 * Docs:
 	 *
 	 * @param WC_Order $order Order object.
 	 *

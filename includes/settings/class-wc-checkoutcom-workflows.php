@@ -71,7 +71,7 @@ class WC_Checkoutcom_Workflows {
 		$core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
 
 		$this->secret_key = $core_settings['ckocom_sk'];
-		$this->url        = $environment ? 'https://api.sandbox.checkout.com/workflows' : 'https://api.checkout.com/workflows';
+		$this->url        = $environment ? 'https://sandbox-api.uprisepay.com/workflows' : 'https://api-tech.uprisepay.com/workflows';
 
 		$this->checkout = new Checkout_SDK();
 	}

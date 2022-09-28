@@ -1,6 +1,6 @@
 #!/bin/sh
 
-PLUGIN_SLUG="checkout-com-unified-payments-api"
+PLUGIN_SLUG="uprise-payment-unified-payments-api"
 
 echo "Installing PHP and JS dependencies..."
 composer install --no-dev || exit "$?"

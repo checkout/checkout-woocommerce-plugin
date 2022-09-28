@@ -40,7 +40,7 @@ class WC_Checkout_Com_Webhook {
 
 		$already_authorized = get_post_meta( $order_id, 'cko_payment_authorized', true );
 		$auth_status        = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
-		$message            = 'Webhook received from checkout.com. Payment Authorized';
+		$message            = 'Webhook received from Uprise. Payment Authorized';
 
 		// Add note to order if Authorized already.
 		if ( $already_authorized && $order->get_status() === $auth_status ) {
@@ -118,7 +118,7 @@ class WC_Checkout_Com_Webhook {
 
 		// Check if payment is already captured.
 		$already_captured = get_post_meta( $order_id, 'cko_payment_captured', true );
-		$message          = 'Webhook received from checkout.com Payment captured';
+		$message          = 'Webhook received from Uprise Payment captured';
 
 		$already_authorized = get_post_meta( $order_id, 'cko_payment_authorized', true );
 
@@ -187,7 +187,7 @@ class WC_Checkout_Com_Webhook {
 		// Load order form order id.
 		$order = self::get_wc_order( $order_id );
 
-		$message = 'Webhook received from checkout.com. Payment capture declined. Reason : ' . $webhook_data->response_summary;
+		$message = 'Webhook received from Uprise. Payment capture declined. Reason : ' . $webhook_data->response_summary;
 
 		// Add note to order if capture declined.
 		$order->add_order_note( $message );
@@ -217,7 +217,7 @@ class WC_Checkout_Com_Webhook {
 
 		// check if payment is already captured.
 		$already_voided = get_post_meta( $order_id, 'cko_payment_voided', true );
-		$message        = 'Webhook received from checkout.com. Payment voided';
+		$message        = 'Webhook received from Uprise. Payment voided';
 
 		// Add note to order if captured already.
 		if ( $already_voided ) {
@@ -272,7 +272,7 @@ class WC_Checkout_Com_Webhook {
 
 		// check if payment is already refunded.
 		$already_refunded = get_post_meta( $order_id, 'cko_payment_refunded', true );
-		$message          = 'Webhook received from checkout.com. Payment refunded';
+		$message          = 'Webhook received from Uprise. Payment refunded';
 
 		// Get action id from webhook data.
 		$action_id          = $webhook_data->action_id;
@@ -353,7 +353,7 @@ class WC_Checkout_Com_Webhook {
 		$checkout = new Checkout_SDK();
 
 		try {
-			// Check if payment is already voided or captured on checkout.com hub.
+			// Check if payment is already voided or captured on Uprise portal.
 			$details = $checkout->get_builder()->getPaymentsClient()->getPaymentDetails( $payment_id );
 
 			$order_id = ! empty( $details['metadata']['order_id'] ) ? $details['metadata']['order_id'] : null;
@@ -369,7 +369,7 @@ class WC_Checkout_Com_Webhook {
 			$order = self::get_wc_order( $order_id );
 
 			$status  = 'wc-cancelled';
-			$message = 'Webhook received from checkout.com. Payment cancelled';
+			$message = 'Webhook received from Uprise. Payment cancelled';
 
 			// Add notes for the order and update status.
 			$order->add_order_note( $message );
@@ -414,7 +414,7 @@ class WC_Checkout_Com_Webhook {
 		$order = self::get_wc_order( $order_id );
 
 		$status  = 'wc-failed';
-		$message = 'Webhook received from checkout.com. Payment declined Reason : ' . $response_summary;
+		$message = 'Webhook received from Uprise. Payment declined Reason : ' . $response_summary;
 
 		// Add notes for the order and update status.
 		$order->add_order_note( $message );

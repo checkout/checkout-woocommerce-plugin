@@ -290,7 +290,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			}
 
 			/**
-			 * Generate the checkout.com token based on the Apple Pay payload.
+			 * Generate the Uprise token based on the Apple Pay payload.
 			 *
 			 * @param {function} callback
 			 */
@@ -580,7 +580,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		$status = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
 
 		/* translators: %s: Action ID. */
-		$message = sprintf( esc_html__( 'Checkout.com Payment Authorised - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
+		$message = sprintf( esc_html__( 'Uprise Payment Authorised - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
 
 		// check if payment was flagged.
 		if ( $result['risk']['flagged'] ) {
@@ -588,7 +588,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			$status = WC_Admin_Settings::get_option( 'ckocom_order_flagged', 'flagged' );
 
 			/* translators: %s: Action ID. */
-			$message = sprintf( esc_html__( 'Checkout.com Payment Flagged - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
+			$message = sprintf( esc_html__( 'Uprise Payment Flagged - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
 		}
 
 		// add notes for the order and update status.
@@ -636,7 +636,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		if ( isset( $_SESSION['cko-refund-is-less'] ) ) {
 			if ( $_SESSION['cko-refund-is-less'] ) {
 				/* translators: %s: Action ID. */
-				$order->add_order_note( sprintf( __( 'Checkout.com Payment Partially refunded from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] ) );
+				$order->add_order_note( sprintf( __( 'Uprise Payment Partially refunded from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] ) );
 
 				unset( $_SESSION['cko-refund-is-less'] );
 
@@ -645,7 +645,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		}
 
 		/* translators: %s: Action ID. */
-		$order->add_order_note( sprintf( __( 'Checkout.com Payment refunded from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] ) );
+		$order->add_order_note( sprintf( __( 'Uprise Payment refunded from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] ) );
 
 		// when true is returned, status is changed to refunded automatically.
 		return true;

@@ -76,8 +76,8 @@ class WC_Checkoutcom_Cards_Settings {
 	 */
 	public static function core_settings() {
 		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
-		$nas_docs      = 'https://www.checkout.com/docs/four/resources/api-authentication/api-keys';
-		$abc_docs      = 'https://www.checkout.com/docs/the-hub/update-your-hub-settings#Manage_the_API_keys';
+		$nas_docs      = 'https://docs.uprisepay.com/';
+		$abc_docs      = 'https://docs.uprisepay.com/';
 		$docs_link     = $abc_docs;
 
 		if ( isset( $core_settings['ckocom_account_type'] ) && 'NAS' === $core_settings['ckocom_account_type'] ) {
@@ -94,8 +94,8 @@ class WC_Checkoutcom_Cards_Settings {
 				'id'          => 'enable',
 				'title'       => __( 'Enable/Disable', 'checkout-com-unified-payments-api' ),
 				'type'        => 'checkbox',
-				'label'       => __( 'Enable Checkout.com cards payment', 'checkout-com-unified-payments-api' ),
-				'description' => __( 'This enables Checkout.com. cards payment', 'checkout-com-unified-payments-api' ),
+				'label'       => __( 'Enable Uprise cards payment', 'checkout-com-unified-payments-api' ),
+				'description' => __( 'This enables Uprise cards payment', 'checkout-com-unified-payments-api' ),
 				'desc_tip'    => true,
 				'default'     => 'yes',
 			],
@@ -113,10 +113,10 @@ class WC_Checkoutcom_Cards_Settings {
 			'title'               => [
 				'title'       => __( 'Payment Option Title', 'checkout-com-unified-payments-api' ),
 				'type'        => 'text',
-				'label'       => __( 'Pay by Card with Checkout.com', 'checkout-com-unified-payments-api' ),
+				'label'       => __( 'Pay by Card with Uprise', 'checkout-com-unified-payments-api' ),
 				'description' => __( 'Title that will be displayed on the checkout page', 'checkout-com-unified-payments-api' ),
 				'desc_tip'    => true,
-				'default'     => 'Pay by Card with Checkout.com',
+				'default'     => 'Pay by Card with Uprise',
 			],
 			'ckocom_account_type' => [
 				'title'       => __( 'Account type', 'checkout-com-unified-payments-api' ),
@@ -133,14 +133,14 @@ class WC_Checkoutcom_Cards_Settings {
 				'title'       => __( 'Secret Key', 'checkout-com-unified-payments-api' ),
 				'type'        => 'text',
 				/* translators: 1: HTML anchor opening tag, 2: HTML anchor closing tag. */
-				'description' => sprintf( __( 'You can %1$s find your secret key %2$s in the Checkout.com Hub', 'checkout-com-unified-payments-api' ), '<a class="checkoutcom-key-docs" target="_blank" href="' . esc_url( $docs_link ) . '">', '</a>' ),
+				'description' => sprintf( __( 'You can %1$s find your secret key %2$s in the Uprise portal', 'checkout-com-unified-payments-api' ), '<a class="checkoutcom-key-docs" target="_blank" href="' . esc_url( $docs_link ) . '">', '</a>' ),
 				'placeholder' => 'sk_xxx',
 			],
 			'ckocom_pk'           => [
 				'title'       => __( 'Public Key', 'checkout-com-unified-payments-api' ),
 				'type'        => 'text',
 				/* translators: 1: HTML anchor opening tag, 2: HTML anchor closing tag. */
-				'description' => sprintf( __( 'You can %1$s find your public key %2$s in the Checkout.com Hub', 'checkout-com-unified-payments-api' ), '<a class="checkoutcom-key-docs" target="_blank" href="' . esc_url( $docs_link ) . '">', '</a>' ),
+				'description' => sprintf( __( 'You can %1$s find your public key %2$s in the Uprise portal', 'checkout-com-unified-payments-api' ), '<a class="checkoutcom-key-docs" target="_blank" href="' . esc_url( $docs_link ) . '">', '</a>' ),
 				'placeholder' => 'pk_xxx',
 			],
 		];
@@ -398,8 +398,8 @@ class WC_Checkoutcom_Cards_Settings {
 	 */
 	public static function apple_settings() {
 		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
-		$nas_docs      = 'https://www.checkout.com/docs/four/payments/payment-methods/apple-pay';
-		$abc_docs      = 'https://www.checkout.com/docs/payments/payment-methods/wallets/apple-pay';
+		$nas_docs      = 'https://docs.uprisepay.com/';
+		$abc_docs      = 'https://docs.uprisepay.com/';
 		$docs_link     = $abc_docs;
 
 		if ( isset( $core_settings['ckocom_account_type'] ) && 'NAS' === $core_settings['ckocom_account_type'] ) {
@@ -416,8 +416,8 @@ class WC_Checkoutcom_Cards_Settings {
 				'id'          => 'enable',
 				'title'       => __( 'Enable/Disable', 'checkout-com-unified-payments-api' ),
 				'type'        => 'checkbox',
-				'label'       => __( 'Enable Checkout.com', 'checkout-com-unified-payments-api' ),
-				'description' => __( 'This enables Checkout.com. cards payment', 'checkout-com-unified-payments-api' ),
+				'label'       => __( 'Enable Uprise', 'checkout-com-unified-payments-api' ),
+				'description' => __( 'This enables Uprise cards payment', 'checkout-com-unified-payments-api' ),
 				'desc_tip'    => true,
 				'default'     => 'yes',
 			],
@@ -513,7 +513,7 @@ class WC_Checkoutcom_Cards_Settings {
 				'id'          => 'enable',
 				'title'       => __( 'Enable/Disable', 'checkout-com-unified-payments-api' ),
 				'type'        => 'checkbox',
-				'label'       => __( 'Enable Checkout.com', 'checkout-com-unified-payments-api' ),
+				'label'       => __( 'Enable Uprise', 'checkout-com-unified-payments-api' ),
 				'description' => __( 'This enables google pay as a payment method', 'checkout-com-unified-payments-api' ),
 				'desc_tip'    => true,
 				'default'     => 'no',
@@ -585,7 +585,7 @@ class WC_Checkoutcom_Cards_Settings {
 				'id'          => 'enable',
 				'title'       => __( 'Enable/Disable', 'checkout-com-unified-payments-api' ),
 				'type'        => 'checkbox',
-				'label'       => __( 'Enable Checkout.com', 'checkout-com-unified-payments-api' ),
+				'label'       => __( 'Enable Uprise', 'checkout-com-unified-payments-api' ),
 				'description' => __( 'This enables PayPal as a payment method', 'checkout-com-unified-payments-api' ),
 				'desc_tip'    => true,
 				'default'     => 'no',
@@ -626,7 +626,7 @@ class WC_Checkoutcom_Cards_Settings {
 				'id'          => 'enable',
 				'title'       => __( 'Enable/Disable', 'checkout-com-unified-payments-api' ),
 				'type'        => 'checkbox',
-				'label'       => __( 'Enable Checkout.com', 'checkout-com-unified-payments-api' ),
+				'label'       => __( 'Enable Uprise', 'checkout-com-unified-payments-api' ),
 				'description' => __( 'This enables alternative payment methods', 'checkout-com-unified-payments-api' ),
 				'desc_tip'    => true,
 				'default'     => 'no',

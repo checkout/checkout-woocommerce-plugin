@@ -1,10 +1,10 @@
 <?php
 /**
- * Plugin Name: Checkout.com Payment Gateway
- * Plugin URI: https://www.checkout.com/
- * Description: Extends WooCommerce by Adding the Checkout.com Gateway.
- * Author: Checkout.com
- * Author URI: https://www.checkout.com/
+ * Plugin Name: Uprise Payment Gateway
+ * Plugin URI: https://uprisepay.com/
+ * Description: Extends WooCommerce by Adding the Uprise Payment Gateway.
+ * Author: Uprise Payment
+ * Author URI: https://uprisepay.com/
  * Version: 4.4.7
  * Requires at least: 4.0
  * Stable tag: 4.4.7
@@ -181,8 +181,8 @@ function cko_admin_enqueue_scripts() {
 	wp_enqueue_script( 'cko-admin-script', WC_CHECKOUTCOM_PLUGIN_URL . '/assets/js/admin.js', [ 'jquery' ], WC_CHECKOUTCOM_PLUGIN_VERSION );
 
 	$vars = [
-		'nas_docs'                           => 'https://www.checkout.com/docs/four/resources/api-authentication/api-keys',
-		'abc_docs'                           => 'https://www.checkout.com/docs/the-hub/update-your-hub-settings#Manage_the_API_keys',
+		'nas_docs'                           => 'https://docs.uprisepay.com/',
+		'abc_docs'                           => 'https://docs.uprisepay.com/',
 
 		'webhook_check_error'                => esc_html__( 'An error occurred while fetching the webhooks. Please try again.', 'checkout-com-unified-payments-api' ),
 		'webhook_register_error'             => esc_html__( 'An error occurred while registering the webhook. Please try again.', 'checkout-com-unified-payments-api' ),
@@ -197,7 +197,7 @@ function cko_admin_enqueue_scripts() {
 add_action( 'wp_enqueue_scripts', 'callback_for_setting_up_scripts' );
 
 /**
- * Load checkout.com style sheet.
+ * Load Uprise style sheet.
  * Load Google Pay js.
  *
  * Only on Checkout related pages.

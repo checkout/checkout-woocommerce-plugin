@@ -1,5 +1,5 @@
-# Copyright (C) 2022 Checkout.com
-# This file is distributed under the same license as the Checkout.com Payment Gateway plugin.
+# Copyright (C) 2022 Uprise payment
+# This file is distributed under the same license as the Uprise Payment Gateway plugin.
 msgid ""
 msgstr ""
 "Project-Id-Version: Uprise-payment Gateway 4.4.7\n"
@@ -37,7 +37,7 @@ msgstr ""
 #: includes/class-wc-gateway-checkout-com-cards.php:35
 #: includes/class-wc-gateway-checkout-com-google-pay.php:20
 #: includes/class-wc-gateway-checkout-com-paypal.php:20
-msgid "Checkout.com"
+msgid "Uprise payment"
 msgstr ""
 
 #: includes/api/class-wc-checkoutcom-api-request.php:85
@@ -1049,12 +1049,12 @@ msgstr ""
 
 #. translators: %s: Payment result ID.
 #: includes/subscription/class-wc-checkoutcom-subscription.php:80
-msgid "Checkout.com Payment Authorised - Action ID : %s "
+msgid "Uprise Payment Authorised - Action ID : %s "
 msgstr ""
 
 #. translators: %s: Payment result ID.
 #: includes/subscription/class-wc-checkoutcom-subscription.php:90
-msgid "Checkout.com Payment Flagged - Action ID : %s "
+msgid "Uprise Payment Flagged - Action ID : %s "
 msgstr ""
 
 #: templates/class-wc-checkoutcom-apm-templates.php:27
