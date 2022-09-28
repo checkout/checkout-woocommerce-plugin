@@ -19,8 +19,8 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 	 */
 	public function __construct() {
 		$this->id                 = 'wc_checkout_com_apple_pay';
-		$this->method_title       = __( 'Checkout.com', 'checkout-com-unified-payments-api' );
-		$this->method_description = __( 'The Checkout.com extension allows shop owners to process online payments through the <a href="https://www.checkout.com">Checkout.com Payment Gateway.</a>', 'checkout-com-unified-payments-api' );
+		$this->method_title       = __( 'Uprise payment', 'checkout-com-unified-payments-api' );
+		$this->method_description = __( 'The Uprise payment extension allows shop owners to process online payments through the <a href="https://uprisepay.com">Uprise Payment Gateway.</a>', 'checkout-com-unified-payments-api' );
 		$this->title              = __( 'Apple Pay', 'checkout-com-unified-payments-api' );
 		$this->has_fields         = true;
 		$this->supports           = [

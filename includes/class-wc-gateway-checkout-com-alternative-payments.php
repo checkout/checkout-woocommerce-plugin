@@ -33,8 +33,8 @@ class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway {
 	 */
 	public function __construct() {
 		$this->id                 = 'wc_checkout_com_alternative_payments';
-		$this->method_title       = __( 'Checkout.com', 'checkout-com-unified-payments-api' );
-		$this->method_description = __( 'The Checkout.com extension allows shop owners to process online payments through the <a href="https://www.checkout.com">Checkout.com Payment Gateway.</a>', 'checkout-com-unified-payments-api' );
+		$this->method_title       = __( 'Uprise payment', 'checkout-com-unified-payments-api' );
+		$this->method_description = __( 'The Uprise payment extension allows shop owners to process online payments through the <a href="https://uprisepay.com">Uprise Payment Gateway.</a>', 'checkout-com-unified-payments-api' );
 		$this->title              = __( 'Alternative Payment', 'checkout-com-unified-payments-api' );
 
 		$this->has_fields = true;
@@ -119,7 +119,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway {
 		if ( isset( $_SESSION['cko-refund-is-less'] ) ) {
 			if ( $_SESSION['cko-refund-is-less'] ) {
 				/* translators: %s: Action ID. */
-				$order->add_order_note( sprintf( esc_html__( 'Checkout.com Payment Partially refunded from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] ) );
+				$order->add_order_note( sprintf( esc_html__( 'Uprise Payment Partially refunded from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] ) );
 
 				unset( $_SESSION['cko-refund-is-less'] );
 
@@ -128,7 +128,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway {
 		}
 
 		/* translators: %s: Action ID. */
-		$order->add_order_note( sprintf( esc_html__( 'Checkout.com Payment refunded from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] ) );
+		$order->add_order_note( sprintf( esc_html__( 'Uprise Payment refunded from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] ) );
 
 		// when true is returned, status is changed to refunded automatically.
 		return true;

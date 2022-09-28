@@ -309,7 +309,7 @@ function renew_save_again( $post_id, $post ) {
 				$status = WC_Admin_Settings::get_option( 'ckocom_order_captured', 'processing' );
 
 				/* translators: %s: Action id. */
-				$message = sprintf( esc_html__( 'Checkout.com Payment Captured from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
+				$message = sprintf( esc_html__( 'Uprise Payment Captured from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
 
 				// add notes for the order and update status.
 				$order->add_order_note( $message );
@@ -336,7 +336,7 @@ function renew_save_again( $post_id, $post ) {
 				$status = WC_Admin_Settings::get_option( 'ckocom_order_void', 'cancelled' );
 
 				/* translators: %s: Action id. */
-				$message = sprintf( esc_html__( 'Checkout.com Payment Voided from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
+				$message = sprintf( esc_html__( 'Uprise Payment Voided from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
 
 				// add notes for the order and update status.
 				$order->add_order_note( $message );
