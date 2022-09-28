@@ -2,8 +2,7 @@
 # This file is distributed under the same license as the Checkout.com Payment Gateway plugin.
 msgid ""
 msgstr ""
-"Project-Id-Version: Checkout.com Payment Gateway 4.4.7\n"
-"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/checkout-com-unified-payments-api\n"
+"Project-Id-Version: Uprise-payment Gateway 4.4.7\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
@@ -12,19 +11,18 @@ msgstr ""
 "POT-Creation-Date: 2022-08-18T04:38:37+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.6.0\n"
-"X-Domain: checkout-com-unified-payments-api\n"
 
 #. Plugin Name of the plugin
-msgid "Checkout.com Payment Gateway"
+msgid "Uprise Payment Gateway"
 msgstr ""
 
 #. Plugin URI of the plugin
 #. Author URI of the plugin
-msgid "https://www.checkout.com/"
+msgid "https://uprisepay.com/"
 msgstr ""
 
 #. Description of the plugin
-msgid "Extends WooCommerce by Adding the Checkout.com Gateway."
+msgid "Extends WooCommerce by Adding the Uprise payment Gateway."
 msgstr ""
 
 #. Author of the plugin
@@ -80,12 +78,12 @@ msgstr ""
 #. translators: 1: Order ID.
 #: includes/api/class-wc-checkoutcom-api-request.php:680
 #: includes/api/class-wc-checkoutcom-api-request.php:754
-msgid "Payment has already been voided or captured on Checkout.com hub for order Id : %s"
+msgid "Payment has already been voided or captured on Uprise portal for order Id : %s"
 msgstr ""
 
 #. translators: 1: Order ID.
 #: includes/api/class-wc-checkoutcom-api-request.php:697
-msgid "An error has occurred while processing your capture payment on Checkout.com hub. Order Id : %s"
+msgid "An error has occurred while processing your capture payment on Uprise portal. Order Id : %s"
 msgstr ""
 
 #: includes/api/class-wc-checkoutcom-api-request.php:713
@@ -94,7 +92,7 @@ msgstr ""
 
 #. translators: 1: Order ID.
 #: includes/api/class-wc-checkoutcom-api-request.php:771
-msgid "An error has occurred while processing your void payment on Checkout.com hub. Order Id : %s"
+msgid "An error has occurred while processing your void payment on Uprise portal. Order Id : %s"
 msgstr ""
 
 #: includes/api/class-wc-checkoutcom-api-request.php:787
@@ -103,7 +101,7 @@ msgstr ""
 
 #. translators: 1: Order ID.
 #: includes/api/class-wc-checkoutcom-api-request.php:857
-msgid "An error has occurred while processing your refund payment on Checkout.com hub. Order Id : %s"
+msgid "An error has occurred while processing your refund payment on Uprise portal. Order Id : %s"
 msgstr ""
 
 #: includes/api/class-wc-checkoutcom-api-request.php:871
@@ -158,7 +156,7 @@ msgstr ""
 #: includes/class-wc-gateway-checkout-com-cards.php:36
 #: includes/class-wc-gateway-checkout-com-google-pay.php:21
 #: includes/class-wc-gateway-checkout-com-paypal.php:21
-msgid "The Checkout.com extension allows shop owners to process online payments through the <a href=\"https://www.checkout.com\">Checkout.com Payment Gateway.</a>"
+msgid "The Uprise payment extension allows shop owners to process online payments through the <a href=\"https://uprisepay.com\">Uprise Payment Gateway.</a>"
 msgstr ""
 
 #: includes/apms/class-wc-gateway-checkout-com-alternative-payments-boleto.php:25
@@ -186,12 +184,12 @@ msgstr ""
 
 #. translators: 1: Result ID, 2: Payment reference number.
 #: includes/apms/class-wc-gateway-checkout-com-alternative-payments-fawry.php:90
-msgid "Checkout.com - Fawry payment - Action ID : %1$s - Fawry reference number : %2$s"
+msgid "Uprise - Fawry payment - Action ID : %1$s - Fawry reference number : %2$s"
 msgstr ""
 
 #. translators: %s: Result ID.
 #: includes/apms/class-wc-gateway-checkout-com-alternative-payments-fawry.php:99
-msgid "Checkout.com Payment Captured - Action ID - %s"
+msgid "Uprise Payment Captured - Action ID - %s"
 msgstr ""
 
 #: includes/apms/class-wc-gateway-checkout-com-alternative-payments-giropay.php:23
@@ -222,11 +220,11 @@ msgid "Pay with Knet. You will be redirected upon place order"
 msgstr ""
 
 #: includes/apms/class-wc-gateway-checkout-com-alternative-payments-multibanco.php:29
-msgid "The Checkout.com extension allows shop owners to process online payments through the <a href=\\\"https://www.checkout.com\\\">Checkout.com Payment Gateway.</a>"
+msgid "The Uprise extension allows shop owners to process online payments through the <a href=\\\"https://uprisepay.com\\\">Uprise Payment Gateway.</a>"
 msgstr ""
 
 #: includes/apms/class-wc-gateway-checkout-com-alternative-payments-multibanco.php:30
-msgid "Pay by Multibanco with Checkout.com"
+msgid "Pay by Multibanco with Uprise payment"
 msgstr ""
 
 #: includes/apms/class-wc-gateway-checkout-com-alternative-payments-poli.php:23
@@ -253,7 +251,7 @@ msgstr ""
 
 #. translators: 1: Result ID, 2: Mandate reference.
 #: includes/apms/class-wc-gateway-checkout-com-alternative-payments-sepa.php:119
-msgid "Checkout.com - Sepa payment Action ID : %1$s - Sepa mandate reference : %2$s"
+msgid "Uprise - Sepa payment Action ID : %1$s - Sepa mandate reference : %2$s"
 msgstr ""
 
 #: includes/apms/class-wc-gateway-checkout-com-alternative-payments-sofort.php:23
@@ -266,50 +264,50 @@ msgid "Pay with Sofort. You will be redirected upon place order"
 msgstr ""
 
 #: includes/class-wc-checkout-com-webhook.php:86
-msgid "Checkout.com Card verified webhook received"
+msgid "Uprise Card verified webhook received"
 msgstr ""
 
 #: includes/class-wc-checkout-com-webhook.php:140
-msgid "Checkout.com Payment Capture webhook received"
+msgid "Uprise Payment Capture webhook received"
 msgstr ""
 
 #. translators: %s: Action ID.
 #: includes/class-wc-checkout-com-webhook.php:156
 #: includes/class-wc-gateway-checkout-com-cards.php:619
-msgid "Checkout.com Payment Captured - Action ID : %s"
+msgid "Uprise Payment Captured - Action ID : %s"
 msgstr ""
 
 #. translators: %s: Action ID.
 #: includes/class-wc-checkout-com-webhook.php:161
-msgid "Checkout.com Payment partially captured - Action ID : %s"
+msgid "Uprise Payment partially captured - Action ID : %s"
 msgstr ""
 
 #: includes/class-wc-checkout-com-webhook.php:228
-msgid "Checkout.com Payment Void webhook received"
+msgid "Uprise Payment Void webhook received"
 msgstr ""
 
 #. translators: %s: Action ID.
 #: includes/class-wc-checkout-com-webhook.php:241
-msgid "Checkout.com Payment Voided - Action ID : %s"
+msgid "Uprise Payment Voided - Action ID : %s"
 msgstr ""
 
 #: includes/class-wc-checkout-com-webhook.php:294
-msgid "Checkout.com Payment Refund webhook received"
+msgid "Uprise Payment Refund webhook received"
 msgstr ""
 
 #. translators: %s: Action ID.
 #: includes/class-wc-checkout-com-webhook.php:303
-msgid "Checkout.com Payment Refunded - Action ID : %s"
+msgid "Uprise Payment Refunded - Action ID : %s"
 msgstr ""
 
 #. translators: %s: Action ID.
 #: includes/class-wc-checkout-com-webhook.php:308
-msgid "Checkout.com Payment partially refunded - Action ID : %s"
+msgid "Uprise Payment partially refunded - Action ID : %s"
 msgstr ""
 
 #. translators: %s: Action ID.
 #: includes/class-wc-checkout-com-webhook.php:322
-msgid "Checkout.com Payment fully refunded - Action ID : %s"
+msgid "Uprise Payment fully refunded - Action ID : %s"
 msgstr ""
 
 #: includes/class-wc-gateway-checkout-com-alternative-payments.php:38
@@ -328,14 +326,14 @@ msgstr ""
 #: includes/class-wc-gateway-checkout-com-alternative-payments.php:122
 #: includes/class-wc-gateway-checkout-com-apple-pay.php:639
 #: includes/class-wc-gateway-checkout-com-cards.php:882
-msgid "Checkout.com Payment Partially refunded from Admin - Action ID : %s"
+msgid "Uprise Payment Partially refunded from Admin - Action ID : %s"
 msgstr ""
 
 #. translators: %s: Action ID.
 #: includes/class-wc-gateway-checkout-com-alternative-payments.php:131
 #: includes/class-wc-gateway-checkout-com-apple-pay.php:648
 #: includes/class-wc-gateway-checkout-com-cards.php:877
-msgid "Checkout.com Payment refunded from Admin - Action ID : %s"
+msgid "Uprise Payment refunded from Admin - Action ID : %s"
 msgstr ""
 
 #: includes/class-wc-gateway-checkout-com-apple-pay.php:24
@@ -355,7 +353,7 @@ msgstr ""
 #: includes/class-wc-gateway-checkout-com-cards.php:596
 #: includes/class-wc-gateway-checkout-com-google-pay.php:187
 #: includes/class-wc-gateway-checkout-com-paypal.php:129
-msgid "Checkout.com Payment Authorised - Action ID : %s"
+msgid "Uprise Payment Authorised - Action ID : %s"
 msgstr ""
 
 #. translators: %s: Action ID.
@@ -364,7 +362,7 @@ msgstr ""
 #: includes/class-wc-gateway-checkout-com-cards.php:604
 #: includes/class-wc-gateway-checkout-com-google-pay.php:195
 #: includes/class-wc-gateway-checkout-com-paypal.php:137
-msgid "Checkout.com Payment Flagged - Action ID : %s"
+msgid "Uprise Payment Flagged - Action ID : %s"
 msgstr ""
 
 #: includes/class-wc-gateway-checkout-com-cards.php:37
@@ -435,7 +433,7 @@ msgstr ""
 
 #. translators: %s: Action ID.
 #: includes/class-wc-gateway-checkout-com-cards.php:611
-msgid "Checkout.com Payment Canceled - Action ID : %s"
+msgid "Uprise Payment Canceled - Action ID : %s"
 msgstr ""
 
 #: includes/class-wc-gateway-checkout-com-cards.php:751
@@ -456,13 +454,13 @@ msgstr ""
 #. translators: %s: Action ID.
 #: includes/class-wc-gateway-checkout-com-google-pay.php:241
 #: includes/class-wc-gateway-checkout-com-paypal.php:183
-msgid "Checkout.com Payment refunded - Action ID : %s"
+msgid "Uprise Payment refunded - Action ID : %s"
 msgstr ""
 
 #. translators: %s: Action ID.
 #: includes/class-wc-gateway-checkout-com-google-pay.php:246
 #: includes/class-wc-gateway-checkout-com-paypal.php:188
-msgid "Checkout.com Payment Partially refunded - Action ID : %s"
+msgid "Uprise Payment Partially refunded - Action ID : %s"
 msgstr ""
 
 #: includes/class-wc-gateway-checkout-com-paypal.php:22
@@ -534,12 +532,12 @@ msgid "Enable/Disable"
 msgstr ""
 
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:97
-msgid "Enable Checkout.com cards payment"
+msgid "Enable Uprise cards payment"
 msgstr ""
 
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:98
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:420
-msgid "This enables Checkout.com. cards payment"
+msgid "This enables Uprise cards payment"
 msgstr ""
 
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:103
@@ -563,7 +561,7 @@ msgid "Payment Option Title"
 msgstr ""
 
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:116
-msgid "Pay by Card with Checkout.com"
+msgid "Pay by Card with Uprise payment"
 msgstr ""
 
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:117
@@ -596,7 +594,7 @@ msgstr ""
 
 #. translators: 1: HTML anchor opening tag, 2: HTML anchor closing tag.
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:136
-msgid "You can %1$s find your secret key %2$s in the Checkout.com Hub"
+msgid "You can %1$s find your secret key %2$s in the Uprise portal"
 msgstr ""
 
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:140
@@ -605,7 +603,7 @@ msgstr ""
 
 #. translators: 1: HTML anchor opening tag, 2: HTML anchor closing tag.
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:143
-msgid "You can %1$s find your public key %2$s in the Checkout.com Hub"
+msgid "You can %1$s find your public key %2$s in the Uprise portal"
 msgstr ""
 
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:160
@@ -835,7 +833,7 @@ msgstr ""
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:516
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:588
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:629
-msgid "Enable Checkout.com"
+msgid "Enable Uprise payment"
 msgstr ""
 
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:425
@@ -896,7 +894,7 @@ msgid "Buy"
 msgstr ""
 
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:465
-msgid "Checkout out"
+msgid "Uprise out"
 msgstr ""
 
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:466
@@ -1110,12 +1108,12 @@ msgstr ""
 
 #. translators: %s: Action id.
 #: woocommerce-gateway-checkout-com.php:312
-msgid "Checkout.com Payment Captured from Admin - Action ID : %s"
+msgid "Uprise Payment Captured from Admin - Action ID : %s"
 msgstr ""
 
 #. translators: %s: Action id.
 #: woocommerce-gateway-checkout-com.php:339
-msgid "Checkout.com Payment Voided from Admin - Action ID : %s"
+msgid "Uprise Payment Voided from Admin - Action ID : %s"
 msgstr ""
 
 #: woocommerce-gateway-checkout-com.php:351
