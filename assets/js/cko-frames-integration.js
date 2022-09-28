@@ -272,7 +272,7 @@ jQuery(function () {
 
     // hook place order button
     jQuery(document.body).on("click","#place_order", function (e) {
-      // check if Uprise is selected
+      // check if Uprise Payment is selected
       if (jQuery("#payment_method_wc_checkout_com_cards").is(":checked")) {
         // check if new card exist
         if (jQuery("#wc-wc_checkout_com_cards-payment-token-new").length > 0) {

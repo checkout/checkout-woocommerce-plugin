@@ -17,8 +17,8 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 	 */
 	public function __construct() {
 		$this->id                 = 'wc_checkout_com_paypal';
-		$this->method_title       = __( 'Uprise payment', 'checkout-com-unified-payments-api' );
-		$this->method_description = __( 'The Uprise payment extension allows shop owners to process online payments through the <a href="https://uprisepay.com">Uprise Payment Gateway.</a>', 'checkout-com-unified-payments-api' );
+		$this->method_title       = __( 'Uprise Payment', 'checkout-com-unified-payments-api' );
+		$this->method_description = __( 'The Uprise Payment extension allows shop owners to process online payments through the <a href="https://uprisepay.com">Uprise Payment.</a>', 'checkout-com-unified-payments-api' );
 		$this->title              = __( 'PayPal', 'checkout-com-unified-payments-api' );
 		$this->has_fields         = true;
 		$this->supports           = [

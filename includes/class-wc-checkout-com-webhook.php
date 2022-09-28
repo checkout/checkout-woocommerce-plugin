@@ -353,7 +353,7 @@ class WC_Checkout_Com_Webhook {
 		$checkout = new Checkout_SDK();
 
 		try {
-			// Check if payment is already voided or captured on Uprise portal.
+			// Check if payment is already voided or captured on Uprise Payment portal.
 			$details = $checkout->get_builder()->getPaymentsClient()->getPaymentDetails( $payment_id );
 
 			$order_id = ! empty( $details['metadata']['order_id'] ) ? $details['metadata']['order_id'] : null;

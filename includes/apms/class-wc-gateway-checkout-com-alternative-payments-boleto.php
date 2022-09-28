@@ -20,8 +20,8 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Boleto extends WC_Gateway_Che
 	 */
 	public function __construct() {
 		$this->id                 = 'wc_checkout_com_alternative_payments_boleto';
-		$this->method_title       = __( 'Uprise payment', 'checkout-com-unified-payments-api' );
-		$this->method_description = __( 'UPrise payment extension allows shop owners to process online payments through the <a href="https://uprisepay.com">Uprise Payment Gateway.</a>', 'checkout-com-unified-payments-api' );
+		$this->method_title       = __( 'Uprise Payment', 'checkout-com-unified-payments-api' );
+		$this->method_description = __( 'UPrise payment extension allows shop owners to process online payments through the <a href="https://uprisepay.com">Uprise Payment.</a>', 'checkout-com-unified-payments-api' );
 		$this->title              = __( 'Boleto', 'checkout-com-unified-payments-api' );
 		$this->has_fields         = true;
 		$this->supports           = [ 'products', 'refunds' ];

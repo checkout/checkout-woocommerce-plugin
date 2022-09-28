@@ -33,8 +33,8 @@ class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway {
 	 */
 	public function __construct() {
 		$this->id                 = 'wc_checkout_com_alternative_payments';
-		$this->method_title       = __( 'Uprise payment', 'checkout-com-unified-payments-api' );
-		$this->method_description = __( 'The Uprise payment extension allows shop owners to process online payments through the <a href="https://uprisepay.com">Uprise Payment Gateway.</a>', 'checkout-com-unified-payments-api' );
+		$this->method_title       = __( 'Uprise Payment', 'checkout-com-unified-payments-api' );
+		$this->method_description = __( 'The Uprise Payment extension allows shop owners to process online payments through the <a href="https://uprisepay.com">Uprise Payment.</a>', 'checkout-com-unified-payments-api' );
 		$this->title              = __( 'Alternative Payment', 'checkout-com-unified-payments-api' );
 
 		$this->has_fields = true;

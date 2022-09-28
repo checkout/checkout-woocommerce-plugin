@@ -20,8 +20,8 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Fawry extends WC_Gateway_Chec
 	 */
 	public function __construct() {
 		$this->id                 = 'wc_checkout_com_alternative_payments_fawry';
-		$this->method_title       = __( 'Uprise payment', 'checkout-com-unified-payments-api' );
-		$this->method_description = __( 'The Uprise payment extension allows shop owners to process online payments through the <a href="https://uprisepay.com">Uprise Payment Gateway.</a>', 'checkout-com-unified-payments-api' );
+		$this->method_title       = __( 'Uprise Payment', 'checkout-com-unified-payments-api' );
+		$this->method_description = __( 'The Uprise Payment extension allows shop owners to process online payments through the <a href="https://uprisepay.com">Uprise Payment.</a>', 'checkout-com-unified-payments-api' );
 		$this->title              = __( 'Fawry', 'checkout-com-unified-payments-api' );
 		$this->supports           = [ 'products', 'refunds' ];
 		$this->has_fields         = true;

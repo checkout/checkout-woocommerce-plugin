@@ -1,8 +1,8 @@
 <?php
 /**
- * Plugin Name: Uprise Payment Gateway
+ * Plugin Name: Uprise Payment
  * Plugin URI: https://uprisepay.com/
- * Description: Extends WooCommerce by Adding the Uprise Payment Gateway.
+ * Description: Extends WooCommerce by Adding the Uprise Payment.
  * Author: Uprise Payment
  * Author URI: https://uprisepay.com/
  * Version: 4.4.7

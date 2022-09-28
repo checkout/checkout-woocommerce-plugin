@@ -1,4 +1,4 @@
-﻿=== Uprise Payment Gateway ===
+﻿=== Uprise Payment ===
 Contributors: checkoutintegration
 Tags: checkout, payments, credit card, payment gateway, apple pay, google pay, payment request
 Requires at least: 4.0
@@ -8,17 +8,17 @@ Tested up to: 6.0
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
-Uprise payment helps your business offer more payment methods and currencies to more customers. We provide best-in-class payment processing for credit card & alternative payment methods.
+Uprise Payment helps your business offer more payment methods and currencies to more customers. We provide best-in-class payment processing for credit card & alternative payment methods.
 
 == Description ==
 
-Uprise payment helps your business offer more payment methods and currencies to more customers. We provide best-in-class payment processing for credit card & alternative payment methods.
+Uprise Payment helps your business offer more payment methods and currencies to more customers. We provide best-in-class payment processing for credit card & alternative payment methods.
 
 We combine gateway, international acquiring, and payment processing services, all through one integration with WooCommerce. So that you can accept more payments and support more customers around the world.
 
-The Uprise payment plugin for WooCommerce allows shop owners to process online payments through the Uprise Payment Gateway.
+The Uprise Payment plugin for WooCommerce allows shop owners to process online payments through the Uprise Payment.
 
-This plugin is an integration of Uprise and offers 6 payment modes. This plugin is maintained by Uprise.
+This plugin is an integration of Uprise Payment and offers 6 payment modes. This plugin is maintained by Uprise.
 
 = Card Payments with Frames.js =
 The payment form is embedded and shoppers complete payments without leaving your website. The Frames.js payment form is cross-browser and cross-device compatible, and can accept online payments from all major credit cards.
@@ -55,7 +55,7 @@ Contact us at: hello@uprisepay.com
 
 = Contributors & Developers =
 
-“Uprise Payment Gateway” is open source software. The following people have contributed to this plugin.
+“Uprise Payment” is open source software. The following people have contributed to this plugin.
 
 == Screenshots ==
 
@@ -70,11 +70,11 @@ Contact us at: hello@uprisepay.com
 
 
 = What fees are associated with the gateway? =
-Uprise uses Interchange++ which offers more transparency than other pricing models. With Uprise there are no minimums, no contracts required and pricing is based on your transaction volume and history.
+Uprise uses Interchange++ which offers more transparency than other pricing models. With Uprise Payment there are no minimums, no contracts required and pricing is based on your transaction volume and history.
 
 Other payment processors charge a blended rate. We use the Interchange++ model, a payment processing fee structure that standardizes the commissions collected by card issuers such as Visa and Mastercard. The amount varies based on card type, the customer's issuing bank, merchant location, and other parameters.
 
-Using Interchange++, we pass the fees charged by card brands directly through to you. Uprise charges a single, consistent mark-up that never changes, so you’ll have full transparency of your costs and know exactly what you’re paying. There are also no hidden fees, no setup fees and no account maintenance fees. Additionally, you’ll also get:
+Using Interchange++, we pass the fees charged by card brands directly through to you. Uprise Payment charges a single, consistent mark-up that never changes, so you’ll have full transparency of your costs and know exactly what you’re paying. There are also no hidden fees, no setup fees and no account maintenance fees. Additionally, you’ll also get:
 
 * Dedicated account management and service
 * Risk and fraud management tools
@@ -159,7 +159,7 @@ hello@uprisepay.com
 
 **From merchant’s WordPress admin**
 1. Go to plugin section-> Add new
-2. Search for "Uprise Payment Gateway"
+2. Search for "Uprise Payment"
 3. Click on Install Now
 4. Click on Activate
 5. Click on Settings to configure the module
@@ -168,7 +168,7 @@ hello@uprisepay.com
 **Webhook URL:**
 http://example.com/?wc-api=wc_checkoutcom_webhook
 
-After the plugin has been configured, customers will be able to choose Uprise as a valid payment method.
+After the plugin has been configured, customers will be able to choose Uprise Payment as a valid payment method.
 
 == Changelog ==
 v4.4.7-a 27th September 2022
@@ -378,7 +378,7 @@ v4.0.1 17 Sep 2019
 · Bug Fix
 
 v4.0.0 3 Sep 2019
-· Uprise Woocommerce module for the Unified Payments API
+· Uprise Payment Woocommerce module for the Unified Payments API
 
 == Upgrade Notice ==
 = 4.1.16 =

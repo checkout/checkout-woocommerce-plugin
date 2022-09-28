@@ -1,5 +1,5 @@
-# Copyright (C) 2022 Uprise payment
-# This file is distributed under the same license as the Uprise Payment Gateway plugin.
+# Copyright (C) 2022 Uprise Payment
+# This file is distributed under the same license as the Uprise Payment plugin.
 msgid ""
 msgstr ""
 "Project-Id-Version: Uprise-payment Gateway 4.4.7\n"
@@ -13,7 +13,7 @@ msgstr ""
 "X-Generator: WP-CLI 2.6.0\n"
 
 #. Plugin Name of the plugin
-msgid "Uprise Payment Gateway"
+msgid "Uprise Payment"
 msgstr ""
 
 #. Plugin URI of the plugin
@@ -22,7 +22,7 @@ msgid "https://uprisepay.com/"
 msgstr ""
 
 #. Description of the plugin
-msgid "Extends WooCommerce by Adding the Uprise payment Gateway."
+msgid "Extends WooCommerce by Adding the Uprise Payment."
 msgstr ""
 
 #. Author of the plugin
@@ -37,7 +37,7 @@ msgstr ""
 #: includes/class-wc-gateway-checkout-com-cards.php:35
 #: includes/class-wc-gateway-checkout-com-google-pay.php:20
 #: includes/class-wc-gateway-checkout-com-paypal.php:20
-msgid "Uprise payment"
+msgid "Uprise Payment"
 msgstr ""
 
 #: includes/api/class-wc-checkoutcom-api-request.php:85
@@ -78,12 +78,12 @@ msgstr ""
 #. translators: 1: Order ID.
 #: includes/api/class-wc-checkoutcom-api-request.php:680
 #: includes/api/class-wc-checkoutcom-api-request.php:754
-msgid "Payment has already been voided or captured on Uprise portal for order Id : %s"
+msgid "Payment has already been voided or captured on Uprise Payment portal for order Id : %s"
 msgstr ""
 
 #. translators: 1: Order ID.
 #: includes/api/class-wc-checkoutcom-api-request.php:697
-msgid "An error has occurred while processing your capture payment on Uprise portal. Order Id : %s"
+msgid "An error has occurred while processing your capture payment on Uprise Payment portal. Order Id : %s"
 msgstr ""
 
 #: includes/api/class-wc-checkoutcom-api-request.php:713
@@ -92,7 +92,7 @@ msgstr ""
 
 #. translators: 1: Order ID.
 #: includes/api/class-wc-checkoutcom-api-request.php:771
-msgid "An error has occurred while processing your void payment on Uprise portal. Order Id : %s"
+msgid "An error has occurred while processing your void payment on Uprise Payment portal. Order Id : %s"
 msgstr ""
 
 #: includes/api/class-wc-checkoutcom-api-request.php:787
@@ -101,7 +101,7 @@ msgstr ""
 
 #. translators: 1: Order ID.
 #: includes/api/class-wc-checkoutcom-api-request.php:857
-msgid "An error has occurred while processing your refund payment on Uprise portal. Order Id : %s"
+msgid "An error has occurred while processing your refund payment on Uprise Payment portal. Order Id : %s"
 msgstr ""
 
 #: includes/api/class-wc-checkoutcom-api-request.php:871
@@ -156,7 +156,7 @@ msgstr ""
 #: includes/class-wc-gateway-checkout-com-cards.php:36
 #: includes/class-wc-gateway-checkout-com-google-pay.php:21
 #: includes/class-wc-gateway-checkout-com-paypal.php:21
-msgid "The Uprise payment extension allows shop owners to process online payments through the <a href=\"https://uprisepay.com\">Uprise Payment Gateway.</a>"
+msgid "The Uprise Payment extension allows shop owners to process online payments through the <a href=\"https://uprisepay.com\">Uprise Payment.</a>"
 msgstr ""
 
 #: includes/apms/class-wc-gateway-checkout-com-alternative-payments-boleto.php:25
@@ -220,11 +220,11 @@ msgid "Pay with Knet. You will be redirected upon place order"
 msgstr ""
 
 #: includes/apms/class-wc-gateway-checkout-com-alternative-payments-multibanco.php:29
-msgid "The Uprise extension allows shop owners to process online payments through the <a href=\\\"https://uprisepay.com\\\">Uprise Payment Gateway.</a>"
+msgid "The Uprise extension allows shop owners to process online payments through the <a href=\\\"https://uprisepay.com\\\">Uprise Payment.</a>"
 msgstr ""
 
 #: includes/apms/class-wc-gateway-checkout-com-alternative-payments-multibanco.php:30
-msgid "Pay by Multibanco with Uprise payment"
+msgid "Pay by Multibanco with Uprise Payment"
 msgstr ""
 
 #: includes/apms/class-wc-gateway-checkout-com-alternative-payments-poli.php:23
@@ -532,7 +532,7 @@ msgid "Enable/Disable"
 msgstr ""
 
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:97
-msgid "Enable Uprise cards payment"
+msgid "Enable Uprise Payment cards payment"
 msgstr ""
 
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:98
@@ -561,7 +561,7 @@ msgid "Payment Option Title"
 msgstr ""
 
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:116
-msgid "Pay by Card with Uprise payment"
+msgid "Pay by Card with Uprise Payment"
 msgstr ""
 
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:117
@@ -594,7 +594,7 @@ msgstr ""
 
 #. translators: 1: HTML anchor opening tag, 2: HTML anchor closing tag.
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:136
-msgid "You can %1$s find your secret key %2$s in the Uprise portal"
+msgid "You can %1$s find your secret key %2$s in the Uprise Payment portal"
 msgstr ""
 
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:140
@@ -603,7 +603,7 @@ msgstr ""
 
 #. translators: 1: HTML anchor opening tag, 2: HTML anchor closing tag.
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:143
-msgid "You can %1$s find your public key %2$s in the Uprise portal"
+msgid "You can %1$s find your public key %2$s in the Uprise Payment portal"
 msgstr ""
 
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:160
@@ -833,7 +833,7 @@ msgstr ""
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:516
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:588
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:629
-msgid "Enable Uprise payment"
+msgid "Enable Uprise Payment"
 msgstr ""
 
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:425

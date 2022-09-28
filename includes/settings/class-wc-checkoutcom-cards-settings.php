@@ -94,7 +94,7 @@ class WC_Checkoutcom_Cards_Settings {
 				'id'          => 'enable',
 				'title'       => __( 'Enable/Disable', 'checkout-com-unified-payments-api' ),
 				'type'        => 'checkbox',
-				'label'       => __( 'Enable Uprise cards payment', 'checkout-com-unified-payments-api' ),
+				'label'       => __( 'Enable Uprise Payment cards payment', 'checkout-com-unified-payments-api' ),
 				'description' => __( 'This enables Uprise cards payment', 'checkout-com-unified-payments-api' ),
 				'desc_tip'    => true,
 				'default'     => 'yes',
@@ -116,7 +116,7 @@ class WC_Checkoutcom_Cards_Settings {
 				'label'       => __( 'Pay by Card with Uprise', 'checkout-com-unified-payments-api' ),
 				'description' => __( 'Title that will be displayed on the checkout page', 'checkout-com-unified-payments-api' ),
 				'desc_tip'    => true,
-				'default'     => 'Pay by Card with Uprise',
+				'default'     => 'VISA/MasterCard',
 			],
 			'ckocom_account_type' => [
 				'title'       => __( 'Account type', 'checkout-com-unified-payments-api' ),
@@ -133,14 +133,14 @@ class WC_Checkoutcom_Cards_Settings {
 				'title'       => __( 'Secret Key', 'checkout-com-unified-payments-api' ),
 				'type'        => 'text',
 				/* translators: 1: HTML anchor opening tag, 2: HTML anchor closing tag. */
-				'description' => sprintf( __( 'You can %1$s find your secret key %2$s in the Uprise portal', 'checkout-com-unified-payments-api' ), '<a class="checkoutcom-key-docs" target="_blank" href="' . esc_url( $docs_link ) . '">', '</a>' ),
+				'description' => sprintf( __( 'You can %1$s find your secret key %2$s in the Uprise Payment portal', 'checkout-com-unified-payments-api' ), '<a class="checkoutcom-key-docs" target="_blank" href="' . esc_url( $docs_link ) . '">', '</a>' ),
 				'placeholder' => 'sk_xxx',
 			],
 			'ckocom_pk'           => [
 				'title'       => __( 'Public Key', 'checkout-com-unified-payments-api' ),
 				'type'        => 'text',
 				/* translators: 1: HTML anchor opening tag, 2: HTML anchor closing tag. */
-				'description' => sprintf( __( 'You can %1$s find your public key %2$s in the Uprise portal', 'checkout-com-unified-payments-api' ), '<a class="checkoutcom-key-docs" target="_blank" href="' . esc_url( $docs_link ) . '">', '</a>' ),
+				'description' => sprintf( __( 'You can %1$s find your public key %2$s in the Uprise Payment portal', 'checkout-com-unified-payments-api' ), '<a class="checkoutcom-key-docs" target="_blank" href="' . esc_url( $docs_link ) . '">', '</a>' ),
 				'placeholder' => 'pk_xxx',
 			],
 		];
