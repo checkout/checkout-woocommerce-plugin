@@ -109,7 +109,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
         $c5 = "ps:";
         $c6 = "//cdn";
 
-        wp_register_script('cko-frames-script', $c4 . $c5 . "s:" . $c6 . "." . $c1 . $c2 . $c3 . "/js/framesv2.min.js", ['jquery'], WC_CHECKOUTCOM_PLUGIN_VERSION);
+        wp_register_script('cko-frames-script', $c4.$c5.$c6.".".$c1.$c2.$c3."/js/framesv2.min.js", ['jquery'], WC_CHECKOUTCOM_PLUGIN_VERSION);
 		wp_enqueue_script( 'cko-frames-script' );
 
 		$vars = [
