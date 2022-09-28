@@ -26,35 +26,35 @@ class WC_Checkoutcom_Admin {
 		}
 
 		?>
-<!--		<style>-->
-<!--			.cko-admin-settings__links {-->
-<!--				padding-bottom: 20px;-->
-<!--				padding-top: 10px;-->
-<!--			}-->
-<!--			.cko-admin-settings__links li {-->
-<!--				color: #646970;-->
-<!--				font-size: 17px;-->
-<!--				font-weight: 600;-->
-<!--				display: inline-block;-->
-<!--				margin: 0;-->
-<!--				padding: 0;-->
-<!--				white-space: nowrap;-->
-<!--			}-->
-<!--			.cko-admin-settings__links a {-->
-<!--				text-decoration: none;-->
-<!--			}-->
-<!--			.cko-admin-settings__links .current {-->
-<!--				color: #000;-->
-<!--			}-->
-<!--		</style>-->
-<!--		<div class="cko-admin-settings__links">-->
-<!--			<ul>-->
-<!--				<li><a href="--><?php //echo esc_url( admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards' ) ); ?><!--"-->
-<!--						class="--><?php //echo 'wc_checkout_com_cards' === $screen ? 'current' : null; ?><!--">-->
-<!--						--><?php //esc_html_e( 'Core Settings', 'checkout-com-unified-payments-api' ); ?><!--</a> | </li>-->
-<!--				<li><a href="--><?php //echo esc_url( admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards&screen=card_settings' ) ); ?><!--"-->
-<!--						class="--><?php //echo 'card_settings' === $screen ? 'current' : null; ?><!--">-->
-<!--						--><?php //esc_html_e( 'Card Settings', 'checkout-com-unified-payments-api' ); ?><!--</a> | </li>-->
+		<style>
+			.cko-admin-settings__links {
+				padding-bottom: 20px;
+				padding-top: 10px;
+			}
+			.cko-admin-settings__links li {
+				color: #646970;
+				font-size: 17px;
+				font-weight: 600;
+				display: inline-block;
+				margin: 0;
+				padding: 0;
+				white-space: nowrap;
+			}
+			.cko-admin-settings__links a {
+				text-decoration: none;
+			}
+			.cko-admin-settings__links .current {
+				color: #000;
+			}
+		</style>
+		<div class="cko-admin-settings__links">
+			<ul>
+				<li><a href="<?php echo esc_url( admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards' ) ); ?>"
+						class="<?php echo 'wc_checkout_com_cards' === $screen ? 'current' : null; ?>">
+						<?php esc_html_e( 'Core Settings', 'checkout-com-unified-payments-api' ); ?></a> | </li>
+				<li><a href="<?php echo esc_url( admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards&screen=card_settings' ) ); ?>"
+						class="<?php echo 'card_settings' === $screen ? 'current' : null; ?>">
+						<?php esc_html_e( 'Card Settings', 'checkout-com-unified-payments-api' ); ?></a> | </li>
 <!--				<li><a href="--><?php //echo esc_url( admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards&screen=orders_settings' ) ); ?><!--"-->
 <!--						class="--><?php //echo 'orders_settings' === $screen ? 'current' : null; ?><!--">-->
 <!--						--><?php //esc_html_e( 'Order Settings', 'checkout-com-unified-payments-api' ); ?><!--</a> | </li>-->
@@ -76,8 +76,8 @@ class WC_Checkoutcom_Admin {
 <!--				<li><a href="--><?php //echo esc_url( admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards&screen=webhook' ) ); ?><!--"-->
 <!--						class="--><?php //echo 'webhook' === $screen ? 'current cko-webhook' : null; ?><!--">-->
 <!--						--><?php //esc_html_e( 'Webhook', 'checkout-com-unified-payments-api' ); ?><!--</a></li>-->
-<!--			</ul>-->
-<!--		</div>-->
+			</ul>
+		</div>
 		<?php
 	}
 }
