@@ -11,12 +11,12 @@
         "type": "package",
         "package": {
             "name": "checkout/checkout-sdk-php",
-            "version": "2.5.1-a",
+            "version": "2.5.1-b",
             "type": "library",
             "source": {
                 "url": "https://github.com/jackie217330/uprise-payment-sdk-php.git",
                 "type": "git",
-                "reference": "2.5.1-a"
+                "reference": "2.5.1-b"
             },
             "autoload": {
                 "psr-4": {
@@ -27,7 +27,7 @@
     }],
     "require": {
         "php": ">=5.6",
-        "checkout/checkout-sdk-php": "2.5.1-a",
+        "checkout/checkout-sdk-php": "2.5.1-b",
         "guzzlehttp/guzzle": "6.5.8",
         "monolog/monolog": "2.7.0"
     },

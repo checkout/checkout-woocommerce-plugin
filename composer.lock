@@ -4,15 +4,15 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "f14efeceff88abfbdd47b399e05524ce",
+    "content-hash": "53b251f0234489778b5cce88f8724f79",
     "packages": [
         {
             "name": "checkout/checkout-sdk-php",
-            "version": "2.5.1-a",
+            "version": "2.5.1-b",
             "source": {
                 "type": "git",
                 "url": "https://github.com/jackie217330/uprise-payment-sdk-php.git",
-                "reference": "2.5.1-a"
+                "reference": "2.5.1-b"
             },
             "type": "library",
             "autoload": {
@@ -5238,7 +5238,7 @@
     "aliases": [],
     "minimum-stability": "stable",
     "stability-flags": {
-        "checkout/checkout-sdk-php": 15
+        "checkout/checkout-sdk-php": 10
     },
     "prefer-stable": false,
     "prefer-lowest": false,
