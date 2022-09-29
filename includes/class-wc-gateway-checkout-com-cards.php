@@ -448,7 +448,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		$save_card = WC_Admin_Settings::get_option( 'ckocom_card_saved' );
 
 		// Check if result contains 3d redirection url.
-		if ( isset( $result['requiresRedirect'] ) && ! empty( $result['requiresRedirect'] ) ) {
+		if ( isset( $result['redirectLink'] ) && ! empty( $result['redirectLink'] ) ) {
 
 			// Check if save card is enable and customer select to save card.
 			if ( $save_card && isset( $_POST['wc-wc_checkout_com_cards-new-payment-method'] ) && sanitize_text_field( $_POST['wc-wc_checkout_com_cards-new-payment-method'] ) ) {
@@ -461,7 +461,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 			// Redirect to 3D secure page.
 			return [
 				'result'   => 'success',
-				'redirect' => $result['requiresRedirect'],
+				'redirect' => $result['redirectLink'],
 			];
 		}
 
