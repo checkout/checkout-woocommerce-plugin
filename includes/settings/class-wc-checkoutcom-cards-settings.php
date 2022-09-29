@@ -125,7 +125,7 @@ class WC_Checkoutcom_Cards_Settings {
 				'desc_tip'    => true,
 				'options'     => [
 					'ABC' => __( 'ABC', 'checkout-com-unified-payments-api' ),
-					'NAS' => __( 'NAS', 'checkout-com-unified-payments-api' ),
+//					'NAS' => __( 'NAS', 'checkout-com-unified-payments-api' ),
 				],
 				'default'     => 'ABC',
 			],
