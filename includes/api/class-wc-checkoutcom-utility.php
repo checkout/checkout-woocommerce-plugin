@@ -193,7 +193,7 @@ class WC_Checkoutcom_Utility {
 	 */
 	public static function logger( $error_message, $exception ) {
 		$logger  = wc_get_logger();
-		$context = [ 'source' => 'wc_checkoutcom_gateway_log' ];
+		$context = [ 'source' => 'wc_uprise_payment_log' ];
 
 		// Get file logging from module setting.
 		$file_logging = 'yes' === WC_Admin_Settings::get_option( 'cko_file_logging', 'no' );
