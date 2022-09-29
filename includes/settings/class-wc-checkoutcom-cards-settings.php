@@ -100,16 +100,29 @@ class WC_Checkoutcom_Cards_Settings {
 				'default'     => 'yes',
 			],
 			'ckocom_environment'  => [
-				'title'       => __( 'Environment', 'checkout-com-unified-payments-api' ),
-				'type'        => 'select',
-				'description' => __( 'When going to production, make sure to set this to Live', 'checkout-com-unified-payments-api' ),
-				'desc_tip'    => true,
-				'options'     => [
-					'sandbox' => __( 'SandBox', 'checkout-com-unified-payments-api' ),
-					'live'    => __( 'Live', 'checkout-com-unified-payments-api' ),
-				],
-				'default'     => 'sandbox',
+//				'title'       => __( 'Environment', 'checkout-com-unified-payments-api' ),
+//				'type'        => 'select',
+//				'description' => __( 'When going to production, make sure to set this to Live', 'checkout-com-unified-payments-api' ),
+//				'desc_tip'    => true,
+//				'options'     => [
+//					'sandbox' => __( 'SandBox', 'checkout-com-unified-payments-api' ),
+//					'live'    => __( 'Live', 'checkout-com-unified-payments-api' ),
+//				],
+                'type'        => 'title',
+				'default'     => 'live',
 			],
+            'ckocom_account_type' => [
+//                'title'       => __( 'Account type', 'checkout-com-unified-payments-api' ),
+//                'type'        => 'select',
+//                'description' => __( 'Contact support team to know your account type.', 'checkout-com-unified-payments-api' ),
+//                'desc_tip'    => true,
+//                'options'     => [
+                    'ABC' => __( 'ABC', 'checkout-com-unified-payments-api' ),
+//					'NAS' => __( 'NAS', 'checkout-com-unified-payments-api' ),
+//                ],
+                'type'        => 'title',
+                'default'     => 'ABC',
+            ],
 			'title'               => [
 				'title'       => __( 'Payment Option Title', 'checkout-com-unified-payments-api' ),
 				'type'        => 'text',
@@ -117,17 +130,6 @@ class WC_Checkoutcom_Cards_Settings {
 				'description' => __( 'Title that will be displayed on the checkout page', 'checkout-com-unified-payments-api' ),
 				'desc_tip'    => true,
 				'default'     => 'VISA/MasterCard',
-			],
-			'ckocom_account_type' => [
-				'title'       => __( 'Account type', 'checkout-com-unified-payments-api' ),
-				'type'        => 'select',
-				'description' => __( 'Contact support team to know your account type.', 'checkout-com-unified-payments-api' ),
-				'desc_tip'    => true,
-				'options'     => [
-					'ABC' => __( 'ABC', 'checkout-com-unified-payments-api' ),
-//					'NAS' => __( 'NAS', 'checkout-com-unified-payments-api' ),
-				],
-				'default'     => 'ABC',
 			],
 			'ckocom_sk'           => [
 				'title'       => __( 'Secret Key', 'checkout-com-unified-payments-api' ),
