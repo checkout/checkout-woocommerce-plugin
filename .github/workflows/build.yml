@@ -14,11 +14,11 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '7.2'
+          php-version: "7.2"
       - name: Build zip
         run: bash bin/build.sh
       - name: Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: checkout-com-unified-payments-api.zip
+          files: uprise-payment-woocommerce.zip

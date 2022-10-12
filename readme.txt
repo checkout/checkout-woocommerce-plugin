@@ -166,7 +166,7 @@ hello@uprisepay.com
 6. Configure the webhook url in your checkout hub account.
 
 **Webhook URL:**
-http://example.com/?wc-api=wc_checkoutcom_webhook
+http://example.com/?wc-api=wc_uprisepayment_webhook
 
 After the plugin has been configured, customers will be able to choose Uprise Payment as a valid payment method.
 

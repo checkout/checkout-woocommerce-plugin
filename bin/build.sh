@@ -1,6 +1,6 @@
 #!/bin/sh
 
-PLUGIN_SLUG="uprise-payment-unified-payments-api"
+PLUGIN_SLUG="uprise-payment-woocommerce"
 
 echo "Installing PHP and JS dependencies..."
 composer install --no-dev || exit "$?"
@@ -16,7 +16,7 @@ cp -R "lib" "$PLUGIN_SLUG/lib/"
 cp -R "vendor" "$PLUGIN_SLUG/vendor/"
 cp -R "templates" "$PLUGIN_SLUG/templates/"
 cp "readme.txt" "$PLUGIN_SLUG/readme.txt"
-cp "woocommerce-gateway-checkout-com.php" "$PLUGIN_SLUG/woocommerce-gateway-checkout-com.php"
+cp "woocommerce-gateway-uprise-payment.php" "$PLUGIN_SLUG/woocommerce-gateway-uprise-payment.php"
 
 echo "Generating zip file..."
 zip -q -r "${PLUGIN_SLUG}.zip" "$PLUGIN_SLUG/"

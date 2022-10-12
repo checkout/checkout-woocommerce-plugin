@@ -1,0 +1,101 @@
+<?php
+/**
+ * Qpay APM class.
+ *
+ * @package wc_uprise_payment
+ */
+
+/**
+ * Class WC_Gateway_Uprise_Payment_Alternative_Payments_Qpay
+ *
+ * @class   WC_Gateway_Uprise_Payment_Alternative_Payments_Qpay
+ * @extends WC_Gateway_Uprise_Payment_Alternative_Payments
+ */
+class WC_Gateway_Uprise_Payment_Alternative_Payments_Qpay extends WC_Gateway_Uprise_Payment_Alternative_Payments {
+
+	const PAYMENT_METHOD = 'qpay';
+
+	/**
+	 * Construct method.
+	 */
+	public function __construct() {
+		$this->id         = 'wc_uprise_payment_alternative_payments_qpay';
+		$this->title      = __( 'QPay', 'uprise-payment-woocommerce' );
+		$this->has_fields = true;
+		$this->supports   = [ 'products', 'refunds' ];
+
+		$this->init_form_fields();
+
+		add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, [ $this, 'process_admin_options' ] );
+	}
+
+	/**
+	 * Payment fields to be displayed.
+	 */
+	public function payment_fields() {
+		// get available apms depending on currency.
+		$apm_available = WC_Checkoutcom_Utility::get_alternative_payment_methods();
+		$message       = __( 'Pay with QPay. You will be redirected upon place order', 'uprise-payment-woocommerce' );
+
+		?>
+			<p style="margin-bottom: 0;"> <?php echo $message; ?> </p>
+		<?php
+
+		if ( ! in_array( self::PAYMENT_METHOD, $apm_available, true ) ) {
+			?>
+				<script>
+					jQuery('.payment_method_wc_uprise_payment_alternative_payments_qpay').hide();
+				</script>
+			<?php
+		}
+
+	}
+
+	/**
+	 * Process Qpay APM payment.
+	 *
+	 * @param int $order_id Order ID.
+	 *
+	 * @return array
+	 */
+	public function process_payment( $order_id ) {
+		if ( ! session_id() ) {
+			session_start();
+		}
+
+		$order = wc_get_order( $order_id );
+
+		// create alternative payment.
+		$result = (array) WC_Checkoutcom_Api_Request::create_apm_payment( $order, self::PAYMENT_METHOD );
+
+		// check if result has error and return error message.
+		if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {
+			WC_Checkoutcom_Utility::wc_add_notice_self( $result['error'], 'error' );
+			return;
+		}
+
+		// redirect to apm if redirection url is available.
+		if ( isset( $result['apm_redirection'] ) && ! empty( $result['apm_redirection'] ) ) {
+
+			return [
+				'result'   => 'success',
+				'redirect' => $result['apm_redirection'],
+			];
+		}
+	}
+
+	/**
+	 * Process refund for the order.
+	 *
+	 * @param int    $order_id Order ID.
+	 * @param int    $amount   Amount to refund.
+	 * @param string $reason   Refund reason.
+	 *
+	 * @return bool
+	 */
+	public function process_refund( $order_id, $amount = null, $reason = '' ) {
+
+		return parent::process_refund( $order_id, $amount, $reason );
+
+	}
+}

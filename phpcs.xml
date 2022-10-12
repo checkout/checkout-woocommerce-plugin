@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <ruleset name="WordPress Coding Standards">
-	<description>Checkout.com Woocommerce payment gateway dev PHP_CodeSniffer ruleset.</description>
+	<description>Uprise Payment Woocommerce payment gateway dev PHP_CodeSniffer ruleset.</description>
 
-    <!-- Exclude paths -->
+	<!-- Exclude paths -->
 	<exclude-pattern>./node_modules/*</exclude-pattern>
 	<exclude-pattern>./vendor/*</exclude-pattern>
 	<exclude-pattern>*\.(?!php$)</exclude-pattern>
@@ -13,18 +13,18 @@
 
 	<!-- Rules -->
 	<rule ref="WordPress-Core">
-		<exclude name="Generic.Arrays.DisallowShortArraySyntax.Found"/>
+		<exclude name="Generic.Arrays.DisallowShortArraySyntax.Found" />
 	</rule>
 	<rule ref="WordPress-Docs" />
 
 	<!-- Disallow long array syntax -->
-	<rule ref="Generic.Arrays.DisallowLongArraySyntax"/>
+	<rule ref="Generic.Arrays.DisallowLongArraySyntax" />
 
-	<arg value="s"/>
+	<arg value="s" />
 
 	<rule ref="WordPress.WP.I18n">
 		<properties>
-			<property name="text_domain" type="array" value="checkout-com-unified-payments-api" />
+			<property name="text_domain" type="array" value="uprise-payment-woocommerce" />
 		</properties>
 	</rule>
 </ruleset>
