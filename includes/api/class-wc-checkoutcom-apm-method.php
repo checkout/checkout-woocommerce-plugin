@@ -359,7 +359,7 @@ class WC_Checkoutcom_APM_Method {
 		$source_data->first_name         = self::$post['billing_first_name'];
 		$source_data->last_name          = self::$post['billing_last_name'];
 		$source_data->account_iban       = self::$post['sepa-iban'];
-		$source_data->bic                = self::$post['sepa-bic'];
+		$source_data->bic                = ! empty( self::$post['sepa-bic'] ) ? self::$post['sepa-bic'] : '';
 		$source_data->billing_descriptor = 'Thanks for shopping.';
 		$source_data->mandate_type       = $is_subscription ? 'recurring' : 'single';
 
@@ -377,7 +377,6 @@ class WC_Checkoutcom_APM_Method {
 		$response = [];
 
 		try {
-
 			$builder = $checkout->get_builder();
 
 			// SEPA support for ABC AC type only.
@@ -394,6 +393,9 @@ class WC_Checkoutcom_APM_Method {
 				}
 			}
 		} catch ( CheckoutApiException $ex ) {
+			// Unset any old value if source creation failed.
+			WC()->session->__unset( 'mandate_reference' );
+
 			$error_message = __( 'An error has occurred while getting sepa info.', 'checkout-com-unified-payments-api' );
 			WC_Checkoutcom_Utility::logger( $error_message, $ex );
 		}

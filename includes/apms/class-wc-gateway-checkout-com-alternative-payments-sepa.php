@@ -90,39 +90,64 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Sepa extends WC_Gateway_Check
 			session_start();
 		}
 
-		global $woocommerce;
-
-		$order = wc_get_order( $order_id );
-
-		// create alternative payment.
-		$result = (array) WC_Checkoutcom_Api_Request::create_apm_payment( $order, self::PAYMENT_METHOD );
-
-		// check if result has error and return error message.
-		if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {
-			WC_Checkoutcom_Utility::wc_add_notice_self( $result['error'] );
-
-			return;
-		}
-
+		$order   = wc_get_order( $order_id );
 		$status  = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
+		$mandate = WC()->session->get( 'mandate_reference' );
 		$message = '';
+		$result  = [];
 
-		if ( ! empty( $result['source'] ) && self::PAYMENT_METHOD === $result['source']['type'] ) {
+		if ( 0 >= $order->get_total() ) { // 0 cost order.
+            $message = esc_html__( 'Checkout.com - SEPA payment for free order.', 'checkout-com-unified-payments-api' );
 
-			$mandate = WC()->session->get( 'mandate_reference' );
+            // save src id for future use.
+			$post_data = sanitize_post( $_POST );
+			$method = WC_Checkoutcom_Api_Request::get_apm_method( $post_data, $order, 'sepa' );
 
-			update_post_meta( $order_id, 'cko_sepa_mandate_reference', $mandate );
-			update_post_meta( $order_id, 'cko_payment_authorized', true );
+            if ( ! empty( $method->id ) ) {
+	            $status = WC_Admin_Settings::get_option( 'ckocom_order_captured', 'processing' );
 
-			$message = sprintf(
+			    if ( class_exists( 'WC_Subscriptions_Order' ) ) {
+					WC_Checkoutcom_Subscription::save_source_id( $order_id, $order, $method->id );
+				}
+            }
+
+			// check if result has error and return error message.
+			if ( empty( $method->id ) ) {
+				WC_Checkoutcom_Utility::wc_add_notice_self( esc_html__( 'Please try correct IBAN', 'checkout-com-unified-payments-api' ) );
+
+				return [
+					'result'   => 'fail',
+					'redirect' => '',
+                ];
+			}
+		} else {
+			// create alternative payment.
+			$result = (array) WC_Checkoutcom_Api_Request::create_apm_payment( $order, self::PAYMENT_METHOD );
+
+			if ( ! empty( $mandate ) && ! empty( $result['source'] ) && self::PAYMENT_METHOD === $result['source']['type'] ) {
+
+				update_post_meta( $order_id, 'cko_sepa_mandate_reference', $mandate );
+				update_post_meta( $order_id, 'cko_payment_authorized', true );
+
+				WC()->session->__unset( 'mandate_reference' );
+			}
+
+			if ( ! empty( $result['source'] ) && self::PAYMENT_METHOD === $result['source']['type'] ) {
+
+				$message = sprintf(
 				/* translators: 1: Result ID, 2: Mandate reference. */
-				esc_html__( 'Checkout.com - Sepa payment Action ID : %1$s - Sepa mandate reference : %2$s', 'checkout-com-unified-payments-api' ),
-				$result['id'],
-				$mandate
-			);
+					esc_html__( 'Checkout.com - Sepa payment Action ID : %1$s - Sepa mandate reference : %2$s', 'checkout-com-unified-payments-api' ),
+					$result['id'],
+					$mandate
+				);
+			}
 
-			WC()->session->__unset( 'mandate_reference' );
+			// check if result has error and return error message.
+			if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {
+				WC_Checkoutcom_Utility::wc_add_notice_self( $result['error'] );
 
+				return;
+			}
 		}
 
 		// save source id for subscription.

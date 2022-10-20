@@ -186,8 +186,7 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_Request {
 						<input class="sepa-checkbox-input" type="checkbox" name="sepa-checkbox-input" id="sepa-checkbox-input" required>
 					</div>
 					<span class="sepa-checkbox-layout">
-						<span style="display:none">&nbsp;</span>
-						<h4 style="font-size: 12px;font-weight: 500">I accept the mandate for a single payment</h4>
+						<h4>I accept the mandate for a single payment</h4>
 					</span>
 				</label>
 			</div>
