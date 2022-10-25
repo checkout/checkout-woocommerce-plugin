@@ -978,7 +978,7 @@ class WC_Checkoutcom_Api_Request {
 				return [ 'error' => $error_message ];
 			}
 		} catch ( CheckoutApiException $ex ) {
-			$error_message = esc_html__( 'An error has occurred while creating apm payments.', 'checkout-com-unified-payments-api' );
+			$error_message = esc_html__( 'An error has occurred while creating apm payments. ', 'checkout-com-unified-payments-api' );
 
 			// Check if gateway response is enabled from module settings.
 			if ( $gateway_debug ) {

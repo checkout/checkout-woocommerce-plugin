@@ -115,6 +115,11 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Sepa extends WC_Gateway_Check
 			if ( empty( $method->id ) ) {
 				WC_Checkoutcom_Utility::wc_add_notice_self( esc_html__( 'Please try correct IBAN', 'checkout-com-unified-payments-api' ) );
 
+				$message .= esc_html__( ' Please try correct IBAN', 'checkout-com-unified-payments-api' );
+
+				$order->add_order_note( $message );
+				$order->update_status( 'failed' );
+
 				return [
 					'result'   => 'fail',
 					'redirect' => '',
@@ -146,7 +151,13 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Sepa extends WC_Gateway_Check
 			if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {
 				WC_Checkoutcom_Utility::wc_add_notice_self( $result['error'] );
 
-				return;
+				$order->add_order_note( $result['error'] );
+				$order->update_status( 'failed' );
+
+				return [
+					'result'   => 'fail',
+					'redirect' => '',
+				];
 			}
 		}
 

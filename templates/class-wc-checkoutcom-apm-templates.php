@@ -148,22 +148,22 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_Request {
 		<div class="sepa-card-header">
 			<div class="sepa-card-header-text">
 				<div class="sepa-card-title">
-					<h4 style="font-weight: bold;">SEPA Direct Debit Mandate for single payment</h4>
+					<h4 style="font-weight: bold;"><?php esc_html_e( 'SEPA Direct Debit Mandate for single payment', 'checkout-com-unified-payments-api' ); ?></h4>
 				</div>
 			</div>
 		</div>
 		<div class="sepa-mandate-content">
 			<div class="sepa-creditor">
-				<h4 style="margin: unset;">Creditor</h4>
-				<h4 style="margin: unset; font-weight: bold; ">b4payment GmbH</h4>
-				<p style="margin: unset;">Obermünsterstraße&nbsp;14</p>
-				<p style="margin: unset;">93047&nbsp;Regensburg</p>
-				<p style="margin: unset;">GERMANY</p>
+				<h4 style="margin: unset;"><?php esc_html_e( 'Creditor', 'checkout-com-unified-payments-api' ); ?></h4>
+				<h4 style="margin: unset; font-weight: bold; "><?php esc_html_e( 'b4payment GmbH', 'checkout-com-unified-payments-api' ); ?></h4>
+				<p style="margin: unset;"><?php esc_html_e( 'Obermünsterstraße&nbsp;14', 'checkout-com-unified-payments-api' ); ?></p>
+				<p style="margin: unset;"><?php esc_html_e( '93047&nbsp;Regensburg', 'checkout-com-unified-payments-api' ); ?></p>
+				<p style="margin: unset;"><?php esc_html_e( 'GERMANY', 'checkout-com-unified-payments-api' ); ?></p>
 				<br>
-				<p style="margin: unset;" class="monospace">Creditor ID: DE36ZZZ00001690322</p>
+				<p style="margin: unset;" class="monospace"><?php esc_html_e( 'Creditor ID: DE36ZZZ00001690322', 'checkout-com-unified-payments-api' ); ?></p>
 			</div>
 			<div class="sepa-debitor">
-				<h4 style="margin: unset;">Debtor</h4>
+				<h4 style="margin: unset;"><?php esc_html_e( 'Debtor', 'checkout-com-unified-payments-api' ); ?></h4>
 				<h4 style="margin: unset; font-weight: bold; "><div class="customerName"></div></h4>
 				<div class="address" style="margin: unset;">
 					<p style="margin: unset;" class="address1"></p>
@@ -177,8 +177,8 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_Request {
 		</div>
 		<div class="sepa-par">
 			<hr style="opacity: 0.2;max-width: inherit;">
-			<p>By accepting this mandate form, you authorise (A) b4payment GmbH to send instructions to your bank to debit your account (B) your bank to debit your account in accordance with the instructions from b4payment GmbH.</p>
-			<p>As part of your rights, you are entitled to a refund from your bank under the terms and conditions of your agreement with your bank. A refund must be claimed within 8 weeks starting from the date on which your account was debited.
+			<p><?php esc_html_e( 'By accepting this mandate form, you authorise (A) b4payment GmbH to send instructions to your bank to debit your account (B) your bank to debit your account in accordance with the instructions from b4payment GmbH.', 'checkout-com-unified-payments-api' ); ?></p>
+			<p><?php esc_html_e( 'As part of your rights, you are entitled to a refund from your bank under the terms and conditions of your agreement with your bank. A refund must be claimed within 8 weeks starting from the date on which your account was debited.', 'checkout-com-unified-payments-api' ); ?>
 			</p>
 			<div class="sepa-checkbox-container" id="sepa-checkbox-container">
 				<label class="sepa-checkbox-layout" for="sepa-checkbox-input">
@@ -186,7 +186,7 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_Request {
 						<input class="sepa-checkbox-input" type="checkbox" name="sepa-checkbox-input" id="sepa-checkbox-input" required>
 					</div>
 					<span class="sepa-checkbox-layout">
-						<h4>I accept the mandate for a single payment</h4>
+						<h4><?php esc_html_e( 'I accept the mandate for a single payment', 'checkout-com-unified-payments-api' ); ?></h4>
 					</span>
 				</label>
 			</div>
@@ -197,7 +197,7 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_Request {
 			<div class="sepa-card-footer">
 				<div class="sepa-card-footer-text">
 					<div class="sepa-footer-title">
-						Your rights regarding the above mandate are explained in a statement that you can obtain from your bank.
+						<?php esc_html_e( 'Your rights regarding the above mandate are explained in a statement that you can obtain from your bank.', 'checkout-com-unified-payments-api' ); ?>
 					</div>
 				</div>
 			</div>
