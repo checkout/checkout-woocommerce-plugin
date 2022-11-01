@@ -9,9 +9,9 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2022-10-24T17:42:53+05:30\n"
+"POT-Creation-Date: 2022-11-01T17:20:51+05:30\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
-"X-Generator: WP-CLI 2.6.0\n"
+"X-Generator: WP-CLI 2.7.1\n"
 "X-Domain: checkout-com-unified-payments-api\n"
 
 #. Plugin Name of the plugin
@@ -1091,55 +1091,59 @@ msgstr ""
 msgid "IBAN"
 msgstr ""
 
-#: templates/class-wc-checkoutcom-apm-templates.php:119
+#: templates/class-wc-checkoutcom-apm-templates.php:114
+msgid "Continue"
+msgstr ""
+
+#: templates/class-wc-checkoutcom-apm-templates.php:127
 msgid "Please fill in the required fields."
 msgstr ""
 
-#: templates/class-wc-checkoutcom-apm-templates.php:151
+#: templates/class-wc-checkoutcom-apm-templates.php:147
 msgid "SEPA Direct Debit Mandate for single payment"
 msgstr ""
 
-#: templates/class-wc-checkoutcom-apm-templates.php:157
+#: templates/class-wc-checkoutcom-apm-templates.php:153
 msgid "Creditor"
 msgstr ""
 
-#: templates/class-wc-checkoutcom-apm-templates.php:158
+#: templates/class-wc-checkoutcom-apm-templates.php:154
 msgid "b4payment GmbH"
 msgstr ""
 
-#: templates/class-wc-checkoutcom-apm-templates.php:159
+#: templates/class-wc-checkoutcom-apm-templates.php:155
 msgid "Obermünsterstraße&nbsp;14"
 msgstr ""
 
-#: templates/class-wc-checkoutcom-apm-templates.php:160
+#: templates/class-wc-checkoutcom-apm-templates.php:156
 msgid "93047&nbsp;Regensburg"
 msgstr ""
 
-#: templates/class-wc-checkoutcom-apm-templates.php:161
+#: templates/class-wc-checkoutcom-apm-templates.php:157
 msgid "GERMANY"
 msgstr ""
 
-#: templates/class-wc-checkoutcom-apm-templates.php:163
+#: templates/class-wc-checkoutcom-apm-templates.php:159
 msgid "Creditor ID: DE36ZZZ00001690322"
 msgstr ""
 
-#: templates/class-wc-checkoutcom-apm-templates.php:166
+#: templates/class-wc-checkoutcom-apm-templates.php:162
 msgid "Debtor"
 msgstr ""
 
-#: templates/class-wc-checkoutcom-apm-templates.php:180
+#: templates/class-wc-checkoutcom-apm-templates.php:176
 msgid "By accepting this mandate form, you authorise (A) b4payment GmbH to send instructions to your bank to debit your account (B) your bank to debit your account in accordance with the instructions from b4payment GmbH."
 msgstr ""
 
-#: templates/class-wc-checkoutcom-apm-templates.php:181
+#: templates/class-wc-checkoutcom-apm-templates.php:177
 msgid "As part of your rights, you are entitled to a refund from your bank under the terms and conditions of your agreement with your bank. A refund must be claimed within 8 weeks starting from the date on which your account was debited."
 msgstr ""
 
-#: templates/class-wc-checkoutcom-apm-templates.php:189
+#: templates/class-wc-checkoutcom-apm-templates.php:185
 msgid "I accept the mandate for a single payment"
 msgstr ""
 
-#: templates/class-wc-checkoutcom-apm-templates.php:200
+#: templates/class-wc-checkoutcom-apm-templates.php:196
 msgid "Your rights regarding the above mandate are explained in a statement that you can obtain from your bank."
 msgstr ""
 
