@@ -283,8 +283,11 @@ class WC_Checkoutcom_Api_Request {
 		if ( ! is_null( $subscription ) ) {
 			$payment->merchant_initiated  = true;
 			$payment->payment_type        = 'Recurring';
-			$payment->previous_payment_id = get_post_meta( $arg['parent_order_id'], '_cko_payment_id', true ) ?? null;
 			$payment->capture             = true;
+
+			if ( 'wc_checkout_com_alternative_payments_sepa' !== $order->get_payment_method() ) {
+				$payment->previous_payment_id = get_post_meta( $arg['parent_order_id'], '_cko_payment_id', true ) ?? null;
+			}
 
 		} elseif ( function_exists( 'wcs_order_contains_subscription' ) ) {
 			if ( wcs_order_contains_subscription( $order, 'parent' ) ) {
@@ -975,7 +978,7 @@ class WC_Checkoutcom_Api_Request {
 				return [ 'error' => $error_message ];
 			}
 		} catch ( CheckoutApiException $ex ) {
-			$error_message = esc_html__( 'An error has occurred while creating apm payments.', 'checkout-com-unified-payments-api' );
+			$error_message = esc_html__( 'An error has occurred while creating apm payments. ', 'checkout-com-unified-payments-api' );
 
 			// Check if gateway response is enabled from module settings.
 			if ( $gateway_debug ) {
@@ -997,7 +1000,7 @@ class WC_Checkoutcom_Api_Request {
 	 *
 	 * @return array
 	 */
-	private static function get_apm_method( $data, $order, $payment_method ) {
+	public static function get_apm_method( $data, $order, $payment_method ) {
 		if ( ! session_id() ) {
 			session_start();
 		}
