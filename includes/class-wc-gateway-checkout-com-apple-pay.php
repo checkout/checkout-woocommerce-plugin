@@ -120,7 +120,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 
 		<script type="text/javascript">
 			// Magic strings used in file
-			var applePayOptionSelector = '.payment_method_wc_checkout_com_apple_pay';
+			var applePayOptionSelector = 'li.payment_method_wc_checkout_com_apple_pay';
 			var applePayButtonId = 'ckocom_applePay';
 
 			// Warning messages for ApplePay
@@ -155,7 +155,9 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			};
 
 			// Listen for when the Apple Pay button is pressed.
-			jQuery(document).unbind("click").on('click', '#' + applePayButtonId, function () {
+			jQuery( document ).off( 'click', '#' + applePayButtonId );
+
+			jQuery( document ).on( 'click', '#' + applePayButtonId, function () {
 				var checkoutFields = '<?php echo $checkout_fields; ?>';
 				var result = isValidFormField(checkoutFields);
 
@@ -164,7 +166,6 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 					handleApplePayEvents(applePaySession);
 					applePaySession.begin();
 				}
-
 			});
 
 			/**
