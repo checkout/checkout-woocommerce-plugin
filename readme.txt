@@ -171,6 +171,14 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v4.4.8 4th November 2022
+- **[fix]** Webhook notices logging.
+- **[fix]** Card holder name send undefined on add payment screen.
+- **[tweak]** Upgrade minimum required PHP version to 7.3
+- **[tweak]** Apple Pay button JS event.
+- **[tweak]** Gateway icon `woocommerce_gateway_icon` filter usage.
+- **[tweak]** Add Google Pay & Apple Pay icon for gateway list on checkout.
+
 v4.4.7 18th August 2022
 - **[fix]** Apple Pay MADA support.
 - **[fix]** Fix MOTO payment type.
