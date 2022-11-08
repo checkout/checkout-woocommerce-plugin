@@ -465,6 +465,7 @@ function cko_gateway_icon( $icons, $id ) {
 		return $icons;
 	}
 
+	return $icons;
 }
 
 /**
