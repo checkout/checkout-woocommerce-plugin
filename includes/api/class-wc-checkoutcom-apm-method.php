@@ -355,6 +355,8 @@ class WC_Checkoutcom_APM_Method {
 		$address->zip           = self::$post['billing_postcode'];
 		$address->country       = self::$post['billing_country'];
 
+		$address = apply_filters( 'checkout_apm_sepa_address', $address );
+
 		$source_data                     = new SourceData();
 		$source_data->first_name         = self::$post['billing_first_name'];
 		$source_data->last_name          = self::$post['billing_last_name'];
