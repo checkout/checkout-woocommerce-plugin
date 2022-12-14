@@ -108,7 +108,7 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_Request {
 			<div class="input-group">
 				<label class="icon" for="sepa-iban">
 					<span class="ckojs ckojs-card"></label>
-				<input type="text" id="sepa-iban" name="sepa-iban" placeholder="<?php echo ( __( 'IBAN', 'checkout-com-unified-payments-api' ) ); ?>" class="input-control" required style="width: 100%;">
+				<input type="text" id="sepa-iban" name="sepa-iban" placeholder="<?php esc_attr_e( 'IBAN', 'checkout-com-unified-payments-api' ); ?>" class="input-control" required style="width: 100%;">
 			</div>
 			<div class="sepa-continue-btn">
 				<input type="button" id="sepa-continue" name="sepa-continue" value="<?php esc_html_e( 'Continue', 'checkout-com-unified-payments-api' ); ?>">
@@ -116,22 +116,18 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_Request {
 
 			<?php
 			self::get_sepa_mandate( $current_user );
-			$alert = esc_html__( 'Please fill in the required fields.', 'checkout-com-unified-payments-api' );
 			?>
 		</div>
 
 		<script type="text/javascript">
 			jQuery('#sepa-continue').click(function(){
-
 				if(jQuery('#sepa-iban').val().length > 0) {
 					jQuery('.sepa-mandate-card').show();
 				} else {
-					alert('<?php echo $alert; ?>')
+					alert('<?php esc_html_e( 'Please fill in the required fields.', 'checkout-com-unified-payments-api' ); ?>')
 				}
-
-			})
+			});
 		</script>
-
 		<?php
 	}
 

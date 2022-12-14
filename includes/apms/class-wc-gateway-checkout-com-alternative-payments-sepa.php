@@ -118,7 +118,22 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Sepa extends WC_Gateway_Check
 				$message .= esc_html__( ' Please try correct IBAN', 'checkout-com-unified-payments-api' );
 
 				$order->add_order_note( $message );
-				$order->update_status( 'failed' );
+
+                // Prevent from going into action loops.
+				remove_action( 'woocommerce_order_status_failed', 'WC_Subscriptions_Manager::failed_subscription_sign_ups_for_order' );
+				remove_action( 'woocommerce_order_status_changed', 'WC_Subscriptions_Order::maybe_record_subscription_payment', 9, 3 );
+
+				$subscriptions = function_exists( 'wcs_get_subscriptions_for_order' ) ? wcs_get_subscriptions_for_order( $order ) : null;
+				if ( ! empty( $subscriptions ) ) {
+					$order->update_status( 'failed' );
+					WC_Subscriptions_Manager::failed_subscription_sign_ups_for_order( $order );
+				} else {
+					$order->update_status( 'failed' );
+				}
+
+				add_action( 'woocommerce_order_status_failed', 'WC_Subscriptions_Manager::failed_subscription_sign_ups_for_order' );
+				add_action( 'woocommerce_order_status_changed', 'WC_Subscriptions_Order::maybe_record_subscription_payment', 9, 3 );
+                // Prevent from going into action loops - END.
 
 				return [
 					'result'   => 'fail',
@@ -152,7 +167,23 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Sepa extends WC_Gateway_Check
 				WC_Checkoutcom_Utility::wc_add_notice_self( $result['error'] );
 
 				$order->add_order_note( $result['error'] );
-				$order->update_status( 'failed' );
+
+				// Prevent from going into action loops.
+				remove_action( 'woocommerce_order_status_failed', 'WC_Subscriptions_Manager::failed_subscription_sign_ups_for_order' );
+				remove_action( 'woocommerce_order_status_changed', 'WC_Subscriptions_Order::maybe_record_subscription_payment', 9, 3 );
+
+				$subscriptions = function_exists( 'wcs_get_subscriptions_for_order' ) ? wcs_get_subscriptions_for_order( $order ) : null;
+				if ( ! empty( $subscriptions ) ) {
+					$order->update_status( 'failed' );
+					WC_Subscriptions_Manager::failed_subscription_sign_ups_for_order( $order );
+				} else {
+					$order->update_status( 'failed' );
+				}
+
+				add_action( 'woocommerce_order_status_failed', 'WC_Subscriptions_Manager::failed_subscription_sign_ups_for_order' );
+				add_action( 'woocommerce_order_status_changed', 'WC_Subscriptions_Order::maybe_record_subscription_payment', 9, 3 );
+				// Prevent from going into action loops - END.
+
 
 				return [
 					'result'   => 'fail',
