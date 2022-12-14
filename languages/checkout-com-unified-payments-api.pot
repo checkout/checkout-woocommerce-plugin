@@ -2,14 +2,14 @@
 # This file is distributed under the same license as the Checkout.com Payment Gateway plugin.
 msgid ""
 msgstr ""
-"Project-Id-Version: Checkout.com Payment Gateway 4.4.7\n"
+"Project-Id-Version: Checkout.com Payment Gateway 4.4.8\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/checkout-com-unified-payments-api\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2022-11-01T17:20:51+05:30\n"
+"POT-Creation-Date: 2022-12-14T17:51:28+05:30\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.7.1\n"
 "X-Domain: checkout-com-unified-payments-api\n"
@@ -264,7 +264,7 @@ msgid " Please try correct IBAN"
 msgstr ""
 
 #. translators: 1: Result ID, 2: Mandate reference.
-#: includes/apms/class-wc-gateway-checkout-com-alternative-payments-sepa.php:144
+#: includes/apms/class-wc-gateway-checkout-com-alternative-payments-sepa.php:159
 msgid "Checkout.com - Sepa payment Action ID : %1$s - Sepa mandate reference : %2$s"
 msgstr ""
 
@@ -338,14 +338,14 @@ msgstr ""
 
 #. translators: %s: Action ID.
 #: includes/class-wc-gateway-checkout-com-alternative-payments.php:122
-#: includes/class-wc-gateway-checkout-com-apple-pay.php:639
+#: includes/class-wc-gateway-checkout-com-apple-pay.php:640
 #: includes/class-wc-gateway-checkout-com-cards.php:882
 msgid "Checkout.com Payment Partially refunded from Admin - Action ID : %s"
 msgstr ""
 
 #. translators: %s: Action ID.
 #: includes/class-wc-gateway-checkout-com-alternative-payments.php:131
-#: includes/class-wc-gateway-checkout-com-apple-pay.php:648
+#: includes/class-wc-gateway-checkout-com-apple-pay.php:649
 #: includes/class-wc-gateway-checkout-com-cards.php:877
 msgid "Checkout.com Payment refunded from Admin - Action ID : %s"
 msgstr ""
@@ -355,14 +355,14 @@ msgstr ""
 msgid "Apple Pay"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-apple-pay.php:555
+#: includes/class-wc-gateway-checkout-com-apple-pay.php:556
 #: includes/class-wc-gateway-checkout-com-cards.php:415
 #: includes/class-wc-gateway-checkout-com-google-pay.php:152
 msgid "There was an issue completing the payment."
 msgstr ""
 
 #. translators: %s: Action ID.
-#: includes/class-wc-gateway-checkout-com-apple-pay.php:583
+#: includes/class-wc-gateway-checkout-com-apple-pay.php:584
 #: includes/class-wc-gateway-checkout-com-cards.php:487
 #: includes/class-wc-gateway-checkout-com-cards.php:596
 #: includes/class-wc-gateway-checkout-com-google-pay.php:187
@@ -371,7 +371,7 @@ msgid "Checkout.com Payment Authorised - Action ID : %s"
 msgstr ""
 
 #. translators: %s: Action ID.
-#: includes/class-wc-gateway-checkout-com-apple-pay.php:591
+#: includes/class-wc-gateway-checkout-com-apple-pay.php:592
 #: includes/class-wc-gateway-checkout-com-cards.php:495
 #: includes/class-wc-gateway-checkout-com-cards.php:604
 #: includes/class-wc-gateway-checkout-com-google-pay.php:195
@@ -455,7 +455,7 @@ msgid "An error has occurred while processing your cancel request. "
 msgstr ""
 
 #. translators: 1: Payment ID, 2: Webhook ID.
-#: includes/class-wc-gateway-checkout-com-cards.php:963
+#: includes/class-wc-gateway-checkout-com-cards.php:966
 msgid "Order payment Id (%1$s) does not match that of the webhook (%2$s)"
 msgstr ""
 

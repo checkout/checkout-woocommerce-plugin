@@ -959,10 +959,14 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 
 		// check if payment ID matches that of the webhook.
 		if ( $payment_id !== $data->data->id ) {
-			/* translators: 1: Payment ID, 2: Webhook ID. */
-			$message = sprintf( esc_html__( 'Order payment Id (%1$s) does not match that of the webhook (%2$s)', 'checkout-com-unified-payments-api' ), $payment_id, $data->data->id );
 
-			WC_Checkoutcom_Utility::logger( $message, null );
+			$gateway_debug = 'yes' === WC_Admin_Settings::get_option( 'cko_gateway_responses', 'no' );
+			if ( $gateway_debug ) {
+				/* translators: 1: Payment ID, 2: Webhook ID. */
+				$message = sprintf( esc_html__( 'Order payment Id (%1$s) does not match that of the webhook (%2$s)', 'checkout-com-unified-payments-api' ), $payment_id, $data->data->id );
+
+				WC_Checkoutcom_Utility::logger( $message, null );
+			}
 
 			return http_response_code( 422 );
 		}

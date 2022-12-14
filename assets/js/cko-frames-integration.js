@@ -59,7 +59,11 @@ jQuery(function () {
     function (event) {
       var valid = Frames.isCardValid()
         if (valid) {
-            let cardholderName = document.getElementById('billing_first_name')?.value + ' ' + document.getElementById('billing_last_name')?.value
+            let billingFirstName = document.getElementById('billing_first_name')?.value;
+            let billingLastName  = document.getElementById('billing_last_name')?.value;
+
+            let cardholderName = [ billingFirstName, billingLastName ].join(' ').trim();
+
             if(cardholderName.length > 0) {
                 // Add the cardholder name
                 Frames.cardholder = {

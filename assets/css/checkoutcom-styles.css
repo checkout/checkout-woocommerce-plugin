@@ -598,6 +598,12 @@ datalist {
     top: 4px;
 }
 
+ul.wc_payment_methods label[for*="payment_method_wc_checkout_com_"] img {
+    height: 22px;
+    width: 38px;
+    vertical-align: middle;
+}
+
 .woocommerce-SavedPaymentMethods-token{
     display: -webkit-box;
 }

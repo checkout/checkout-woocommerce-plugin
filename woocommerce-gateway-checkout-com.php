@@ -5,12 +5,12 @@
  * Description: Extends WooCommerce by Adding the Checkout.com Gateway.
  * Author: Checkout.com
  * Author URI: https://www.checkout.com/
- * Version: 4.4.7
+ * Version: 4.4.8
  * Requires at least: 4.0
- * Stable tag: 4.4.7
- * Tested up to: 6.0
- * WC tested up to: 6.5.1
- * Requires PHP: 7.2
+ * Stable tag: 4.4.8
+ * Tested up to: 6.1
+ * WC tested up to: 7.0.0
+ * Requires PHP: 7.3
  * Text Domain: checkout-com-unified-payments-api
  * Domain Path: /languages
  *
@@ -24,7 +24,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Constants.
  */
-define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '4.4.7' );
+define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '4.4.8' );
 define( 'WC_CHECKOUTCOM_PLUGIN_URL', untrailingslashit( plugins_url( basename( plugin_dir_path( __FILE__ ) ), basename( __FILE__ ) ) ) );
 define( 'WC_CHECKOUTCOM_PLUGIN_PATH', untrailingslashit( plugin_dir_path( __FILE__ ) ) );
 
@@ -405,14 +405,15 @@ function cko_gateway_icon( $icons, $id ) {
 
 			foreach ( $card_icon as $key => $value ) {
 				$card_icons = $plugin_url . $value . '.svg';
-				$icons     .= "<img src='$card_icons' id='cards-icon'>";
+				$icons     .= sprintf( '<img src="%1$s" id="cards-icon" alt="%2$s">', $card_icons, $value );
 			}
 
 			return $icons;
 		}
 
-		return false;
+		return $icons;
 	}
+
 	/**
 	 *  Display logo for APM available for payment
 	 */
@@ -423,14 +424,48 @@ function cko_gateway_icon( $icons, $id ) {
 		foreach ( $apm_available as $value ) {
 			if ( strpos( $id, $value ) ) {
 				$apm_icons = $plugin_url . $value . '.svg';
-				$icons    .= "<img src='$apm_icons' id='apm-icon'>";
+				$icons     .= sprintf( '<img src="%1$s" id="apm-icon" alt="%2$s">', $apm_icons, $value );
 
 				return $icons;
 			}
 		}
 
-		return false;
+		return $icons;
 	}
+
+	/* Check if Google Pay gateway */
+	if ( 'wc_checkout_com_google_pay' === $id ) {
+		$display_card_icon = WC_Admin_Settings::get_option( 'ckocom_display_icon', '0' ) === '1';
+
+		/* check if display card option is selected */
+		if ( $display_card_icon ) {
+
+			$value      = 'googlepay';
+            $card_icons = $plugin_url . $value . '.svg';
+
+            return sprintf( '<img src="%1$s" id="google-icon" alt="%2$s">', $card_icons, $value );
+		}
+
+		return $icons;
+	}
+
+	/* Check if Google Pay gateway */
+	if ( 'wc_checkout_com_apple_pay' === $id ) {
+		$display_card_icon = WC_Admin_Settings::get_option( 'ckocom_display_icon', '0' ) === '1';
+
+		/* check if display card option is selected */
+		if ( $display_card_icon ) {
+
+			$value      = 'applepay';
+			$card_icons = $plugin_url . $value . '.svg';
+
+			return sprintf( '<img src="%1$s" id="apple-icon" alt="%2$s">', $card_icons, $value );
+		}
+
+		return $icons;
+	}
+
+	return $icons;
 }
 
 /**
