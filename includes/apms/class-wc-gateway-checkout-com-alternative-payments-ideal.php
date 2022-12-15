@@ -46,6 +46,9 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Ideal extends WC_Gateway_Chec
 			<?php
 		} else {
 			WC_Checkoutcom_Apm_Templates::get_ideal_bank();
+			?>
+			<script src='<?php echo WC_CHECKOUTCOM_PLUGIN_URL . '/assets/js/ideal.js'; ?>'></script>
+			<?php
 		}
 	}
 
