@@ -111,7 +111,7 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_Request {
 				<input type="text" id="sepa-iban" name="sepa-iban" placeholder="<?php echo ( __( 'IBAN', 'checkout-com-unified-payments-api' ) ); ?>" class="input-control" required style="width: 100%;">
 			</div>
 			<div class="sepa-continue-btn">
-				<input type="button" id="sepa-continue" name="sepa-continue" value="Continue">
+				<input type="button" id="sepa-continue" name="sepa-continue" value="<?php esc_html_e( 'Continue', 'checkout-com-unified-payments-api' ); ?>">
 			</div>
 
 			<?php
