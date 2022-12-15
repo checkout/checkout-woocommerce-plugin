@@ -290,6 +290,7 @@ class WC_Checkoutcom_Cards_Settings {
 					'discover'        => __( 'Discover', 'checkout-com-unified-payments-api' ),
 					'jcb'             => __( 'JCB', 'checkout-com-unified-payments-api' ),
 					'cartesbancaires' => __( 'Cartes Bancaires', 'checkout-com-unified-payments-api' ),
+					'mada'            => __( 'Mada', 'checkout-com-unified-payments-api' ),
 				],
 				'class'   => 'wc-enhanced-select',
 				'css'     => 'width: 400px;',
