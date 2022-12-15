@@ -28,13 +28,14 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_Request {
 				</div>
 				<label for="issuer-id">
 
-					<input name="issuer-id" list="issuer-id" style="width: 80%;">
-					<datalist id="issuer-id">
+					<input name="issuer-id-dummy" list="issuer-id-dummy" style="width: 80%;">
+					<datalist id="issuer-id-dummy">
 						<?php foreach ( $issuers as $value ) { ?>
-							<option value="<?php echo $value['bic']; ?>"><?php echo $value['name']; ?></option>
+							<option data-value="<?php echo $value['bic']; ?>" value="<?php echo $value['name']; ?>"><?php echo $value['bic']; ?></option>
 						<?php } ?>
 					</datalist>
 					</input>
+					<input type="hidden" name="issuer-id" id="issuer-id">
 				</label>
 			</div>
 		<?php
@@ -116,18 +117,22 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_Request {
 
 			<?php
 			self::get_sepa_mandate( $current_user );
+			$alert = esc_html__( 'Please fill in the required fields.', 'checkout-com-unified-payments-api' );
 			?>
 		</div>
 
 		<script type="text/javascript">
 			jQuery('#sepa-continue').click(function(){
+
 				if(jQuery('#sepa-iban').val().length > 0) {
 					jQuery('.sepa-mandate-card').show();
 				} else {
-					alert('<?php esc_html_e( 'Please fill in the required fields.', 'checkout-com-unified-payments-api' ); ?>')
+					alert('<?php echo $alert; ?>')
 				}
-			});
+
+			})
 		</script>
+
 		<?php
 	}
 
@@ -182,7 +187,8 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_Request {
 						<input class="sepa-checkbox-input" type="checkbox" name="sepa-checkbox-input" id="sepa-checkbox-input" required>
 					</div>
 					<span class="sepa-checkbox-layout">
-						<h4><?php esc_html_e( 'I accept the mandate for a single payment', 'checkout-com-unified-payments-api' ); ?></h4>
+                        <span style="display:none">&nbsp;</span>
+						<h4 style="font-size: 12px;font-weight: 500;"><?php esc_html_e( 'I accept the mandate for a single payment', 'checkout-com-unified-payments-api' ); ?></h4>
 					</span>
 				</label>
 			</div>
