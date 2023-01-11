@@ -43,15 +43,10 @@ jQuery( function ( $ ) {
 			const capture_status = ckoCustomButtonValues.capture_status;
 
 			// check if order status is same as auth status in cko settings
-			// hide refund button and show capture and void button
+			// show capture and void button
 			if ( order_status === auth_status ) {
-				$( '.refund-items' ).hide();
 				$( '#cko-capture' ).show();
 				$( '#cko-void' ).show();
-			} else if ( order_status === capture_status || 'completed' === order_status ) {
-				$( '.refund-items' ).show();
-			} else {
-				$( '.refund-items' ).hide();
 			}
 
 			if ( $( '#cko-void' ).length > 0 ) {
