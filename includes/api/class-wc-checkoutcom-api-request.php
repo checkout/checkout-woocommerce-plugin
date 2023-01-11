@@ -281,14 +281,13 @@ class WC_Checkoutcom_Api_Request {
 
 		// Check for the subscription flag.
 		if ( ! is_null( $subscription ) ) {
-			$payment->merchant_initiated  = true;
-			$payment->payment_type        = 'Recurring';
-			$payment->capture             = true;
+			$payment->merchant_initiated = true;
+			$payment->payment_type       = 'Recurring';
+			$payment->capture            = true;
 
 			if ( 'wc_checkout_com_alternative_payments_sepa' !== $order->get_payment_method() ) {
 				$payment->previous_payment_id = get_post_meta( $arg['parent_order_id'], '_cko_payment_id', true ) ?? null;
 			}
-
 		} elseif ( function_exists( 'wcs_order_contains_subscription' ) ) {
 			if ( wcs_order_contains_subscription( $order, 'parent' ) ) {
 				$payment->merchant_initiated = false;
