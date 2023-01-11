@@ -61,13 +61,13 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Sepa extends WC_Gateway_Check
 					// check if apm is selected as payment method.
 					if (jQuery('#payment_method_wc_checkout_com_alternative_payments_sepa').is(':checked')) {
 
-						if (jQuery('#sepa-iban').val().length == 0) {
-							alert('Please enter your bank accounts iban');
+						if (0 === jQuery('#sepa-iban').val().length) {
+							alert( '<?php esc_html_e( 'Please enter your bank accounts iban', 'checkout-com-unified-payments-api' ); ?>' );
 							return false;
 						}
 
-						if (jQuery('input[name="sepa-checkbox-input"]:checked').length == 0) {
-							alert('Please accept the mandate to continue');
+						if (0 === jQuery('input[name="sepa-checkbox-input"]:checked').length) {
+							alert( '<?php esc_html_e( 'Please accept the mandate to continue', 'checkout-com-unified-payments-api' ); ?>' );
 							return false;
 						}
 					}
@@ -97,19 +97,19 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Sepa extends WC_Gateway_Check
 		$result  = [];
 
 		if ( 0 >= $order->get_total() ) { // 0 cost order.
-            $message = esc_html__( 'Checkout.com - SEPA payment for free order.', 'checkout-com-unified-payments-api' );
+			$message = esc_html__( 'Checkout.com - SEPA payment for free order.', 'checkout-com-unified-payments-api' );
 
-            // save src id for future use.
+			// save src id for future use.
 			$post_data = sanitize_post( $_POST );
-			$method = WC_Checkoutcom_Api_Request::get_apm_method( $post_data, $order, 'sepa' );
+			$method    = WC_Checkoutcom_Api_Request::get_apm_method( $post_data, $order, 'sepa' );
 
-            if ( ! empty( $method->id ) ) {
-	            $status = WC_Admin_Settings::get_option( 'ckocom_order_captured', 'processing' );
+			if ( ! empty( $method->id ) ) {
+				$status = WC_Admin_Settings::get_option( 'ckocom_order_captured', 'processing' );
 
-			    if ( class_exists( 'WC_Subscriptions_Order' ) ) {
+				if ( class_exists( 'WC_Subscriptions_Order' ) ) {
 					WC_Checkoutcom_Subscription::save_source_id( $order_id, $order, $method->id );
 				}
-            }
+			}
 
 			// check if result has error and return error message.
 			if ( empty( $method->id ) ) {
@@ -119,7 +119,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Sepa extends WC_Gateway_Check
 
 				$order->add_order_note( $message );
 
-                // Prevent from going into action loops.
+				// Prevent from going into action loops.
 				remove_action( 'woocommerce_order_status_failed', 'WC_Subscriptions_Manager::failed_subscription_sign_ups_for_order' );
 				remove_action( 'woocommerce_order_status_changed', 'WC_Subscriptions_Order::maybe_record_subscription_payment', 9, 3 );
 
@@ -133,12 +133,12 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Sepa extends WC_Gateway_Check
 
 				add_action( 'woocommerce_order_status_failed', 'WC_Subscriptions_Manager::failed_subscription_sign_ups_for_order' );
 				add_action( 'woocommerce_order_status_changed', 'WC_Subscriptions_Order::maybe_record_subscription_payment', 9, 3 );
-                // Prevent from going into action loops - END.
+				// Prevent from going into action loops - END.
 
 				return [
 					'result'   => 'fail',
 					'redirect' => '',
-                ];
+				];
 			}
 		} else {
 			// create alternative payment.
@@ -183,7 +183,6 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Sepa extends WC_Gateway_Check
 				add_action( 'woocommerce_order_status_failed', 'WC_Subscriptions_Manager::failed_subscription_sign_ups_for_order' );
 				add_action( 'woocommerce_order_status_changed', 'WC_Subscriptions_Order::maybe_record_subscription_payment', 9, 3 );
 				// Prevent from going into action loops - END.
-
 
 				return [
 					'result'   => 'fail',

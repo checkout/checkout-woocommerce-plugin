@@ -250,7 +250,6 @@ function action_woocommerce_order_item_add_action_buttons( $order ) {
 
 	if ( $order->get_payment_method() === 'wc_checkout_com_cards' || $order->get_payment_method() === 'wc_checkout_com_google_pay' ) {
 		?>
-
 <script type="text/javascript">
 	var ckoCustomButtonValues = {
 		order_status: "<?php echo $order_status; ?>",
@@ -264,7 +263,7 @@ function action_woocommerce_order_item_add_action_buttons( $order ) {
 <button class="button" id="cko-void" style="display:none;">Void</button>
 		<?php
 	}
-};
+}
 
 add_action( 'save_post', 'renew_save_again', 10, 2 );
 
@@ -387,7 +386,7 @@ add_filter( 'woocommerce_gateway_icon', 'cko_gateway_icon', 10, 2 );
  * @param string $icons Icons markup.
  * @param string $id Gateway ID.
  *
- * @return false|string|void
+ * @return string
  */
 function cko_gateway_icon( $icons, $id ) {
 
@@ -424,7 +423,7 @@ function cko_gateway_icon( $icons, $id ) {
 		foreach ( $apm_available as $value ) {
 			if ( strpos( $id, $value ) ) {
 				$apm_icons = $plugin_url . $value . '.svg';
-				$icons     .= sprintf( '<img src="%1$s" id="apm-icon" alt="%2$s">', $apm_icons, $value );
+				$icons    .= sprintf( '<img src="%1$s" id="apm-icon" alt="%2$s">', $apm_icons, $value );
 
 				return $icons;
 			}
@@ -441,9 +440,9 @@ function cko_gateway_icon( $icons, $id ) {
 		if ( $display_card_icon ) {
 
 			$value      = 'googlepay';
-            $card_icons = $plugin_url . $value . '.svg';
+			$card_icons = $plugin_url . $value . '.svg';
 
-            return sprintf( '<img src="%1$s" id="google-icon" alt="%2$s">', $card_icons, $value );
+			return sprintf( '<img src="%1$s" id="google-icon" alt="%2$s">', $card_icons, $value );
 		}
 
 		return $icons;

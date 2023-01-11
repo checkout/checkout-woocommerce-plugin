@@ -355,7 +355,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 	 */
 	public function element_form_cvv() {
 		?>
-		<div class="cko-cvv" style="display: none;padding-top: 10px;">
+		<div class="cko-cvv" style="display: none;">
 			<p class="validate-required" id="cko-cvv" data-priority="10">
 				<label for="cko-cvv"><?php esc_html_e( 'Card Code', 'checkout-com-unified-payments-api' ); ?> <span class="required">*</span></label>
 				<input id="cko-cvv" type="text" autocomplete="off" class="input-text" placeholder="<?php esc_attr_e( 'CVV', 'checkout-com-unified-payments-api' ); ?>" name="<?php echo esc_attr( $this->id ); ?>-card-cvv"/>

@@ -54,12 +54,12 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Boleto extends WC_Gateway_Che
 					if (jQuery('#payment_method_wc_checkout_com_alternative_payments_boleto').is(':checked')) {
 
 						if (!jQuery("[name='name']")[0].checkValidity()) {
-							alert('Please enter your name');
+							alert('<?php esc_html_e( 'Please enter your name', 'checkout-com-unified-payments-api' ); ?>');
 							return false;
 						}
 
 						if (!jQuery("[name='cpf']")[0].checkValidity()) {
-							alert('Please enter your CPF');
+							alert('<?php esc_html_e( 'Please enter your CPF', 'checkout-com-unified-payments-api' ); ?>');
 							return false;
 						}
 					}
