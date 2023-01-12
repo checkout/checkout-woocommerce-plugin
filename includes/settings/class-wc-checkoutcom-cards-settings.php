@@ -156,12 +156,12 @@ class WC_Checkoutcom_Cards_Settings {
 	public static function cards_settings() {
 
 		$settings = [
-			'card_setting'                => [
+			'card_setting'                          => [
 				'title'       => __( 'Card settings', 'checkout-com-unified-payments-api' ),
 				'type'        => 'title',
 				'description' => '',
 			],
-			'ckocom_card_autocap'         => [
+			'ckocom_card_autocap'                   => [
 				'id'       => 'ckocom_card_autocap',
 				'title'    => __( 'Payment Action', 'checkout-com-unified-payments-api' ),
 				'type'     => 'select',
@@ -173,14 +173,14 @@ class WC_Checkoutcom_Cards_Settings {
 				'default'  => 1,
 				'desc'     => 'Set this to Authorise only if you want to manually capture the payment.',
 			],
-			'ckocom_card_cap_delay'       => [
+			'ckocom_card_cap_delay'                 => [
 				'id'       => 'ckocom_card_cap_delay',
 				'title'    => __( 'Capture Delay', 'checkout-com-unified-payments-api' ),
 				'type'     => 'text',
 				'desc'     => __( 'The delay in hours (0 means immediately, 1.2 means one hour and 30 min)', 'checkout-com-unified-payments-api' ),
 				'desc_tip' => true,
 			],
-			'ckocom_card_threed'          => [
+			'ckocom_card_threed'                    => [
 				'id'       => 'ckocom_card_threed',
 				'title'    => __( 'Use 3D Secure', 'checkout-com-unified-payments-api' ),
 				'type'     => 'select',
@@ -192,7 +192,7 @@ class WC_Checkoutcom_Cards_Settings {
 				'default'  => 0,
 				'desc'     => '3D secure payment',
 			],
-			'ckocom_card_notheed'         => [
+			'ckocom_card_notheed'                   => [
 				'id'       => 'ckocom_card_notheed',
 				'title'    => __( 'Attempt non-3D Secure', 'checkout-com-unified-payments-api' ),
 				'type'     => 'select',
@@ -204,7 +204,7 @@ class WC_Checkoutcom_Cards_Settings {
 				'default'  => 0,
 				'desc'     => 'Attempt non-3D Secure payment',
 			],
-			'ckocom_card_saved'           => [
+			'ckocom_card_saved'                     => [
 				'id'       => 'ckocom_card_saved',
 				'title'    => __( 'Enable Save Cards', 'checkout-com-unified-payments-api' ),
 				'type'     => 'select',
@@ -216,7 +216,7 @@ class WC_Checkoutcom_Cards_Settings {
 				'default'  => 0,
 				'desc'     => 'Allow customers to save cards for future payments',
 			],
-			'ckocom_card_require_cvv'     => [
+			'ckocom_card_require_cvv'               => [
 				'id'       => 'ckocom_card_require_cvv',
 				'title'    => __( 'Require CVV For Saved Cards', 'checkout-com-unified-payments-api' ),
 				'type'     => 'select',
@@ -228,7 +228,7 @@ class WC_Checkoutcom_Cards_Settings {
 				'default'  => 0,
 				'desc'     => 'Allow customers to save cards for future payments',
 			],
-			'ckocom_card_desctiptor'      => [
+			'ckocom_card_desctiptor'                => [
 				'id'       => 'ckocom_card_desctiptor',
 				'title'    => __( 'Enable Dynamic Descriptor', 'checkout-com-unified-payments-api' ),
 				'type'     => 'select',
@@ -240,21 +240,21 @@ class WC_Checkoutcom_Cards_Settings {
 				'default'  => 0,
 				'desc'     => __( 'Dynamic Descriptor', 'checkout-com-unified-payments-api' ),
 			],
-			'ckocom_card_desctiptor_name' => [
+			'ckocom_card_desctiptor_name'           => [
 				'id'       => 'ckocom_card_desctiptor_name',
 				'title'    => __( 'Descriptor Name', 'checkout-com-unified-payments-api' ),
 				'type'     => 'text',
 				'desc'     => __( 'Maximum 25 characters)', 'checkout-com-unified-payments-api' ),
 				'desc_tip' => true,
 			],
-			'ckocom_card_desctiptor_city' => [
+			'ckocom_card_desctiptor_city'           => [
 				'id'       => 'ckocom_card_desctiptor_city',
 				'title'    => __( 'Descriptor City', 'checkout-com-unified-payments-api' ),
 				'type'     => 'text',
 				'desc'     => __( 'Maximum 13 characters)', 'checkout-com-unified-payments-api' ),
 				'desc_tip' => true,
 			],
-			'ckocom_card_mada'            => [
+			'ckocom_card_mada'                      => [
 				'id'       => 'ckocom_card_mada',
 				'title'    => __( 'Enable MADA Bin Check', 'checkout-com-unified-payments-api' ),
 				'type'     => 'select',
@@ -266,7 +266,7 @@ class WC_Checkoutcom_Cards_Settings {
 				'default'  => 0,
 				'desc'     => __( 'For processing MADA transactions, this option needs to be set to Yes', 'checkout-com-unified-payments-api' ),
 			],
-			'ckocom_display_icon'         => [
+			'ckocom_display_icon'                   => [
 				'id'       => 'ckocom_display_icon',
 				'title'    => __( 'Display Card Icons', 'checkout-com-unified-payments-api' ),
 				'type'     => 'select',
@@ -278,7 +278,7 @@ class WC_Checkoutcom_Cards_Settings {
 				'default'  => 0,
 				'desc'     => 'Enable/disable cards icon on checkout page',
 			],
-			'ckocom_card_icons'           => [
+			'ckocom_card_icons'                     => [
 				'id'      => 'ckocom_card_icons',
 				'title'   => __( 'Card Icons', 'checkout-com-unified-payments-api' ),
 				'type'    => 'multiselect',
@@ -295,7 +295,19 @@ class WC_Checkoutcom_Cards_Settings {
 				'class'   => 'wc-enhanced-select',
 				'css'     => 'width: 400px;',
 			],
-			'ckocom_language_fallback'    => [
+			'ckocom_language_type'                  => [
+				'id'       => 'ckocom_language_type',
+				'title'    => __( 'Language Support', 'checkout-com-unified-payments-api' ),
+				'type'     => 'select',
+				'desc_tip' => true,
+				'options'  => [
+					0 => __( 'Predefined Translation', 'checkout-com-unified-payments-api' ),
+					1 => __( 'Custom Translation', 'checkout-com-unified-payments-api' ),
+				],
+				'default'  => 0,
+				'desc'     => 'Select a translation type for card input fields',
+			],
+			'ckocom_language_fallback'              => [
 				'id'       => 'ckocom_language_fallback',
 				'title'    => __( 'Language Fallback', 'checkout-com-unified-payments-api' ),
 				'type'     => 'select',
@@ -312,7 +324,55 @@ class WC_Checkoutcom_Cards_Settings {
 				'default'  => 'EN-GB',
 				'desc'     => 'Select the language to use by default if the one used by the shopper is not supported by the integration.',
 			],
-			'ckocom_iframe_style'         => [
+			'ckocom_card_number_placeholder'        => [
+				'id'       => 'ckocom_card_number_placeholder',
+				'title'    => __( 'Card Number Placeholder', 'checkout-com-unified-payments-api' ),
+				'type'     => 'text',
+				'default'  => 'Card number',
+				'desc'     => __( 'Card number input box placeholder.', 'checkout-com-unified-payments-api' ),
+				'desc_tip' => true,
+			],
+			'ckocom_card_expiry_month_placeholder'  => [
+				'id'       => 'ckocom_card_expiry_month_placeholder',
+				'title'    => __( 'Card Expiry Month Placeholder', 'checkout-com-unified-payments-api' ),
+				'type'     => 'text',
+				'default'  => 'MM',
+				'desc'     => __( 'Card expiry month input box placeholder.', 'checkout-com-unified-payments-api' ),
+				'desc_tip' => true,
+			],
+			'ckocom_card_expiry_year_placeholder'   => [
+				'id'       => 'ckocom_card_expiry_year_placeholder',
+				'title'    => __( 'Card Expiry Year Placeholder', 'checkout-com-unified-payments-api' ),
+				'type'     => 'text',
+				'default'  => 'YY',
+				'desc'     => __( 'Card expiry year input box placeholder.', 'checkout-com-unified-payments-api' ),
+				'desc_tip' => true,
+			],
+			'ckocom_card_cvv_placeholder'           => [
+				'id'       => 'ckocom_card_cvv_placeholder',
+				'title'    => __( 'Card CVV Placeholder', 'checkout-com-unified-payments-api' ),
+				'type'     => 'text',
+				'default'  => 'CVV',
+				'desc'     => __( 'Card CVV input box placeholder.', 'checkout-com-unified-payments-api' ),
+				'desc_tip' => true,
+			],
+			'ckocom_card_scheme_link_placeholder'   => [
+				'id'       => 'ckocom_card_scheme_link_placeholder',
+				'title'    => __( 'Card Scheme Link Placeholder', 'checkout-com-unified-payments-api' ),
+				'type'     => 'text',
+				'default'  => 'Click here to update your type of card',
+				'desc'     => __( 'Card Scheme Link input box placeholder.', 'checkout-com-unified-payments-api' ),
+				'desc_tip' => true,
+			],
+			'ckocom_card_scheme_header_placeholder' => [
+				'id'       => 'ckocom_card_scheme_header_placeholder',
+				'title'    => __( 'Card Scheme Header Placeholder', 'checkout-com-unified-payments-api' ),
+				'type'     => 'text',
+				'default'  => 'Choose your type of card',
+				'desc'     => __( 'Card Scheme Header input box placeholder.', 'checkout-com-unified-payments-api' ),
+				'desc_tip' => true,
+			],
+			'ckocom_iframe_style'                   => [
 				'id'       => 'ckocom_iframe_style',
 				'title'    => __( 'Iframe Style', 'checkout-com-unified-payments-api' ),
 				'type'     => 'select',
