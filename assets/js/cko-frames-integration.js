@@ -14,10 +14,18 @@ jQuery(function () {
   }
 
   function initFrames() {
+    var localization;
+
+    try {
+      localization = JSON.parse( document.getElementById("localization").value );
+    } catch ( e ) {
+      localization = document.getElementById("localization").value;
+    }
+
     Frames.init({
       debug: document.getElementById( "debug" ).value === "yes",
       publicKey: document.getElementById("public-key").value,
-      localization: document.getElementById("localization").value,
+      localization: localization,
       schemeChoice: {
         frameSelector: ".scheme-choice-frame"
       },
