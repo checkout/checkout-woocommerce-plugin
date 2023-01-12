@@ -193,6 +193,8 @@ jQuery( function ( $ ) {
                 ckocom_card_expiry_month_placeholder.closest( 'tr' ).hide();
                 ckocom_card_expiry_year_placeholder.closest( 'tr' ).hide();
                 ckocom_card_cvv_placeholder.closest( 'tr' ).hide();
+                ckocom_card_scheme_link_placeholder.closest( 'tr' ).hide();
+                ckocom_card_scheme_header_placeholder.closest( 'tr' ).hide();
             } else {
                 ckocom_language_fallback.closest( 'tr' ).hide();
             }
