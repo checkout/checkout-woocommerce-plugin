@@ -1019,30 +1019,45 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		$woo_locale = str_replace( '_', '-', get_locale() );
 		$locale     = substr( $woo_locale, 0, 2 );
 
-		switch ( $locale ) {
-			case 'en':
-				$localization = 'EN-GB';
-				break;
-			case 'it':
-				$localization = 'IT-IT';
-				break;
-			case 'nl':
-				$localization = 'NL-NL';
-				break;
-			case 'fr':
-				$localization = 'FR-FR';
-				break;
-			case 'de':
-				$localization = 'DE-DE';
-				break;
-			case 'kr':
-				$localization = 'KR-KR';
-				break;
-			case 'es':
-				$localization = 'ES-ES';
-				break;
-			default:
-				$localization = WC_Admin_Settings::get_option( 'ckocom_language_fallback', 'EN-GB' );
+		$ckocom_language_type = WC_Admin_Settings::get_option( 'ckocom_language_type', '0' );
+
+		if ( '0' === $ckocom_language_type ) {
+			switch ( $locale ) {
+				case 'en':
+					$localization = 'EN-GB';
+					break;
+				case 'it':
+					$localization = 'IT-IT';
+					break;
+				case 'nl':
+					$localization = 'NL-NL';
+					break;
+				case 'fr':
+					$localization = 'FR-FR';
+					break;
+				case 'de':
+					$localization = 'DE-DE';
+					break;
+				case 'kr':
+					$localization = 'KR-KR';
+					break;
+				case 'es':
+					$localization = 'ES-ES';
+					break;
+				default:
+					$localization = WC_Admin_Settings::get_option( 'ckocom_language_fallback', 'EN-GB' );
+			}
+		} else {
+			$localization = [
+				'cardNumberPlaceholder'  => WC_Admin_Settings::get_option( 'ckocom_card_number_placeholder', 'Card number' ),
+				'expiryMonthPlaceholder' => WC_Admin_Settings::get_option( 'ckocom_card_expiry_month_placeholder', 'MM' ),
+				'expiryYearPlaceholder'  => WC_Admin_Settings::get_option( 'ckocom_card_expiry_year_placeholder', 'YY' ),
+				'cvvPlaceholder'         => WC_Admin_Settings::get_option( 'ckocom_card_cvv_placeholder', 'CVV' ),
+				'cardSchemeLink'         => WC_Admin_Settings::get_option( 'ckocom_card_scheme_link_placeholder', 'Click here to update your type of card' ),
+				'cardSchemeHeader'       => WC_Admin_Settings::get_option( 'ckocom_card_scheme_header_placeholder', 'Choose your type of card' ),
+			];
+
+			$localization = json_encode( $localization );
 		}
 
 		return $localization;
