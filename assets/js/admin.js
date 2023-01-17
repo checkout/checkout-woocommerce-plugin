@@ -115,6 +115,14 @@ jQuery( function ( $ ) {
 			let ckocom_card_desctiptor_city = $( '#ckocom_card_desctiptor_city' );
 			let ckocom_display_icon = $( '#ckocom_display_icon' );
 			let ckocom_card_icons = $( '#ckocom_card_icons' );
+			let ckocom_language_type = $( '#ckocom_language_type' );
+			let ckocom_language_fallback = $( '#ckocom_language_fallback' );
+			let ckocom_card_number_placeholder = $( '#ckocom_card_number_placeholder' );
+			let ckocom_card_expiry_month_placeholder = $( '#ckocom_card_expiry_month_placeholder' );
+			let ckocom_card_expiry_year_placeholder = $( '#ckocom_card_expiry_year_placeholder' );
+			let ckocom_card_cvv_placeholder = $( '#ckocom_card_cvv_placeholder' );
+			let ckocom_card_scheme_link_placeholder = $( '#ckocom_card_scheme_link_placeholder' );
+			let ckocom_card_scheme_header_placeholder = $( '#ckocom_card_scheme_header_placeholder' );
 
 			if ( ckocom_card_autocap.val() === '0' ) {
 				ckocom_card_cap_delay.closest( 'tr' ).hide();
@@ -178,6 +186,38 @@ jQuery( function ( $ ) {
 					ckocom_card_icons.closest( 'tr' ).show();
 				}
 			} )
+
+            if ( ckocom_language_type.val() === '0' ) {
+                ckocom_language_fallback.closest( 'tr' ).show();
+                ckocom_card_number_placeholder.closest( 'tr' ).hide();
+                ckocom_card_expiry_month_placeholder.closest( 'tr' ).hide();
+                ckocom_card_expiry_year_placeholder.closest( 'tr' ).hide();
+                ckocom_card_cvv_placeholder.closest( 'tr' ).hide();
+                ckocom_card_scheme_link_placeholder.closest( 'tr' ).hide();
+                ckocom_card_scheme_header_placeholder.closest( 'tr' ).hide();
+            } else {
+                ckocom_language_fallback.closest( 'tr' ).hide();
+            }
+
+            ckocom_language_type.on( 'change', function () {
+                if ( this.value === '0' ) {
+                    ckocom_language_fallback.closest( 'tr' ).show();
+                    ckocom_card_number_placeholder.closest( 'tr' ).hide();
+                    ckocom_card_expiry_month_placeholder.closest( 'tr' ).hide();
+                    ckocom_card_expiry_year_placeholder.closest( 'tr' ).hide();
+                    ckocom_card_cvv_placeholder.closest( 'tr' ).hide();
+                    ckocom_card_scheme_link_placeholder.closest( 'tr' ).hide();
+                    ckocom_card_scheme_header_placeholder.closest( 'tr' ).hide();
+                } else {
+                    ckocom_language_fallback.closest( 'tr' ).hide();
+                    ckocom_card_number_placeholder.closest( 'tr' ).show();
+                    ckocom_card_expiry_month_placeholder.closest( 'tr' ).show();
+                    ckocom_card_expiry_year_placeholder.closest( 'tr' ).show();
+                    ckocom_card_cvv_placeholder.closest( 'tr' ).show();
+                    ckocom_card_scheme_link_placeholder.closest( 'tr' ).show();
+                    ckocom_card_scheme_header_placeholder.closest( 'tr' ).show();
+                }
+            } )
 		},
 
 		webhookSettings: function () {
