@@ -620,6 +620,12 @@ ul.wc_payment_methods label[for*="payment_method_wc_checkout_com_"] img {
     padding-left: 5px;
 }
 
+.cko-cvv {
+    padding-top: 10px;
+    padding-left: 1.41575em;
+    display: inline-block;
+}
+
 #cko-cvv > input {
     height : 35px;
     width : 75px;

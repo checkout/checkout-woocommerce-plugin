@@ -242,7 +242,6 @@ jQuery(function () {
     ) {
       jQuery(".cko-form").hide();
 
-      // jQuery( "input[type=radio][name=wc-wc_checkout_com_cards-payment-token]" ).change(function () {
       jQuery(document).on( 'change', "input[type=radio][name=wc-wc_checkout_com_cards-payment-token]", function () {
         // if ( this.value === "new" ) {
         if ( this.value === "new" && jQuery(this).is(':checked') ) {
@@ -254,6 +253,10 @@ jQuery(function () {
           jQuery(".cko-form").hide();
           jQuery(".cko-save-card-checkbox").hide();
           jQuery(".cko-cvv").show();
+
+          if ( jQuery( this ).is( ':checked' ) && 'woocommerce-SavedPaymentMethods-token' === this.parentElement.getAttribute( 'class' ) ) {
+              jQuery( ".cko-cvv" ).appendTo( this.parentElement );
+          }
 
           if (document.getElementById("is-mada").value === 1) {
             if (this.value === document.getElementById("mada-token")) {
