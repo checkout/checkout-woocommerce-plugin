@@ -171,6 +171,12 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v4.4.10 17th January 2023
+- **[feat]** New settings to set custom placeholder for card input fields
+- **[tweak]** Always show Refund button for any order status
+- **[tweak]** Make CVV input position dynamic for saved cards
+- **[fix]** Fix string missing translation
+
 v4.4.9 16th December 2022
 - **[feat]** Accept SEPA payment with free subscription.
 - **[tweak]** Added new filter `checkout_apm_sepa_address` on checkout with SEPA for address.
