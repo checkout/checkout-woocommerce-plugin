@@ -257,7 +257,7 @@ class WC_Checkoutcom_Api_Request {
 		$name  = $post_data['billing_first_name'] . ' ' . $post_data['billing_last_name'];
 
 		// Pay Order Page.
-		$is_pay_order = ! empty( $get_data['pay_for_order'] ) ? (bool) $get_data['pay_for_order'] : false;
+		$is_pay_order = ! empty( $get_data['pay_for_order'] ) && (bool) $get_data['pay_for_order'];
 
 		if ( $is_pay_order ) {
 			if ( ! empty( $get_data['order_id'] ) ) {
@@ -490,23 +490,23 @@ class WC_Checkoutcom_Api_Request {
 
 			$order = wc_get_order( $order_id );
 
-			$billing_first_name = $order->billing_first_name;
-			$billing_last_name  = $order->billing_last_name;
-			$billing_address_1  = $order->billing_address_1;
-			$billing_address_2  = $order->billing_address_2;
-			$billing_city       = $order->billing_city;
-			$billing_state      = $order->billing_state;
-			$billing_postcode   = $order->billing_postcode;
-			$billing_country    = $order->billing_country;
+			$billing_first_name = $order->get_billing_first_name();
+			$billing_last_name  = $order->get_billing_last_name();
+			$billing_address_1  = $order->get_billing_address_1();
+			$billing_address_2  = $order->get_billing_address_2();
+			$billing_city       = $order->get_billing_city();
+			$billing_state      = $order->get_billing_state();
+			$billing_postcode   = $order->get_billing_postcode();
+			$billing_country    = $order->get_billing_country();
 
-			$shipping_first_name = $order->shipping_first_name;
-			$shipping_last_name  = $order->shipping_last_name;
-			$shipping_address_1  = $order->shipping_address_1;
-			$shipping_address_2  = $order->shipping_address_2;
-			$shipping_city       = $order->shipping_city;
-			$shipping_state      = $order->shipping_state;
-			$shipping_postcode   = $order->shipping_postcode;
-			$shipping_country    = $order->shipping_country;
+			$shipping_first_name = $order->get_shipping_first_name();
+			$shipping_last_name  = $order->get_shipping_last_name();
+			$shipping_address_1  = $order->get_shipping_address_1();
+			$shipping_address_2  = $order->get_shipping_address_2();
+			$shipping_city       = $order->get_shipping_city();
+			$shipping_state      = $order->get_shipping_state();
+			$shipping_postcode   = $order->get_shipping_postcode();
+			$shipping_country    = $order->get_shipping_country();
 
 		} else {
 			$shipping_first_name = $billing_first_name;
