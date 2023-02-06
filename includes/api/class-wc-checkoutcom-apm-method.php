@@ -334,10 +334,10 @@ class WC_Checkoutcom_APM_Method {
 	 */
 	public static function get_sepa_info() {
 
-		global $woocommerce;
-
-		$items           = $woocommerce->cart->get_cart();
+		$get_data        = sanitize_post( $_GET );
+		$items           = WC()->cart->get_cart();
 		$is_subscription = false;
+		$is_pay_order    = ! empty( $get_data['pay_for_order'] ) && (bool) $get_data['pay_for_order'];
 
 		foreach ( $items as $item => $values ) {
 			$_product        = wc_get_product( $values['data']->get_id() );
@@ -346,6 +346,17 @@ class WC_Checkoutcom_APM_Method {
 			if ( $is_subscription ) {
 				break;
 			}
+		}
+
+		if ( $is_pay_order ) {
+			self::$post['billing_address_1']  = self::$order_info->get_billing_address_1();
+			self::$post['billing_address_2']  = self::$order_info->get_billing_address_2();
+			self::$post['billing_city']       = self::$order_info->get_billing_city();
+			self::$post['billing_postcode']   = self::$order_info->get_billing_postcode();
+			self::$post['billing_country']    = self::$order_info->get_billing_country();
+			self::$post['billing_first_name'] = self::$order_info->get_billing_first_name();
+			self::$post['billing_last_name']  = self::$order_info->get_billing_last_name();
+			self::$post['billing_email']      = self::$order_info->get_billing_email();
 		}
 
 		$address                = new Address();
