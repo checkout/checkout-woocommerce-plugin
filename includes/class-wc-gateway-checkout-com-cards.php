@@ -72,6 +72,32 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 
 		// Payment scripts.
 		add_action( 'wp_enqueue_scripts', [ $this, 'payment_scripts' ] );
+
+		// Meta field on subscription edit.
+		add_filter( 'woocommerce_subscription_payment_meta', [ $this, 'add_payment_meta_field' ], 10, 2 );
+	}
+
+	/**
+	 * Add subscription order payment meta field.
+	 *
+	 * @param array           $payment_meta associative array of meta data required for automatic payments.
+	 * @param WC_Subscription $subscription An instance of a subscription object.
+	 * @return array
+	 */
+	public function add_payment_meta_field( $payment_meta, $subscription ) {
+		$subscription_id = $subscription->get_id();
+		$source_id       = get_post_meta( $subscription_id, '_cko_source_id', true );
+
+		$payment_meta[ $this->id ] = [
+			'post_meta' => [
+				'_cko_source_id' => [
+					'value' => $source_id,
+					'label' => 'Checkout.com Card Source ID',
+				],
+			],
+		];
+
+		return $payment_meta;
 	}
 
 	/**
