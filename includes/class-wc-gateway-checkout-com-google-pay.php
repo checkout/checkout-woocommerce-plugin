@@ -75,7 +75,7 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 				'merchant_id'   => $this->get_option( 'ckocom_google_merchant_id' ),
 				'currency_code' => $currency_code,
 				'total_price'   => $total_price,
-				'button_type'   => $this->get_option( 'ckocom_google_style' ),
+				'button_type'   => $this->get_option( 'ckocom_google_style', 'google-pay-black' ),
 			];
 
 			wp_localize_script( 'cko-google-pay-integration-script', 'cko_google_pay_vars', $vars );

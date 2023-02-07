@@ -618,7 +618,7 @@ class WC_Checkoutcom_Cards_Settings {
 				'type'        => 'select',
 				'class'       => 'wc-enhanced-select',
 				'description' => __( 'Select button color.', 'checkout-com-unified-payments-api' ),
-				'default'     => 'authorize',
+				'default'     => 'google-pay-black',
 				'desc_tip'    => true,
 				'options'     => [
 					'google-pay-black' => __( 'Black', 'checkout-com-unified-payments-api' ),
