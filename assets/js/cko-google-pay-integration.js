@@ -1,3 +1,5 @@
+/* global google */
+
 jQuery( function ( $ ) {
 	googlePayUiController = (function () {
 		var DOMStrings = {
