@@ -144,6 +144,8 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_Request {
 	 * @return void
 	 */
 	private static function get_sepa_mandate( $current_user ) {
+		global $wp;
+
 		?>
 	<div class="sepa-mandate-card" style="display: none;">
 		<div class="sepa-card-header">
@@ -187,7 +189,7 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_Request {
 						<input class="sepa-checkbox-input" type="checkbox" name="sepa-checkbox-input" id="sepa-checkbox-input" required>
 					</div>
 					<span class="sepa-checkbox-layout">
-                        <span style="display:none">&nbsp;</span>
+						<span style="display:none">&nbsp;</span>
 						<h4 style="font-size: 12px;font-weight: 500;"><?php esc_html_e( 'I accept the mandate for a single payment', 'checkout-com-unified-payments-api' ); ?></h4>
 					</span>
 				</label>
@@ -205,23 +207,48 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_Request {
 			</div>
 		</div>
 	</div>
-
-	<script type="text/javascript">
-		jQuery(document).ready(function(){
-			var customerName = jQuery('#billing_first_name').val() + " " + jQuery('#billing_last_name').val();
-			jQuery('.customerName').html(customerName)
-			var address1 = jQuery('#billing_address_1').val();
-			jQuery('.address1').html(address1)
-			var address2 = jQuery('#billing_address_2').val();
-			var city = jQuery('#billing_city').val();
-			jQuery('.address2').html(address2 + ' ' + city)
-			var billingCountry = jQuery("#billing_country option:selected").html();
-			var country = billingCountry.toUpperCase();
-			jQuery('.country').html(country)
-
-		})
-	</script>
-
 		<?php
+
+		if ( isset( $_GET['pay_for_order'] ) && 'true' === $_GET['pay_for_order'] ) {
+			$order_id = wc_clean( $wp->query_vars['order-pay'] );
+			$order    = wc_get_order( $order_id );
+
+			if ( $order ) {
+				?>
+				<script type="text/javascript">
+					jQuery(document).ready(function(){
+						var customerName = "<?php echo esc_html( $order->get_billing_first_name() . ' ' . $order->get_billing_last_name() ); ?>";
+						jQuery('.customerName').html(customerName)
+						var address1 = "<?php echo esc_html( $order->get_billing_address_1() ); ?>";
+						jQuery('.address1').html(address1)
+						var address2 = "<?php echo esc_html( $order->get_billing_address_2() ); ?>";
+						var city = "<?php echo esc_html( $order->get_billing_city() ); ?>";
+						jQuery('.address2').html(address2 + ' ' + city)
+						var billingCountry = "<?php echo esc_html( WC()->countries->countries[ $order->get_billing_country() ] ); ?>";
+						var country = billingCountry.toUpperCase();
+						jQuery('.country').html(country)
+					})
+				</script>
+				<?php
+			}
+		} else {
+			?>
+			<script type="text/javascript">
+				jQuery(document).ready(function(){
+					var customerName = jQuery('#billing_first_name').val() + " " + jQuery('#billing_last_name').val();
+					jQuery('.customerName').html(customerName)
+					var address1 = jQuery('#billing_address_1').val();
+					jQuery('.address1').html(address1)
+					var address2 = jQuery('#billing_address_2').val();
+					var city = jQuery('#billing_city').val();
+					jQuery('.address2').html(address2 + ' ' + city)
+					var billingCountry = jQuery("#billing_country option:selected").html();
+					var country = billingCountry.toUpperCase();
+					jQuery('.country').html(country)
+
+				})
+			</script>
+			<?php
+		}
 	}
 }
