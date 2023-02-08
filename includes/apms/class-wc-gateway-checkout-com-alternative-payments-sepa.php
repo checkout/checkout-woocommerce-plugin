@@ -32,11 +32,38 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Sepa extends WC_Gateway_Check
 			'subscription_suspension',
 			'subscription_reactivation',
 			'subscription_date_changes',
+			'subscription_payment_method_change_admin',
 		];
 
 		$this->init_form_fields();
 
 		add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, [ $this, 'process_admin_options' ] );
+
+		// Meta field on subscription edit.
+		add_filter( 'woocommerce_subscription_payment_meta', [ $this, 'add_payment_meta_field' ], 10, 2 );
+	}
+
+	/**
+	 * Add subscription order payment meta field.
+	 *
+	 * @param array           $payment_meta associative array of meta data required for automatic payments.
+	 * @param WC_Subscription $subscription An instance of a subscription object.
+	 * @return array
+	 */
+	public function add_payment_meta_field( $payment_meta, $subscription ) {
+		$subscription_id = $subscription->get_id();
+		$source_id       = get_post_meta( $subscription_id, '_cko_source_id', true );
+
+		$payment_meta[ $this->id ] = [
+			'post_meta' => [
+				'_cko_source_id' => [
+					'value' => $source_id,
+					'label' => 'Checkout.com SEPA Direct Debit Source ID',
+				],
+			],
+		];
+
+		return $payment_meta;
 	}
 
 	/**
