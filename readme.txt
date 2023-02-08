@@ -171,6 +171,11 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v4.4.11 8th February 2023
+- **[tweak]** Update Google Pay logo and button styles
+- **[fix]** WooCommerce order property access warning
+- **[fix]** Fix JS error of undefined
+
 v4.4.10 17th January 2023
 - **[feat]** New settings to set custom placeholder for card input fields
 - **[tweak]** Always show Refund button for any order status
