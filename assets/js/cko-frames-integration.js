@@ -26,9 +26,8 @@ jQuery(function () {
       debug: document.getElementById( "debug" ).value === "yes",
       publicKey: document.getElementById("public-key").value,
       localization: localization,
-      schemeChoice: {
-        frameSelector: ".scheme-choice-frame"
-      },
+      schemeChoice: true,
+      modes: [ Frames.modes.FEATURE_FLAG_SCHEME_CHOICE ],
       style: {
         base: {
           borderRadius: '3px'

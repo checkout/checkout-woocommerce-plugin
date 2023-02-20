@@ -2,14 +2,14 @@
 # This file is distributed under the same license as the Checkout.com Payment Gateway plugin.
 msgid ""
 msgstr ""
-"Project-Id-Version: Checkout.com Payment Gateway 4.4.10\n"
+"Project-Id-Version: Checkout.com Payment Gateway 4.4.11\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/checkout-com-unified-payments-api\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2023-01-17T15:00:56+05:30\n"
+"POT-Creation-Date: 2023-02-08T16:22:15+05:30\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.7.1\n"
 "X-Domain: checkout-com-unified-payments-api\n"
@@ -126,7 +126,7 @@ msgstr ""
 msgid "An error has occurred while processing your payment."
 msgstr ""
 
-#: includes/api/class-wc-checkoutcom-apm-method.php:401
+#: includes/api/class-wc-checkoutcom-apm-method.php:412
 msgid "An error has occurred while getting sepa info."
 msgstr ""
 
@@ -259,28 +259,28 @@ msgstr ""
 msgid "SEPA Direct Debit"
 msgstr ""
 
-#: includes/apms/class-wc-gateway-checkout-com-alternative-payments-sepa.php:65
+#: includes/apms/class-wc-gateway-checkout-com-alternative-payments-sepa.php:92
 msgid "Please enter your bank accounts iban"
 msgstr ""
 
-#: includes/apms/class-wc-gateway-checkout-com-alternative-payments-sepa.php:70
+#: includes/apms/class-wc-gateway-checkout-com-alternative-payments-sepa.php:97
 msgid "Please accept the mandate to continue"
 msgstr ""
 
-#: includes/apms/class-wc-gateway-checkout-com-alternative-payments-sepa.php:100
+#: includes/apms/class-wc-gateway-checkout-com-alternative-payments-sepa.php:127
 msgid "Checkout.com - SEPA payment for free order."
 msgstr ""
 
-#: includes/apms/class-wc-gateway-checkout-com-alternative-payments-sepa.php:116
+#: includes/apms/class-wc-gateway-checkout-com-alternative-payments-sepa.php:143
 msgid "Please try correct IBAN"
 msgstr ""
 
-#: includes/apms/class-wc-gateway-checkout-com-alternative-payments-sepa.php:118
+#: includes/apms/class-wc-gateway-checkout-com-alternative-payments-sepa.php:145
 msgid " Please try correct IBAN"
 msgstr ""
 
 #. translators: 1: Result ID, 2: Mandate reference.
-#: includes/apms/class-wc-gateway-checkout-com-alternative-payments-sepa.php:159
+#: includes/apms/class-wc-gateway-checkout-com-alternative-payments-sepa.php:186
 msgid "Checkout.com - Sepa payment Action ID : %1$s - Sepa mandate reference : %2$s"
 msgstr ""
 
@@ -303,7 +303,7 @@ msgstr ""
 
 #. translators: %s: Action ID.
 #: includes/class-wc-checkout-com-webhook.php:156
-#: includes/class-wc-gateway-checkout-com-cards.php:619
+#: includes/class-wc-gateway-checkout-com-cards.php:645
 msgid "Checkout.com Payment Captured - Action ID : %s"
 msgstr ""
 
@@ -346,7 +346,7 @@ msgstr ""
 
 #: includes/class-wc-gateway-checkout-com-alternative-payments.php:67
 #: includes/class-wc-gateway-checkout-com-apple-pay.php:66
-#: includes/class-wc-gateway-checkout-com-cards.php:135
+#: includes/class-wc-gateway-checkout-com-cards.php:161
 #: includes/class-wc-gateway-checkout-com-google-pay.php:100
 #: includes/class-wc-gateway-checkout-com-paypal.php:58
 msgid "Other Settings"
@@ -355,14 +355,14 @@ msgstr ""
 #. translators: %s: Action ID.
 #: includes/class-wc-gateway-checkout-com-alternative-payments.php:122
 #: includes/class-wc-gateway-checkout-com-apple-pay.php:640
-#: includes/class-wc-gateway-checkout-com-cards.php:882
+#: includes/class-wc-gateway-checkout-com-cards.php:908
 msgid "Checkout.com Payment Partially refunded from Admin - Action ID : %s"
 msgstr ""
 
 #. translators: %s: Action ID.
 #: includes/class-wc-gateway-checkout-com-alternative-payments.php:131
 #: includes/class-wc-gateway-checkout-com-apple-pay.php:649
-#: includes/class-wc-gateway-checkout-com-cards.php:877
+#: includes/class-wc-gateway-checkout-com-cards.php:903
 msgid "Checkout.com Payment refunded from Admin - Action ID : %s"
 msgstr ""
 
@@ -372,15 +372,15 @@ msgid "Apple Pay"
 msgstr ""
 
 #: includes/class-wc-gateway-checkout-com-apple-pay.php:556
-#: includes/class-wc-gateway-checkout-com-cards.php:415
+#: includes/class-wc-gateway-checkout-com-cards.php:441
 #: includes/class-wc-gateway-checkout-com-google-pay.php:152
 msgid "There was an issue completing the payment."
 msgstr ""
 
 #. translators: %s: Action ID.
 #: includes/class-wc-gateway-checkout-com-apple-pay.php:584
-#: includes/class-wc-gateway-checkout-com-cards.php:487
-#: includes/class-wc-gateway-checkout-com-cards.php:596
+#: includes/class-wc-gateway-checkout-com-cards.php:513
+#: includes/class-wc-gateway-checkout-com-cards.php:622
 #: includes/class-wc-gateway-checkout-com-google-pay.php:187
 #: includes/class-wc-gateway-checkout-com-paypal.php:129
 msgid "Checkout.com Payment Authorised - Action ID : %s"
@@ -388,8 +388,8 @@ msgstr ""
 
 #. translators: %s: Action ID.
 #: includes/class-wc-gateway-checkout-com-apple-pay.php:592
-#: includes/class-wc-gateway-checkout-com-cards.php:495
-#: includes/class-wc-gateway-checkout-com-cards.php:604
+#: includes/class-wc-gateway-checkout-com-cards.php:521
+#: includes/class-wc-gateway-checkout-com-cards.php:630
 #: includes/class-wc-gateway-checkout-com-google-pay.php:195
 #: includes/class-wc-gateway-checkout-com-paypal.php:137
 msgid "Checkout.com Payment Flagged - Action ID : %s"
@@ -403,75 +403,75 @@ msgstr ""
 msgid "Use a new card"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:109
+#: includes/class-wc-gateway-checkout-com-cards.php:135
 msgid "Please enter a valid card number"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:110
+#: includes/class-wc-gateway-checkout-com-cards.php:136
 msgid "Please enter a valid expiry date"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:111
+#: includes/class-wc-gateway-checkout-com-cards.php:137
 msgid "Please enter a valid cvv code"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:165
+#: includes/class-wc-gateway-checkout-com-cards.php:191
 #: woocommerce-gateway-checkout-com.php:109
 msgid "Settings"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:232
+#: includes/class-wc-gateway-checkout-com-cards.php:258
 msgid "Please enter your card details."
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:308
+#: includes/class-wc-gateway-checkout-com-cards.php:334
 msgid "PAN"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:315
+#: includes/class-wc-gateway-checkout-com-cards.php:341
 msgid "PAN error"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:323
+#: includes/class-wc-gateway-checkout-com-cards.php:349
 msgid "Expiry date"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:327
+#: includes/class-wc-gateway-checkout-com-cards.php:353
 msgid "Expiry error"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:335
 #: includes/class-wc-gateway-checkout-com-cards.php:361
+#: includes/class-wc-gateway-checkout-com-cards.php:387
 msgid "CVV"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:339
+#: includes/class-wc-gateway-checkout-com-cards.php:365
 msgid "CVV error"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:360
+#: includes/class-wc-gateway-checkout-com-cards.php:386
 msgid "Card Code"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:566
+#: includes/class-wc-gateway-checkout-com-cards.php:592
 msgid "Unable to add payment method to your account."
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:577
+#: includes/class-wc-gateway-checkout-com-cards.php:603
 msgid "Payment method successfully added."
 msgstr ""
 
 #. translators: %s: Action ID.
-#: includes/class-wc-gateway-checkout-com-cards.php:611
+#: includes/class-wc-gateway-checkout-com-cards.php:637
 msgid "Checkout.com Payment Canceled - Action ID : %s"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:751
+#: includes/class-wc-gateway-checkout-com-cards.php:777
 msgid "An error has occurred while processing your cancel request. "
 msgstr ""
 
 #. translators: 1: Payment ID, 2: Webhook ID.
-#: includes/class-wc-gateway-checkout-com-cards.php:966
+#: includes/class-wc-gateway-checkout-com-cards.php:992
 msgid "Order payment Id (%1$s) does not match that of the webhook (%2$s)"
 msgstr ""
 
@@ -1179,51 +1179,51 @@ msgstr ""
 msgid "Please fill in the required fields."
 msgstr ""
 
-#: templates/class-wc-checkoutcom-apm-templates.php:152
+#: templates/class-wc-checkoutcom-apm-templates.php:154
 msgid "SEPA Direct Debit Mandate for single payment"
 msgstr ""
 
-#: templates/class-wc-checkoutcom-apm-templates.php:158
+#: templates/class-wc-checkoutcom-apm-templates.php:160
 msgid "Creditor"
 msgstr ""
 
-#: templates/class-wc-checkoutcom-apm-templates.php:159
+#: templates/class-wc-checkoutcom-apm-templates.php:161
 msgid "b4payment GmbH"
 msgstr ""
 
-#: templates/class-wc-checkoutcom-apm-templates.php:160
+#: templates/class-wc-checkoutcom-apm-templates.php:162
 msgid "Obermünsterstraße&nbsp;14"
 msgstr ""
 
-#: templates/class-wc-checkoutcom-apm-templates.php:161
+#: templates/class-wc-checkoutcom-apm-templates.php:163
 msgid "93047&nbsp;Regensburg"
 msgstr ""
 
-#: templates/class-wc-checkoutcom-apm-templates.php:162
+#: templates/class-wc-checkoutcom-apm-templates.php:164
 msgid "GERMANY"
 msgstr ""
 
-#: templates/class-wc-checkoutcom-apm-templates.php:164
+#: templates/class-wc-checkoutcom-apm-templates.php:166
 msgid "Creditor ID: DE36ZZZ00001690322"
 msgstr ""
 
-#: templates/class-wc-checkoutcom-apm-templates.php:167
+#: templates/class-wc-checkoutcom-apm-templates.php:169
 msgid "Debtor"
 msgstr ""
 
-#: templates/class-wc-checkoutcom-apm-templates.php:181
+#: templates/class-wc-checkoutcom-apm-templates.php:183
 msgid "By accepting this mandate form, you authorise (A) b4payment GmbH to send instructions to your bank to debit your account (B) your bank to debit your account in accordance with the instructions from b4payment GmbH."
 msgstr ""
 
-#: templates/class-wc-checkoutcom-apm-templates.php:182
+#: templates/class-wc-checkoutcom-apm-templates.php:184
 msgid "As part of your rights, you are entitled to a refund from your bank under the terms and conditions of your agreement with your bank. A refund must be claimed within 8 weeks starting from the date on which your account was debited."
 msgstr ""
 
-#: templates/class-wc-checkoutcom-apm-templates.php:191
+#: templates/class-wc-checkoutcom-apm-templates.php:193
 msgid "I accept the mandate for a single payment"
 msgstr ""
 
-#: templates/class-wc-checkoutcom-apm-templates.php:202
+#: templates/class-wc-checkoutcom-apm-templates.php:204
 msgid "Your rights regarding the above mandate are explained in a statement that you can obtain from your bank."
 msgstr ""
 

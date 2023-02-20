@@ -326,7 +326,6 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 					<!-- frames will be loaded here -->
 					<div class="card-frame"></div>
 				</div>
-				<div class="scheme-choice-frame"></div>
 			<?php else : ?>
 				<div class="multi-frame">
 					<div class="input-container card-number">
@@ -368,7 +367,6 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 						</div>
 					</div>
 				</div>
-				<div class="scheme-choice-frame"></div>
 			<?php endif; ?>
 		</div>
 		<?php
