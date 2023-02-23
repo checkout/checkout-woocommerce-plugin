@@ -64,8 +64,10 @@ class WC_Checkoutcom_Api_Request {
 		$checkout = new Checkout_SDK();
 
 		try {
+			$cko_idempotency_key = $request_param->metadata['order_id'] . '-' . $order->get_order_key();
+
 			// Call to create charge.
-			$response = $checkout->get_builder()->getPaymentsClient()->requestPayment( $request_param );
+			$response = $checkout->get_builder()->getPaymentsClient()->requestPayment( $request_param, $cko_idempotency_key );
 
 			// Check if payment successful.
 			if ( WC_Checkoutcom_Utility::is_successful( $response ) ) {
