@@ -83,6 +83,24 @@ jQuery(function () {
 
   Frames.addEventHandler(Frames.Events.CARD_TOKENIZED, onCardTokenized);
 
+  Frames.addEventHandler(Frames.Events.CARD_BIN_CHANGED, function ( event ) {
+
+      // Show hide co badged label.
+      jQuery( '.cko-co-brand-label' ).css( 'display', event?.isCoBadged ? 'inline' : 'none' );
+
+      if ( event?.isCoBadged ) {
+          jQuery( '.cko-information-icon-tip' ).tipTip( {
+              attribute: 'data-tip',
+              fadeIn: 50,
+              fadeOut: 50,
+              delay: 200,
+              maxWidth: '300px',
+              keepAlive: true,
+          } );
+      }
+
+  })
+
   function onCardTokenized(event) {
     // 2. After card tokenized this event fires.
     if (

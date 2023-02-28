@@ -107,6 +107,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 
 		$core_settings    = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
 		$card_pay_enabled = ! empty( $core_settings['enabled'] ) && 'yes' === $core_settings['enabled'];
+		$suffix           = defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG ? '' : '.min';
 
 		// Return if card payment is disabled.
 		if ( ! $card_pay_enabled ) {
@@ -138,9 +139,21 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 			'is-add-payment-method' => is_wc_endpoint_url( 'add-payment-method' ) ? 'yes' : 'no',
 		];
 
+		wp_register_script(
+			'cko-jquery-tiptip',
+			WC_CHECKOUTCOM_PLUGIN_URL . '/assets/js/jquery-tiptip/jquery.tipTip' . $suffix . '.js',
+			[ 'jquery' ],
+			WC_CHECKOUTCOM_PLUGIN_VERSION
+		);
+
 		wp_localize_script( 'cko-frames-script', 'cko_frames_vars', $vars );
 
-		wp_register_script( 'cko-frames-integration-script', WC_CHECKOUTCOM_PLUGIN_URL . '/assets/js/cko-frames-integration.js', [ 'cko-frames-script', 'jquery' ], WC_CHECKOUTCOM_PLUGIN_VERSION );
+		wp_register_script(
+			'cko-frames-integration-script',
+			WC_CHECKOUTCOM_PLUGIN_URL . '/assets/js/cko-frames-integration.js',
+			[ 'cko-frames-script', 'jquery', 'cko-jquery-tiptip' ],
+			WC_CHECKOUTCOM_PLUGIN_VERSION
+		);
 		wp_enqueue_script( 'cko-frames-integration-script' );
 	}
 
@@ -368,6 +381,9 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 					</div>
 				</div>
 			<?php endif; ?>
+			<span class="cko-co-brand-label"><?php esc_html_e( 'Select your preferred card brand', 'checkout-com-unified-payments-api' ); ?>
+				<span class="cko-information-icon-tip" data-tip="<?php esc_html_e( 'Your card has two brands and you can choose your preferred brand for this payment, if you don\'t the merchant preferred brand will be selected.', 'checkout-com-unified-payments-api' ); ?>"></span>
+			</span>
 		</div>
 		<?php
 	}
