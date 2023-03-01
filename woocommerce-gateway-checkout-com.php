@@ -158,9 +158,12 @@ function cko_check_if_empty() {
 	if ( 'wc_checkout_com_cards' === $_POST['payment_method'] ) {
 
 		// Check if require cvv is enabled in module setting.
-		if ( WC_Admin_Settings::get_option( 'ckocom_card_saved' )
+		if (
+			WC_Admin_Settings::get_option( 'ckocom_card_saved' )
 			&& WC_Admin_Settings::get_option( 'ckocom_card_require_cvv' )
-			&& 'new' !== $_POST['wc-wc_checkout_com_cards-payment-token'] ) {
+			&& isset( $_POST['wc-wc_checkout_com_cards-payment-token'] )
+			&& 'new' !== $_POST['wc-wc_checkout_com_cards-payment-token']
+		) {
 			// check if cvv is empty on checkout page.
 			if ( empty( $_POST['wc_checkout_com_cards-card-cvv'] ) ) {
 				wc_add_notice( esc_html__( 'Please enter a valid cvv.', 'checkout-com-unified-payments-api' ), 'error' );
