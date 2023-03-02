@@ -96,20 +96,32 @@ iframe {
   font-family: monospace;
 }
 
+@media screen and (min-width: 17.5rem) {
+	.card-frame {
+		width: 230px;
+		margin-bottom: 0;
+	}
+}
+
+@media screen and (min-width: 20rem) {
+	.card-frame {
+		width: 280px;
+		margin-bottom: 0;
+	}
+}
+
 @media screen and (min-width: 31rem) {
-  .one-liner {
-    flex-direction: row;
-  }
+	.one-liner {
+		flex-direction: row;
+	}
 
-  .card-frame {
-    width: 318px;
-    margin-bottom: 0;
-  }
+	.card-frame {
+		width: 318px;
+		margin-bottom: 0;
+	}
 
-  #pay-button {
-    width: 175px;
-    margin-left: 8px;
-  }
-
-
+	#pay-button {
+		width: 175px;
+		margin-left: 8px;
+	}
 }
