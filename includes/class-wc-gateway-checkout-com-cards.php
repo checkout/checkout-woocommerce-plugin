@@ -424,12 +424,21 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		$order = wc_get_order( $order_id );
 
 		// Check if card token or token_id exist.
-		if ( sanitize_text_field( $_POST['wc-wc_checkout_com_cards-payment-token'] ) ) {
-			if ( 'new' === sanitize_text_field( $_POST['wc-wc_checkout_com_cards-payment-token'] ) ) {
-				$arg = sanitize_text_field( $_POST['cko-card-token'] );
-			} else {
-				$arg = sanitize_text_field( $_POST['wc-wc_checkout_com_cards-payment-token'] );
-			}
+		if ( WC_Checkoutcom_Api_Request::is_using_saved_payment_method() ) {
+			// Saved card selected.
+			$arg = sanitize_text_field( $_POST['wc-wc_checkout_com_cards-payment-token'] );
+		} elseif (
+			isset( $_POST['wc-wc_checkout_com_cards-payment-token'] ) &&
+			'new' === sanitize_text_field( $_POST['wc-wc_checkout_com_cards-payment-token'] )
+		) {
+			// New card selected.
+			$arg = sanitize_text_field( $_POST['cko-card-token'] );
+		} elseif (
+			! isset( $_POST['wc-wc_checkout_com_cards-payment-token'] ) &&
+			! empty( $_POST['cko-card-token'] )
+		) {
+			// New card with stripe enabled.
+			$arg = sanitize_text_field( $_POST['cko-card-token'] );
 		}
 
 		// Check if empty card token and empty token_id.

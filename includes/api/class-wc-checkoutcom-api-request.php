@@ -172,33 +172,27 @@ class WC_Checkoutcom_Api_Request {
 
 		// Prepare payment parameters.
 		if ( 'wc_checkout_com_cards' === $post_data['payment_method'] ) {
-			if ( $post_data['wc-wc_checkout_com_cards-payment-token'] ) {
-				if ( 'new' === $post_data['wc-wc_checkout_com_cards-payment-token'] ) {
-					// New card used.
 
-					$method        = new RequestTokenSource();
-					$method->token = $arg;
-				} else {
-					// Saved card used.
+			if ( self::is_using_saved_payment_method() ) {
+				// Saved card used.
+				// Load token id ($arg).
+				$token = WC_Payment_Tokens::get( $arg );
 
-					// Load token by id ($arg).
-					$token = WC_Payment_Tokens::get( $arg );
+				$card_scheme = $token->get_meta( 'preferred_scheme' );
 
-					$card_scheme = $token->get_meta( 'preferred_scheme' );
+				// Get source_id from $token.
+				$source_id = $token->get_token();
 
-					// Get source_id from $token.
-					$source_id = $token->get_token();
+				$method     = new RequestIdSource();
+				$method->id = $source_id;
 
-					$method     = new RequestIdSource();
-					$method->id = $source_id;
+				$is_save_card = true;
 
-					$is_save_card = true;
-
-					if ( WC_Admin_Settings::get_option( 'ckocom_card_require_cvv' ) ) {
-						$method->cvv = $post_data['wc_checkout_com_cards-card-cvv'];
-					}
+				if ( WC_Admin_Settings::get_option( 'ckocom_card_require_cvv' ) ) {
+					$method->cvv = $post_data['wc_checkout_com_cards-card-cvv'];
 				}
 			} else {
+				// New card used.
 				$method        = new RequestTokenSource();
 				$method->token = $arg;
 			}
@@ -1419,5 +1413,17 @@ class WC_Checkoutcom_Api_Request {
 		}
 
 		return 'OK' === wp_remote_retrieve_response_message( $wp_response ) && 200 === wp_remote_retrieve_response_code( $wp_response );
+	}
+
+
+	/**
+	 * Checks if payment is via saved payment source.
+	 *
+	 * @return bool
+	 */
+	public static function is_using_saved_payment_method() {
+		$payment_method = isset( $_POST['payment_method'] ) ? wc_clean( wp_unslash( $_POST['payment_method'] ) ) : 'wc_checkout_com_cards';
+
+		return ( isset( $_POST[ 'wc-' . $payment_method . '-payment-token' ] ) && 'new' !== $_POST[ 'wc-' . $payment_method . '-payment-token' ] );
 	}
 }
