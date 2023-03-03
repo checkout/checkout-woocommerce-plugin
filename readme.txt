@@ -171,6 +171,12 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v4.4.12 3th March 2023
+- **[tweak]** Update style of co-badged cards choice option
+- **[tweak]** Implement idempotency key for payment request to avoid duplicate payment
+- **[fix]** Credit card input filed not showing on small screen device
+- **[fix]** CVV error when new card is used and CVV required for saved card is enabled
+
 v4.4.11 8th February 2023
 - **[tweak]** Update Google Pay logo and button styles
 - **[fix]** WooCommerce order property access warning
