@@ -93,6 +93,11 @@ div + button {
   margin: 0 7px;
 }
 
+#order_review #payment .icon-container > img,
+#add_payment_method #payment .icon-container > img {
+    max-height: 100%;
+}
+
 .icon-container.payment-method  {
   transform: translateY(-50%) rotateY(90deg);
   transition: opacity 0.15s ease-out;
@@ -117,6 +122,7 @@ div + button {
 }
 
 .frame--activated {
+  width: 100%;
   opacity: 1;
   border: solid 1px #13395E;
   border-radius: 3px;
