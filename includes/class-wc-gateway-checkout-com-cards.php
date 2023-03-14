@@ -479,6 +479,11 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		// Create payment with card token.
 		$result = (array) WC_Checkoutcom_Api_Request::create_payment( $order, $arg );
 
+        if ( isset( $result['3d_redirection_error'] ) && true === $result['3d_redirection_error'] ) {
+	        // Retry Create payment with card token.
+            $result = (array) WC_Checkoutcom_Api_Request::create_payment( $order, $arg, null, true );
+        }
+
 		// check if result has error and return error message.
 		if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {
 			WC_Checkoutcom_Utility::wc_add_notice_self( $result['error'] );
@@ -611,7 +616,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 
 		// Redirect to my-account/payment-method if card verification failed.
 		// show error to customer.
-		if ( 'error' === $result['card_verification'] ) {
+		if ( isset( $result['card_verification'] ) && 'error' === $result['card_verification'] ) {
 			WC_Checkoutcom_Utility::wc_add_notice_self( __( 'Unable to add payment method to your account.', 'checkout-com-unified-payments-api' ), 'error' );
 			wp_redirect( $result['redirection_url'] );
 			exit;

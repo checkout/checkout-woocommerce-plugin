@@ -47,7 +47,7 @@ class WC_Checkoutcom_Api_Request {
 	 *
 	 * @return array
 	 */
-	public static function create_payment( WC_Order $order, $arg, $subscription = null ) {
+	public static function create_payment( WC_Order $order, $arg, $subscription = null, $retry_idempotency_key = false ) {
 		// Get payment request parameter.
 		$request_param = WC_Checkoutcom_Api_Request::get_request_param( $order, $arg, $subscription );
 
@@ -66,6 +66,11 @@ class WC_Checkoutcom_Api_Request {
 		try {
 			$cko_idempotency_key = $request_param->metadata['order_id'] . '-' . $order->get_order_key();
 
+			// Append time.
+			if ( true === $retry_idempotency_key ) {
+				$cko_idempotency_key .= '-' . date( 'Y-m-d h:i:s' );
+			}
+
 			// Call to create charge.
 			$response = $checkout->get_builder()->getPaymentsClient()->requestPayment( $request_param, $cko_idempotency_key );
 
@@ -80,6 +85,11 @@ class WC_Checkoutcom_Api_Request {
 					}
 					// Check if redirection link exist.
 					if ( WC_Checkoutcom_Utility::get_redirect_url( $response ) ) {
+
+						if ( ! self::is_url_response_ok( WC_Checkoutcom_Utility::get_redirect_url( $response ) ) ) {
+							return [ '3d_redirection_error' => true ];
+						}
+
 						// return 3d redirection url.
 						return [ '3d' => WC_Checkoutcom_Utility::get_redirect_url( $response ) ];
 
@@ -1427,5 +1437,16 @@ class WC_Checkoutcom_Api_Request {
 		$payment_method = isset( $_POST['payment_method'] ) ? wc_clean( wp_unslash( $_POST['payment_method'] ) ) : 'wc_checkout_com_cards';
 
 		return ( isset( $_POST[ 'wc-' . $payment_method . '-payment-token' ] ) && 'new' !== $_POST[ 'wc-' . $payment_method . '-payment-token' ] );
+	}
+
+	/**
+	 * Checks if URL is giving 200 OK response by pinging.
+	 *
+	 * @return bool
+	 */
+	public static function is_url_response_ok( $url ) {
+		$response = wp_remote_get( $url );
+
+		return ! is_wp_error( $response ) && 200 === wp_remote_retrieve_response_code( $response );
 	}
 }
