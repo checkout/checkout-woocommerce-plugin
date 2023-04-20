@@ -44,6 +44,7 @@ class WC_Checkoutcom_Api_Request {
 	 * @param WC_Order $order Order object.
 	 * @param array    $arg  Arguments.
 	 * @param string   $subscription Subscription renewal flag.
+	 * @param bool     $retry_idempotency_key Retry idempotency.
 	 *
 	 * @return array
 	 */
@@ -68,7 +69,7 @@ class WC_Checkoutcom_Api_Request {
 
 			// Append time.
 			if ( true === $retry_idempotency_key ) {
-				$cko_idempotency_key .= '-' . date( 'Y-m-d h:i:s' );
+				$cko_idempotency_key .= '-' . gmdate( 'Y-m-d h:i:s' );
 			}
 
 			// Call to create charge.
@@ -1448,6 +1449,8 @@ class WC_Checkoutcom_Api_Request {
 
 	/**
 	 * Checks if URL is giving 200 OK response by pinging.
+	 *
+	 * @param string $url URL.
 	 *
 	 * @return bool
 	 */
