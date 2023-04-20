@@ -252,12 +252,19 @@ class WC_Checkoutcom_Api_Request {
 
 		$checkout              = new Checkout_SDK();
 		$payment               = $checkout->get_payment_request();
-		$payment->source       = $method;
 		$payment->capture      = $auto_capture;
 		$payment->amount       = $amount_cents;
 		$payment->currency     = $order->get_currency();
 		$payment->reference    = $order->get_order_number();
 		$payment->payment_type = PaymentType::$regular;
+
+		if ( 'giropay' === $method->type && cko_is_nas_account() ) {
+			$payment->description = $method->purpose;
+
+			unset( $method->purpose );
+		}
+
+		$payment->source = $method;
 
 		$email = $post_data['billing_email'];
 		$name  = $post_data['billing_first_name'] . ' ' . $post_data['billing_last_name'];
