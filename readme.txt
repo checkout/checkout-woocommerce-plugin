@@ -171,6 +171,9 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v4.4.14 20th March 2023
+- **[tweak]** Update Giropay source property and description property
+
 v4.4.13 15th March 2023
 - **[tweak]** Add payment retry if 3ds redirection link is expired with idempotency key
 
