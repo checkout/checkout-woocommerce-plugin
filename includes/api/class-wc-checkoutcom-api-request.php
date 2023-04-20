@@ -44,6 +44,7 @@ class WC_Checkoutcom_Api_Request {
 	 * @param WC_Order $order Order object.
 	 * @param array    $arg  Arguments.
 	 * @param string   $subscription Subscription renewal flag.
+	 * @param bool     $retry_idempotency_key Retry idempotency.
 	 *
 	 * @return array
 	 */
@@ -68,7 +69,7 @@ class WC_Checkoutcom_Api_Request {
 
 			// Append time.
 			if ( true === $retry_idempotency_key ) {
-				$cko_idempotency_key .= '-' . date( 'Y-m-d h:i:s' );
+				$cko_idempotency_key .= '-' . gmdate( 'Y-m-d h:i:s' );
 			}
 
 			// Call to create charge.
@@ -252,12 +253,19 @@ class WC_Checkoutcom_Api_Request {
 
 		$checkout              = new Checkout_SDK();
 		$payment               = $checkout->get_payment_request();
-		$payment->source       = $method;
 		$payment->capture      = $auto_capture;
 		$payment->amount       = $amount_cents;
 		$payment->currency     = $order->get_currency();
 		$payment->reference    = $order->get_order_number();
 		$payment->payment_type = PaymentType::$regular;
+
+		if ( 'giropay' === $method->type && cko_is_nas_account() ) {
+			$payment->description = $method->purpose;
+
+			unset( $method->purpose );
+		}
+
+		$payment->source = $method;
 
 		$email = $post_data['billing_email'];
 		$name  = $post_data['billing_first_name'] . ' ' . $post_data['billing_last_name'];
@@ -1441,6 +1449,8 @@ class WC_Checkoutcom_Api_Request {
 
 	/**
 	 * Checks if URL is giving 200 OK response by pinging.
+	 *
+	 * @param string $url URL.
 	 *
 	 * @return bool
 	 */

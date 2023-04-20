@@ -118,7 +118,7 @@ class WC_Checkoutcom_APM_Method {
 	public function giropay() {
 
 		$method          = new RequestGiropaySource();
-		$method->purpose = self::$order_info->get_order_number() . '-' . $_SERVER['HTTP_HOST'];
+		$method->purpose = 'Giropay by Checkout.com';
 
 		return $method;
 	}
