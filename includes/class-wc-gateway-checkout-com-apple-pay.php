@@ -93,6 +93,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		$generate_token_url = str_replace( 'https:', 'https:', add_query_arg( 'wc-api', 'wc_checkoutcom_generate_token', home_url( '/' ) ) );
 		$apple_settings     = get_option( 'woocommerce_wc_checkout_com_apple_pay_settings' );
 		$mada_enabled       = isset( $apple_settings['enable_mada'] ) && ( 'yes' === $apple_settings['enable_mada'] );
+        $ajax_url           = admin_url( 'admin-ajax.php' );
 
 		if ( ! empty( $this->get_option( 'description' ) ) ) {
 			echo  $this->get_option( 'description' );
@@ -135,9 +136,15 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 
 				promise.then(function (canMakePayments) {
 					if (canMakePayments) {
-						showAppleApplePayOption();
+                        showAppleApplePayOption();
 					} else {
-						displayApplePayNotPossible();
+                        console.log( 'canMakePayments:', canMakePayments )
+
+                        if ( ! canMakePayments && ApplePaySession.canMakePayments() ) {
+                            showAppleApplePayOption();
+                        } else {
+						    displayApplePayNotPossible();
+                        }
 					}
 				});
 			} else {
@@ -158,8 +165,11 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			jQuery( document ).off( 'click', '#' + applePayButtonId );
 
 			jQuery( document ).on( 'click', '#' + applePayButtonId, function () {
+                console.clear();
 				var checkoutFields = '<?php echo $checkout_fields; ?>';
 				var result = isValidFormField(checkoutFields);
+
+                result = 1;
 
 				if(result){
 					var applePaySession = new ApplePaySession(3, getApplePayConfig());
@@ -187,7 +197,21 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 						label: window.location.host,
 						amount: "<?php echo $woocommerce->cart->total; ?>",
 						type: 'final'
-					}
+					},
+                    requiredShippingContactFields: [
+                        "postalAddress",
+                        "name",
+                        "phone",
+                        "email"
+                    ],
+                    // shippingMethods: [
+                    //     {
+                    //         "label": "1Free Standard Shipping",
+                    //         "amount": "0.00",
+                    //         "detail": "Arrives in 5-7 days",
+                    //         "identifier": "1standardShipping",
+                    //     }
+                    // ],
 				}
 			}
 
@@ -212,36 +236,41 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 				*
 				* @param {object} event - The event contains the payment method selected.
 				*/
-				session.onpaymentmethodselected = function (event) {
-					// base on the card selected the total can be change, if for example you.
-					// plan to charge a fee for credit cards for example.
-					var newTotal = {
-						type: 'final',
-						label: window.location.host,
-						amount: "<?php echo $woocommerce->cart->total; ?>",
-					};
-
-					var newLineItems = [
-						{
-							type: 'final',
-							label: 'Subtotal',
-							amount: "<?php echo $woocommerce->cart->subtotal; ?>"
-						},
-						{
-							type: 'final',
-							label: 'Shipping - ' + "<?php echo $chosen_shipping; ?>",
-							amount: "<?php echo $shipping_amount; ?>"
-						}
-					];
-
-					session.completePaymentMethodSelection(newTotal, newLineItems);
-				};
+				//session.onpaymentmethodselected = function (event) {
+                //    console.log('onpaymentmethodselected', event)
+				//	// base on the card selected the total can be change, if for example you.
+				//	// plan to charge a fee for credit cards for example.
+				//	var newTotal = {
+				//		type: 'final',
+				//		label: window.location.host,
+				//		amount: "<?php //echo $woocommerce->cart->total; ?>//",
+				//	};
+                //
+				//	var newLineItems = [
+				//		{
+				//			type: 'final',
+				//			label: 'Subtotal',
+				//			amount: "<?php //echo $woocommerce->cart->subtotal; ?>//"
+				//		},
+				//		{
+				//			type: 'final',
+				//			label: 'Shipping - ' + "<?php //echo $chosen_shipping; ?>//",
+				//			amount: "<?php //echo $shipping_amount; ?>//"
+				//		}
+				//	];
+                //
+				//	session.completePaymentMethodSelection({newTotal, newLineItems});
+				//};
 
 				/**
 				* An event handler that is called when the user has authorized the Apple Pay payment
 				*  with Touch ID, Face ID, or passcode.
 				*/
 				session.onpaymentauthorized = function (event) {
+                    console.log( 'event', event );
+                    console.log( 'payment', event.payment );
+                    console.log( 'shippingContact', event.payment.shippingContact );
+
 					generateCheckoutToken(event.payment.token.paymentData, function (outcome) {
 
 						if (outcome) {
@@ -263,9 +292,51 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 				*/
 				session.oncancel = function (event) {
 					// popup dismissed
+                    console.log(event)
 				};
 
-			}
+                session.onshippingcontactselected = function(event) {
+                    console.log( 'onshippingcontactselected', event.shippingContact )
+
+                    jQuery.when( updateShippingOptions( event.shippingContact ) ).then( function( response ) {
+                        console.log( 'response', response )
+
+                        session.completeShippingContactSelection(
+                            {
+                                newShippingMethods: response.shipping_options,
+                                newTotal: response.total,
+                                newLineItems: response.displayItems
+                            }
+                        );
+                    } );
+                };
+
+                session.onshippingmethodselected = function ( event ) {
+                    console.log( 'onshippingmethodselected', event.shippingMethod )
+
+                    jQuery.when( updateShippingDetails( event.shippingMethod ) ).then( function( response ) {
+                        console.log( 'response', response );
+
+                        if ( 'success' === response.result ) {
+                            // evt.updateWith( { status: 'success', total: response.total, displayItems: response.displayItems } );
+
+                            session.completeShippingMethodSelection(
+                                {
+                                    newTotal: response.total,
+                                    newLineItems: response.displayItems
+                                }
+                            );
+                        }
+
+                        if ( 'fail' === response.result ) {
+                            // evt.updateWith( { status: 'fail' } );
+                        }
+                    } );
+
+
+                };
+
+            }
 
 			/**
 			 * Perform the session validation.
@@ -468,6 +539,54 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 
 				return false;
 			}
+
+            /**
+             * Update shipping options.
+             *
+             * @param {PaymentAddress} address Shipping address.
+             */
+            function updateShippingOptions( address ) {
+                var data = {
+                    action: 'get_shipping_options',
+                    // security:  wc_stripe_payment_request_params.nonce.shipping,
+                    country:   address.countryCode,
+                    // state:     address.region,
+                    postcode:  address.postalCode,
+                    city:      address.locality,
+                    // address:   typeof address.addressLine[0] === 'undefined' ? '' : address.addressLine[0],
+                    // address_2: typeof address.addressLine[1] === 'undefined' ? '' : address.addressLine[1],
+                    // payment_request_type: paymentRequestType,
+                    // is_product_page: wc_stripe_payment_request_params.is_product_page,
+                };
+
+                return jQuery.ajax( {
+                    type:    'POST',
+                    data:    data,
+                    url:     '<?php echo esc_url( $ajax_url ); ?>',
+                } );
+            }
+
+            /**
+             * Updates the shipping price and the total based on the shipping option.
+             *
+             * @param {Object}   details        The line items and shipping options.
+             * @param {String}   shippingOption User's preferred shipping option to use for shipping price calculations.
+             */
+            function updateShippingDetails( shippingOption ) {
+                var data = {
+                    action: 'update_shipping_method',
+                    // security: wc_stripe_payment_request_params.nonce.update_shipping,
+                    shipping_method: [ shippingOption.identifier ],
+                    // payment_request_type: paymentRequestType,
+                    // is_product_page: wc_stripe_payment_request_params.is_product_page,
+                };
+
+                return jQuery.ajax( {
+                    type: 'POST',
+                    data: data,
+                    url:  '<?php echo esc_url( $ajax_url ); ?>',
+                } );
+            }
 
 		</script>
 		<?php
