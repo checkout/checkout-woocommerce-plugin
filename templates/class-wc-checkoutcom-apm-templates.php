@@ -107,9 +107,9 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_Request {
 		<!-- Sepa details-->
 		<div class="sepa-content">
 			<div class="input-group">
-				<label class="icon" for="sepa-iban">
-					<span class="ckojs ckojs-card"></label>
-				<input type="text" id="sepa-iban" name="sepa-iban" placeholder="<?php esc_attr_e( 'IBAN', 'checkout-com-unified-payments-api' ); ?>" class="input-control" required style="width: 100%;">
+                <p class="sepa-example">Example: GB33BUKB20201555555555 / DE75512108001245126199 / FR7630006000011234567890189</p>
+				<label style="display: block;padding-top: 20px;" class="icon" for="sepa-iban"><?php esc_html_e( 'IBAN.', 'checkout-com-unified-payments-api' ); ?><span class="ckojs ckojs-card"></label>
+				<input type="text" id="sepa-iban" name="sepa-iban" placeholder="<?php esc_attr_e( 'DE00 0000 0000 0000 0000 00', 'checkout-com-unified-payments-api' ); ?>" class="input-control" required style="width: 100%;">
 			</div>
 			<div class="sepa-continue-btn">
 				<input type="button" id="sepa-continue" name="sepa-continue" value="<?php esc_attr_e( 'Continue', 'checkout-com-unified-payments-api' ); ?>">
@@ -131,6 +131,52 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_Request {
 				}
 
 			})
+
+            jQuery( '#sepa-iban' ).on( 'paste', (event) => {
+                const clipboardData = event.clipboardData || event.originalEvent.clipboardData || window.clipboardData;
+
+                if ( clipboardData ){
+                    let text = clipboardData.getData('text');
+                    text = text.toLocaleUpperCase();
+                    text = text.replace(/[^a-zA-Z0-9]/g, '');
+                    event.target.value = text;
+                    event.preventDefault();
+                }
+            })
+
+            jQuery( '#sepa-iban' ).on( 'keypress', function (event) {
+                const evt = event || window.event;
+
+                // Reject input if not a-z or A-Z or 0-9 .
+                const regex = new RegExp("^[a-zA-Z0-9]+$");
+                const key   = String.fromCharCode( ! event.charCode ? event.which : event.charCode );
+                if ( ! regex.test(key) ) {
+                    event.preventDefault();
+                    return false;
+                }
+
+                // Ensure we only handle printable keys, excluding enter and space.
+                const charCode = typeof evt.which == "number" ? evt.which : evt.keyCode;
+                if (charCode && charCode > 32) {
+                    const keyChar = String.fromCharCode(charCode);
+
+                    // Transform typed character.
+                    let mappedChar = keyChar.toLocaleUpperCase();
+                    let start, end;
+                    if ( typeof this.selectionStart == "number" && typeof this.selectionEnd == "number" ) {
+
+                        start = this.selectionStart;
+                        end   = this.selectionEnd;
+
+                        this.value = this.value.slice( 0, start ) + mappedChar + this.value.slice( end );
+
+                        // Move the caret.
+                        this.selectionStart = this.selectionEnd = start + 1;
+                    }
+                }
+
+                return false;
+            });
 		</script>
 
 		<?php

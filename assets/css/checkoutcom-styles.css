@@ -717,6 +717,10 @@ ul.wc_payment_methods label[for*="payment_method_wc_checkout_com_"] img {
 #sepa-iban {
     height:35px;
     font-size: 17px;
+    padding-left: 30px;
+    background-image: url( '../images/bank.svg' );
+    background-repeat: no-repeat;
+    background-position: left 5px center;
 }
 
 .sepa-continue-btn {
@@ -728,4 +732,9 @@ ul.wc_payment_methods label[for*="payment_method_wc_checkout_com_"] img {
     padding-bottom: 0px;
     padding-top: 0px;
     font-size: 13px;
+}
+
+.sepa-example {
+    font-size: 14px;
+    font-weight: 800;
 }
