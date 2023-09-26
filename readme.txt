@@ -171,6 +171,9 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v4.4.15 20th March 2023
+- **[tweak]** Update IBAN input field validation and styling
+
 v4.4.14 20th March 2023
 - **[tweak]** Update Giropay source property and description property
 
