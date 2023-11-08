@@ -822,6 +822,9 @@ class WC_Checkoutcom_Api_Request {
 	 * @return array|mixed
 	 */
 	public static function refund_payment( $order_id, $order ) {
+		$core_settings      = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$is_fallback_active = ( 'yes' === ( $core_settings['enable_fallback_ac'] ?? 'no' ) );
+
 		$cko_payment_id = get_post_meta( $order_id, '_cko_payment_id', true );
 
 		// Check if cko_payment_id is empty.
@@ -846,8 +849,68 @@ class WC_Checkoutcom_Api_Request {
 		$checkout = new Checkout_SDK();
 
 		try {
-			// Check if payment is already voided or captured on checkout.com hub.
-			$details = $checkout->get_builder()->getPaymentsClient()->getPaymentDetails( $cko_payment_id );
+
+			try {
+				// Check if payment is already voided or captured on checkout.com hub.
+				$details = $checkout->get_builder()->getPaymentsClient()->getPaymentDetails( $cko_payment_id );
+
+			} catch ( CheckoutApiException $ex ) {
+
+				// Handle above try block exception.
+				if ( ! $is_fallback_active ) {
+					$error_message = esc_html__( 'An error has occurred while processing your refund. ', 'checkout-com-unified-payments-api' );
+
+					// check if gateway response is enabled from module settings.
+					if ( $gateway_debug ) {
+						$error_message .= $ex->getMessage();
+					}
+
+					WC_Checkoutcom_Utility::logger( $error_message, $ex );
+
+					return [ 'error' => $error_message ];
+				}
+
+				// Handle Retry with fallback account.
+				$checkout = new Checkout_SDK( true );
+				$details = $checkout->get_builder()->getPaymentsClient()->getPaymentDetails( $cko_payment_id );
+
+				if ( 'Refunded' === $details['status'] && ! $refund_is_less ) {
+					$error_message = 'Payment has already been refunded on Checkout.com hub for order Id : ' . $order_id;
+
+					return [ 'error' => $error_message ];
+				}
+
+				$refund_request            = new RefundRequest();
+				$refund_request->reference = $order->get_order_number();
+
+				// Process partial refund if amount is less than order amount.
+				if ( $refund_is_less ) {
+					$refund_request->amount = $refund_amount_cents;
+
+					$_SESSION['cko-refund-is-less'] = $refund_is_less;
+				}
+
+				$order->add_order_note( esc_html__( 'Checkout.com Refund : Process via fallback account.', 'checkout-com-unified-payments-api' ) );
+
+				$response = $checkout->get_builder()->getPaymentsClient()->refundPayment( $cko_payment_id, $refund_request );
+
+				if ( ! WC_Checkoutcom_Utility::is_successful( $response ) ) {
+					/* translators: 1: Order ID. */
+					$error_message = sprintf( esc_html__( 'An error has occurred while processing your refund payment on Checkout.com hub. Order Id : %s', 'checkout-com-unified-payments-api' ), $order_id );
+
+					// Check if gateway response is enabled from module settings.
+					if ( $gateway_debug ) {
+						$error_message .= $response;
+					}
+
+					WC_Checkoutcom_Utility::logger( $error_message, $response );
+
+					return [ 'error' => $error_message ];
+				} else {
+					return $response;
+				}
+
+			}
 
 			if ( 'Refunded' === $details['status'] && ! $refund_is_less ) {
 				$error_message = 'Payment has already been refunded on Checkout.com hub for order Id : ' . $order_id;
@@ -862,7 +925,6 @@ class WC_Checkoutcom_Api_Request {
 			if ( $refund_is_less ) {
 				$refund_request->amount = $refund_amount_cents;
 
-				// Set is_mada in session.
 				$_SESSION['cko-refund-is-less'] = $refund_is_less;
 			}
 

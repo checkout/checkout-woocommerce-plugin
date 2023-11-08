@@ -102,6 +102,28 @@ jQuery( function ( $ ) {
 			} );
 		},
 
+        coreSettings: function () {
+            let enable_fallback_ac = $( '#woocommerce_wc_checkout_com_cards_enable_fallback_ac' );
+            let fallback_ckocom_sk = $( '#woocommerce_wc_checkout_com_cards_fallback_ckocom_sk' );
+            let fallback_ckocom_pk = $( '#woocommerce_wc_checkout_com_cards_fallback_ckocom_pk' );
+
+            if ( enable_fallback_ac.length <= 0 ) {
+                return;
+            }
+
+            enable_fallback_ac.on( 'change', function () {
+                if ( this.checked ) {
+                    fallback_ckocom_sk.closest( 'tr' ).show();
+                    fallback_ckocom_pk.closest( 'tr' ).show();
+                } else {
+                    fallback_ckocom_sk.closest( 'tr' ).hide();
+                    fallback_ckocom_pk.closest( 'tr' ).hide();
+                }
+            } )
+
+            enable_fallback_ac.trigger( 'change' );
+        },
+
 		cardSettings: function () {
 
 			let ckocom_card_autocap = $( '#ckocom_card_autocap' );
@@ -300,6 +322,8 @@ jQuery( function ( $ ) {
 	admin_functions.updateDocURL();
 
 	admin_functions.orderStatusSettings();
+
+    admin_functions.coreSettings();
 
 	// Script to hide and show fields.
 	admin_functions.cardSettings();
