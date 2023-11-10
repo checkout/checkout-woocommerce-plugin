@@ -31,6 +31,19 @@ define( 'WC_CHECKOUTCOM_PLUGIN_PATH', untrailingslashit( plugin_dir_path( __FILE
 add_action( 'plugins_loaded', 'init_checkout_com_gateway_class', 0 );
 
 /**
+ * Declare compatibility with HPOS.
+ * https://github.com/woocommerce/woocommerce/wiki/High-Performance-Order-Storage-Upgrade-Recipe-Book#declaring-extension-incompatibility
+ */
+add_action(
+	'before_woocommerce_init',
+	function() {
+		if ( class_exists( '\Automattic\WooCommerce\Utilities\FeaturesUtil' ) ) {
+			\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility( 'custom_order_tables', __FILE__, true );
+		}
+	}
+);
+
+/**
  * This function registers our PHP class as a WooCommerce payment gateway.
  */
 function init_checkout_com_gateway_class() {
@@ -268,94 +281,96 @@ function action_woocommerce_order_item_add_action_buttons( $order ) {
 	}
 }
 
-add_action( 'save_post', 'renew_save_again', 10, 2 );
+add_action( 'woocommerce_process_shop_order_meta', 'handle_order_capture_void_action', 50, 2 );
 
 /**
  * Do action for capture and void button.
  *
- * @param int    $post_id Post ID being saved.
- * @param object $post Post object being saved.
+ * @param int       $order_id Order ID being saved.
+ * @param \WC_Order $order Order object being saved.
  *
  * @return bool|void
  */
-function renew_save_again( $post_id, $post ) {
+function handle_order_capture_void_action( $order_id, $order ) {
 
-	if ( is_admin() ) {
-		// If this isn't a 'WooCommerce Order' post, don't update it.
-		if ( 'shop_order' !== $post->post_type ) {
-			return;
-		}
-		if ( isset( $_POST['cko_payment_action'] ) && sanitize_text_field( $_POST['cko_payment_action'] ) ) {
+	if ( ! is_admin() ) {
+        return;
+    }
 
-			$order = wc_get_order( sanitize_text_field( $_POST['post_ID'] ) );
-
-			WC_Admin_Notices::remove_notice( 'wc_checkout_com_cards' );
-
-			// check if post is capture.
-			if ( 'cko-capture' === sanitize_text_field( $_POST['cko_payment_action'] ) ) {
-
-				// send capture request to cko.
-				$result = (array) WC_Checkoutcom_Api_Request::capture_payment();
-
-				if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {
-					WC_Admin_Notices::add_custom_notice( 'wc_checkout_com_cards', $result['error'] );
-
-					return false;
-				}
-
-				// Set action id as woo transaction id.
-				update_post_meta( sanitize_text_field( $_POST['post_ID'] ), '_transaction_id', $result['action_id'] );
-				update_post_meta( sanitize_text_field( $_POST['post_ID'] ), 'cko_payment_captured', true );
-
-				// Get cko capture status configured in admin.
-				$status = WC_Admin_Settings::get_option( 'ckocom_order_captured', 'processing' );
-
-				/* translators: %s: Action id. */
-				$message = sprintf( esc_html__( 'Checkout.com Payment Captured from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
-
-				// add notes for the order and update status.
-				$order->add_order_note( $message );
-				$order->update_status( $status );
-
-				return true;
-
-			} elseif ( 'cko-void' === sanitize_text_field( $_POST['cko_payment_action'] ) ) {
-				// check if post is void.
-				// send void request to cko.
-				$result = (array) WC_Checkoutcom_Api_Request::void_payment();
-
-				if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {
-					WC_Admin_Notices::add_custom_notice( 'wc_checkout_com_cards', $result['error'] );
-
-					return false;
-				}
-
-				// Set action id as woo transaction id.
-				update_post_meta( sanitize_text_field( $_POST['post_ID'] ), '_transaction_id', $result['action_id'] );
-				update_post_meta( sanitize_text_field( $_POST['post_ID'] ), 'cko_payment_voided', true );
-
-				// Get cko capture status configured in admin.
-				$status = WC_Admin_Settings::get_option( 'ckocom_order_void', 'cancelled' );
-
-				/* translators: %s: Action id. */
-				$message = sprintf( esc_html__( 'Checkout.com Payment Voided from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
-
-				// add notes for the order and update status.
-				$order->add_order_note( $message );
-				$order->update_status( $status );
-
-				// increase stock level.
-				wc_increase_stock_levels( sanitize_text_field( $_POST['post_ID'] ) );
-
-				return true;
-
-			} else {
-				WC_Admin_Notices::add_custom_notice( 'wc_checkout_com_cards', esc_html__( 'An error has occurred.', 'checkout-com-unified-payments-api' ) );
-
-				return false;
-			}
-		}
+	if ( ! isset( $_POST['cko_payment_action'] ) || ! sanitize_text_field( $_POST['cko_payment_action'] ) ) {
+		return;
 	}
+
+    // Handle case where HPOS not enable and WP Post object is given.
+	if ( ! is_a( $order, 'WC_Order' ) ) {
+		$order = wc_get_order( $order_id );
+	}
+
+	WC_Admin_Notices::remove_notice( 'wc_checkout_com_cards' );
+
+	// check if post is capture.
+	if ( 'cko-capture' === sanitize_text_field( $_POST['cko_payment_action'] ) ) {
+
+        // send capture request to cko.
+        $result = (array) WC_Checkoutcom_Api_Request::capture_payment( $order_id );
+
+        if ( ! empty( $result['error'] ) ) {
+            WC_Admin_Notices::add_custom_notice( 'wc_checkout_com_cards', $result['error'] );
+
+            return false;
+        }
+
+        // Set action id as woo transaction id.
+		$order->update_meta_data( '_transaction_id', $result['action_id'] );
+		$order->update_meta_data( 'cko_payment_captured', true );
+
+        // Get cko capture status configured in admin.
+        $status = WC_Admin_Settings::get_option( 'ckocom_order_captured', 'processing' );
+
+        /* translators: %s: Action id. */
+        $message = sprintf( esc_html__( 'Checkout.com Payment Captured from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
+
+        // add notes for the order and update status.
+        $order->add_order_note( $message );
+        $order->update_status( $status );
+
+        return true;
+
+    } elseif ( 'cko-void' === sanitize_text_field( $_POST['cko_payment_action'] ) ) {
+        // check if post is void.
+        // send void request to cko.
+        $result = (array) WC_Checkoutcom_Api_Request::void_payment( $order_id );
+
+        if ( ! empty( $result['error'] ) ) {
+            WC_Admin_Notices::add_custom_notice( 'wc_checkout_com_cards', $result['error'] );
+
+            return false;
+        }
+
+        // Set action id as woo transaction id.
+		$order->update_meta_data( '_transaction_id', $result['action_id'] );
+		$order->update_meta_data( 'cko_payment_voided', true );
+        
+        // Get cko capture status configured in admin.
+        $status = WC_Admin_Settings::get_option( 'ckocom_order_void', 'cancelled' );
+
+        /* translators: %s: Action id. */
+        $message = sprintf( esc_html__( 'Checkout.com Payment Voided from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
+
+        // add notes for the order and update status.
+        $order->add_order_note( $message );
+        $order->update_status( $status );
+
+        // increase stock level.
+        wc_increase_stock_levels( $order );
+
+        return true;
+
+    } else {
+        WC_Admin_Notices::add_custom_notice( 'wc_checkout_com_cards', esc_html__( 'An error has occurred.', 'checkout-com-unified-payments-api' ) );
+
+        return false;
+    }
 }
 
 add_action( 'woocommerce_thankyou', 'add_fawry_number' );
@@ -368,7 +383,10 @@ add_action( 'woocommerce_thankyou', 'add_fawry_number' );
  * @return void
  */
 function add_fawry_number( $order_id ) {
-	$fawry_number = get_post_meta( $order_id, 'cko_fawry_reference_number', $single = true );
+
+    $order = wc_get_order( $order_id );
+
+	$fawry_number = $order->get_meta( 'cko_fawry_reference_number' );
 	$fawry        = __( 'Fawry reference number: ', 'checkout-com-unified-payments-api' );
 	if ( $fawry_number ) {
 		wc_enqueue_js(

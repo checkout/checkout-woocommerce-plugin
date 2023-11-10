@@ -29,16 +29,15 @@ class WC_Checkout_Com_Webhook {
 		}
 
 		// Load order form order id.
-		$order    = self::get_wc_order( $order_id );
-		$order_id = $order->get_id();
+		$order = self::get_wc_order( $order_id );
 
-		$already_captured = get_post_meta( $order_id, 'cko_payment_captured', true );
+		$already_captured = $order->get_meta( 'cko_payment_captured' );
 
 		if ( $already_captured ) {
 			return true;
 		}
 
-		$already_authorized = get_post_meta( $order_id, 'cko_payment_authorized', true );
+		$already_authorized = $order->get_meta( 'cko_payment_authorized' );
 		$auth_status        = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
 		$message            = 'Webhook received from checkout.com. Payment Authorized';
 
@@ -52,9 +51,9 @@ class WC_Checkout_Com_Webhook {
 		$action_id = $webhook_data->action_id;
 
 		// Set action id as woo transaction id.
-		update_post_meta( $order_id, '_transaction_id', $action_id );
-		update_post_meta( $order_id, '_cko_payment_id', $webhook_data->id );
-		update_post_meta( $order_id, 'cko_payment_authorized', true );
+		$order->update_meta_data( '_transaction_id', $action_id );
+		$order->update_meta_data( '_cko_payment_id', $webhook_data->id );
+		$order->update_meta_data( 'cko_payment_authorized', true );
 
 		$order->add_order_note( $message );
 		$order->update_status( $auth_status );
@@ -80,12 +79,11 @@ class WC_Checkout_Com_Webhook {
 		}
 
 		// Load order form order id.
-		$order    = self::get_wc_order( $order_id );
-		$order_id = $order->get_id();
+		$order = self::get_wc_order( $order_id );
 
 		$order->add_order_note( __( 'Checkout.com Card verified webhook received', 'checkout-com-unified-payments-api' ) );
 		// Set action id as woo transaction id.
-		update_post_meta( $order_id, '_transaction_id', $action_id );
+		$order->update_meta_data( '_transaction_id', $action_id );
 
 		// Get cko capture status configured in admin.
 		$status = WC_Admin_Settings::get_option( 'ckocom_order_captured', 'processing' );
@@ -117,10 +115,10 @@ class WC_Checkout_Com_Webhook {
 		$order_id = $order->get_id();
 
 		// Check if payment is already captured.
-		$already_captured = get_post_meta( $order_id, 'cko_payment_captured', true );
+		$already_captured = $order->get_meta( 'cko_payment_captured' );
 		$message          = 'Webhook received from checkout.com Payment captured';
 
-		$already_authorized = get_post_meta( $order_id, 'cko_payment_authorized', true );
+		$already_authorized = $order->get_meta( 'cko_payment_authorized' );
 
 		/**
 		* We return false here as payment approved webhook is not yet delivered
@@ -146,8 +144,8 @@ class WC_Checkout_Com_Webhook {
 		$order_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $order_amount, $order->get_currency() );
 
 		// Set action id as woo transaction id.
-		update_post_meta( $order_id, '_transaction_id', $action_id );
-		update_post_meta( $order_id, 'cko_payment_captured', true );
+		$order->update_meta_data( '_transaction_id', $action_id );
+		$order->update_meta_data( 'cko_payment_captured', true );
 
 		// Get cko capture status configured in admin.
 		$status = WC_Admin_Settings::get_option( 'ckocom_order_captured', 'processing' );
@@ -216,7 +214,7 @@ class WC_Checkout_Com_Webhook {
 		$order_id = $order->get_id();
 
 		// check if payment is already captured.
-		$already_voided = get_post_meta( $order_id, 'cko_payment_voided', true );
+		$already_voided = $order->get_meta( 'cko_payment_voided' );
 		$message        = 'Webhook received from checkout.com. Payment voided';
 
 		// Add note to order if captured already.
@@ -231,8 +229,8 @@ class WC_Checkout_Com_Webhook {
 		$action_id = $webhook_data->action_id;
 
 		// Set action id as woo transaction id.
-		update_post_meta( $order_id, '_transaction_id', $action_id );
-		update_post_meta( $order_id, 'cko_payment_voided', true );
+		$order->update_meta_data( '_transaction_id', $action_id );
+		$order->update_meta_data( 'cko_payment_voided', true );
 
 		// Get cko capture status configured in admin.
 		$status = WC_Admin_Settings::get_option( 'ckocom_order_void', 'cancelled' );
@@ -271,7 +269,7 @@ class WC_Checkout_Com_Webhook {
 		$order_id = $order->get_id();
 
 		// check if payment is already refunded.
-		$already_refunded = get_post_meta( $order_id, 'cko_payment_refunded', true );
+		$already_refunded = $order->get_meta( 'cko_payment_refunded' );
 		$message          = 'Webhook received from checkout.com. Payment refunded';
 
 		// Get action id from webhook data.
@@ -279,7 +277,7 @@ class WC_Checkout_Com_Webhook {
 		$amount             = $webhook_data->amount;
 		$order_amount       = $order->get_total();
 		$order_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $order_amount, $order->get_currency() );
-		$get_transaction_id = get_post_meta( $order_id, '_transaction_id', true );
+		$get_transaction_id = $order->get_meta( '_transaction_id' );
 
 		if ( $get_transaction_id === $action_id ) {
 			return true;
@@ -294,8 +292,8 @@ class WC_Checkout_Com_Webhook {
 		$order->add_order_note( esc_html__( 'Checkout.com Payment Refund webhook received', 'checkout-com-unified-payments-api' ) );
 
 		// Set action id as woo transaction id.
-		update_post_meta( $order_id, '_transaction_id', $action_id );
-		update_post_meta( $order_id, 'cko_payment_refunded', true );
+		$order->update_meta_data( '_transaction_id', $action_id );
+		$order->update_meta_data( 'cko_payment_refunded', true );
 
 		$refund_amount = WC_Checkoutcom_Utility::decimal_to_value( $amount, $order->get_currency() );
 
