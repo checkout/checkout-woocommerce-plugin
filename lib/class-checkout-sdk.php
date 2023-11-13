@@ -35,15 +35,16 @@ class Checkout_SDK {
 
 	/**
 	 * Constructor.
+	 *
+	 * @param bool $use_fallback
 	 */
-	public function __construct() {
-
+	public function __construct( $use_fallback = false ) {
 		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
 		$environment   = 'sandbox' === $core_settings['ckocom_environment'] ? Environment::sandbox() : Environment::production();
 
 		$this->nas_account_type = cko_is_nas_account();
 
-		if ( $this->nas_account_type ) {
+		if ( $this->nas_account_type && false === $use_fallback ) {
 			$builder = CheckoutFourSdk::staticKeys();
 		} else {
 			$builder = CheckoutDefaultSdk::staticKeys();
@@ -52,6 +53,11 @@ class Checkout_SDK {
 		$builder->setPublicKey( $core_settings['ckocom_pk'] );
 		$builder->setSecretKey( $core_settings['ckocom_sk'] );
 		$builder->setEnvironment( $environment );
+
+		if ( $use_fallback ) {
+			$builder->setPublicKey( $core_settings['fallback_ckocom_pk'] );
+			$builder->setSecretKey( $core_settings['fallback_ckocom_sk'] );
+		}
 
 		try {
 
