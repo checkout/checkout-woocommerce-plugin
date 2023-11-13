@@ -71,7 +71,7 @@ class WC_Checkoutcom_Utility {
 	 *
 	 * @return float|int
 	 */
-	public function decimal_to_value( $amount, $currency_symbol ) {
+	public static function decimal_to_value( $amount, $currency_symbol ) {
 		$currency                    = strtoupper( $currency_symbol );
 		$three_decimal_currency_list = [ 'BHD', 'LYD', 'JOD', 'IQD', 'KWD', 'OMR', 'TND' ];
 		$zero_decimal_currency_list  = [

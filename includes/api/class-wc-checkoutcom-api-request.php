@@ -1473,22 +1473,30 @@ class WC_Checkoutcom_Api_Request {
 			return false;
 		}
 
-		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$core_settings      = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$is_fallback_active = ( 'yes' === ( $core_settings['enable_fallback_ac'] ?? 'no' ) );
 
 		$core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
-
-		$wp_request_headers = [
-			'Authorization' => $core_settings['ckocom_sk'],
-		];
 
 		$wp_response = wp_remote_post(
 			$url,
 			[
-				'headers' => $wp_request_headers,
+				'headers' => [ 'Authorization' => $core_settings['ckocom_sk'] ],
 			]
 		);
 
-		if ( 200 !== wp_remote_retrieve_response_code( $wp_response ) ) {
+		// If unauthorized & fallback ABC setup retry with those cred.
+		if ( 401 === wp_remote_retrieve_response_code( $wp_response ) && $is_fallback_active ) {
+
+			$wp_response = wp_remote_post(
+				$url,
+				[
+					'headers' => [ 'Authorization' => $core_settings['fallback_ckocom_sk'] ],
+				]
+			);
+
+		} elseif ( 200 !== wp_remote_retrieve_response_code( $wp_response ) ) {
+
 			WC_Checkoutcom_Utility::logger(
 				sprintf(
 					'An error has occurred while mandate cancel Order # %d request. Response code: %d',
