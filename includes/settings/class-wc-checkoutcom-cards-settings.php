@@ -119,7 +119,7 @@ class WC_Checkoutcom_Cards_Settings {
 				'default'     => 'Pay by Card with Checkout.com',
 			],
 			'ckocom_account_type' => [
-				'title'       => __( 'Account type', 'checkout-com-unified-payments-api' ),
+				'title'       => __( 'Account Type', 'checkout-com-unified-payments-api' ),
 				'type'        => 'select',
 				'description' => __( 'Contact support team to know your account type.', 'checkout-com-unified-payments-api' ),
 				'desc_tip'    => true,
@@ -141,6 +141,23 @@ class WC_Checkoutcom_Cards_Settings {
 				'type'        => 'text',
 				/* translators: 1: HTML anchor opening tag, 2: HTML anchor closing tag. */
 				'description' => sprintf( __( 'You can %1$s find your public key %2$s in the Checkout.com Hub', 'checkout-com-unified-payments-api' ), '<a class="checkoutcom-key-docs" target="_blank" href="' . esc_url( $docs_link ) . '">', '</a>' ),
+				'placeholder' => 'pk_xxx',
+			],
+			'enable_fallback_ac'  => [
+				'id'          => 'enable',
+				'title'       => __( 'Fallback Account', 'checkout-com-unified-payments-api' ),
+				'type'        => 'checkbox',
+				'label'       => __( 'Enable Fallback Account(ABC account) for Refund', 'checkout-com-unified-payments-api' ),
+				'default'     => 'no',
+			],
+			'fallback_ckocom_sk'  => [
+				'title'       => __( 'Secret Key', 'checkout-com-unified-payments-api' ),
+				'type'        => 'text',
+				'placeholder' => 'sk_xxx',
+			],
+			'fallback_ckocom_pk'  => [
+				'title'       => __( 'Public Key', 'checkout-com-unified-payments-api' ),
+				'type'        => 'text',
 				'placeholder' => 'pk_xxx',
 			],
 		];
