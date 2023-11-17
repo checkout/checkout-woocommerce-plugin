@@ -88,7 +88,9 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Sepa extends WC_Gateway_Check
 					// check if apm is selected as payment method.
 					if (jQuery('#payment_method_wc_checkout_com_alternative_payments_sepa').is(':checked')) {
 
-						if (0 === jQuery('#sepa-iban').val().length) {
+						const iban = jQuery('#sepa-iban').val();
+
+						if (0 === iban.length) {
 							alert( '<?php esc_html_e( 'Please enter your bank accounts iban', 'checkout-com-unified-payments-api' ); ?>' );
 							return false;
 						}

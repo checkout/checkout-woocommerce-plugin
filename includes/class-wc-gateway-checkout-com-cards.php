@@ -479,10 +479,10 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		// Create payment with card token.
 		$result = (array) WC_Checkoutcom_Api_Request::create_payment( $order, $arg );
 
-        if ( isset( $result['3d_redirection_error'] ) && true === $result['3d_redirection_error'] ) {
-	        // Retry Create payment with card token.
-            $result = (array) WC_Checkoutcom_Api_Request::create_payment( $order, $arg, null, true );
-        }
+		if ( isset( $result['3d_redirection_error'] ) && true === $result['3d_redirection_error'] ) {
+			// Retry Create payment with card token.
+			$result = (array) WC_Checkoutcom_Api_Request::create_payment( $order, $arg, null, true );
+		}
 
 		// check if result has error and return error message.
 		if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {

@@ -71,7 +71,7 @@ class WC_Checkoutcom_Utility {
 	 *
 	 * @return float|int
 	 */
-	public function decimal_to_value( $amount, $currency_symbol ) {
+	public static function decimal_to_value( $amount, $currency_symbol ) {
 		$currency                    = strtoupper( $currency_symbol );
 		$three_decimal_currency_list = [ 'BHD', 'LYD', 'JOD', 'IQD', 'KWD', 'OMR', 'TND' ];
 		$zero_decimal_currency_list  = [
@@ -117,13 +117,13 @@ class WC_Checkoutcom_Utility {
 		// If the input of the delay is numeric.
 		if ( is_numeric( $delay ) ) {
 			// Get total seconds based on the hour input.
-			$total_seconds = $delay * 3600;
+			$total_seconds = round( $delay * 3600 );
 			// If the delay is 0 manually add a 10 seconds delay.
 			if ( 0 === $total_seconds ) {
 				$total_seconds += $default_seconds_delay;
 			}
 			$hours   = floor( $total_seconds / 3600 );
-			$minutes = floor( $total_seconds / 60 % 60 );
+			$minutes = floor( floor( $total_seconds / 60 ) % 60 );
 			$seconds = floor( $total_seconds % 60 );
 
 			// Return date and time in UTC with the delays added.
