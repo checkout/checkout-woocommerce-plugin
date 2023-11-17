@@ -41,6 +41,8 @@ Upon receiving your live credentials from your account manager, here are the req
 - In the plugin settings, input your **Live** keys
 - Switch the _Endpoint URL mode_ to **Live**.
 
+Keep these keys securely as they are your production credentials. 
+
 # Development environment Setup
 
 - Clone the repository to in `wp-content/plugins` folder with the name `woocommerce-gateway-checkout-com`
