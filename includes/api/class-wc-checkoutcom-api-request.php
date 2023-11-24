@@ -109,7 +109,8 @@ class WC_Checkoutcom_Api_Request {
 
 				// Set payment id post meta if the payment id declined.
 				if ( 'Declined' === $response['status'] ) {
-					update_post_meta( $order->get_id(), '_cko_payment_id', $response['id'] );
+					$order->update_meta_data( '_cko_payment_id', $response['id'] );
+					$order->save();
 				}
 
 				$error_message = __( 'An error has occurred while processing your payment. Please check your card details and try again. ', 'checkout-com-unified-payments-api' );
@@ -300,7 +301,8 @@ class WC_Checkoutcom_Api_Request {
 			$payment->capture            = true;
 
 			if ( 'wc_checkout_com_alternative_payments_sepa' !== $order->get_payment_method() ) {
-				$payment->previous_payment_id = get_post_meta( $arg['parent_order_id'], '_cko_payment_id', true ) ?? null;
+				$parent_order                 = wc_get_order( $arg['parent_order_id'] );
+				$payment->previous_payment_id = $parent_order->get_meta( '_cko_payment_id', true ) ?? null;
 			}
 		} elseif ( function_exists( 'wcs_order_contains_subscription' ) ) {
 			if ( wcs_order_contains_subscription( $order, 'parent' ) ) {
@@ -579,7 +581,9 @@ class WC_Checkoutcom_Api_Request {
 
 				// Set payment id post meta if the payment id declined.
 				if ( 'Declined' === $response['status'] ) {
-					update_post_meta( $response['metadata']['order_id'], '_cko_payment_id', $response['id'] );
+					$order = wc_get_order( $response['metadata']['order_id'] );
+					$order->update_meta_data( '_cko_payment_id', $response['id'] );
+					$order->save();
 				}
 
 				$error_message = __( 'An error has occurred while processing your payment. Please check your card details and try again.', 'checkout-com-unified-payments-api' );
@@ -664,12 +668,13 @@ class WC_Checkoutcom_Api_Request {
 
 	/**
 	 * Perform capture.
+	 * @param int $order_id
 	 *
 	 * @return array|mixed
 	 */
-	public static function capture_payment() {
-		$order_id       = sanitize_text_field( $_POST['post_ID'] );
-		$cko_payment_id = get_post_meta( $order_id, '_cko_payment_id', true );
+	public static function capture_payment( $order_id ) {
+		$order          = wc_get_order( $order_id );
+		$cko_payment_id = $order->get_meta( '_cko_payment_id' );
 
 		// Check if cko_payment_id is empty.
 		if ( empty( $cko_payment_id ) ) {
@@ -678,7 +683,6 @@ class WC_Checkoutcom_Api_Request {
 			return [ 'error' => $error_message ];
 		}
 
-		$order         = wc_get_order( $order_id );
 		$amount        = $order->get_total();
 		$amount_cents  = WC_Checkoutcom_Utility::value_to_decimal( $amount, $order->get_currency() );
 		$gateway_debug = 'yes' === WC_Admin_Settings::get_option( 'cko_gateway_responses', 'no' );
@@ -741,12 +745,13 @@ class WC_Checkoutcom_Api_Request {
 
 	/**
 	 * Perform Void.
+	 * @param int $order_id
 	 *
 	 * @return array|mixed
 	 */
-	public static function void_payment() {
-		$order_id       = sanitize_text_field( $_POST['post_ID'] );
-		$cko_payment_id = get_post_meta( $order_id, '_cko_payment_id', true );
+	public static function void_payment( $order_id ) {
+		$order          = wc_get_order( $order_id );
+		$cko_payment_id = $order->get_meta( '_cko_payment_id' );
 
 		// Check if cko_payment_id is empty.
 		if ( empty( $cko_payment_id ) ) {
@@ -825,7 +830,7 @@ class WC_Checkoutcom_Api_Request {
 		$core_settings      = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
 		$is_fallback_active = ( 'yes' === ( $core_settings['enable_fallback_ac'] ?? 'no' ) );
 
-		$cko_payment_id = get_post_meta( $order_id, '_cko_payment_id', true );
+		$cko_payment_id = $order->get_meta( '_cko_payment_id' );
 
 		// Check if cko_payment_id is empty.
 		if ( empty( $cko_payment_id ) ) {

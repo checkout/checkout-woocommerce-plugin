@@ -21,10 +21,6 @@ class WC_Checkoutcom_Subscription {
 	 * @param WC_Order $renewal_order Order object to be renewed.
 	 */
 	public static function renewal_payment( $renewal_total, $renewal_order ) {
-
-		// Get renewal order ID.
-		$order_id = $renewal_order->get_id();
-
 		$args              = [];
 		$subscriptions_arr = [];
 
@@ -34,16 +30,16 @@ class WC_Checkoutcom_Subscription {
 		}
 
 		foreach ( $subscriptions_arr as $subscriptions_obj ) {
-			$args['source_id']        = get_post_meta( $subscriptions_obj->get_id(), '_cko_source_id', true );
+			$args['source_id']        = $subscriptions_obj->get_meta( '_cko_source_id' );
 			$args['parent_order_id']  = $subscriptions_obj->get_parent_id();
-			$args['preferred_scheme'] = get_post_meta( $subscriptions_obj->get_id(), '_cko_preferred_scheme', true );
+			$args['preferred_scheme'] = $subscriptions_obj->get_meta( '_cko_preferred_scheme' );
 		}
 
 		$payment_result = (array) WC_Checkoutcom_Api_Request::create_payment( $renewal_order, $args, 'renewal' );
 
 		// Update renewal order status based on payment result.
 		if ( ! isset( $payment_result['error'] ) ) {
-			self::update_order_status( $payment_result, $renewal_order, $order_id );
+			self::update_order_status( $payment_result, $renewal_order );
 		}
 	}
 
@@ -51,18 +47,20 @@ class WC_Checkoutcom_Subscription {
 	 * Update status of renewal order and add notes
 	 *
 	 * @param array  $payment_result Payment result.
-	 * @param object $renewal_order Renewal order object.
+	 * @param WC_Order $renewal_order Renewal order object.
 	 * @param int    $order_id Order ID.
 	 */
-	public static function update_order_status( $payment_result, $renewal_order, $order_id ) {
+	public static function update_order_status( $payment_result, $renewal_order ) {
+		// Get renewal order ID.
+		$order_id = $renewal_order->get_id();
 
 		// Set action id as woo transaction id.
-		update_post_meta( $order_id, '_transaction_id', $payment_result['action_id'] );
-		update_post_meta( $order_id, '_cko_payment_id', $payment_result['id'] );
+		$renewal_order->update_meta_data( '_transaction_id', $payment_result['action_id'] );
+		$renewal_order->update_meta_data( '_cko_payment_id', $payment_result['id'] );
 
 		// Set Authorize meta key to true if renewal order.
 		if ( in_array(
-			get_post_meta( $order_id, '_payment_method', true ),
+			$renewal_order->get_meta( '_payment_method' ),
 			[
 				'wc_checkout_com_google_pay',
 				'wc_checkout_com_apple_pay',
@@ -70,7 +68,7 @@ class WC_Checkoutcom_Subscription {
 			],
 			true
 		) ) {
-			update_post_meta( $order_id, 'cko_payment_authorized', true );
+			$renewal_order->update_meta_data( 'cko_payment_authorized', true );
 		}
 
 		// Get cko auth status configured in admin.
@@ -98,7 +96,7 @@ class WC_Checkoutcom_Subscription {
 		$order_status = $renewal_order->get_status();
 
 		if ( 'pending' === $order_status ) {
-			update_post_meta( $order_id, 'cko_payment_authorized', true );
+			$renewal_order->update_meta_data( 'cko_payment_authorized', true );
 			$renewal_order->update_status( $status );
 		}
 
@@ -117,7 +115,7 @@ class WC_Checkoutcom_Subscription {
 	public static function save_source_id( $order_id, $order, $source_id ) {
 		// update source id for subscription payment method change.
 		if ( $order instanceof WC_Subscription ) {
-			update_post_meta( $order->get_id(), '_cko_source_id', $source_id );
+			$order->update_meta_data( '_cko_source_id', $source_id );
 		}
 
 		// Check for subscription and save source id.
@@ -126,7 +124,7 @@ class WC_Checkoutcom_Subscription {
 				$subscriptions = wcs_get_subscriptions_for_order( $order );
 
 				foreach ( $subscriptions as $subscription_obj ) {
-					update_post_meta( $subscription_obj->get_id(), '_cko_source_id', $source_id );
+					$subscription_obj->update_meta_data( '_cko_source_id', $source_id );
 				}
 			}
 		}
@@ -137,7 +135,7 @@ class WC_Checkoutcom_Subscription {
 	/**
 	 * Save source id for each order containing subscription
 	 *
-	 * @param object $subscription WC_Subscription.
+	 * @param WC_Subscription|WC_Order $subscription WC_Subscription.
 	 *
 	 * @return void
 	 */
@@ -145,7 +143,7 @@ class WC_Checkoutcom_Subscription {
 
 		if ( 'wc_checkout_com_alternative_payments_sepa' === $subscription->get_payment_method() ) {
 
-			$mandate_cancel = get_post_meta( $subscription->get_id(), '_cko_mandate_cancel', true );
+			$mandate_cancel = $subscription->get_meta( '_cko_mandate_cancel' );
 
 			if ( $mandate_cancel ) {
 				$is_mandate_cancel = WC_Checkoutcom_Api_Request::mandate_cancel_request( $mandate_cancel, $subscription->get_id() );
@@ -163,16 +161,16 @@ class WC_Checkoutcom_Subscription {
 	/**
 	 * Save mandate cancel URL to order meta.
 	 *
-	 * @param int    $order_id Order ID.
-	 * @param object $order Order object.
-	 * @param string $url Mandate cancel URL.
+	 * @param int             $order_id Order ID.
+	 * @param WC_Subscription $order Order object.
+	 * @param string          $url Mandate cancel URL.
 	 *
 	 * @return void
 	 */
 	public static function save_mandate_cancel( $order_id, $order, $url ) {
 
 		if ( $order instanceof WC_Subscription ) {
-			update_post_meta( $order->get_id(), '_cko_mandate_cancel', $url );
+			$order->update_meta_data( '_cko_mandate_cancel', $url );
 		}
 
 		// check for subscription and save source id.
@@ -181,7 +179,7 @@ class WC_Checkoutcom_Subscription {
 				$subscriptions = wcs_get_subscriptions_for_order( $order );
 
 				foreach ( $subscriptions as $subscription_obj ) {
-					update_post_meta( $subscription_obj->get_id(), '_cko_mandate_cancel', $url );
+					$subscription_obj->update_meta_data( '_cko_mandate_cancel', $url );
 				}
 			}
 		}
