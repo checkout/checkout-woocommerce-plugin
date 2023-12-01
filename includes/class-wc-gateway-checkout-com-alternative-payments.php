@@ -113,7 +113,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway {
 		}
 
 		// Set action id as woo transaction id.
-		$order->update_meta_data( '_transaction_id', $result['action_id'] );
+		$order->set_transaction_id( $result['action_id'] );
 		$order->update_meta_data( 'cko_payment_refunded', true );
 		$order->save();
 

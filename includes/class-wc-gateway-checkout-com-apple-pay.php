@@ -574,7 +574,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		}
 
 		// Set action id as woo transaction id.
-		$order->update_meta_data( '_transaction_id', $result['action_id'] );
+		$order->set_transaction_id( $result['action_id'] );
 		$order->update_meta_data( '_cko_payment_id', $result['id'] );
 
 		// Get cko auth status configured in admin.
@@ -631,7 +631,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		}
 
 		// Set action id as woo transaction id.
-		$order->update_meta_data( '_transaction_id', $result['action_id'] );
+		$order->set_transaction_id( $result['action_id'] );
 		$order->update_meta_data( 'cko_payment_refunded', true );
 		$order->save();
 

@@ -55,7 +55,7 @@ class WC_Checkoutcom_Subscription {
 		$order_id = $renewal_order->get_id();
 
 		// Set action id as woo transaction id.
-		$renewal_order->update_meta_data( '_transaction_id', $payment_result['action_id'] );
+		$renewal_order->set_transaction_id( $payment_result['action_id'] );
 		$renewal_order->update_meta_data( '_cko_payment_id', $payment_result['id'] );
 
 		// Set Authorize meta key to true if renewal order.

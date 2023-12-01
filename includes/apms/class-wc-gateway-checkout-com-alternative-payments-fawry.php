@@ -99,7 +99,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Fawry extends WC_Gateway_Chec
 			}
 		}
 
-		$order->update_meta_data( '_transaction_id', $result['id'] );
+		$order->set_transaction_id( $result['id'] );
 		$order->update_meta_data( '_cko_payment_id', $result['id'] );
 
 		// add notes for the order and update status.

@@ -530,7 +530,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		}
 
 		// Set action id as woo transaction id.
-		$order->update_meta_data( '_transaction_id', $result['action_id'] );
+		$order->set_transaction_id( $result['action_id'] );
 		$order->update_meta_data( '_cko_payment_id', $result['id'] );
 
 		// Get cko auth status configured in admin.
@@ -633,11 +633,11 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		}
 
 		// Set action id as woo transaction id.
-		$order->update_meta_data( '_transaction_id', $action['0']['id'] );
+		$order->set_transaction_id( $action['0']['id'] );
 
 		// if no action id and source is boleto or paypal.
 		if ( null == $action['0']['id'] && in_array( $result['source']['type'], [ 'paypal', 'boleto' ], true ) ) { // phpcs:ignore WordPress.PHP.StrictComparisons.LooseComparison -- Deliberate loose comparison.
-			$order->update_meta_data( '_transaction_id', $result['id'] );
+			$order->set_transaction_id( $result['id'] );
 		}
 
 		$order->update_meta_data( '_cko_payment_id', $result['id'] );
@@ -925,7 +925,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		}
 
 		// Set action id as woo transaction id.
-		$order->update_meta_data( '_transaction_id', $result['action_id'] );
+		$order->set_transaction_id( $result['action_id'] );
 		$order->update_meta_data( 'cko_payment_refunded', true );
 		$order->save();
 
