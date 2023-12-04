@@ -51,7 +51,7 @@ class WC_Checkout_Com_Webhook {
 		$action_id = $webhook_data->action_id;
 
 		// Set action id as woo transaction id.
-		$order->update_meta_data( '_transaction_id', $action_id );
+		$order->set_transaction_id( $action_id );
 		$order->update_meta_data( '_cko_payment_id', $webhook_data->id );
 		$order->update_meta_data( 'cko_payment_authorized', true );
 
@@ -83,7 +83,7 @@ class WC_Checkout_Com_Webhook {
 
 		$order->add_order_note( __( 'Checkout.com Card verified webhook received', 'checkout-com-unified-payments-api' ) );
 		// Set action id as woo transaction id.
-		$order->update_meta_data( '_transaction_id', $action_id );
+		$order->set_transaction_id( $action_id );
 
 		// Get cko capture status configured in admin.
 		$status = WC_Admin_Settings::get_option( 'ckocom_order_captured', 'processing' );
@@ -144,7 +144,7 @@ class WC_Checkout_Com_Webhook {
 		$order_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $order_amount, $order->get_currency() );
 
 		// Set action id as woo transaction id.
-		$order->update_meta_data( '_transaction_id', $action_id );
+		$order->set_transaction_id( $action_id );
 		$order->update_meta_data( 'cko_payment_captured', true );
 
 		// Get cko capture status configured in admin.
@@ -229,7 +229,7 @@ class WC_Checkout_Com_Webhook {
 		$action_id = $webhook_data->action_id;
 
 		// Set action id as woo transaction id.
-		$order->update_meta_data( '_transaction_id', $action_id );
+		$order->set_transaction_id( $action_id );
 		$order->update_meta_data( 'cko_payment_voided', true );
 
 		// Get cko capture status configured in admin.
@@ -277,7 +277,7 @@ class WC_Checkout_Com_Webhook {
 		$amount             = $webhook_data->amount;
 		$order_amount       = $order->get_total();
 		$order_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $order_amount, $order->get_currency() );
-		$get_transaction_id = $order->get_meta( '_transaction_id' );
+		$get_transaction_id = $order->get_transaction_id();
 
 		if ( $get_transaction_id === $action_id ) {
 			return true;
@@ -292,7 +292,7 @@ class WC_Checkout_Com_Webhook {
 		$order->add_order_note( esc_html__( 'Checkout.com Payment Refund webhook received', 'checkout-com-unified-payments-api' ) );
 
 		// Set action id as woo transaction id.
-		$order->update_meta_data( '_transaction_id', $action_id );
+		$order->set_transaction_id( $action_id );
 		$order->update_meta_data( 'cko_payment_refunded', true );
 
 		$refund_amount = WC_Checkoutcom_Utility::decimal_to_value( $amount, $order->get_currency() );

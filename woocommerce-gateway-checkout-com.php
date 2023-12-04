@@ -168,7 +168,7 @@ add_action( 'woocommerce_checkout_process', 'cko_check_if_empty' );
  * Validate cvv on checkout page.
  */
 function cko_check_if_empty() {
-	if ( 'wc_checkout_com_cards' === $_POST['payment_method'] ) {
+	if ( isset( $_POST['payment_method'] ) && 'wc_checkout_com_cards' === $_POST['payment_method'] ) {
 
 		// Check if require cvv is enabled in module setting.
 		if (
@@ -321,7 +321,7 @@ function handle_order_capture_void_action( $order_id, $order ) {
         }
 
         // Set action id as woo transaction id.
-		$order->update_meta_data( '_transaction_id', $result['action_id'] );
+		$order->set_transaction_id( $result['action_id'] );
 		$order->update_meta_data( 'cko_payment_captured', true );
 
         // Get cko capture status configured in admin.
@@ -348,7 +348,7 @@ function handle_order_capture_void_action( $order_id, $order ) {
         }
 
         // Set action id as woo transaction id.
-		$order->update_meta_data( '_transaction_id', $result['action_id'] );
+		$order->set_transaction_id( $result['action_id'] );
 		$order->update_meta_data( 'cko_payment_voided', true );
         
         // Get cko capture status configured in admin.
