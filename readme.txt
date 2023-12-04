@@ -171,6 +171,9 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v4.4.17 4th Dec 2023
+- **[fix]** Fix incorrect use of method
+
 v4.4.16 24th Nov 2023
 - **[tweak]** WC HPOS related fixes
 - **[tweak]** Add new configuration section to add ABC fallback account for refund process
@@ -185,7 +188,7 @@ v4.4.14 20th March 2023
 v4.4.13 15th March 2023
 - **[tweak]** Add payment retry if 3ds redirection link is expired with idempotency key
 
-v4.4.12 3th March 2023
+v4.4.12 3rd March 2023
 - **[tweak]** Update style of co-badged cards choice option
 - **[tweak]** Implement idempotency key for payment request to avoid duplicate payment
 - **[fix]** Credit card input filed not showing on small screen device
