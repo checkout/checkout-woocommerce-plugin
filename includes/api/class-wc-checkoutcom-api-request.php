@@ -65,7 +65,12 @@ class WC_Checkoutcom_Api_Request {
 		$checkout = new Checkout_SDK();
 
 		try {
-			$cko_idempotency_key = $request_param->metadata['order_id'] . '-' . $order->get_order_key();
+			$cko_idempotency_key = sprintf(
+				'%s-%s-%s',
+				$request_param->metadata['order_id'],
+				$order->get_order_key(),
+				WC()->session->get( '3ds_action_id' )
+			);
 
 			// Append time.
 			if ( true === $retry_idempotency_key ) {
@@ -125,6 +130,8 @@ class WC_Checkoutcom_Api_Request {
 				}
 
 				WC_Checkoutcom_Utility::logger( $error_message, $response );
+
+				WC()->session->set( '3ds_action_id', $response['action_id'] );
 
 				return [ 'error' => $error_message ];
 			}
@@ -599,6 +606,8 @@ class WC_Checkoutcom_Api_Request {
 				}
 
 				WC_Checkoutcom_Utility::logger( $error_message, $response );
+
+				WC()->session->set( '3ds_action_id', $response['actions'][0]['id'] );
 
 				$arr = [ 'error' => $error_message ];
 
