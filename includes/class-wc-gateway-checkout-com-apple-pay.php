@@ -131,15 +131,16 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			hideAppleApplePayOption();
 			// If Apple Pay is available as a payment option, and enabled on the checkout page, un-hide the payment option.
 			if (window.ApplePaySession) {
-				var promise = ApplePaySession.canMakePaymentsWithActiveCard("<?php echo $this->get_option( 'ckocom_apple_mercahnt_id' ); ?>");
+				var canMakePayments = ApplePaySession.canMakePayments("<?php echo $this->get_option( 'ckocom_apple_mercahnt_id' ); ?>");
 
-				promise.then(function (canMakePayments) {
-					if (canMakePayments) {
+				if ( canMakePayments ) {
+					setTimeout( function() {
 						showAppleApplePayOption();
-					} else {
-						displayApplePayNotPossible();
-					}
-				});
+					}, 500 );
+				} else {
+					displayApplePayNotPossible();
+				}
+
 			} else {
 				displayApplePayNotPossible();
 			}
