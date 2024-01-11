@@ -171,6 +171,10 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v4.4.18 11th Jan 2024
+- **[tweak]** Apple Pay button condition to show on checkout page
+- **[fix]** Idempotency key not working after failed payment request
+
 v4.4.17 4th Dec 2023
 - **[fix]** Fix incorrect use of method
 

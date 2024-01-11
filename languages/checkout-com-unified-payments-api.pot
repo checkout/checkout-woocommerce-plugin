@@ -1,15 +1,15 @@
-# Copyright (C) 2023 Checkout.com
+# Copyright (C) 2024 Checkout.com
 # This file is distributed under the same license as the Checkout.com Payment Gateway plugin.
 msgid ""
 msgstr ""
-"Project-Id-Version: Checkout.com Payment Gateway 4.4.17\n"
+"Project-Id-Version: Checkout.com Payment Gateway 4.4.18\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/checkout-com-unified-payments-api\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2023-12-04T19:06:45+05:30\n"
+"POT-Creation-Date: 2024-01-11T18:52:22+05:30\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.9.0\n"
 "X-Domain: checkout-com-unified-payments-api\n"
@@ -42,93 +42,93 @@ msgstr ""
 msgid "Checkout.com"
 msgstr ""
 
-#: includes/api/class-wc-checkoutcom-api-request.php:98
-#: includes/api/class-wc-checkoutcom-api-request.php:1040
+#: includes/api/class-wc-checkoutcom-api-request.php:103
+#: includes/api/class-wc-checkoutcom-api-request.php:1049
 msgid "An error has occurred while processing your payment. Redirection link not found"
 msgstr ""
 
-#: includes/api/class-wc-checkoutcom-api-request.php:116
+#: includes/api/class-wc-checkoutcom-api-request.php:121
 msgid "An error has occurred while processing your payment. Please check your card details and try again. "
 msgstr ""
 
 #. translators: 1: Response status, 2: Summary.
-#: includes/api/class-wc-checkoutcom-api-request.php:123
-#: includes/api/class-wc-checkoutcom-api-request.php:597
+#: includes/api/class-wc-checkoutcom-api-request.php:128
+#: includes/api/class-wc-checkoutcom-api-request.php:604
 msgid "Status : %1$s, Response summary : %2$s"
 msgstr ""
 
-#: includes/api/class-wc-checkoutcom-api-request.php:132
-#: includes/api/class-wc-checkoutcom-api-request.php:619
+#: includes/api/class-wc-checkoutcom-api-request.php:139
+#: includes/api/class-wc-checkoutcom-api-request.php:628
 msgid "An error has occurred while processing your payment. "
 msgstr ""
 
-#: includes/api/class-wc-checkoutcom-api-request.php:589
-#: includes/api/class-wc-checkoutcom-api-request.php:1049
+#: includes/api/class-wc-checkoutcom-api-request.php:596
+#: includes/api/class-wc-checkoutcom-api-request.php:1058
 msgid "An error has occurred while processing your payment. Please check your card details and try again."
 msgstr ""
 
-#: includes/api/class-wc-checkoutcom-api-request.php:664
+#: includes/api/class-wc-checkoutcom-api-request.php:673
 msgid "An error has occurred while processing your Google pay payment."
 msgstr ""
 
-#: includes/api/class-wc-checkoutcom-api-request.php:681
-#: includes/api/class-wc-checkoutcom-api-request.php:758
-#: includes/api/class-wc-checkoutcom-api-request.php:837
+#: includes/api/class-wc-checkoutcom-api-request.php:690
+#: includes/api/class-wc-checkoutcom-api-request.php:767
+#: includes/api/class-wc-checkoutcom-api-request.php:846
 msgid "An error has occurred. No Cko Payment Id"
 msgstr ""
 
 #. translators: 1: Order ID.
-#: includes/api/class-wc-checkoutcom-api-request.php:700
-#: includes/api/class-wc-checkoutcom-api-request.php:775
+#: includes/api/class-wc-checkoutcom-api-request.php:709
+#: includes/api/class-wc-checkoutcom-api-request.php:784
 msgid "Payment has already been voided or captured on Checkout.com hub for order Id : %s"
 msgstr ""
 
 #. translators: 1: Order ID.
-#: includes/api/class-wc-checkoutcom-api-request.php:717
+#: includes/api/class-wc-checkoutcom-api-request.php:726
 msgid "An error has occurred while processing your capture payment on Checkout.com hub. Order Id : %s"
 msgstr ""
 
-#: includes/api/class-wc-checkoutcom-api-request.php:733
+#: includes/api/class-wc-checkoutcom-api-request.php:742
 msgid "An error has occurred while processing your capture request."
 msgstr ""
 
 #. translators: 1: Order ID.
-#: includes/api/class-wc-checkoutcom-api-request.php:792
+#: includes/api/class-wc-checkoutcom-api-request.php:801
 msgid "An error has occurred while processing your void payment on Checkout.com hub. Order Id : %s"
 msgstr ""
 
-#: includes/api/class-wc-checkoutcom-api-request.php:808
+#: includes/api/class-wc-checkoutcom-api-request.php:817
 msgid "An error has occurred while processing your void request."
 msgstr ""
 
-#: includes/api/class-wc-checkoutcom-api-request.php:866
-#: includes/api/class-wc-checkoutcom-api-request.php:954
+#: includes/api/class-wc-checkoutcom-api-request.php:875
+#: includes/api/class-wc-checkoutcom-api-request.php:963
 msgid "An error has occurred while processing your refund. "
 msgstr ""
 
-#: includes/api/class-wc-checkoutcom-api-request.php:898
+#: includes/api/class-wc-checkoutcom-api-request.php:907
 msgid "Checkout.com Refund : Process via fallback account."
 msgstr ""
 
 #. translators: 1: Order ID.
-#: includes/api/class-wc-checkoutcom-api-request.php:904
-#: includes/api/class-wc-checkoutcom-api-request.php:940
+#: includes/api/class-wc-checkoutcom-api-request.php:913
+#: includes/api/class-wc-checkoutcom-api-request.php:949
 msgid "An error has occurred while processing your refund payment on Checkout.com hub. Order Id : %s"
 msgstr ""
 
-#: includes/api/class-wc-checkoutcom-api-request.php:983
+#: includes/api/class-wc-checkoutcom-api-request.php:992
 msgid "An error has occured while retrieving ideal bank details."
 msgstr ""
 
-#: includes/api/class-wc-checkoutcom-api-request.php:1061
+#: includes/api/class-wc-checkoutcom-api-request.php:1070
 msgid "An error has occurred while creating apm payments. "
 msgstr ""
 
-#: includes/api/class-wc-checkoutcom-api-request.php:1207
+#: includes/api/class-wc-checkoutcom-api-request.php:1216
 msgid "An error has occurred while creating klarna session."
 msgstr ""
 
-#: includes/api/class-wc-checkoutcom-api-request.php:1434
+#: includes/api/class-wc-checkoutcom-api-request.php:1443
 msgid "An error has occurred while processing your payment."
 msgstr ""
 
@@ -360,14 +360,14 @@ msgstr ""
 
 #. translators: %s: Action ID.
 #: includes/class-wc-gateway-checkout-com-alternative-payments.php:123
-#: includes/class-wc-gateway-checkout-com-apple-pay.php:641
+#: includes/class-wc-gateway-checkout-com-apple-pay.php:642
 #: includes/class-wc-gateway-checkout-com-cards.php:938
 msgid "Checkout.com Payment Partially refunded from Admin - Action ID : %s"
 msgstr ""
 
 #. translators: %s: Action ID.
 #: includes/class-wc-gateway-checkout-com-alternative-payments.php:132
-#: includes/class-wc-gateway-checkout-com-apple-pay.php:650
+#: includes/class-wc-gateway-checkout-com-apple-pay.php:651
 #: includes/class-wc-gateway-checkout-com-cards.php:933
 msgid "Checkout.com Payment refunded from Admin - Action ID : %s"
 msgstr ""
@@ -377,14 +377,14 @@ msgstr ""
 msgid "Apple Pay"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-apple-pay.php:556
+#: includes/class-wc-gateway-checkout-com-apple-pay.php:557
 #: includes/class-wc-gateway-checkout-com-cards.php:463
 #: includes/class-wc-gateway-checkout-com-google-pay.php:151
 msgid "There was an issue completing the payment."
 msgstr ""
 
 #. translators: %s: Action ID.
-#: includes/class-wc-gateway-checkout-com-apple-pay.php:584
+#: includes/class-wc-gateway-checkout-com-apple-pay.php:585
 #: includes/class-wc-gateway-checkout-com-cards.php:540
 #: includes/class-wc-gateway-checkout-com-cards.php:649
 #: includes/class-wc-gateway-checkout-com-google-pay.php:186
@@ -393,7 +393,7 @@ msgid "Checkout.com Payment Authorised - Action ID : %s"
 msgstr ""
 
 #. translators: %s: Action ID.
-#: includes/class-wc-gateway-checkout-com-apple-pay.php:592
+#: includes/class-wc-gateway-checkout-com-apple-pay.php:593
 #: includes/class-wc-gateway-checkout-com-cards.php:548
 #: includes/class-wc-gateway-checkout-com-cards.php:657
 #: includes/class-wc-gateway-checkout-com-google-pay.php:194
