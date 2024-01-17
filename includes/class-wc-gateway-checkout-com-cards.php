@@ -1011,8 +1011,12 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 			return http_response_code( 401 );
 		}
 
-        $order      = wc_get_order( $data->data->metadata->order_id );
+		$order      = false;
 		$payment_id = null;
+
+        if ( ! empty( $data->data->metadata->order_id ) ) {
+	        $order = wc_get_order( $data->data->metadata->order_id );
+        }
 
         if ( $order ) {
             $payment_id = $order->get_meta( '_cko_payment_id' ) ?? null;
