@@ -1062,6 +1062,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 				$response = WC_Checkout_Com_Webhook::cancel_payment( $data );
 				break;
 			case 'payment_declined':
+			case 'payment_authentication_failed':
 				$response = WC_Checkout_Com_Webhook::decline_payment( $data );
 				break;
 
