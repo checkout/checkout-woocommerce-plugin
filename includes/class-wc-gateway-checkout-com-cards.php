@@ -504,6 +504,13 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 				WC()->session->set( 'wc-wc_checkout_com_cards-new-payment-method', 'no' );
 			}
 
+			$order->add_order_note(
+				sprintf(
+					esc_html__( 'Checkout.com 3d Redirect waiting. URL : %s', 'checkout-com-unified-payments-api' ),
+					$result['3d']
+				)
+			);
+
 			// Redirect to 3D secure page.
 			return [
 				'result'   => 'success',

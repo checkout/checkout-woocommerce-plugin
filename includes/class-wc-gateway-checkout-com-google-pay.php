@@ -158,6 +158,13 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 		// Redirect to apm if redirection url is available.
 		if ( isset( $result['3d'] ) && ! empty( $result['3d'] ) ) {
 
+			$order->add_order_note(
+				sprintf(
+					esc_html__( 'Checkout.com 3d Redirect waiting. URL : %s', 'checkout-com-unified-payments-api' ),
+					$result['3d']
+				)
+			);
+
 			return [
 				'result'   => 'success',
 				'redirect' => $result['3d'],
