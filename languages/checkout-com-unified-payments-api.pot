@@ -2,14 +2,14 @@
 # This file is distributed under the same license as the Checkout.com Payment Gateway plugin.
 msgid ""
 msgstr ""
-"Project-Id-Version: Checkout.com Payment Gateway 4.4.19\n"
+"Project-Id-Version: Checkout.com Payment Gateway 4.4.20\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/checkout-com-unified-payments-api\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2024-01-17T18:39:00+05:30\n"
+"POT-Creation-Date: 2024-01-31T18:00:11+05:30\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.9.0\n"
 "X-Domain: checkout-com-unified-payments-api\n"
@@ -309,7 +309,7 @@ msgstr ""
 
 #. translators: %s: Action ID.
 #: includes/class-wc-checkout-com-webhook.php:154
-#: includes/class-wc-gateway-checkout-com-cards.php:672
+#: includes/class-wc-gateway-checkout-com-cards.php:679
 msgid "Checkout.com Payment Captured - Action ID : %s"
 msgstr ""
 
@@ -361,14 +361,14 @@ msgstr ""
 #. translators: %s: Action ID.
 #: includes/class-wc-gateway-checkout-com-alternative-payments.php:123
 #: includes/class-wc-gateway-checkout-com-apple-pay.php:642
-#: includes/class-wc-gateway-checkout-com-cards.php:938
+#: includes/class-wc-gateway-checkout-com-cards.php:945
 msgid "Checkout.com Payment Partially refunded from Admin - Action ID : %s"
 msgstr ""
 
 #. translators: %s: Action ID.
 #: includes/class-wc-gateway-checkout-com-alternative-payments.php:132
 #: includes/class-wc-gateway-checkout-com-apple-pay.php:651
-#: includes/class-wc-gateway-checkout-com-cards.php:933
+#: includes/class-wc-gateway-checkout-com-cards.php:940
 msgid "Checkout.com Payment refunded from Admin - Action ID : %s"
 msgstr ""
 
@@ -385,18 +385,18 @@ msgstr ""
 
 #. translators: %s: Action ID.
 #: includes/class-wc-gateway-checkout-com-apple-pay.php:585
-#: includes/class-wc-gateway-checkout-com-cards.php:540
-#: includes/class-wc-gateway-checkout-com-cards.php:649
-#: includes/class-wc-gateway-checkout-com-google-pay.php:186
+#: includes/class-wc-gateway-checkout-com-cards.php:547
+#: includes/class-wc-gateway-checkout-com-cards.php:656
+#: includes/class-wc-gateway-checkout-com-google-pay.php:193
 #: includes/class-wc-gateway-checkout-com-paypal.php:129
 msgid "Checkout.com Payment Authorised - Action ID : %s"
 msgstr ""
 
 #. translators: %s: Action ID.
 #: includes/class-wc-gateway-checkout-com-apple-pay.php:593
-#: includes/class-wc-gateway-checkout-com-cards.php:548
-#: includes/class-wc-gateway-checkout-com-cards.php:657
-#: includes/class-wc-gateway-checkout-com-google-pay.php:194
+#: includes/class-wc-gateway-checkout-com-cards.php:555
+#: includes/class-wc-gateway-checkout-com-cards.php:664
+#: includes/class-wc-gateway-checkout-com-google-pay.php:201
 #: includes/class-wc-gateway-checkout-com-paypal.php:137
 msgid "Checkout.com Payment Flagged - Action ID : %s"
 msgstr ""
@@ -467,25 +467,30 @@ msgstr ""
 msgid "Card Code"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:619
+#: includes/class-wc-gateway-checkout-com-cards.php:509
+#: includes/class-wc-gateway-checkout-com-google-pay.php:163
+msgid "Checkout.com 3d Redirect waiting. URL : %s"
+msgstr ""
+
+#: includes/class-wc-gateway-checkout-com-cards.php:626
 msgid "Unable to add payment method to your account."
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:630
+#: includes/class-wc-gateway-checkout-com-cards.php:637
 msgid "Payment method successfully added."
 msgstr ""
 
 #. translators: %s: Action ID.
-#: includes/class-wc-gateway-checkout-com-cards.php:664
+#: includes/class-wc-gateway-checkout-com-cards.php:671
 msgid "Checkout.com Payment Canceled - Action ID : %s"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:804
+#: includes/class-wc-gateway-checkout-com-cards.php:811
 msgid "An error has occurred while processing your cancel request. "
 msgstr ""
 
 #. translators: 1: Payment ID, 2: Webhook ID.
-#: includes/class-wc-gateway-checkout-com-cards.php:1031
+#: includes/class-wc-gateway-checkout-com-cards.php:1038
 msgid "Order payment Id (%1$s) does not match that of the webhook (%2$s)"
 msgstr ""
 
@@ -496,13 +501,13 @@ msgid "Google Pay"
 msgstr ""
 
 #. translators: %s: Action ID.
-#: includes/class-wc-gateway-checkout-com-google-pay.php:241
+#: includes/class-wc-gateway-checkout-com-google-pay.php:248
 #: includes/class-wc-gateway-checkout-com-paypal.php:184
 msgid "Checkout.com Payment refunded - Action ID : %s"
 msgstr ""
 
 #. translators: %s: Action ID.
-#: includes/class-wc-gateway-checkout-com-google-pay.php:246
+#: includes/class-wc-gateway-checkout-com-google-pay.php:253
 #: includes/class-wc-gateway-checkout-com-paypal.php:189
 msgid "Checkout.com Payment Partially refunded - Action ID : %s"
 msgstr ""
@@ -1146,22 +1151,22 @@ msgstr ""
 msgid "Webhook Details"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-webhook.php:173
-#: includes/settings/class-wc-checkoutcom-webhook.php:272
-#: includes/settings/class-wc-checkoutcom-workflows.php:262
+#: includes/settings/class-wc-checkoutcom-webhook.php:177
+#: includes/settings/class-wc-checkoutcom-webhook.php:276
+#: includes/settings/class-wc-checkoutcom-workflows.php:266
 msgid "An error has occurred while processing webhook request."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-webhook.php:204
-#: includes/settings/class-wc-checkoutcom-webhook.php:215
+#: includes/settings/class-wc-checkoutcom-webhook.php:208
+#: includes/settings/class-wc-checkoutcom-webhook.php:219
 msgid "Webhook is configured at this URL:"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-webhook.php:210
+#: includes/settings/class-wc-checkoutcom-webhook.php:214
 msgid "Webhook is configured with this name:"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-webhook.php:219
+#: includes/settings/class-wc-checkoutcom-webhook.php:223
 msgid "Webhook is not configured with the current site or there is some issue with connection, Please check logs or try again."
 msgstr ""
 

@@ -171,6 +171,10 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v4.4.20 31st Jan 2024
+- **[tweak]** Add order note when 3ds redirection happens
+- **[tweak]** Disable new webhook event from webhook registration
+
 v4.4.19 17th Jan 2024
 - **[tweak]** Add new Webhook event types
 - **[fix]** PHP notices and warnings
