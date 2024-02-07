@@ -191,7 +191,7 @@ class WC_Checkoutcom_Utility {
 	 * @param string    $error_message Error message to log.
 	 * @param Exception $exception Exception object.
 	 */
-	public static function logger( $error_message, $exception ) {
+	public static function logger( $error_message, $exception = null ) {
 		$logger  = wc_get_logger();
 		$context = [ 'source' => 'wc_checkoutcom_gateway_log' ];
 
@@ -431,6 +431,37 @@ class WC_Checkoutcom_Utility {
 		}
 
 		return $approved;
+	}
+
+
+	public static function cko_set_session( $key, $value ) {
+		if ( ! class_exists( 'WooCommerce' ) || null == WC()->session ) {
+			return false;
+		}
+
+		$cko_session = WC()->session->get('cko_session');
+
+		if ( ! is_array( $cko_session ) ) {
+			$cko_session = array();
+		}
+
+		$cko_session[$key] = $value;
+
+		WC()->session->set( 'cko_session', $cko_session );
+	}
+
+	public static function cko_get_session( $key ) {
+		if ( ! class_exists( 'WooCommerce' ) || null == WC()->session ) {
+			return false;
+		}
+
+		$cko_session = WC()->session->get( 'cko_session' );
+
+		if ( ! empty( $cko_session[$key] ) ) {
+			return $cko_session[$key];
+		}
+
+		return false;
 	}
 
 }

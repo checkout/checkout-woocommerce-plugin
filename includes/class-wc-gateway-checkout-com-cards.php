@@ -964,7 +964,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 	 * @return bool|int|void
 	 */
 	public function webhook_handler() {
-		// webhook_url_format = http://localhost/wordpress-5.0.2/wordpress/?wc-api=wc_checkoutcom_webhook .
+		// webhook_url_format = http://example.com/?wc-api=wc_checkoutcom_webhook .
 
 		// Get webhook data.
 		$data = json_decode( file_get_contents( 'php://input' ) );
@@ -1023,6 +1023,15 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 
         if ( ! empty( $data->data->metadata->order_id ) ) {
 	        $order = wc_get_order( $data->data->metadata->order_id );
+        } elseif ( ! empty( $data->data->reference ) ) {
+	        $order = wc_get_order( $data->data->reference );
+
+            if ( isset( $data->data->metadata ) ) {
+	            $data->data->metadata->order_id = $data->data->reference;
+            } else {
+	            $data->data->metadata = new StdClass();
+	            $data->data->metadata->order_id = $data->data->reference;
+            }
         }
 
         if ( $order ) {

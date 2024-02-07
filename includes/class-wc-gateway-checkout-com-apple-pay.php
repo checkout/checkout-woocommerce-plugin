@@ -248,7 +248,6 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 						if (outcome) {
 							document.getElementById('cko-apple-card-token').value = outcome;
 							status = ApplePaySession.STATUS_SUCCESS;
-							// jQuery('#place_order').prop("disabled",false);
 							jQuery('#place_order').prop("disabled",false);
 							jQuery('#place_order').trigger('click');
 						} else {
