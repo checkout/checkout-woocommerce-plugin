@@ -434,22 +434,37 @@ class WC_Checkoutcom_Utility {
 	}
 
 
+	/**
+	 * Set WC session value by key.
+	 *
+	 * @param string $key Session key.
+	 * @param string $value Session value.
+	 *
+	 * @return false|void
+	 */
 	public static function cko_set_session( $key, $value ) {
 		if ( ! class_exists( 'WooCommerce' ) || null == WC()->session ) {
 			return false;
 		}
 
-		$cko_session = WC()->session->get('cko_session');
+		$cko_session = WC()->session->get( 'cko_session' );
 
 		if ( ! is_array( $cko_session ) ) {
-			$cko_session = array();
+			$cko_session = [];
 		}
 
-		$cko_session[$key] = $value;
+		$cko_session[ $key ] = $value;
 
 		WC()->session->set( 'cko_session', $cko_session );
 	}
 
+	/**
+	 *  Get WC session value by key.
+	 *
+	 * @param string $key Session key.
+	 *
+	 * @return false|mixed
+	 */
 	public static function cko_get_session( $key ) {
 		if ( ! class_exists( 'WooCommerce' ) || null == WC()->session ) {
 			return false;
@@ -457,11 +472,33 @@ class WC_Checkoutcom_Utility {
 
 		$cko_session = WC()->session->get( 'cko_session' );
 
-		if ( ! empty( $cko_session[$key] ) ) {
-			return $cko_session[$key];
+		if ( ! empty( $cko_session[ $key ] ) ) {
+			return $cko_session[ $key ];
 		}
 
 		return false;
 	}
 
+	/**
+	 * Check if cart has subscription item.
+	 *
+	 * @return bool
+	 */
+	public static function is_cart_contains_subscription() {
+		$cart = WC()->cart;
+
+		if ( $cart->is_empty() ) {
+			return false;
+		}
+
+		foreach ( $cart->get_cart() as $cart_item_key => $cart_item ) {
+			$product = $cart_item['data'];
+
+			if ( $product->is_type( 'subscription' ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
 }

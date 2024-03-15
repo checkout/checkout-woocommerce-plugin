@@ -144,11 +144,11 @@ class WC_Checkoutcom_Cards_Settings {
 				'placeholder' => 'pk_xxx',
 			],
 			'enable_fallback_ac'  => [
-				'id'          => 'enable',
-				'title'       => __( 'Fallback Account', 'checkout-com-unified-payments-api' ),
-				'type'        => 'checkbox',
-				'label'       => __( 'Enable Fallback Account(ABC account) for Refund', 'checkout-com-unified-payments-api' ),
-				'default'     => 'no',
+				'id'      => 'enable',
+				'title'   => __( 'Fallback Account', 'checkout-com-unified-payments-api' ),
+				'type'    => 'checkbox',
+				'label'   => __( 'Enable Fallback Account(ABC account) for Refund', 'checkout-com-unified-payments-api' ),
+				'default' => 'no',
 			],
 			'fallback_ckocom_sk'  => [
 				'title'       => __( 'Secret Key', 'checkout-com-unified-payments-api' ),
@@ -654,12 +654,12 @@ class WC_Checkoutcom_Cards_Settings {
 	 */
 	public static function paypal_settings() {
 		$settings = [
-			'google_setting' => [
+			'google_setting'            => [
 				'title'       => __( 'PayPal Settings', 'checkout-com-unified-payments-api' ),
 				'type'        => 'title',
 				'description' => '',
 			],
-			'enabled'        => [
+			'enabled'                   => [
 				'id'          => 'enable',
 				'title'       => __( 'Enable/Disable', 'checkout-com-unified-payments-api' ),
 				'type'        => 'checkbox',
@@ -668,7 +668,7 @@ class WC_Checkoutcom_Cards_Settings {
 				'desc_tip'    => true,
 				'default'     => 'no',
 			],
-			'title'          => [
+			'title'                     => [
 				'title'       => __( 'Title', 'checkout-com-unified-payments-api' ),
 				'type'        => 'text',
 				'label'       => __( 'PayPal', 'checkout-com-unified-payments-api' ),
@@ -676,12 +676,20 @@ class WC_Checkoutcom_Cards_Settings {
 				'desc_tip'    => true,
 				'default'     => 'PayPal',
 			],
-			'description'    => [
+			'description'               => [
 				'title'       => __( 'Description', 'checkout-com-unified-payments-api' ),
 				'type'        => 'text',
 				'description' => __( 'This controls the description which the user sees during checkout.', 'checkout-com-unified-payments-api' ),
 				'default'     => 'Pay with PayPal.',
 				'desc_tip'    => true,
+			],
+			'ckocom_paypal_merchant_id' => [
+				'title'       => __( 'Merchant ID', 'checkout-com-unified-payments-api' ),
+				'type'        => 'text',
+				'description' => __( 'Your Paypal merchant ID.', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => false,
+				'default'     => '',
+				'placeholder' => 'ABCD1EFGH2I3K',
 			],
 		];
 

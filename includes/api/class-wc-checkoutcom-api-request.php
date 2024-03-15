@@ -13,7 +13,6 @@ use Checkout\Common\ChallengeIndicatorType;
 use Checkout\Common\CustomerRequest;
 use Checkout\Payments\Product;
 use Checkout\Payments\BillingDescriptor;
-//use Checkout\Payments\PaymentRequest;
 use Checkout\Payments\PaymentType;
 use Checkout\Payments\PreferredSchema;
 use Checkout\Payments\ProcessingSettings;
@@ -65,11 +64,13 @@ class WC_Checkoutcom_Api_Request {
 		$checkout = new Checkout_SDK();
 
 		try {
+			$three_ds_action_id = ( ! empty( WC()->session ) ) ? WC()->session->get( '3ds_action_id' ) : null;
+
 			$cko_idempotency_key = sprintf(
 				'%s-%s-%s',
 				$request_param->metadata['order_id'],
 				$order->get_order_key(),
-				WC()->session->get( '3ds_action_id' )
+				$three_ds_action_id
 			);
 
 			// Append time.
@@ -304,7 +305,7 @@ class WC_Checkoutcom_Api_Request {
 		// Check for the subscription flag.
 		if ( ! is_null( $subscription ) ) {
 			$payment->merchant_initiated = true;
-			$payment->payment_type       = 'Recurring';
+			$payment->payment_type       = PaymentType::$recurring;
 			$payment->capture            = true;
 
 			if ( 'wc_checkout_com_alternative_payments_sepa' !== $order->get_payment_method() ) {
@@ -314,7 +315,7 @@ class WC_Checkoutcom_Api_Request {
 		} elseif ( function_exists( 'wcs_order_contains_subscription' ) ) {
 			if ( wcs_order_contains_subscription( $order, 'parent' ) ) {
 				$payment->merchant_initiated = false;
-				$payment->payment_type       = 'Recurring';
+				$payment->payment_type       = PaymentType::$recurring;
 
 				// For PayPal subscription order.
 				if ( 'paypal' === $method->type ) {
@@ -677,7 +678,8 @@ class WC_Checkoutcom_Api_Request {
 
 	/**
 	 * Perform capture.
-	 * @param int $order_id
+	 *
+	 * @param int $order_id Order ID.
 	 *
 	 * @return array|mixed
 	 */
@@ -754,7 +756,8 @@ class WC_Checkoutcom_Api_Request {
 
 	/**
 	 * Perform Void.
-	 * @param int $order_id
+	 *
+	 * @param int $order_id Order ID.
 	 *
 	 * @return array|mixed
 	 */
@@ -886,7 +889,7 @@ class WC_Checkoutcom_Api_Request {
 
 				// Handle Retry with fallback account.
 				$checkout = new Checkout_SDK( true );
-				$details = $checkout->get_builder()->getPaymentsClient()->getPaymentDetails( $cko_payment_id );
+				$details  = $checkout->get_builder()->getPaymentsClient()->getPaymentDetails( $cko_payment_id );
 
 				if ( 'Refunded' === $details['status'] && ! $refund_is_less ) {
 					$error_message = 'Payment has already been refunded on Checkout.com hub for order Id : ' . $order_id;
@@ -923,7 +926,6 @@ class WC_Checkoutcom_Api_Request {
 				} else {
 					return $response;
 				}
-
 			}
 
 			if ( 'Refunded' === $details['status'] && ! $refund_is_less ) {

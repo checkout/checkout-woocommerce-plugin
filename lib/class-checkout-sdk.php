@@ -35,7 +35,7 @@ class Checkout_SDK {
 	/**
 	 * Constructor.
 	 *
-	 * @param bool $use_fallback
+	 * @param bool $use_fallback Use Fallback account flag.
 	 */
 	public function __construct( $use_fallback = false ) {
 		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
@@ -46,7 +46,7 @@ class Checkout_SDK {
 		if ( $this->nas_account_type && false === $use_fallback ) {
 			$builder = CheckoutSdk::builder()->staticKeys();
 		} else {
-			$builder = CheckoutSdk::builder()->previous();
+			$builder = CheckoutSdk::builder()->previous()->staticKeys();
 		}
 
 		$builder->publicKey( $core_settings['ckocom_pk'] );
@@ -101,5 +101,4 @@ class Checkout_SDK {
 			return new Checkout\Payments\Previous\CaptureRequest();
 		}
 	}
-
 }
