@@ -46,9 +46,8 @@ class WC_Checkoutcom_Subscription {
 	/**
 	 * Update status of renewal order and add notes
 	 *
-	 * @param array  $payment_result Payment result.
+	 * @param array    $payment_result Payment result.
 	 * @param WC_Order $renewal_order Renewal order object.
-	 * @param int    $order_id Order ID.
 	 */
 	public static function update_order_status( $payment_result, $renewal_order ) {
 		// Get renewal order ID.
@@ -102,7 +101,6 @@ class WC_Checkoutcom_Subscription {
 
 		// Reduce stock levels.
 		wc_reduce_stock_levels( $order_id );
-
 	}
 
 	/**
@@ -116,6 +114,7 @@ class WC_Checkoutcom_Subscription {
 		// update source id for subscription payment method change.
 		if ( $order instanceof WC_Subscription ) {
 			$order->update_meta_data( '_cko_source_id', $source_id );
+			$order->save();
 		}
 
 		// Check for subscription and save source id.
@@ -125,6 +124,7 @@ class WC_Checkoutcom_Subscription {
 
 				foreach ( $subscriptions as $subscription_obj ) {
 					$subscription_obj->update_meta_data( '_cko_source_id', $source_id );
+					$subscription_obj->save();
 				}
 			}
 		}
@@ -155,7 +155,6 @@ class WC_Checkoutcom_Subscription {
 				}
 			}
 		}
-
 	}
 
 	/**

@@ -21,14 +21,20 @@ jQuery( function ( $ ) {
 					if ( jQuery( this ).val() === DOMStrings.paymentMethodName ) {
 						// Google Pay selected.
 						jQuery( '#ckocom_googlePay' ).show();
+                        jQuery( '#paypal-button-container' ).hide();
 
 						jQuery( DOMStrings.placeOrder ).hide()
 						jQuery( '#place_order' ).prop( "disabled", true );
 
 					} else if ( 'wc_checkout_com_apple_pay' === this.value ) {
+                        jQuery( '#paypal-button-container' ).hide();
 						jQuery( '#ckocom_googlePay' ).hide();
 						jQuery( "#place_order" ).hide();
-					} else {
+					} else if ( 'wc_checkout_com_paypal' === this.value ) {
+                        jQuery( '#ckocom_googlePay' ).hide();
+                        jQuery( '#ckocom_applePay' ).hide();
+                        jQuery( "#place_order" ).hide();
+                    } else {
 						jQuery( '#ckocom_googlePay' ).hide();
 
 						jQuery( '#place_order' ).prop( "disabled", false );

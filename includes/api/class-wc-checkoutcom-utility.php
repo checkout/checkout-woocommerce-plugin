@@ -191,7 +191,7 @@ class WC_Checkoutcom_Utility {
 	 * @param string    $error_message Error message to log.
 	 * @param Exception $exception Exception object.
 	 */
-	public static function logger( $error_message, $exception ) {
+	public static function logger( $error_message, $exception = null ) {
 		$logger  = wc_get_logger();
 		$context = [ 'source' => 'wc_checkoutcom_gateway_log' ];
 
@@ -433,4 +433,72 @@ class WC_Checkoutcom_Utility {
 		return $approved;
 	}
 
+
+	/**
+	 * Set WC session value by key.
+	 *
+	 * @param string $key Session key.
+	 * @param string $value Session value.
+	 *
+	 * @return false|void
+	 */
+	public static function cko_set_session( $key, $value ) {
+		if ( ! class_exists( 'WooCommerce' ) || null == WC()->session ) {
+			return false;
+		}
+
+		$cko_session = WC()->session->get( 'cko_session' );
+
+		if ( ! is_array( $cko_session ) ) {
+			$cko_session = [];
+		}
+
+		$cko_session[ $key ] = $value;
+
+		WC()->session->set( 'cko_session', $cko_session );
+	}
+
+	/**
+	 *  Get WC session value by key.
+	 *
+	 * @param string $key Session key.
+	 *
+	 * @return false|mixed
+	 */
+	public static function cko_get_session( $key ) {
+		if ( ! class_exists( 'WooCommerce' ) || null == WC()->session ) {
+			return false;
+		}
+
+		$cko_session = WC()->session->get( 'cko_session' );
+
+		if ( ! empty( $cko_session[ $key ] ) ) {
+			return $cko_session[ $key ];
+		}
+
+		return false;
+	}
+
+	/**
+	 * Check if cart has subscription item.
+	 *
+	 * @return bool
+	 */
+	public static function is_cart_contains_subscription() {
+		$cart = WC()->cart;
+
+		if ( $cart->is_empty() ) {
+			return false;
+		}
+
+		foreach ( $cart->get_cart() as $cart_item_key => $cart_item ) {
+			$product = $cart_item['data'];
+
+			if ( $product->is_type( 'subscription' ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
 }
