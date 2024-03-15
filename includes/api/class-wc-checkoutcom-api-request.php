@@ -707,7 +707,7 @@ class WC_Checkoutcom_Api_Request {
 
 			if ( 'Voided' === $details['status'] || 'Captured' === $details['status'] ) {
 				$error_message = sprintf(
-					/* translators: 1: Order ID. */
+				/* translators: 1: Order ID. */
 					esc_html__( 'Payment has already been voided or captured on Checkout.com hub for order Id : %s', 'checkout-com-unified-payments-api' ),
 					$order_id
 				);
@@ -724,7 +724,7 @@ class WC_Checkoutcom_Api_Request {
 
 			if ( ! WC_Checkoutcom_Utility::is_successful( $response ) ) {
 				$error_message = sprintf(
-					/* translators: 1: Order ID. */
+				/* translators: 1: Order ID. */
 					esc_html__( 'An error has occurred while processing your capture payment on Checkout.com hub. Order Id : %s', 'checkout-com-unified-payments-api' ),
 					$order_id
 				);
@@ -783,7 +783,7 @@ class WC_Checkoutcom_Api_Request {
 
 			if ( 'Voided' === $details['status'] || 'Captured' === $details['status'] ) {
 				$error_message = sprintf(
-					/* translators: 1: Order ID. */
+				/* translators: 1: Order ID. */
 					esc_html__( 'Payment has already been voided or captured on Checkout.com hub for order Id : %s', 'checkout-com-unified-payments-api' ),
 					$order_id
 				);
@@ -800,7 +800,7 @@ class WC_Checkoutcom_Api_Request {
 
 			if ( ! WC_Checkoutcom_Utility::is_successful( $response ) ) {
 				$error_message = sprintf(
-					/* translators: 1: Order ID. */
+				/* translators: 1: Order ID. */
 					esc_html__( 'An error has occurred while processing your void payment on Checkout.com hub. Order Id : %s', 'checkout-com-unified-payments-api' ),
 					$order_id
 				);
