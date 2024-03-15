@@ -4,7 +4,7 @@ Tags: checkout, payments, credit card, payment gateway, apple pay, google pay, p
 Requires at least: 5.0
 Stable tag: trunk
 Requires PHP: 7.3
-Tested up to: 6.4.1
+Tested up to: 6.4.3
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -171,6 +171,11 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v4.5.0 15th Mar 2024
+- **[feat]** Upgrade checkout-sdk-php library
+- **[feat]** Updated PayPal integration
+- **[fix]** PHP notices and warnings
+
 v4.4.20 31st Jan 2024
 - **[tweak]** Add order note when 3ds redirection happens
 - **[tweak]** Disable new webhook event from webhook registration
