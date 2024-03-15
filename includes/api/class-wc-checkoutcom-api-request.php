@@ -171,7 +171,7 @@ class WC_Checkoutcom_Api_Request {
 		$mada_enable        = '1' === WC_Admin_Settings::get_option( 'ckocom_card_mada', '0' );
 		$save_card          = WC_Admin_Settings::get_option( 'ckocom_card_saved' );
 		$google_settings    = get_option( 'woocommerce_wc_checkout_com_google_pay_settings' );
-		$is_google_threeds  = 1 === absint( $google_settings['ckocom_google_threed'] ) && null === $subscription;
+		$is_google_threeds  = ! empty( $google_settings['ckocom_google_threed'] ) && 1 === absint( $google_settings['ckocom_google_threed'] ) && null === $subscription;
 		$is_paypal_renewal  = ( 'wc_checkout_com_paypal' === $order->get_payment_method() ) && ( ! is_null( $subscription ) );
 
 		$is_save_card   = false;
