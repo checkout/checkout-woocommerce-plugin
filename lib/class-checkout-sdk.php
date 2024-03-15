@@ -5,8 +5,7 @@
  * @package wc_checkout_com
  */
 
-use Checkout\CheckoutDefaultSdk;
-use Checkout\CheckoutFourSdk;
+use Checkout\CheckoutSdk;
 use Checkout\Environment;
 use Checkout\CheckoutArgumentException;
 
@@ -45,18 +44,18 @@ class Checkout_SDK {
 		$this->nas_account_type = cko_is_nas_account();
 
 		if ( $this->nas_account_type && false === $use_fallback ) {
-			$builder = CheckoutFourSdk::staticKeys();
+			$builder = CheckoutSdk::builder()->staticKeys();
 		} else {
-			$builder = CheckoutDefaultSdk::staticKeys();
+			$builder = CheckoutSdk::builder()->previous();
 		}
 
-		$builder->setPublicKey( $core_settings['ckocom_pk'] );
-		$builder->setSecretKey( $core_settings['ckocom_sk'] );
-		$builder->setEnvironment( $environment );
+		$builder->publicKey( $core_settings['ckocom_pk'] );
+		$builder->secretKey( $core_settings['ckocom_sk'] );
+		$builder->environment( $environment );
 
 		if ( $use_fallback ) {
-			$builder->setPublicKey( $core_settings['fallback_ckocom_pk'] );
-			$builder->setSecretKey( $core_settings['fallback_ckocom_sk'] );
+			$builder->publicKey( $core_settings['fallback_ckocom_pk'] );
+			$builder->secretKey( $core_settings['fallback_ckocom_sk'] );
 		}
 
 		try {
@@ -84,9 +83,9 @@ class Checkout_SDK {
 	 */
 	public function get_payment_request() {
 		if ( $this->nas_account_type ) {
-			return new Checkout\Payments\Four\Request\PaymentRequest();
+			return new Checkout\Payments\Request\PaymentRequest();
 		} else {
-			return new Checkout\Payments\PaymentRequest();
+			return new Checkout\Payments\Previous\PaymentRequest();
 		}
 	}
 
@@ -97,9 +96,9 @@ class Checkout_SDK {
 	 */
 	public function get_capture_request() {
 		if ( $this->nas_account_type ) {
-			return new Checkout\Payments\Four\CaptureRequest();
-		} else {
 			return new Checkout\Payments\CaptureRequest();
+		} else {
+			return new Checkout\Payments\Previous\CaptureRequest();
 		}
 	}
 

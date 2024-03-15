@@ -5,24 +5,24 @@
  * @package wc_checkout_com
  */
 
-use Checkout\Apm\Klarna\CreditSessionRequest;
+use Checkout\Apm\Previous\Klarna\CreditSessionRequest;
 use Checkout\CheckoutApiException;
 use Checkout\CheckoutUtils;
 use Checkout\Common\Address;
 use Checkout\Common\ChallengeIndicatorType;
 use Checkout\Common\CustomerRequest;
-use Checkout\Common\Four\Product;
+use Checkout\Payments\Product;
 use Checkout\Payments\BillingDescriptor;
-use Checkout\Payments\PaymentRequest;
+//use Checkout\Payments\PaymentRequest;
 use Checkout\Payments\PaymentType;
 use Checkout\Payments\PreferredSchema;
 use Checkout\Payments\ProcessingSettings;
 use Checkout\Payments\RefundRequest;
 use Checkout\Payments\ShippingDetails;
-use Checkout\Payments\Source\Apm\FawryProduct;
-use Checkout\Payments\Source\Apm\RequestPayPalSource;
-use Checkout\Payments\Source\RequestIdSource;
-use Checkout\Payments\Source\RequestTokenSource;
+use Checkout\Payments\Request\Source\Apm\FawryProduct;
+use Checkout\Payments\Previous\Source\Apm\RequestPayPalSource;
+use Checkout\Payments\Request\Source\RequestIdSource;
+use Checkout\Payments\Request\Source\RequestTokenSource;
 use Checkout\Payments\ThreeDsRequest;
 use Checkout\Payments\VoidRequest;
 use Checkout\Tokens\ApplePayTokenData;

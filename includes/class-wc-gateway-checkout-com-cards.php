@@ -7,7 +7,7 @@
 
 use Checkout\CheckoutApiException;
 use Checkout\Common\CustomerRequest;
-use Checkout\Payments\Source\RequestTokenSource;
+use Checkout\Payments\Request\Source\RequestTokenSource;
 use Checkout\Payments\ThreeDsRequest;
 
 include_once dirname( __DIR__ ) . '/lib/class-checkout-sdk.php';

@@ -6,7 +6,7 @@
  */
 
 use Checkout\CheckoutApiException;
-use Checkout\Webhooks\WebhookRequest;
+use Checkout\Webhooks\Previous\WebhookRequest;
 
 include_once 'class-wc-checkoutcom-workflows.php';
 
