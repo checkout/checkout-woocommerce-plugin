@@ -48,7 +48,7 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 		add_action( 'wp_enqueue_scripts', [ $this, 'payment_scripts' ] );
 		add_filter( 'script_loader_tag', [ $this, 'add_attributes_to_script' ], 10, 3 );
 
-		add_action('woocommerce_api_' . strtolower( 'CKO_Paypal_Woocommerce' ), [ $this, 'handle_wc_api' ] );
+		add_action( 'woocommerce_api_' . strtolower( 'CKO_Paypal_Woocommerce' ), [ $this, 'handle_wc_api' ] );
 	}
 
 	/**
@@ -68,14 +68,14 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 
                         if ( wc_notice_count( 'error' ) > 0 ) {
 						    WC()->session->set( 'reload_checkout', true );
-						    $error_messages_data = wc_get_notices('error');
-						    $error_messages = array();
-						    foreach ($error_messages_data as $key => $value) {
+						    $error_messages_data = wc_get_notices( 'error' );
+						    $error_messages      = array();
+						    foreach ( $error_messages_data as $key => $value ) {
 							    $error_messages[] = $value['notice'];
 						    }
 						    wc_clear_notices();
 						    ob_start();
-						    wp_send_json_error(array('messages' => $error_messages));
+						    wp_send_json_error( array( 'messages' => $error_messages ) );
 						    exit;
 					    }
 					    exit();
@@ -83,7 +83,6 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
                     break;
 
 			    case "cc_capture":
-//				    wc_clear_notices();
 				    WC_Checkoutcom_Utility::cko_set_session( 'cko_paypal_order_id', wc_clean( $_GET['paypal_order_id'] ) );
 				    $this->cko_cc_capture();
 				    break;
@@ -118,11 +117,11 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 	 */
     public function cko_create_order_request() {
 
-	    $paymentContextsRequest = new Checkout\Payments\Contexts\PaymentContextsRequest();
-	    $paymentContextsRequest->source = new Checkout\Payments\Request\Source\Apm\RequestPayPalSource();
+	    $paymentContextsRequest           = new Checkout\Payments\Contexts\PaymentContextsRequest();
+	    $paymentContextsRequest->source   = new Checkout\Payments\Request\Source\Apm\RequestPayPalSource();
 	    $paymentContextsRequest->currency = get_woocommerce_currency();
 
-	    $paymentContextsRequest->processing = new Checkout\Payments\Contexts\PaymentContextsProcessing();
+	    $paymentContextsRequest->processing                      = new Checkout\Payments\Contexts\PaymentContextsProcessing();
 	    $paymentContextsRequest->processing->shipping_preference = Checkout\Payments\ShippingPreference::$NO_SHIPPING;
 
 	    $total_amount = WC()->cart->total;
@@ -136,16 +135,16 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
         if ( WC_Checkoutcom_Utility::is_cart_contains_subscription() ) {
 		    $paymentContextsRequest->payment_type = PaymentType::$recurring;
 
-	        $plan = new Checkout\Payments\BillingPlan();
+	        $plan       = new Checkout\Payments\BillingPlan();
 	        $plan->type = Checkout\Payments\BillingPlanType::$merchant_initiated_billing_single_agreement;
 
 	        $paymentContextsRequest->processing->plan = $plan;
         }
 
-	    $items = new Checkout\Payments\Contexts\PaymentContextsItems();
-	    $items->name = 'All Products';
+	    $items             = new Checkout\Payments\Contexts\PaymentContextsItems();
+	    $items->name       = 'All Products';
 	    $items->unit_price = $amount_cents;
-	    $items->quantity = '1';
+	    $items->quantity   = '1';
 
 	    $paymentContextsRequest->items = [ $items ];
 
@@ -234,10 +233,10 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 	    try {
 	        $checkout = new Checkout_SDK();
 
-		    $payment_request_param = $checkout->get_payment_request();
-		    $payment_request_param->payment_context_id = $payment_context_id;
+		    $payment_request_param                        = $checkout->get_payment_request();
+		    $payment_request_param->payment_context_id    = $payment_context_id;
 		    $payment_request_param->processing_channel_id = $processing_channel_id;
-		    $payment_request_param->reference = $order->get_order_number();
+		    $payment_request_param->reference             = $order->get_order_number();
 
 		    $response      = $checkout->get_builder()->getPaymentsClient()->requestPayment( $payment_request_param );
 		    $response_code = $response['http_metadata']->getStatusCode();
@@ -361,34 +360,34 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 		$environment   = 'sandbox' === $core_settings['ckocom_environment'];
 
         if ( $environment ) {
-            // sandbox
+            // sandbox.
 		    $paypal_js_arg['client-id'] = 'ASLqLf4pnWuBshW8Qh8z_DRUbIv2Cgs3Ft8aauLm9Z-MO9FZx1INSo38nW109o_Xvu88P3tly88XbJMR';
         } else {
-            // live
+            // live.
 		    $paypal_js_arg['client-id'] = 'ATbi1ysGm-jp4RmmAFz1EWH4dFpPd-VdXIWWzR4QZK5LAvDu_5atDY9dsUEJcLS5mTpR8Wb1l_m6Ameq';
         }
 
 		$paypal_js_arg['merchant-id'] = $this->get_option( 'ckocom_paypal_merchant_id' );
 
 		$paypal_js_arg['disable-funding'] = 'credit,card,sepa';
-		$paypal_js_arg['commit'] = 'false';
-		$paypal_js_arg['currency'] = get_woocommerce_currency();
-		$paypal_js_arg['intent'] = 'capture'; // 'authorize' // ???
+		$paypal_js_arg['commit']          = 'false';
+		$paypal_js_arg['currency']        = get_woocommerce_currency();
+		$paypal_js_arg['intent']          = 'capture'; // 'authorize' // ???
 
         if ( WC_Checkoutcom_Utility::is_cart_contains_subscription() ) {
 	        $paypal_js_arg['intent'] = 'tokenize';
-	        $paypal_js_arg['vault'] = 'true';
+	        $paypal_js_arg['vault']  = 'true';
         }
 
-		$paypal_js_url = add_query_arg($paypal_js_arg, 'https://www.paypal.com/sdk/js');
+		$paypal_js_url = add_query_arg( $paypal_js_arg, 'https://www.paypal.com/sdk/js' );
 
 		wp_register_script( 'cko-paypal-script', $paypal_js_url, [ 'jquery' ], null );
 
 		$vars = [
-			'create_order_url' => add_query_arg( [ 'cko_paypal_action' => 'create_order'], WC()->api_request_url( 'CKO_Paypal_Woocommerce' ) ),
-			'cc_capture'       => add_query_arg( [ 'cko_paypal_action' => 'cc_capture' ], WC()->api_request_url( 'CKO_Paypal_Woocommerce' ) ),
+			'create_order_url'             => add_query_arg( [ 'cko_paypal_action' => 'create_order'], WC()->api_request_url( 'CKO_Paypal_Woocommerce' ) ),
+			'cc_capture'                   => add_query_arg( [ 'cko_paypal_action' => 'cc_capture' ], WC()->api_request_url( 'CKO_Paypal_Woocommerce' ) ),
 			'woocommerce_process_checkout' => wp_create_nonce('woocommerce-process_checkout'),
-            'paypal_button_selector' => '#paypal-button-container',
+            'paypal_button_selector'       => '#paypal-button-container',
 		];
 
 		wp_localize_script( 'cko-paypal-script', 'cko_paypal_vars', $vars );
@@ -589,5 +588,4 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 
 		return true;
 	}
-
 }
