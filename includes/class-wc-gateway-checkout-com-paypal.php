@@ -51,6 +51,11 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 		add_action('woocommerce_api_' . strtolower( 'CKO_Paypal_Woocommerce' ), [ $this, 'handle_wc_api' ] );
 	}
 
+	/**
+     * Handle paypal method API requests.
+     *
+	 * @return void
+	 */
     public function handle_wc_api() {
 
 	    if ( ! empty( $_GET['cko_paypal_action'] ) ) {
@@ -88,7 +93,30 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 	    exit();
     }
 
-    public function cko_create_order_request( $subscription = null ) {
+	/**
+	 * Process payment with PayPal.
+	 *
+	 * @param int $order_id Order ID.
+	 *
+	 * @return array
+	 */
+	public function process_payment( $order_id ) {
+		if ( ! session_id() ) {
+			session_start();
+		}
+
+		$this->cko_create_order_request();
+		exit();
+	}
+
+	/**
+     * Handle PayPal PaymentContexts request with cart data.
+     *
+     * 1st step to generate PayPal Order ID.
+     *
+	 * @return void
+	 */
+    public function cko_create_order_request() {
 
 	    $paymentContextsRequest = new Checkout\Payments\Contexts\PaymentContextsRequest();
 	    $paymentContextsRequest->source = new Checkout\Payments\Request\Source\Apm\RequestPayPalSource();
@@ -150,6 +178,11 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
         exit();
     }
 
+	/**
+     * Handle last payment request to capture payment.
+     *
+	 * @return void
+	 */
     public function cko_cc_capture() {
 	    $cko_paypal_order_id = WC_Checkoutcom_Utility::cko_get_session( 'cko_paypal_order_id' );
 	    $cko_pc_id = WC_Checkoutcom_Utility::cko_get_session( 'cko_pc_id' );
@@ -188,6 +221,14 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
         }
     }
 
+	/**
+     * Handle request to capture amount.
+     *
+	 * @param WC_Order $order Order object.
+	 * @param string   $payment_context_id Payment Context ID.
+	 * @param string   $processing_channel_id Processing channel ID.
+	 * @return array|void
+	 */
     public function request_payment( $order, $payment_context_id, $processing_channel_id ) {
 
 	    try {
@@ -221,7 +262,7 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 			    $order->set_transaction_id( $response['id'] );
 			    $order->update_meta_data( '_cko_payment_id', $response['id'] );
 
-			    if ( class_exists( 'WC_Subscriptions_Order' ) ) {
+			    if ( class_exists( 'WC_Subscriptions_Order' ) && isset( $response['source'] ) ) {
 				    // Save source id for subscription.
 				    WC_Checkoutcom_Subscription::save_source_id( $order->get_id(), $order, $response['source']['id'] );
 			    }
@@ -420,8 +461,9 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
                 }).then(function (data) {
                     if (typeof data.success !== 'undefined') {
                         var messages = data.data.messages ? data.data.messages : data.data;
-                        if ('string' === typeof messages) {
-                            showError('<ul class="woocommerce-error" role="alert">' + messages + '</ul>', jQuery('form'));
+
+                        if ( 'string' === typeof messages || Array.isArray( messages ) ) {
+                            showError( messages );
                         }
                         return null;
                     } else {
@@ -450,8 +492,9 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
                         jQuery.post(cko_paypal_vars.cc_capture + "&paypal_order_id=" + data.orderID + "&woocommerce-process-checkout-nonce=" + cko_paypal_vars.woocommerce_process_checkout, function (data) {
                             if (typeof data.success !== 'undefined' && data.success !== true ) {
                                 var messages = data.data.messages ? data.data.messages : data.data;
-                                if ('string' === typeof messages) {
-                                    showError('<ul class="woocommerce-error" role="alert">' + messages + '</ul>', jQuery('form'));
+
+                                if ( 'string' === typeof messages || Array.isArray( messages ) ) {
+                                    showError( messages );
                                 }
                             } else {
                                 window.location.href = data.data.redirect;
@@ -468,12 +511,29 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
                 }).render( cko_paypal_vars.paypal_button_selector );
             });
 
-            var showError = function (error_message) {
+            var showError = function ( error_message ) {
+
+                if ( 'string' === typeof error_message ) {
+                    error_message = [ error_message ];
+                }
+
+                let ulWrapper = jQuery( '<ul/>' )
+                    .prop( 'role', 'alert' ).addClass( 'woocommerce-error' );
+
+                if ( Array.isArray( error_message ) ) {
+                    jQuery.each( error_message, function( index, value ) {
+                        jQuery( ulWrapper ).append( jQuery( '<li>' ).html( value ) );
+                    });
+                }
+
+                let wcNoticeDiv = jQuery( '<div>' )
+                    .addClass( 'woocommerce-NoticeGroup woocommerce-NoticeGroup-checkout' )
+                    .append( ulWrapper );
 
                 jQuery('form.checkout .woocommerce-NoticeGroup').remove();
-                jQuery('form.checkout').prepend('<div class="woocommerce-NoticeGroup woocommerce-NoticeGroup-checkout">' + error_message + '</div>');
+                jQuery('form.checkout').prepend(wcNoticeDiv);
                 jQuery('.woocommerce, .form.checkout').removeClass('processing').unblock();
-                // $('.woocommerce').find('.input-text, select, input:checkbox').trigger('validate').trigger('blur');
+
                 jQuery('html, body').animate({
                     scrollTop: (jQuery('form.checkout').offset().top - 100 )
                 }, 1000 );
@@ -481,82 +541,6 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 
         </script>
 		<?php
-	}
-
-	/**
-	 * Process payment with PayPal.
-	 *
-	 * @param int $order_id Order ID.
-	 *
-	 * @return array
-	 */
-	public function process_payment( $order_id ) {
-		if ( ! session_id() ) {
-			session_start();
-		}
-
-		$this->cko_create_order_request();
-        exit();
-
-		$order = new WC_Order( $order_id );
-
-		// Create payment with PayPal token.
-		$result = (array) ( new WC_Checkoutcom_Api_Request )->create_payment( $order, [] );
-
-		// Redirect to apm if redirection url is available.
-		if ( isset( $result['3d'] ) && ! empty( $result['3d'] ) ) {
-
-			return [
-				'result'   => 'success',
-				'redirect' => $result['3d'],
-			];
-		}
-
-		// check if result has error and return error message.
-		if ( ! empty( $result['error'] ) ) {
-			WC_Checkoutcom_Utility::wc_add_notice_self( $result['error'] );
-			return;
-		}
-
-		if ( class_exists( 'WC_Subscriptions_Order' ) ) {
-			// Save source id for subscription.
-			WC_Checkoutcom_Subscription::save_source_id( $order_id, $order, $result['source']['id'] );
-		}
-
-		// Set action id as woo transaction id.
-		$order->set_transaction_id( $result['action_id'] );
-		$order->update_meta_data( '_cko_payment_id', $result['id'] );
-
-		// Get cko auth status configured in admin.
-		$status = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
-
-		/* translators: %s: Action ID. */
-		$message = sprintf( esc_html__( 'Checkout.com Payment Authorised - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
-
-		// check if payment was flagged.
-		if ( $result['risk']['flagged'] ) {
-			// Get cko auth status configured in admin.
-			$status = WC_Admin_Settings::get_option( 'ckocom_order_flagged', 'flagged' );
-
-			/* translators: %s: Action ID. */
-			$message = sprintf( esc_html__( 'Checkout.com Payment Flagged - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
-		}
-
-		// add notes for the order and update status.
-		$order->add_order_note( $message );
-		$order->update_status( $status );
-
-		// Reduce stock levels.
-		wc_reduce_stock_levels( $order_id );
-
-		// Remove cart.
-		WC()->cart->empty_cart();
-
-		// Return thank you page.
-		return [
-			'result'   => 'success',
-			'redirect' => $this->get_return_url( $order ),
-		];
 	}
 
 	/**

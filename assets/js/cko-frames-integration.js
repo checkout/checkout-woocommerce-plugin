@@ -19,7 +19,7 @@ jQuery(function () {
     try {
       localization = JSON.parse( document.getElementById("localization").value );
     } catch ( e ) {
-      localization = document.getElementById("localization").value;
+      localization = document.getElementById("localization")?.value;
     }
 
     Frames.init({
