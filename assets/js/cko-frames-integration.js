@@ -23,8 +23,8 @@ jQuery(function () {
     }
 
     Frames.init({
-      debug: document.getElementById( "debug" ).value === "yes",
-      publicKey: document.getElementById("public-key").value,
+      debug: document.getElementById( "debug" )?.value === "yes",
+      publicKey: document.getElementById("public-key")?.value,
       localization: localization,
       schemeChoice: true,
       modes: [ Frames.modes.FEATURE_FLAG_SCHEME_CHOICE ],

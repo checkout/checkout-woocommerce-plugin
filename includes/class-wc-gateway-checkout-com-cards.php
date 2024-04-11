@@ -118,6 +118,10 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 			return;
 		}
 
+        if ( is_wc_endpoint_url( 'order-received' ) ) {
+            return;
+        }
+
 		// Styles.
 		if ( WC_Admin_Settings::get_option( 'ckocom_iframe_style', '0' ) ) {
 			wp_register_style( 'frames_style', WC_CHECKOUTCOM_PLUGIN_URL . '/assets/css/multi-iframe.css', [], WC_CHECKOUTCOM_PLUGIN_VERSION );

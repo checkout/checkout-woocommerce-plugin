@@ -7,6 +7,8 @@
 
 defined( 'ABSPATH' ) || exit;
 
+require_once 'express/paypal/class-paypal-express.php';
+
 use Checkout\CheckoutApiException;
 use Checkout\Payments\PaymentType;
 
@@ -86,11 +88,99 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 				    WC_Checkoutcom_Utility::cko_set_session( 'cko_paypal_order_id', wc_clean( $_GET['paypal_order_id'] ) );
 				    $this->cko_cc_capture();
 				    break;
+
+			    case "express_add_to_cart":
+					$this->cko_express_add_to_cart();
+					break;
+
+			    case "express_create_order":
+				    $this->cko_express_create_order();
+					break;
+
+			    case "express_paypal_order_session":
+				    WC_Checkoutcom_Utility::cko_set_session( 'cko_paypal_order_id', wc_clean( $_GET['paypal_order_id'] ) );
+					$this->cko_express_paypal_order_session();
+					break;
             }
         }
 
 	    exit();
     }
+
+	public function cko_express_add_to_cart() {
+		// TODO: Add Nonce.
+
+		if ( ! defined( 'WOOCOMMERCE_CART' ) ) {
+			define( 'WOOCOMMERCE_CART', true );
+		}
+
+		WC()->shipping->reset_shipping();
+
+		$product_id   = isset( $_POST['product_id'] ) ? absint( $_POST['product_id'] ) : 0;
+		$qty          = ! isset( $_POST['qty'] ) ? 1 : absint( $_POST['qty'] );
+		$product      = wc_get_product( $product_id );
+		$product_type = $product->get_type();
+		error_log( var_export( ['$product_type'=> $product_type], true ) );
+
+		// First empty the cart to prevent wrong calculation.
+		WC()->cart->empty_cart();
+
+		// TODO: Add check for variable type product.
+		if ( ( 'variable' === $product_type || 'variable-subscription' === $product_type ) && isset( $_POST['attributes'] ) ) {
+			$attributes = wc_clean( wp_unslash( $_POST['attributes'] ) );
+
+			$data_store   = WC_Data_Store::load( 'product' );
+			$variation_id = $data_store->find_matching_product_variation( $product, $attributes );
+
+			$is_added_to_cart = WC()->cart->add_to_cart( $product->get_id(), $qty, $variation_id, $attributes );
+			error_log( var_export( ['$is_added_to_cart'=> $is_added_to_cart], true ) );
+		}
+
+		if ( in_array( $product_type, [ 'simple', 'variation', 'subscription', 'subscription_variation' ], true ) ) {
+			$is_added_to_cart = WC()->cart->add_to_cart( $product->get_id(), $qty );
+			error_log( var_export( ['$is_added_to_cart'=> $is_added_to_cart], true ) );
+		}
+
+		WC()->cart->calculate_totals();
+
+		$data           = [];
+//		$data          += $this->build_display_items();
+		$data['result'] = 'success';
+		$data['total']  = WC()->cart->total;
+
+		wp_send_json( $data );
+	}
+
+	public function cko_express_create_order() {
+
+		error_log( var_export( $_POST, true ) );
+
+		if ( ! empty( $_POST['express_checkout'] ) && ! empty( $_POST[ 'add_to_cart' ] ) && 'success' !== $_POST[ 'add_to_cart' ] ) {
+			return null;
+		}
+
+		if ( WC()->cart->is_empty() ) {
+			return null;
+		}
+
+		$this->cko_create_order_request( true );
+	}
+
+	public function cko_express_paypal_order_session() {
+		$cko_paypal_order_id = WC_Checkoutcom_Utility::cko_get_session( 'cko_paypal_order_id' );
+		$cko_pc_id           = WC_Checkoutcom_Utility::cko_get_session( 'cko_pc_id' );
+
+		error_log( var_export( [
+			'$cko_paypal_order_id' => $cko_paypal_order_id,
+			'$cko_pc_id' => $cko_pc_id
+		], true ) );
+
+		wp_send_json_success();
+
+//		WC_Checkoutcom_Utility::cko_set_session( 'cko_paypal_order_id', '' );
+//		WC_Checkoutcom_Utility::cko_set_session( 'cko_pc_id', '' );
+
+	}
 
 	/**
 	 * Process payment with PayPal.
@@ -104,7 +194,55 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 			session_start();
 		}
 
-		$this->cko_create_order_request();
+		error_log( var_export( __METHOD__, true ) );
+
+		$cko_paypal_order_id = WC_Checkoutcom_Utility::cko_get_session( 'cko_paypal_order_id' );
+		$cko_pc_id           = WC_Checkoutcom_Utility::cko_get_session( 'cko_pc_id' );
+
+		if ( ! empty( $cko_pc_id ) ) {
+
+			error_log( var_export( __LINE__, true ) );
+
+			try {
+				$checkout = new Checkout_SDK();
+				$response = $checkout->get_builder()->getPaymentContextsClient()->getPaymentContextDetails( $cko_pc_id );
+
+				$order_id = absint( WC()->session->get( 'order_awaiting_payment' ) );
+				$order    = wc_get_order( $order_id );
+
+				$payment_context_id    = $cko_pc_id;
+				$processing_channel_id = $response['payment_request']['processing_channel_id'];
+
+				// Payment request to capture amount.
+				$return_response = $this->request_payment( $order, $payment_context_id, $processing_channel_id );
+
+				error_log( var_export( $return_response, true ) );
+
+				WC_Checkoutcom_Utility::cko_set_session( 'cko_paypal_order_id', '' );
+				WC_Checkoutcom_Utility::cko_set_session( 'cko_pc_id', '' );
+
+				wp_send_json( $return_response );
+
+			} catch ( CheckoutApiException $ex ) {
+				$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
+
+				$error_message = 'An error has occurred while processing PayPal getPaymentContextDetails request. ';
+
+				if ( $gateway_debug ) {
+					$error_message .= $ex->getMessage();
+				}
+
+				WC_Checkoutcom_Utility::logger( $error_message, $ex );
+
+				wp_send_json_error( [ 'messages' => $error_message ] );
+			}
+
+
+		} else {
+			// Not express checkout
+			$this->cko_create_order_request();
+		}
+
 		exit();
 	}
 
@@ -115,7 +253,7 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
      *
 	 * @return void
 	 */
-    public function cko_create_order_request() {
+    public function cko_create_order_request( $is_express = false ) {
 
 	    $paymentContextsRequest           = new Checkout\Payments\Contexts\PaymentContextsRequest();
 	    $paymentContextsRequest->source   = new Checkout\Payments\Request\Source\Apm\RequestPayPalSource();
@@ -123,6 +261,10 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 
 	    $paymentContextsRequest->processing                      = new Checkout\Payments\Contexts\PaymentContextsProcessing();
 	    $paymentContextsRequest->processing->shipping_preference = Checkout\Payments\ShippingPreference::$NO_SHIPPING;
+
+		if ( $is_express ) {
+			$paymentContextsRequest->processing->user_action = Checkout\Payments\UserAction::$CONTINUE;
+		}
 
 	    $total_amount = WC()->cart->total;
 	    $amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $total_amount, get_woocommerce_currency() );
@@ -184,7 +326,7 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 	 */
     public function cko_cc_capture() {
 	    $cko_paypal_order_id = WC_Checkoutcom_Utility::cko_get_session( 'cko_paypal_order_id' );
-	    $cko_pc_id = WC_Checkoutcom_Utility::cko_get_session( 'cko_pc_id' );
+	    $cko_pc_id           = WC_Checkoutcom_Utility::cko_get_session( 'cko_pc_id' );
 
 	    if ( empty( $cko_pc_id ) ) {
 		    return;
@@ -202,6 +344,9 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 
             // Payment request to capture amount.
             $return_response = $this->request_payment( $order, $payment_context_id, $processing_channel_id );
+
+		    WC_Checkoutcom_Utility::cko_set_session( 'cko_paypal_order_id', '' );
+		    WC_Checkoutcom_Utility::cko_set_session( 'cko_pc_id', '' );
 
             wp_send_json_success( $return_response );
 
@@ -351,8 +496,16 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 	 * Outputs scripts used for checkout payment.
 	 */
 	public function payment_scripts() {
+		if ( ! empty( WC_Checkoutcom_Utility::cko_get_session( 'cko_pc_id' ) ) ) {
+			return;
+		}
+
 		// Load on Cart, Checkout, pay for order or add payment method pages.
 		if ( ! is_cart() && ! is_checkout() && ! isset( $_GET['pay_for_order'] ) && ! is_add_payment_method_page() ) {
+			return;
+		}
+
+		if ( is_wc_endpoint_url( 'order-received' ) ) {
 			return;
 		}
 
@@ -384,15 +537,26 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 		wp_register_script( 'cko-paypal-script', $paypal_js_url, [ 'jquery' ], null );
 
 		$vars = [
-			'create_order_url'             => add_query_arg( [ 'cko_paypal_action' => 'create_order'], WC()->api_request_url( 'CKO_Paypal_Woocommerce' ) ),
-			'cc_capture'                   => add_query_arg( [ 'cko_paypal_action' => 'cc_capture' ], WC()->api_request_url( 'CKO_Paypal_Woocommerce' ) ),
-			'woocommerce_process_checkout' => wp_create_nonce('woocommerce-process_checkout'),
-            'paypal_button_selector'       => '#paypal-button-container',
+			'create_order_url'              => add_query_arg( [ 'cko_paypal_action' => 'create_order'], WC()->api_request_url( 'CKO_Paypal_Woocommerce' ) ),
+			'cc_capture'                    => add_query_arg( [ 'cko_paypal_action' => 'cc_capture' ], WC()->api_request_url( 'CKO_Paypal_Woocommerce' ) ),
+			'woocommerce_process_checkout'  => wp_create_nonce('woocommerce-process_checkout'),
+			'is_cart_contains_subscription' => WC_Checkoutcom_Utility::is_cart_contains_subscription(),
+            'paypal_button_selector'        => '#paypal-button-container',
 		];
 
 		wp_localize_script( 'cko-paypal-script', 'cko_paypal_vars', $vars );
 
 		wp_enqueue_script( 'cko-paypal-script' );
+
+		wp_register_script(
+                'cko-paypal-integration-script',
+			WC_CHECKOUTCOM_PLUGIN_URL . '/assets/js/cko-paypal-integration.js',
+			[ 'jquery', 'cko-paypal-script' ],
+			WC_CHECKOUTCOM_PLUGIN_VERSION
+        );
+
+		wp_enqueue_script( 'cko-paypal-integration-script' );
+
     }
 
 	/**
@@ -403,143 +567,6 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 		if ( ! empty( $this->get_option( 'description' ) ) ) {
 			echo  $this->get_option( 'description' );
 		}
-
-		?>
-
-        <script>
-            jQuery( '#payment' ).append( '<div id="paypal-button-container" style="margin-top:15px;"></div>' );
-
-            jQuery( cko_paypal_vars.paypal_button_selector ).hide();
-
-            if ( jQuery( '#payment_method_wc_checkout_com_paypal' ).is( ':checked' ) ) {
-                // Disable place order button.
-                jQuery( '#place_order' ).hide();
-                // Show Google Pay button.
-                jQuery( cko_paypal_vars.paypal_button_selector ).show();
-            }
-
-            jQuery( document ).on( 'change', "input[name='payment_method']", function ( e ) {
-
-                if ( jQuery( this ).val() === 'wc_checkout_com_paypal' ) {
-                    // PayPay selected.
-                    jQuery( cko_paypal_vars.paypal_button_selector ).show();
-
-                    jQuery( "#place_order" ).hide();
-                    jQuery( '#place_order' ).prop( "disabled", true );
-
-                } else if ( 'wc_checkout_com_apple_pay' === this.value ) {
-                    jQuery( cko_paypal_vars.paypal_button_selector ).hide();
-                    jQuery( '#ckocom_googlePay' ).hide();
-                    jQuery( "#place_order" ).hide();
-                } else if ( 'wc_checkout_com_google_pay' === this.value ) {
-                    jQuery( cko_paypal_vars.paypal_button_selector ).hide();
-                    jQuery( '#ckocom_applePay' ).hide();
-                    jQuery( "#place_order" ).hide();
-                } else {
-                    jQuery( cko_paypal_vars.paypal_button_selector ).hide();
-                    jQuery( '#ckocom_googlePay' ).hide();
-
-                    jQuery( '#place_order' ).prop( "disabled", false );
-                    jQuery( '#place_order' ).show()
-                }
-            } )
-
-            var cko_create_order_id = function () {
-                var data;
-
-                data = jQuery( cko_paypal_vars.paypal_button_selector ).closest('form').serialize();
-
-                return fetch( cko_paypal_vars.create_order_url, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded'
-                    },
-                    body: data
-                }).then(function (res) {
-                    return res.json();
-                }).then(function (data) {
-                    if (typeof data.success !== 'undefined') {
-                        var messages = data.data.messages ? data.data.messages : data.data;
-
-                        if ( 'string' === typeof messages || Array.isArray( messages ) ) {
-                            showError( messages );
-                        }
-                        return null;
-                    } else {
-                        return data.order_id;
-                    }
-                });
-            };
-
-            // Initialise PayPal when page is ready.
-            jQuery( document ).ready(function() {
-                paypal.Buttons({
-                    <?php if ( WC_Checkoutcom_Utility::is_cart_contains_subscription() ) { ?>
-                    createBillingAgreement: function ( data, actions ) {
-                        return cko_create_order_id();
-                    },
-                    <?php } else { ?>
-                    createOrder( data, actions ) {
-                        return cko_create_order_id();
-                    },
-                    <?php } ?>
-
-                    onApprove: async function (data) {
-
-                        jQuery('.woocommerce').block({message: null, overlayCSS: {background: '#fff', opacity: 0.6}});
-
-                        jQuery.post(cko_paypal_vars.cc_capture + "&paypal_order_id=" + data.orderID + "&woocommerce-process-checkout-nonce=" + cko_paypal_vars.woocommerce_process_checkout, function (data) {
-                            if (typeof data.success !== 'undefined' && data.success !== true ) {
-                                var messages = data.data.messages ? data.data.messages : data.data;
-
-                                if ( 'string' === typeof messages || Array.isArray( messages ) ) {
-                                    showError( messages );
-                                }
-                            } else {
-                                window.location.href = data.data.redirect;
-                            }
-                        });
-                    },
-                    onCancel: function (data, actions) {
-                        jQuery('.woocommerce').unblock();
-                    },
-                    onError: function (err) {
-                        console.log(err);
-                        jQuery('.woocommerce').unblock();
-                    },
-                }).render( cko_paypal_vars.paypal_button_selector );
-            });
-
-            var showError = function ( error_message ) {
-
-                if ( 'string' === typeof error_message ) {
-                    error_message = [ error_message ];
-                }
-
-                let ulWrapper = jQuery( '<ul/>' )
-                    .prop( 'role', 'alert' ).addClass( 'woocommerce-error' );
-
-                if ( Array.isArray( error_message ) ) {
-                    jQuery.each( error_message, function( index, value ) {
-                        jQuery( ulWrapper ).append( jQuery( '<li>' ).html( value ) );
-                    });
-                }
-
-                let wcNoticeDiv = jQuery( '<div>' )
-                    .addClass( 'woocommerce-NoticeGroup woocommerce-NoticeGroup-checkout' )
-                    .append( ulWrapper );
-
-                jQuery('form.checkout .woocommerce-NoticeGroup').remove();
-                jQuery('form.checkout').prepend(wcNoticeDiv);
-                jQuery('.woocommerce, .form.checkout').removeClass('processing').unblock();
-
-                jQuery('html, body').animate({
-                    scrollTop: (jQuery('form.checkout').offset().top - 100 )
-                }, 1000 );
-            };
-
-        </script>
-		<?php
 	}
 
 	/**
