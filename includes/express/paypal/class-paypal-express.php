@@ -99,6 +99,13 @@ class CKO_Paypal_Express {
 		}
 
 		?>
+        <style>
+            .cko-disabled {
+                cursor: not-allowed;
+                -webkit-filter: grayscale(100%);
+                filter: grayscale(100%);
+            }
+        </style>
 		<div id="cko-paypal-button-wrapper" style="margin-top: 1em;clear:both;display:none;"></div>
 		<?php
 	}

@@ -2,6 +2,35 @@
 
 jQuery( function ( $ ) {
 
+    const formSelector = 'form.cart';
+
+    const onFormChange = function ( e ) {
+        const form = document.querySelector( formSelector );
+
+        const addToCartButton = form ? form.querySelector('.single_add_to_cart_button') : null;
+
+        const isEnabled = ( null === addToCartButton ) || ! addToCartButton.classList.contains( 'disabled' );
+
+        const element = jQuery( cko_paypal_vars.paypal_button_selector );
+
+        if ( isEnabled ) {
+            jQuery(element)
+                .removeClass('cko-disabled')
+                .off('mouseup')
+                .find('> *')
+                .css('pointer-events', '');
+        } else {
+            jQuery(element)
+                .addClass('cko-disabled')
+                .on('mouseup', function(event) {
+                    event.stopImmediatePropagation();
+                })
+                .find('> *')
+                .css('pointer-events', 'none');
+        }
+
+    };
+
     const getAttributes = function() {
         var select = $( '.variations_form' ).find( '.variations select' ),
             data   = {},
@@ -98,6 +127,8 @@ jQuery( function ( $ ) {
             paypal.Buttons({ ...this.paypalButtonProps() }).render( cko_paypal_vars.paypal_button_selector );
 
             this.updateButtonVisibility();
+
+            jQuery(document).on('change', formSelector, onFormChange );
         },
 
         paypalButtonProps: function () {
