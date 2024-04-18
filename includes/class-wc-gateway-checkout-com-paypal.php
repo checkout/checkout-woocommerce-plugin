@@ -496,6 +496,12 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 	 * Outputs scripts used for checkout payment.
 	 */
 	public function payment_scripts() {
+		$paypal_enabled = ! empty( $this->get_option( 'enabled' ) ) && 'yes' === $this->get_option( 'enabled' );
+
+		if ( ! $paypal_enabled ) {
+			return;
+		}
+
 		if ( ! empty( WC_Checkoutcom_Utility::cko_get_session( 'cko_pc_id' ) ) ) {
 			return;
 		}

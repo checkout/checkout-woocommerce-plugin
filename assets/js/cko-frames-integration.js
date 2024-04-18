@@ -14,7 +14,11 @@ jQuery(function () {
   }
 
   function initFrames() {
-    var localization;
+    let localization;
+
+    if ( ! document.getElementById( "public-key" ) ) {
+        return;
+    }
 
     try {
       localization = JSON.parse( document.getElementById("localization").value );
@@ -118,7 +122,7 @@ jQuery(function () {
     }
   }
 
-  if (document.getElementById("multiFrame").value == 1) {
+  if ( document.getElementById("multiFrame")?.value == 1 ) {
     var logos = generateLogos();
 
     function generateLogos() {
@@ -352,7 +356,7 @@ jQuery(function () {
    * function to show saved card checkbox based on logged-in user
    */
   function checkUserLoggedIn() {
-    if (document.getElementById("user-logged-in").value) {
+    if ( document.getElementById("user-logged-in")?.value ) {
       jQuery(".cko-save-card-checkbox").show();
     } else {
       jQuery(".cko-save-card-checkbox").hide();

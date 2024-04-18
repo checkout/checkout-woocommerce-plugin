@@ -96,7 +96,7 @@ jQuery( function ( $ ) {
             jQuery( '#payment #paypal-button-container' ).remove();
 
             if ( ! jQuery( '#payment' ).find( '#paypal-button-container' ).length ) {
-                jQuery( '#payment' ).append( '<div id="paypal-button-container" style="margin-top:15px;"></div>' );
+                jQuery( '#payment .place-order' ).append( '<div id="paypal-button-container" style="margin-top:15px; display:none;"></div>' );
             }
 
             // Initialize paypal button.

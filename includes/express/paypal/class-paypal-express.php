@@ -20,6 +20,14 @@ class CKO_Paypal_Express {
 	}
 
 	public function __construct() {
+		$paypal_settings = get_option( 'woocommerce_wc_checkout_com_paypal_settings' );
+
+		$is_express_enable = ! empty( $paypal_settings['paypal_express'] ) && 'yes' === $paypal_settings['paypal_express'];
+		$paypal_enabled    = ! empty( $paypal_settings['enabled'] ) && 'yes' === $paypal_settings['enabled'];
+
+        if ( ! $paypal_enabled || ! $is_express_enable ) {
+            return;
+        }
 
 		add_action( 'woocommerce_after_add_to_cart_form', [ $this, 'display_payment_request_button_html' ], 1 );
 
