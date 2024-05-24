@@ -68,7 +68,8 @@ jQuery( function ( $ ) {
             // security: wc_stripe_payment_request_params.nonce.add_to_cart,
             product_id: product_id,
             qty: $( '.quantity .qty' ).val(),
-            attributes: $( '.variations_form' ).length ? getAttributes().data : []
+            attributes: $( '.variations_form' ).length ? getAttributes().data : [],
+            nonce: cko_paypal_vars.paypal_express_add_to_cart_nonce
         };
 
         console.log(data);
@@ -76,7 +77,7 @@ jQuery( function ( $ ) {
         return await $.ajax( {
             url: cko_paypal_vars.add_to_cart_url,
             type: 'POST',
-            async:false,
+            async: false,
             data: data
         } ).done( function ( response ) {
             console.log( response );
@@ -85,13 +86,8 @@ jQuery( function ( $ ) {
 
     const cko_express_create_order_id = async function () {
         let addToCartSuccess = await cko_express_add_to_cart()
-        console.log(addToCartSuccess );
 
         // Prepare add-to-cart for express checkout.
-
-        // Get Order ID from below endpoint.
-
-
         let data = {
             express_checkout: true,
             add_to_cart: addToCartSuccess.result
@@ -99,6 +95,7 @@ jQuery( function ( $ ) {
 
         console.log( data );
 
+        // Get Order ID from below endpoint.
         return fetch( cko_paypal_vars.create_order_url, {
             method: 'POST',
             headers: {
@@ -109,7 +106,7 @@ jQuery( function ( $ ) {
             return res.json();
         }).then(function (data) {
             if (typeof data.success !== 'undefined') {
-                var messages = data.data.messages ? data.data.messages : data.data;
+                let messages = data.data.messages ? data.data.messages : data.data;
 
                 if ( 'string' === typeof messages || Array.isArray( messages ) ) {
                     showError( messages );
@@ -134,12 +131,7 @@ jQuery( function ( $ ) {
         paypalButtonProps: function () {
             let paypalButtonProps = {
                 onApprove: async function (data) {
-
                     console.log(data);
-
-                    // if ( data.orderID ) {
-                    //     window.location = cko_paypal_vars.redirect;
-                    // }
 
                     jQuery.post(cko_paypal_vars.paypal_order_session_url + "&paypal_order_id=" + data.orderID + "&woocommerce-process-checkout-nonce=" + cko_paypal_vars.woocommerce_process_checkout, function (data) {
                         if (typeof data.success !== 'undefined' && data.success !== true ) {

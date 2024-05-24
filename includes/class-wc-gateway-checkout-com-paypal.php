@@ -108,7 +108,9 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
     }
 
 	public function cko_express_add_to_cart() {
-		// TODO: Add Nonce.
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST[ 'nonce' ] ) ), 'checkoutcom_paypal_express_add_to_cart' ) ) {
+			wp_send_json( [ 'result' => 'failed' ] );
+		}
 
 		if ( ! defined( 'WOOCOMMERCE_CART' ) ) {
 			define( 'WOOCOMMERCE_CART', true );
@@ -120,7 +122,6 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 		$qty          = ! isset( $_POST['qty'] ) ? 1 : absint( $_POST['qty'] );
 		$product      = wc_get_product( $product_id );
 		$product_type = $product->get_type();
-		error_log( var_export( ['$product_type'=> $product_type], true ) );
 
 		// First empty the cart to prevent wrong calculation.
 		WC()->cart->empty_cart();
@@ -133,12 +134,10 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 			$variation_id = $data_store->find_matching_product_variation( $product, $attributes );
 
 			$is_added_to_cart = WC()->cart->add_to_cart( $product->get_id(), $qty, $variation_id, $attributes );
-			error_log( var_export( ['$is_added_to_cart'=> $is_added_to_cart], true ) );
 		}
 
 		if ( in_array( $product_type, [ 'simple', 'variation', 'subscription', 'subscription_variation' ], true ) ) {
 			$is_added_to_cart = WC()->cart->add_to_cart( $product->get_id(), $qty );
-			error_log( var_export( ['$is_added_to_cart'=> $is_added_to_cart], true ) );
 		}
 
 		WC()->cart->calculate_totals();
@@ -152,8 +151,6 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 	}
 
 	public function cko_express_create_order() {
-
-		error_log( var_export( $_POST, true ) );
 
 		if ( ! empty( $_POST['express_checkout'] ) && ! empty( $_POST[ 'add_to_cart' ] ) && 'success' !== $_POST[ 'add_to_cart' ] ) {
 			return null;
@@ -170,16 +167,7 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 		$cko_paypal_order_id = WC_Checkoutcom_Utility::cko_get_session( 'cko_paypal_order_id' );
 		$cko_pc_id           = WC_Checkoutcom_Utility::cko_get_session( 'cko_pc_id' );
 
-		error_log( var_export( [
-			'$cko_paypal_order_id' => $cko_paypal_order_id,
-			'$cko_pc_id' => $cko_pc_id
-		], true ) );
-
 		wp_send_json_success();
-
-//		WC_Checkoutcom_Utility::cko_set_session( 'cko_paypal_order_id', '' );
-//		WC_Checkoutcom_Utility::cko_set_session( 'cko_pc_id', '' );
-
 	}
 
 	/**
@@ -194,29 +182,44 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 			session_start();
 		}
 
-		error_log( var_export( __METHOD__, true ) );
-
 		$cko_paypal_order_id = WC_Checkoutcom_Utility::cko_get_session( 'cko_paypal_order_id' );
 		$cko_pc_id           = WC_Checkoutcom_Utility::cko_get_session( 'cko_pc_id' );
 
 		if ( ! empty( $cko_pc_id ) ) {
 
-			error_log( var_export( __LINE__, true ) );
-
 			try {
 				$checkout = new Checkout_SDK();
 				$response = $checkout->get_builder()->getPaymentContextsClient()->getPaymentContextDetails( $cko_pc_id );
 
+
 				$order_id = absint( WC()->session->get( 'order_awaiting_payment' ) );
 				$order    = wc_get_order( $order_id );
+
+				if ( isset( $response['payment_request']['shipping']['address'] ) ) {
+					$paypal_shipping_address    = $response['payment_request']['shipping']['address'];
+					$paypal_shipping_first_name = $response['payment_request']['shipping']['first_name'];
+					$paypal_shipping_last_name  = $response['payment_request']['shipping']['last_name'] ?? '';
+
+					$order->set_billing_address_1( $paypal_shipping_address[ 'address_line1' ] );
+					$order->set_billing_address_2( $paypal_shipping_address[ 'address_line2' ] ?? '' );
+					$order->set_billing_city( $paypal_shipping_address[ 'city' ] );
+					$order->set_billing_postcode( $paypal_shipping_address[ 'zip' ] );
+					$order->set_billing_country( $paypal_shipping_address[ 'country' ] );
+
+					$order->set_shipping_first_name( $paypal_shipping_first_name );
+					$order->set_shipping_last_name( $paypal_shipping_last_name );
+					$order->set_shipping_address_1( $paypal_shipping_address[ 'address_line1' ] );
+					$order->set_shipping_address_2( $paypal_shipping_address[ 'address_line2' ] ?? '' );
+					$order->set_shipping_city( $paypal_shipping_address[ 'city' ] );
+					$order->set_shipping_postcode( $paypal_shipping_address[ 'zip' ] );
+					$order->set_shipping_country( $paypal_shipping_address[ 'country' ] );
+				}
 
 				$payment_context_id    = $cko_pc_id;
 				$processing_channel_id = $response['payment_request']['processing_channel_id'];
 
 				// Payment request to capture amount.
 				$return_response = $this->request_payment( $order, $payment_context_id, $processing_channel_id );
-
-				error_log( var_export( $return_response, true ) );
 
 				WC_Checkoutcom_Utility::cko_set_session( 'cko_paypal_order_id', '' );
 				WC_Checkoutcom_Utility::cko_set_session( 'cko_pc_id', '' );
@@ -260,7 +263,7 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 	    $paymentContextsRequest->currency = get_woocommerce_currency();
 
 	    $paymentContextsRequest->processing                      = new Checkout\Payments\Contexts\PaymentContextsProcessing();
-	    $paymentContextsRequest->processing->shipping_preference = Checkout\Payments\ShippingPreference::$NO_SHIPPING;
+	    $paymentContextsRequest->processing->shipping_preference = Checkout\Payments\ShippingPreference::$GET_FROM_FILE;
 
 		if ( $is_express ) {
 			$paymentContextsRequest->processing->user_action = Checkout\Payments\UserAction::$CONTINUE;
@@ -378,10 +381,21 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 	    try {
 	        $checkout = new Checkout_SDK();
 
+		    $amount        = $order->get_total();
+		    $amount_cents  = WC_Checkoutcom_Utility::value_to_decimal( $amount, $order->get_currency() );
+
 		    $payment_request_param                        = $checkout->get_payment_request();
 		    $payment_request_param->payment_context_id    = $payment_context_id;
 		    $payment_request_param->processing_channel_id = $processing_channel_id;
 		    $payment_request_param->reference             = $order->get_order_number();
+		    $payment_request_param->amount                = $amount_cents;
+
+		    $items             = new Checkout\Payments\Contexts\PaymentContextsItems();
+		    $items->name       = 'All Products';
+		    $items->unit_price = $amount_cents;
+		    $items->quantity   = '1';
+
+			$payment_request_param->items = [ $items ];
 
 		    $response      = $checkout->get_builder()->getPaymentsClient()->requestPayment( $payment_request_param );
 		    $response_code = $response['http_metadata']->getStatusCode();
