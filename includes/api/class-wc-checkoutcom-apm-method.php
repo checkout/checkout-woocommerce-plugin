@@ -218,7 +218,6 @@ class WC_Checkoutcom_APM_Method {
 	public function ideal() {
 
 		$method              = new RequestIdealSource();
-		$method->bic         = self::$data_info['issuer-id'];
 		$method->description = self::$order_info->get_order_number();
 
 		return $method;

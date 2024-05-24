@@ -976,35 +976,6 @@ class WC_Checkoutcom_Api_Request {
 	}
 
 	/**
-	 * Return ideal banks info.
-	 *
-	 * @return array
-	 */
-	public static function get_ideal_bank() {
-		$gateway_debug = 'yes' === WC_Admin_Settings::get_option( 'cko_gateway_responses', 'no' );
-
-		// Initialize the Checkout Api.
-		$checkout = new Checkout_SDK();
-
-		try {
-
-			return $checkout->get_builder()->getIdealClient()->getIssuers();
-
-		} catch ( CheckoutApiException $ex ) {
-			$error_message = __( 'An error has occured while retrieving ideal bank details.', 'checkout-com-unified-payments-api' );
-
-			// check if gateway response is enabled from module settings.
-			if ( $gateway_debug ) {
-				$error_message .= $ex->getMessage();
-			}
-
-			WC_Checkoutcom_Utility::logger( $error_message, $ex );
-
-			return [ 'error' => $error_message ];
-		}
-	}
-
-	/**
 	 * Create APM payment.
 	 *
 	 * @param WC_Order $order Order object.
