@@ -45,6 +45,11 @@ class CKO_Paypal_Express {
 		add_action( 'woocommerce_update_cart_action_cart_updated', [ $this, 'empty_paypal_session' ], 1 );
 		add_action( 'woocommerce_cart_item_set_quantity', [ $this, 'empty_paypal_session' ], 1 );
 		add_action( 'woocommerce_add_to_cart', [ $this, 'empty_paypal_session' ], 1 );
+
+		/**
+		 * Filters.
+		 */
+		add_filter( 'woocommerce_checkout_get_value', [ $this, 'fill_paypal_selected_address_field' ], 10, 2 );
 	}
 
 	public function payment_scripts() {
@@ -199,6 +204,77 @@ class CKO_Paypal_Express {
 	public function empty_paypal_session() {
 		WC_Checkoutcom_Utility::cko_set_session( 'cko_paypal_order_id', '' );
 		WC_Checkoutcom_Utility::cko_set_session( 'cko_pc_id', '' );
+		WC_Checkoutcom_Utility::cko_set_session( 'cko_pc_details', '' );
+	}
+
+	/**
+	 * Set default checkout field value from PayPal Express.
+	 *
+	 * @param  string $value Default checkout field value.
+	 * @param  string $key   The checkout form field name/key
+	 *
+	 * @return string $value Checkout field value.
+	 */
+	public function fill_paypal_selected_address_field( $value, $key ) {
+
+		if ( ! session_id() ) {
+			session_start();
+		}
+
+		$cko_paypal_order_id = WC_Checkoutcom_Utility::cko_get_session( 'cko_paypal_order_id' );
+		$cko_pc_id           = WC_Checkoutcom_Utility::cko_get_session( 'cko_pc_id' );
+		$cko_pc_details      = WC_Checkoutcom_Utility::cko_get_session( 'cko_pc_details' );
+
+		if ( empty( $cko_pc_id ) ) {
+			return $value;
+		}
+
+		if ( empty( $cko_pc_details ) ) {
+			try {
+				$checkout       = new Checkout_SDK();
+				$response       = $checkout->get_builder()->getPaymentContextsClient()->getPaymentContextDetails( $cko_pc_id );
+				$cko_pc_details = $response;
+
+				WC_Checkoutcom_Utility::cko_set_session( 'cko_pc_details', $response );
+
+			} catch ( CheckoutApiException $ex ) {}
+		}
+
+		if ( isset( $cko_pc_details['payment_request']['shipping']['address'] ) ) {
+			$paypal_shipping_address    = $cko_pc_details['payment_request']['shipping']['address'];
+			$paypal_shipping_first_name = $cko_pc_details['payment_request']['shipping']['first_name'];
+			$paypal_shipping_last_name  = $cko_pc_details['payment_request']['shipping']['last_name'] ?? '';
+
+			switch ( $key ) {
+				case 'shipping_first_name':
+					return $paypal_shipping_first_name;
+
+				case 'shipping_last_name':
+					return $paypal_shipping_last_name;
+
+				case 'billing_address_1':
+				case 'shipping_address_1':
+					return $paypal_shipping_address[ 'address_line1' ];
+
+				case 'billing_address_2':
+				case 'shipping_address_2':
+					return $paypal_shipping_address[ 'address_line2' ]  ?? '';
+
+				case 'billing_city':
+				case 'shipping_city':
+					return $paypal_shipping_address[ 'city' ];
+
+				case 'billing_postcode':
+				case 'shipping_postcode':
+					return $paypal_shipping_address[ 'zip' ];
+
+				case 'billing_country':
+				case 'shipping_country':
+					return $paypal_shipping_address[ 'country' ];
+			}
+		}
+
+		return $value;
 	}
 }
 
