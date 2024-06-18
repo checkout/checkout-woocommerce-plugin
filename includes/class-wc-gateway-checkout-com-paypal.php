@@ -200,19 +200,19 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 					$paypal_shipping_first_name = $response['payment_request']['shipping']['first_name'];
 					$paypal_shipping_last_name  = $response['payment_request']['shipping']['last_name'] ?? '';
 
-					$order->set_billing_address_1( $paypal_shipping_address[ 'address_line1' ] );
-					$order->set_billing_address_2( $paypal_shipping_address[ 'address_line2' ] ?? '' );
-					$order->set_billing_city( $paypal_shipping_address[ 'city' ] );
-					$order->set_billing_postcode( $paypal_shipping_address[ 'zip' ] );
-					$order->set_billing_country( $paypal_shipping_address[ 'country' ] );
-
-					$order->set_shipping_first_name( $paypal_shipping_first_name );
-					$order->set_shipping_last_name( $paypal_shipping_last_name );
-					$order->set_shipping_address_1( $paypal_shipping_address[ 'address_line1' ] );
-					$order->set_shipping_address_2( $paypal_shipping_address[ 'address_line2' ] ?? '' );
-					$order->set_shipping_city( $paypal_shipping_address[ 'city' ] );
-					$order->set_shipping_postcode( $paypal_shipping_address[ 'zip' ] );
-					$order->set_shipping_country( $paypal_shipping_address[ 'country' ] );
+//					$order->set_billing_address_1( $paypal_shipping_address[ 'address_line1' ] );
+//					$order->set_billing_address_2( $paypal_shipping_address[ 'address_line2' ] ?? '' );
+//					$order->set_billing_city( $paypal_shipping_address[ 'city' ] );
+//					$order->set_billing_postcode( $paypal_shipping_address[ 'zip' ] );
+//					$order->set_billing_country( $paypal_shipping_address[ 'country' ] );
+//
+//					$order->set_shipping_first_name( $paypal_shipping_first_name );
+//					$order->set_shipping_last_name( $paypal_shipping_last_name );
+//					$order->set_shipping_address_1( $paypal_shipping_address[ 'address_line1' ] );
+//					$order->set_shipping_address_2( $paypal_shipping_address[ 'address_line2' ] ?? '' );
+//					$order->set_shipping_city( $paypal_shipping_address[ 'city' ] );
+//					$order->set_shipping_postcode( $paypal_shipping_address[ 'zip' ] );
+//					$order->set_shipping_country( $paypal_shipping_address[ 'country' ] );
 				}
 
 				$payment_context_id    = $cko_pc_id;

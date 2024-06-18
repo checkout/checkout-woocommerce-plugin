@@ -242,13 +242,16 @@ class CKO_Paypal_Express {
 
 		if ( isset( $cko_pc_details['payment_request']['shipping']['address'] ) ) {
 			$paypal_shipping_address    = $cko_pc_details['payment_request']['shipping']['address'];
-			$paypal_shipping_first_name = $cko_pc_details['payment_request']['shipping']['first_name'];
-			$paypal_shipping_last_name  = $cko_pc_details['payment_request']['shipping']['last_name'] ?? '';
+			$shipping_name              = $cko_pc_details['payment_request']['shipping']['first_name'] ? explode( ' ', $cko_pc_details['payment_request']['shipping']['first_name'] ) : [];
+			$paypal_shipping_first_name = $shipping_name[0] ?? '';
+			$paypal_shipping_last_name  = $shipping_name[1] ?? '';
 
 			switch ( $key ) {
+				case 'billing_first_name':
 				case 'shipping_first_name':
 					return $paypal_shipping_first_name;
 
+				case 'billing_last_name':
 				case 'shipping_last_name':
 					return $paypal_shipping_last_name;
 
