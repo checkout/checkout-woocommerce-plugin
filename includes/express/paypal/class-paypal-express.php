@@ -88,15 +88,16 @@ class CKO_Paypal_Express {
 		wp_register_script( 'cko-paypal-script', $paypal_js_url, [ 'jquery' ], null );
 
 		$vars = [
-			'add_to_cart_url'               => add_query_arg( [ 'cko_paypal_action' => 'express_add_to_cart'], WC()->api_request_url( 'CKO_Paypal_Woocommerce' ) ),
-			'create_order_url'              => add_query_arg( [ 'cko_paypal_action' => 'express_create_order'], WC()->api_request_url( 'CKO_Paypal_Woocommerce' ) ),
-			'paypal_order_session_url'      => add_query_arg( [ 'cko_paypal_action' => 'express_paypal_order_session'], WC()->api_request_url( 'CKO_Paypal_Woocommerce' ) ),
-			'cc_capture'                    => add_query_arg( [ 'cko_paypal_action' => 'cc_capture' ], WC()->api_request_url( 'CKO_Paypal_Woocommerce' ) ),
-			'woocommerce_process_checkout'  => wp_create_nonce('woocommerce-process_checkout'),
-			'is_cart_contains_subscription' => WC_Checkoutcom_Utility::is_cart_contains_subscription(),
-			'paypal_button_selector'        => '#cko-paypal-button-wrapper',
-			'redirect'                      => wc_get_checkout_url(),
+			'add_to_cart_url'                  => add_query_arg( [ 'cko_paypal_action' => 'express_add_to_cart'], WC()->api_request_url( 'CKO_Paypal_Woocommerce' ) ),
+			'create_order_url'                 => add_query_arg( [ 'cko_paypal_action' => 'express_create_order'], WC()->api_request_url( 'CKO_Paypal_Woocommerce' ) ),
+			'paypal_order_session_url'         => add_query_arg( [ 'cko_paypal_action' => 'express_paypal_order_session'], WC()->api_request_url( 'CKO_Paypal_Woocommerce' ) ),
+			'cc_capture'                       => add_query_arg( [ 'cko_paypal_action' => 'cc_capture' ], WC()->api_request_url( 'CKO_Paypal_Woocommerce' ) ),
+			'woocommerce_process_checkout'     => wp_create_nonce('woocommerce-process_checkout'),
+			'is_cart_contains_subscription'    => WC_Checkoutcom_Utility::is_cart_contains_subscription(),
+			'paypal_button_selector'           => '#cko-paypal-button-wrapper',
+			'redirect'                         => wc_get_checkout_url(),
 			'paypal_express_add_to_cart_nonce' => wp_create_nonce( 'checkoutcom_paypal_express_add_to_cart' ),
+            'debug'                            => 'yes' === WC_Admin_Settings::get_option( 'cko_console_logging', 'no' ),
 		];
 
 		wp_localize_script( 'cko-paypal-script', 'cko_paypal_vars', $vars );

@@ -65,14 +65,11 @@ jQuery( function ( $ ) {
         }
 
         var data = {
-            // security: wc_stripe_payment_request_params.nonce.add_to_cart,
             product_id: product_id,
             qty: $( '.quantity .qty' ).val(),
             attributes: $( '.variations_form' ).length ? getAttributes().data : [],
             nonce: cko_paypal_vars.paypal_express_add_to_cart_nonce
         };
-
-        console.log(data);
 
         return await $.ajax( {
             url: cko_paypal_vars.add_to_cart_url,
@@ -80,7 +77,7 @@ jQuery( function ( $ ) {
             async: false,
             data: data
         } ).done( function ( response ) {
-            console.log( response );
+            cko_paypal_vars.debug && console.log( response );
         } )
     }
 
@@ -93,7 +90,7 @@ jQuery( function ( $ ) {
             add_to_cart: addToCartSuccess.result
         }
 
-        console.log( data );
+        cko_paypal_vars.debug && console.log( data );
 
         // Get Order ID from below endpoint.
         return fetch( cko_paypal_vars.create_order_url, {
@@ -131,7 +128,7 @@ jQuery( function ( $ ) {
         paypalButtonProps: function () {
             let paypalButtonProps = {
                 onApprove: async function (data) {
-                    console.log(data);
+                    cko_paypal_vars.debug && console.log(data);
 
                     jQuery.post(cko_paypal_vars.paypal_order_session_url + "&paypal_order_id=" + data.orderID + "&woocommerce-process-checkout-nonce=" + cko_paypal_vars.woocommerce_process_checkout, function (data) {
                         if (typeof data.success !== 'undefined' && data.success !== true ) {
@@ -146,11 +143,11 @@ jQuery( function ( $ ) {
                     });
                 },
                 onCancel: function (data, actions) {
-                    console.log(data);
+                    cko_paypal_vars.debug && console.log(data);
                     jQuery('.woocommerce').unblock();
                 },
                 onError: function (err) {
-                    console.log(err);
+                    cko_paypal_vars.debug && console.log(err);
                     jQuery('.woocommerce').unblock();
                 },
             };
