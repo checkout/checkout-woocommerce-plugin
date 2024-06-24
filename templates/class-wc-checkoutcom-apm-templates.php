@@ -11,37 +11,6 @@
 class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_Request {
 
 	/**
-	 * Render available ideal bank list on checkout.
-	 *
-	 * @return void
-	 */
-	public static function get_ideal_bank() {
-		$ideal_banks = WC_Checkoutcom_Api_Request::get_ideal_bank();
-
-		$country = $ideal_banks['countries'];
-		$issuers = $country[0]['issuers'];
-
-		?>
-			<div class="ideal-bank-info" id="ideal-bank-info">
-				<div class="ideal-heading">
-					<label><?php esc_html_e( 'Your Bank', 'checkout-com-unified-payments-api' ); ?></label>
-				</div>
-				<label for="issuer-id">
-
-					<input name="issuer-id-dummy" list="issuer-id-dummy" style="width: 80%;">
-					<datalist id="issuer-id-dummy">
-						<?php foreach ( $issuers as $value ) { ?>
-							<option data-value="<?php echo $value['bic']; ?>" value="<?php echo $value['name']; ?>"><?php echo $value['bic']; ?></option>
-						<?php } ?>
-					</datalist>
-					</input>
-					<input type="hidden" name="issuer-id" id="issuer-id">
-				</label>
-			</div>
-		<?php
-	}
-
-	/**
 	 * Render available klarna list on checkout.
 	 *
 	 * @param string $client_token Client token.
