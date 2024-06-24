@@ -14,17 +14,21 @@ jQuery(function () {
   }
 
   function initFrames() {
-    var localization;
+    let localization;
+
+    if ( ! document.getElementById( "public-key" ) ) {
+        return;
+    }
 
     try {
       localization = JSON.parse( document.getElementById("localization").value );
     } catch ( e ) {
-      localization = document.getElementById("localization").value;
+      localization = document.getElementById("localization")?.value;
     }
 
     Frames.init({
-      debug: document.getElementById( "debug" ).value === "yes",
-      publicKey: document.getElementById("public-key").value,
+      debug: document.getElementById( "debug" )?.value === "yes",
+      publicKey: document.getElementById("public-key")?.value,
       localization: localization,
       schemeChoice: true,
       modes: [ Frames.modes.FEATURE_FLAG_SCHEME_CHOICE ],
@@ -118,7 +122,7 @@ jQuery(function () {
     }
   }
 
-  if (document.getElementById("multiFrame").value == 1) {
+  if ( document.getElementById("multiFrame")?.value == 1 ) {
     var logos = generateLogos();
 
     function generateLogos() {
@@ -352,7 +356,7 @@ jQuery(function () {
    * function to show saved card checkbox based on logged-in user
    */
   function checkUserLoggedIn() {
-    if (document.getElementById("user-logged-in").value) {
+    if ( document.getElementById("user-logged-in")?.value ) {
       jQuery(".cko-save-card-checkbox").show();
     } else {
       jQuery(".cko-save-card-checkbox").hide();

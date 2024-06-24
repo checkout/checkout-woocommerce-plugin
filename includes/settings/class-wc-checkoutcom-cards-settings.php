@@ -691,6 +691,14 @@ class WC_Checkoutcom_Cards_Settings {
 				'default'     => '',
 				'placeholder' => 'ABCD1EFGH2I3K',
 			],
+			'paypal_express' => [
+				'title'       => __( 'PayPal Express', 'checkout-com-unified-payments-api' ),
+				'label'       => __( 'Enable PayPal Express', 'checkout-com-unified-payments-api' ),
+				'type'        => 'checkbox',
+				'description' => __( 'Toggle to activate PayPal Express checkout for smoother checkout.', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => false,
+				'default'     => 'no',
+			],
 		];
 
 		return apply_filters( 'wc_checkout_com_paypal', $settings );
