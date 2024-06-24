@@ -501,4 +501,18 @@ class WC_Checkoutcom_Utility {
 
 		return false;
 	}
+
+	public static function is_paypal_express_available() {
+		$paypal_settings = get_option( 'woocommerce_wc_checkout_com_paypal_settings' );
+
+		$is_express_enable = ! empty( $paypal_settings['paypal_express'] ) && 'yes' === $paypal_settings['paypal_express'];
+
+		$available_payment_methods = WC()->payment_gateways()->get_available_payment_gateways();
+
+		if ( isset( $available_payment_methods['wc_checkout_com_paypal'] ) && $is_express_enable ) {
+			return true;
+		}
+
+		return false;
+	}
 }
