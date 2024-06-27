@@ -171,6 +171,10 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v4.6.0 27th June 2024
+- **[feat]** Upgrade PayPal with Express Checkout
+- **[feat]** Update iDEAL APM with latest standard
+
 v4.5.0 15th Mar 2024
 - **[feat]** Upgrade checkout-sdk-php library
 - **[feat]** Updated PayPal integration
