@@ -9,7 +9,7 @@
     },
     "require": {
         "php": ">=7.3",
-        "checkout/checkout-sdk-php": "3.0.*"
+        "checkout/checkout-sdk-php": "3.2.*"
     },
     "require-dev": {
         "squizlabs/php_codesniffer": "^3.6",
