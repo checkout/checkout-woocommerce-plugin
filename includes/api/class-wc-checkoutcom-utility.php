@@ -220,8 +220,8 @@ class WC_Checkoutcom_Utility {
 		$apm           = ! empty( $apm_setting['ckocom_apms_selector'] ) ? $apm_setting['ckocom_apms_selector'] : [];
 		$country_code  = WC()->customer->get_billing_country();
 
-		$abc_apms = [ 'alipay', 'bancontact', 'boleto', 'eps', 'fawry', 'giropay', 'ideal', 'klarna', 'knet', 'multibanco', 'poli', 'qpay', 'sepa', 'sofort' ];
-		$nas_apms = [ 'ideal', 'bancontact', 'eps', 'fawry', 'giropay', 'knet', 'multibanco', 'qpay', 'sofort' ];
+		$abc_apms = [ 'alipay', 'bancontact', 'boleto', 'eps', 'fawry', 'giropay', 'ideal', 'knet', 'multibanco', 'poli', 'qpay', 'sepa', 'sofort' ];
+		$nas_apms = [ 'ideal', 'bancontact', 'eps', 'fawry', 'giropay', 'klarna', 'knet', 'multibanco', 'qpay', 'sort' ];
 
 		if ( cko_is_nas_account() ) {
 			$apm = array_intersect( $apm, $nas_apms );

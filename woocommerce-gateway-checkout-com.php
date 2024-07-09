@@ -233,7 +233,7 @@ function callback_for_setting_up_scripts() {
 
 	// load cko apm settings.
 	$apm_settings = get_option( 'woocommerce_wc_checkout_com_alternative_payments_settings' );
-	$apm_enable   = ! empty( $apms_settings['enabled'] ) && 'yes' === $apms_settings['enabled'];
+	$apm_enable   = ! empty( $apm_settings['enabled'] ) && 'yes' === $apm_settings['enabled'];
 
 	if ( $apm_enable && ! empty( $apm_settings['ckocom_apms_selector'] ) ) {
 		foreach ( $apm_settings['ckocom_apms_selector'] as $value ) {
