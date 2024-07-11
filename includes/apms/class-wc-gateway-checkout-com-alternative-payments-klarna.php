@@ -57,9 +57,26 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Klarna extends WC_Gateway_Che
             if ( ! empty( $klarna_session['partner_metadata']['client_token'] ) ) {
 	            $client_token = $klarna_session['partner_metadata']['client_token'];
             }
+
+            if ( ! empty( $client_token ) ) {
+                printf( '<input type="hidden" id="klarna-client-token" value="%s">', $client_token );
+            } else {
+	            ?>
+                <script>
+                    jQuery('#payment_method_wc_checkout_com_alternative_payments_klarna').prop( 'checked', false );
+                    jQuery('.payment_method_wc_checkout_com_alternative_payments_klarna').hide();
+
+                    setTimeout( () => {
+                            jQuery('#payment_method_wc_checkout_com_alternative_payments_klarna').prop( 'checked', false );
+                        },
+                        2000
+                    );
+
+                </script>
+	            <?php
+            }
 			?>
 
-			<input type="hidden" id="klarna-client-token" value="<?php echo $client_token; ?>">
 			<div id="cart-info" data-cart='<?php echo json_encode( WC_Checkoutcom_Api_Request::get_cart_info() ); ?>'></div>
 
 			<div class="klarna-details"></div>

@@ -1186,7 +1186,7 @@ class WC_Checkoutcom_Api_Request {
 				$error_message .= $ex->getMessage();
 			}
 
-			WC_Checkoutcom_Utility::logger( $error_message, $ex );
+			WC_Checkoutcom_Utility::logger( $error_message, $ex->error_details );
 
 			return [ 'error' => $error_message ];
 		}
