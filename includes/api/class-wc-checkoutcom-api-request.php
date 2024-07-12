@@ -5,10 +5,10 @@
  * @package wc_checkout_com
  */
 
-use Checkout\Apm\Previous\Klarna\CreditSessionRequest;
 use Checkout\CheckoutApiException;
 use Checkout\CheckoutUtils;
 use Checkout\Common\Address;
+use Checkout\Common\AccountHolder;
 use Checkout\Common\ChallengeIndicatorType;
 use Checkout\Common\CustomerRequest;
 use Checkout\Payments\Product;
@@ -20,6 +20,7 @@ use Checkout\Payments\RefundRequest;
 use Checkout\Payments\ShippingDetails;
 use Checkout\Payments\Request\Source\Apm\FawryProduct;
 use Checkout\Payments\Previous\Source\Apm\RequestPayPalSource;
+use Checkout\Payments\Request\Source\Contexts\PaymentContextsKlarnaSource;
 use Checkout\Payments\Request\Source\RequestIdSource;
 use Checkout\Payments\Request\Source\RequestTokenSource;
 use Checkout\Payments\ThreeDsRequest;
@@ -1085,8 +1086,23 @@ class WC_Checkoutcom_Api_Request {
 		$total_amount = WC()->cart->total;
 		$amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $total_amount, get_woocommerce_currency() );
 
-		foreach ( $items as $item => $values ) {
+		$woo_locale    = str_replace( '_', '-', get_locale() );
+		$locale        = substr( $woo_locale, 0, 5 );
 
+		$processing         = new Checkout\Payments\Contexts\PaymentContextsProcessing();
+		$processing->locale = strtolower( $locale );
+
+		$billing_address          = new Address();
+		$billing_address->country = WC()->customer->get_billing_country();
+
+		$account_holder                  = new AccountHolder();
+		$account_holder->billing_address =  $billing_address;
+
+		$source                 = new PaymentContextsKlarnaSource();
+		$source->account_holder = $account_holder;
+
+
+		foreach ( $items as $item => $values ) {
 			$_product         = wc_get_product( $values['data']->get_id() );
 			$wc_product       = wc_get_product( $values['product_id'] );
 			$price_excl_tax   = wc_get_price_excluding_tax( $wc_product );
@@ -1098,26 +1114,20 @@ class WC_Checkoutcom_Api_Request {
 				$unit_price_cents       = WC_Checkoutcom_Utility::value_to_decimal( $price_incl_tax, get_woocommerce_currency() );
 				$tax_amount             = $price_incl_tax - $price_excl_tax;
 				$total_tax_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $tax_amount, get_woocommerce_currency() );
-				$tax                    = WC_Tax::get_rates();
-				$reset_tax              = reset( $tax )['rate'];
-				$tax_rate               = round( $reset_tax );
 			} else {
-				$tax_rate               = 0;
 				$total_tax_amount_cents = 0;
 			}
 
-			$products[] = [
-				'name'                  => $_product->get_title(),
-				'quantity'              => $values['quantity'],
-				'unit_price'            => $unit_price_cents,
-				'tax_rate'              => $tax_rate * 100,
-				'total_amount'          => $unit_price_cents * $values['quantity'],
-				'total_tax_amount'      => $total_tax_amount_cents,
-				'type'                  => 'physical',
-				'reference'             => $_product->get_sku(),
-				'total_discount_amount' => 0,
+			$item                  = new Checkout\Payments\Contexts\PaymentContextsItems();
+			$item->name            = $_product->get_title();
+			$item->unit_price      = $unit_price_cents;
+			$item->quantity        = $values['quantity'];
+			$item->total_amount    = $unit_price_cents * $values['quantity'];
+			$item->reference       = $_product->get_sku();
+			$item->tax_amount      = $total_tax_amount_cents;
+			$item->discount_amount = 0;
 
-			];
+			$products[] = $item;
 		}
 
 		$chosen_methods  = wc_get_chosen_shipping_method_ids();
@@ -1133,67 +1143,50 @@ class WC_Checkoutcom_Api_Request {
 
 				$total_tax_amount       = WC()->cart->get_shipping_tax();
 				$total_tax_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $total_tax_amount, get_woocommerce_currency() );
-
-				$shipping_rates = WC_Tax::get_shipping_tax_rates();
-				$vat            = array_shift( $shipping_rates );
-
-				if ( isset( $vat['rate'] ) ) {
-					$shipping_tax_rate = round( $vat['rate'] * 100 );
-				} else {
-					$shipping_tax_rate = 0;
-				}
 			} else {
-				$shipping_tax_rate      = 0;
 				$total_tax_amount_cents = 0;
 			}
 
-			$products[] = [
-				'name'                  => $chosen_shipping,
-				'quantity'              => 1,
-				'unit_price'            => $shipping_amount_cents,
-				'tax_rate'              => $shipping_tax_rate,
-				'total_amount'          => $shipping_amount_cents,
-				'total_tax_amount'      => $total_tax_amount_cents,
-				'type'                  => 'shipping_fee',
-				'reference'             => $chosen_shipping,
-				'total_discount_amount' => 0,
-			];
+			$item                  = new Checkout\Payments\Contexts\PaymentContextsItems();
+			$item->name            = $chosen_shipping;
+			$item->unit_price      = $shipping_amount_cents;
+			$item->quantity        = 1;
+			$item->total_amount    = $shipping_amount_cents;
+			$item->reference       = $chosen_shipping;
+			$item->tax_amount      = $total_tax_amount_cents;
+			$item->discount_amount = 0;
+
+			$products[] = $item;
 		}
 
-		$total_tax_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( WC()->cart->get_total_tax(), get_woocommerce_currency() );
-
-		$gateway_debug = 'yes' === WC_Admin_Settings::get_option( 'cko_gateway_responses', 'no' );
-		$woo_locale    = str_replace( '_', '-', get_locale() );
-		$locale        = substr( $woo_locale, 0, 5 );
-		$country       = WC()->customer->get_billing_country();
+		$paymentContextsRequest               = new Checkout\Payments\Contexts\PaymentContextsRequest();
+		$paymentContextsRequest->source       = $source;
+		$paymentContextsRequest->amount       = $amount_cents;
+		$paymentContextsRequest->currency     = get_woocommerce_currency();
+		$paymentContextsRequest->payment_type = PaymentType::$regular;
+		$paymentContextsRequest->items        = $products;
+		$paymentContextsRequest->processing   = $processing;
 
 		// Initialize the Checkout Api.
 		$checkout = new Checkout_SDK();
 
 		try {
-			$credit_session_request                   = new CreditSessionRequest();
-			$credit_session_request->purchase_country = $country;
-			$credit_session_request->currency         = get_woocommerce_currency();
-			$credit_session_request->locale           = strtolower( $locale );
-			$credit_session_request->amount           = $amount_cents;
-			$credit_session_request->tax_amount       = $total_tax_amount_cents;
-			$credit_session_request->products         = $products;
+			$response = $checkout->get_builder()->getPaymentContextsClient()->createPaymentContexts( $paymentContextsRequest );
 
-			$builder = $checkout->get_builder();
+			WC_Checkoutcom_Utility::cko_set_session( 'cko_klarna_pc_id', $response['id'] );
 
-			// Klarna supports for ABC AC type only.
-			if ( method_exists( $builder, 'getKlarnaClient' ) ) {
-				return $builder->getKlarnaClient()->createCreditSession( $credit_session_request );
-			}
+			return $response;
+
 		} catch ( CheckoutApiException $ex ) {
-			$error_message = esc_html__( 'An error has occurred while creating klarna session.', 'checkout-com-unified-payments-api' );
+			$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
 
-			// Check if gateway response is enabled from module settings.
+			$error_message = 'An error has occurred while processing Klarna createPaymentContexts request. ';
+
 			if ( $gateway_debug ) {
 				$error_message .= $ex->getMessage();
 			}
 
-			WC_Checkoutcom_Utility::logger( $error_message, $ex );
+			WC_Checkoutcom_Utility::logger( $error_message, $ex->error_details );
 
 			return [ 'error' => $error_message ];
 		}

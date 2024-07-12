@@ -220,8 +220,8 @@ class WC_Checkoutcom_Utility {
 		$apm           = ! empty( $apm_setting['ckocom_apms_selector'] ) ? $apm_setting['ckocom_apms_selector'] : [];
 		$country_code  = WC()->customer->get_billing_country();
 
-		$abc_apms = [ 'alipay', 'bancontact', 'boleto', 'eps', 'fawry', 'giropay', 'ideal', 'klarna', 'knet', 'multibanco', 'poli', 'qpay', 'sepa', 'sofort' ];
-		$nas_apms = [ 'ideal', 'bancontact', 'eps', 'fawry', 'giropay', 'knet', 'multibanco', 'qpay', 'sofort' ];
+		$abc_apms = [ 'alipay', 'bancontact', 'boleto', 'eps', 'fawry', 'giropay', 'ideal', 'knet', 'multibanco', 'poli', 'qpay', 'sepa', 'sofort' ];
+		$nas_apms = [ 'ideal', 'bancontact', 'eps', 'fawry', 'giropay', 'klarna', 'knet', 'multibanco', 'qpay', 'sort' ];
 
 		if ( cko_is_nas_account() ) {
 			$apm = array_intersect( $apm, $nas_apms );
@@ -276,14 +276,30 @@ class WC_Checkoutcom_Utility {
 						|| $currency_code === 'NOR'
 						|| $currency_code === 'SEK'
 					) {
-						if ( $country_code === 'AT'
+						if ( $country_code === 'AU'
+							|| $country_code === 'AT'
+							|| $country_code === 'BE'
+							|| $country_code === 'CA'
+							|| $country_code === 'CZ'
 							|| $country_code === 'DK'
 							|| $country_code === 'FI'
+							|| $country_code === 'FR'
 							|| $country_code === 'DE'
+							|| $country_code === 'GR'
+							|| $country_code === 'IE'
+							|| $country_code === 'IT'
+							|| $country_code === 'MX'
 							|| $country_code === 'NL'
+							|| $country_code === 'NZ'
 							|| $country_code === 'NO'
+							|| $country_code === 'PL'
+							|| $country_code === 'PT'
+							|| $country_code === 'RO'
+							|| $country_code === 'ES'
 							|| $country_code === 'SE'
+							|| $country_code === 'CH'
 							|| $country_code === 'GB'
+							|| $country_code === 'US'
 						) {
 							array_push( $apm_array, $value );
 						}

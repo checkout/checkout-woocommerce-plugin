@@ -11,38 +11,6 @@
 class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_Request {
 
 	/**
-	 * Render available klarna list on checkout.
-	 *
-	 * @param string $client_token Client token.
-	 * @param array  $payment_method_categories Payment method categories.
-	 *
-	 * @return void
-	 */
-	public static function get_klarna( $client_token, $payment_method_categories ) {
-		?>
-		<div class="klarna-details">
-			<div class="klarna_widgets">
-				<?php if ( ! empty( $payment_method_categories ) ) { ?>
-					<?php foreach ( $payment_method_categories as $key => $value ) { ?>
-						<ul style="margin-bottom: 0px;margin-top: 0px;"><li>
-							<label class="test">
-								<input type="radio" class="input-radio" id="<?php echo $value['identifier']; ?>" name="klarna_widget" value="<?php echo $value['identifier']; ?>"/>
-								<?php echo esc_html( $value['name'] ); ?>
-							</label>
-						</li></ul>
-					<?php } ?>
-					<?php
-				} else {
-					echo  __( 'Klarna is not offering any payment options for this purchase. Please choose another payment method.', 'checkout-com-unified-payments-api' );
-				}
-				?>
-			</div>
-		</div>
-		<div id="klarna_container"></div>
-		<?php
-	}
-
-	/**
 	 * Render boleto form on checkout.
 	 *
 	 * @return void
