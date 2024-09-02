@@ -25,6 +25,7 @@ include_once( 'subscription/class-wc-checkoutcom-subscription.php' );
 /**
  * Class WC_Gateway_Checkout_Com_Cards for Card payment method.
  */
+#[AllowDynamicProperties]
 class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 
 	/**

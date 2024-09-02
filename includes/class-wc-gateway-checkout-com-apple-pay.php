@@ -12,6 +12,7 @@ include_once( 'settings/class-wc-checkoutcom-cards-settings.php' );
 /**
  * Class WC_Gateway_Checkout_Com_Apple_Pay for Apple Pay method.
  */
+#[AllowDynamicProperties]
 class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 
 	/**

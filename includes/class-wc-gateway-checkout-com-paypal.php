@@ -15,6 +15,7 @@ use Checkout\Payments\PaymentType;
 /**
  * Class WC_Gateway_Checkout_Com_PayPal for PayPal payment method.
  */
+#[AllowDynamicProperties]
 class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 
 	/**

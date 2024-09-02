@@ -10,6 +10,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Class WC_Gateway_Checkout_Com_Google_Pay for Google Pay payment method.
  */
+#[AllowDynamicProperties]
 class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 
 	/**

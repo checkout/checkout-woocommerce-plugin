@@ -26,6 +26,7 @@ include_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments
 /**
  * Class WC_Gateway_Checkout_Com_Alternative_Payments for Alternative Payment method main class.
  */
+#[AllowDynamicProperties]
 class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway {
 
 	/**
