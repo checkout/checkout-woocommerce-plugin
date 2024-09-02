@@ -37,7 +37,7 @@ add_action( 'plugins_loaded', 'init_checkout_com_gateway_class', 0 );
  */
 add_action(
 	'before_woocommerce_init',
-	function() {
+	function () {
 		if ( class_exists( '\Automattic\WooCommerce\Utilities\FeaturesUtil' ) ) {
 			\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility( 'custom_order_tables', __FILE__, true );
 		}
@@ -52,13 +52,13 @@ function init_checkout_com_gateway_class() {
 		return;
 	}
 
-	load_plugin_textdomain( 'checkout-com-unified-payments-api', false, plugin_basename( dirname( __FILE__ ) ) . '/languages' );
+	load_plugin_textdomain( 'checkout-com-unified-payments-api', false, plugin_basename( __DIR__ ) . '/languages' );
 
-	include_once( 'includes/class-wc-gateway-checkout-com-cards.php' );
-	include_once( 'includes/class-wc-gateway-checkout-com-apple-pay.php' );
-	include_once( 'includes/class-wc-gateway-checkout-com-google-pay.php' );
-	include_once( 'includes/class-wc-gateway-checkout-com-paypal.php' );
-	include_once( 'includes/class-wc-gateway-checkout-com-alternative-payments.php' );
+	include_once 'includes/class-wc-gateway-checkout-com-cards.php';
+	include_once 'includes/class-wc-gateway-checkout-com-apple-pay.php';
+	include_once 'includes/class-wc-gateway-checkout-com-google-pay.php';
+	include_once 'includes/class-wc-gateway-checkout-com-paypal.php';
+	include_once 'includes/class-wc-gateway-checkout-com-alternative-payments.php';
 
 	// Load payment gateway class.
 	add_filter( 'woocommerce_payment_gateways', 'checkout_com_add_gateway' );
@@ -169,6 +169,7 @@ add_action( 'woocommerce_checkout_process', 'cko_check_if_empty' );
  * Validate cvv on checkout page.
  */
 function cko_check_if_empty() {
+	// phpcs:disable WordPress.Security.NonceVerification.Missing
 	if ( isset( $_POST['payment_method'] ) && 'wc_checkout_com_cards' === $_POST['payment_method'] ) {
 
 		// Check if require cvv is enabled in module setting.
@@ -180,6 +181,7 @@ function cko_check_if_empty() {
 		) {
 			// check if cvv is empty on checkout page.
 			if ( empty( $_POST['wc_checkout_com_cards-card-cvv'] ) ) {
+                // phpcs:enable
 				wc_add_notice( esc_html__( 'Please enter a valid cvv.', 'checkout-com-unified-payments-api' ), 'error' );
 			}
 		}
@@ -222,7 +224,7 @@ add_action( 'wp_enqueue_scripts', 'callback_for_setting_up_scripts' );
 function callback_for_setting_up_scripts() {
 
 	// Load on Cart, Checkout, pay for order or add payment method pages.
-	if ( ! is_cart() && ! is_checkout() && ! isset( $_GET['pay_for_order'] ) && ! is_add_payment_method_page() ) {
+	if ( ! is_cart() && ! is_checkout() && ! isset( $_GET['pay_for_order'] ) && ! is_add_payment_method_page() ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		return;
 	}
 
@@ -243,7 +245,6 @@ function callback_for_setting_up_scripts() {
 			}
 		}
 	}
-
 }
 
 add_action( 'woocommerce_order_item_add_action_buttons', 'action_woocommerce_order_item_add_action_buttons', 10, 1 );
@@ -269,9 +270,9 @@ function action_woocommerce_order_item_add_action_buttons( $order ) {
 		?>
 <script type="text/javascript">
 	var ckoCustomButtonValues = {
-		order_status: "<?php echo $order_status; ?>",
-		auth_status: "<?php echo $auth_status; ?>",
-		capture_status: "<?php echo $capture_status; ?>"
+		order_status: "<?php echo esc_js( $order_status ); ?>",
+		auth_status: "<?php echo esc_js( $auth_status ); ?>",
+		capture_status: "<?php echo esc_js( $capture_status ); ?>"
 	}
 </script>
 
@@ -295,14 +296,14 @@ add_action( 'woocommerce_process_shop_order_meta', 'handle_order_capture_void_ac
 function handle_order_capture_void_action( $order_id, $order ) {
 
 	if ( ! is_admin() ) {
-        return;
-    }
-
-	if ( ! isset( $_POST['cko_payment_action'] ) || ! sanitize_text_field( $_POST['cko_payment_action'] ) ) {
 		return;
 	}
 
-    // Handle case where HPOS not enable and WP Post object is given.
+	if ( ! isset( $_POST['cko_payment_action'] ) || ! sanitize_text_field( $_POST['cko_payment_action'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
+		return;
+	}
+
+	// Handle case where HPOS not enable and WP Post object is given.
 	if ( ! is_a( $order, 'WC_Order' ) ) {
 		$order = wc_get_order( $order_id );
 	}
@@ -310,68 +311,68 @@ function handle_order_capture_void_action( $order_id, $order ) {
 	WC_Admin_Notices::remove_notice( 'wc_checkout_com_cards' );
 
 	// check if post is capture.
-	if ( 'cko-capture' === sanitize_text_field( $_POST['cko_payment_action'] ) ) {
+	if ( 'cko-capture' === sanitize_text_field( $_POST['cko_payment_action'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
 
-        // send capture request to cko.
-        $result = (array) WC_Checkoutcom_Api_Request::capture_payment( $order_id );
+		// send capture request to cko.
+		$result = (array) WC_Checkoutcom_Api_Request::capture_payment( $order_id );
 
-        if ( ! empty( $result['error'] ) ) {
-            WC_Admin_Notices::add_custom_notice( 'wc_checkout_com_cards', $result['error'] );
+		if ( ! empty( $result['error'] ) ) {
+			WC_Admin_Notices::add_custom_notice( 'wc_checkout_com_cards', $result['error'] );
 
-            return false;
-        }
+			return false;
+		}
 
-        // Set action id as woo transaction id.
+		// Set action id as woo transaction id.
 		$order->set_transaction_id( $result['action_id'] );
 		$order->update_meta_data( 'cko_payment_captured', true );
 
-        // Get cko capture status configured in admin.
-        $status = WC_Admin_Settings::get_option( 'ckocom_order_captured', 'processing' );
+		// Get cko capture status configured in admin.
+		$status = WC_Admin_Settings::get_option( 'ckocom_order_captured', 'processing' );
 
-        /* translators: %s: Action id. */
-        $message = sprintf( esc_html__( 'Checkout.com Payment Captured from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
+		/* translators: %s: Action id. */
+		$message = sprintf( esc_html__( 'Checkout.com Payment Captured from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
 
-        // add notes for the order and update status.
-        $order->add_order_note( $message );
-        $order->update_status( $status );
+		// add notes for the order and update status.
+		$order->add_order_note( $message );
+		$order->update_status( $status );
 
-        return true;
+		return true;
 
-    } elseif ( 'cko-void' === sanitize_text_field( $_POST['cko_payment_action'] ) ) {
-        // check if post is void.
-        // send void request to cko.
-        $result = (array) WC_Checkoutcom_Api_Request::void_payment( $order_id );
+	} elseif ( 'cko-void' === sanitize_text_field( $_POST['cko_payment_action'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
+		// check if post is void.
+		// send void request to cko.
+		$result = (array) WC_Checkoutcom_Api_Request::void_payment( $order_id );
 
-        if ( ! empty( $result['error'] ) ) {
-            WC_Admin_Notices::add_custom_notice( 'wc_checkout_com_cards', $result['error'] );
+		if ( ! empty( $result['error'] ) ) {
+			WC_Admin_Notices::add_custom_notice( 'wc_checkout_com_cards', $result['error'] );
 
-            return false;
-        }
+			return false;
+		}
 
-        // Set action id as woo transaction id.
+		// Set action id as woo transaction id.
 		$order->set_transaction_id( $result['action_id'] );
 		$order->update_meta_data( 'cko_payment_voided', true );
-        
-        // Get cko capture status configured in admin.
-        $status = WC_Admin_Settings::get_option( 'ckocom_order_void', 'cancelled' );
 
-        /* translators: %s: Action id. */
-        $message = sprintf( esc_html__( 'Checkout.com Payment Voided from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
+		// Get cko capture status configured in admin.
+		$status = WC_Admin_Settings::get_option( 'ckocom_order_void', 'cancelled' );
 
-        // add notes for the order and update status.
-        $order->add_order_note( $message );
-        $order->update_status( $status );
+		/* translators: %s: Action id. */
+		$message = sprintf( esc_html__( 'Checkout.com Payment Voided from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
 
-        // increase stock level.
-        wc_increase_stock_levels( $order );
+		// add notes for the order and update status.
+		$order->add_order_note( $message );
+		$order->update_status( $status );
 
-        return true;
+		// increase stock level.
+		wc_increase_stock_levels( $order );
 
-    } else {
-        WC_Admin_Notices::add_custom_notice( 'wc_checkout_com_cards', esc_html__( 'An error has occurred.', 'checkout-com-unified-payments-api' ) );
+		return true;
 
-        return false;
-    }
+	} else {
+		WC_Admin_Notices::add_custom_notice( 'wc_checkout_com_cards', esc_html__( 'An error has occurred.', 'checkout-com-unified-payments-api' ) );
+
+		return false;
+	}
 }
 
 add_action( 'woocommerce_thankyou', 'add_fawry_number' );
@@ -385,7 +386,7 @@ add_action( 'woocommerce_thankyou', 'add_fawry_number' );
  */
 function add_fawry_number( $order_id ) {
 
-    $order = wc_get_order( $order_id );
+	$order = wc_get_order( $order_id );
 
 	$fawry_number = $order->get_meta( 'cko_fawry_reference_number' );
 	$fawry        = __( 'Fawry reference number: ', 'checkout-com-unified-payments-api' );
@@ -514,7 +515,7 @@ add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_paypal',
  * @param WC_Order $renewal_order A WC_Order object created to record the renewal payment.
  */
 function subscription_payment( $renewal_total, $renewal_order ) {
-	include_once( 'includes/subscription/class-wc-checkoutcom-subscription.php' );
+	include_once 'includes/subscription/class-wc-checkoutcom-subscription.php';
 
 	WC_Checkoutcom_Subscription::renewal_payment( $renewal_total, $renewal_order );
 }
@@ -529,7 +530,7 @@ add_action( 'woocommerce_subscription_status_cancelled', 'subscription_cancelled
  * @return void
  */
 function subscription_cancelled( $subscription ) {
-	include_once( 'includes/subscription/class-wc-checkoutcom-subscription.php' );
+	include_once 'includes/subscription/class-wc-checkoutcom-subscription.php';
 
 	WC_Checkoutcom_Subscription::subscription_cancelled( $subscription );
 }
