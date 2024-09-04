@@ -27,7 +27,6 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Giropay extends WC_Gateway_Ch
 		$this->init_form_fields();
 
 		add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, [ $this, 'process_admin_options' ] );
-
 	}
 
 	/**
@@ -39,7 +38,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Giropay extends WC_Gateway_Ch
 		$message       = __( 'Pay with Giropay. You will be redirected upon place order', 'checkout-com-unified-payments-api' );
 
 		?>
-			<p style="margin-bottom: 0;"> <?php echo $message; ?> </p>
+			<p style="margin-bottom: 0;"> <?php echo esc_html( $message ); ?> </p>
 		<?php
 
 		if ( ! in_array( self::PAYMENT_METHOD, $apm_available, true ) ) {
@@ -49,7 +48,6 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Giropay extends WC_Gateway_Ch
 				</script>
 			<?php
 		}
-
 	}
 
 	/**
@@ -99,6 +97,5 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Giropay extends WC_Gateway_Ch
 	public function process_refund( $order_id, $amount = null, $reason = '' ) {
 
 		return parent::process_refund( $order_id, $amount, $reason );
-
 	}
 }

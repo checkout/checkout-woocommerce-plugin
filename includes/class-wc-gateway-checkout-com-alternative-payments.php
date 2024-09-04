@@ -7,21 +7,21 @@
 
 defined( 'ABSPATH' ) || exit;
 
-include_once __DIR__ . '/../templates/class-wc-checkoutcom-apm-templates.php';
-include_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-ideal.php';
-include_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-alipay.php';
-include_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-qpay.php';
-include_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-boleto.php';
-include_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-sepa.php';
-include_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-knet.php';
-include_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-bancontact.php';
-include_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-eps.php';
-include_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-poli.php';
-include_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-klarna.php';
-include_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-sofort.php';
-include_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-fawry.php';
-include_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-giropay.php';
-include_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-multibanco.php';
+require_once __DIR__ . '/../templates/class-wc-checkoutcom-apm-templates.php';
+require_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-ideal.php';
+require_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-alipay.php';
+require_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-qpay.php';
+require_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-boleto.php';
+require_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-sepa.php';
+require_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-knet.php';
+require_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-bancontact.php';
+require_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-eps.php';
+require_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-poli.php';
+require_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-klarna.php';
+require_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-sofort.php';
+require_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-fawry.php';
+require_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-giropay.php';
+require_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-multibanco.php';
 
 /**
  * Class WC_Gateway_Checkout_Com_Alternative_Payments for Alternative Payment method main class.

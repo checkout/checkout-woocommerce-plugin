@@ -51,7 +51,7 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 	 */
 	public function payment_scripts() {
 		// Load on Cart, Checkout, pay for order or add payment method pages.
-		if ( ! is_cart() && ! is_checkout() && ! isset( $_GET['pay_for_order'] ) && ! is_add_payment_method_page() ) {
+		if ( ! is_cart() && ! is_checkout() && ! isset( $_GET['pay_for_order'] ) && ! is_add_payment_method_page() ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 			return;
 		}
 
@@ -120,7 +120,7 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 	public function payment_fields() {
 
 		if ( ! empty( $this->get_option( 'description' ) ) ) {
-			echo  $this->get_option( 'description' );
+			echo esc_html( $this->get_option( 'description' ) );
 		}
 
 		?>
@@ -154,13 +154,14 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 		}
 
 		// Create payment with Google token.
-		$result = (array) ( new WC_Checkoutcom_Api_Request )->create_payment( $order, $google_token );
+		$result = (array) ( new WC_Checkoutcom_Api_Request() )->create_payment( $order, $google_token );
 
 		// Redirect to apm if redirection url is available.
 		if ( isset( $result['3d'] ) && ! empty( $result['3d'] ) ) {
 
 			$order->add_order_note(
 				sprintf(
+					/* translators: %s: URL */
 					esc_html__( 'Checkout.com 3d Redirect waiting. URL : %s', 'checkout-com-unified-payments-api' ),
 					$result['3d']
 				)
@@ -265,5 +266,4 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 
 		return true;
 	}
-
 }

@@ -71,7 +71,7 @@ class CKO_Paypal_Express {
 			$paypal_js_arg['client-id'] = 'ATbi1ysGm-jp4RmmAFz1EWH4dFpPd-VdXIWWzR4QZK5LAvDu_5atDY9dsUEJcLS5mTpR8Wb1l_m6Ameq';
 		}
 
-		$paypal_js_arg['merchant-id'] = $paypal_settings[ 'ckocom_paypal_merchant_id' ] ?? '';
+		$paypal_js_arg['merchant-id'] = $paypal_settings['ckocom_paypal_merchant_id'] ?? '';
 
 		$paypal_js_arg['disable-funding'] = 'credit,card,sepa';
 		$paypal_js_arg['commit']          = 'false';
@@ -88,16 +88,16 @@ class CKO_Paypal_Express {
 		wp_register_script( 'cko-paypal-script', $paypal_js_url, [ 'jquery' ], null );
 
 		$vars = [
-			'add_to_cart_url'                  => add_query_arg( [ 'cko_paypal_action' => 'express_add_to_cart'], WC()->api_request_url( 'CKO_Paypal_Woocommerce' ) ),
-			'create_order_url'                 => add_query_arg( [ 'cko_paypal_action' => 'express_create_order'], WC()->api_request_url( 'CKO_Paypal_Woocommerce' ) ),
-			'paypal_order_session_url'         => add_query_arg( [ 'cko_paypal_action' => 'express_paypal_order_session'], WC()->api_request_url( 'CKO_Paypal_Woocommerce' ) ),
+			'add_to_cart_url'                  => add_query_arg( [ 'cko_paypal_action' => 'express_add_to_cart' ], WC()->api_request_url( 'CKO_Paypal_Woocommerce' ) ),
+			'create_order_url'                 => add_query_arg( [ 'cko_paypal_action' => 'express_create_order' ], WC()->api_request_url( 'CKO_Paypal_Woocommerce' ) ),
+			'paypal_order_session_url'         => add_query_arg( [ 'cko_paypal_action' => 'express_paypal_order_session' ], WC()->api_request_url( 'CKO_Paypal_Woocommerce' ) ),
 			'cc_capture'                       => add_query_arg( [ 'cko_paypal_action' => 'cc_capture' ], WC()->api_request_url( 'CKO_Paypal_Woocommerce' ) ),
-			'woocommerce_process_checkout'     => wp_create_nonce('woocommerce-process_checkout'),
+			'woocommerce_process_checkout'     => wp_create_nonce( 'woocommerce-process_checkout' ),
 			'is_cart_contains_subscription'    => WC_Checkoutcom_Utility::is_cart_contains_subscription(),
 			'paypal_button_selector'           => '#cko-paypal-button-wrapper',
 			'redirect'                         => wc_get_checkout_url(),
 			'paypal_express_add_to_cart_nonce' => wp_create_nonce( 'checkoutcom_paypal_express_add_to_cart' ),
-            'debug'                            => 'yes' === WC_Admin_Settings::get_option( 'cko_console_logging', 'no' ),
+			'debug'                            => 'yes' === WC_Admin_Settings::get_option( 'cko_console_logging', 'no' ),
 		];
 
 		wp_localize_script( 'cko-paypal-script', 'cko_paypal_vars', $vars );
@@ -134,7 +134,7 @@ class CKO_Paypal_Express {
 
 	public function disable_other_gateways( array $methods ) {
 
-		if ( ! isset( $methods[ 'wc_checkout_com_paypal' ] ) ) {
+		if ( ! isset( $methods['wc_checkout_com_paypal'] ) ) {
 			return $methods;
 		}
 
@@ -145,7 +145,7 @@ class CKO_Paypal_Express {
 		$disable_all_gateway = ! empty( $cko_pc_id ) && ! empty( $cko_paypal_order_id );
 
 		if ( $disable_all_gateway ) {
-			return [ 'wc_checkout_com_paypal' => $methods[ 'wc_checkout_com_paypal' ] ];
+			return [ 'wc_checkout_com_paypal' => $methods['wc_checkout_com_paypal'] ];
 		}
 
 		return $methods;
@@ -158,7 +158,13 @@ class CKO_Paypal_Express {
 		// Check if PayPal session variable exist for current customer.
 		$paypal_session_exist = ! empty( $cko_pc_id ) && ! empty( $cko_paypal_order_id );
 
-		$cancel_url = add_query_arg( [ 'cko-paypal-session-cancel' => '1', 'cko-paypal-session-cancel-nonce' => wp_create_nonce( 'checkoutcom_paypal_cancel' ), ], wc_get_checkout_url() );
+		$cancel_url = add_query_arg(
+			[
+				'cko-paypal-session-cancel'       => '1',
+				'cko-paypal-session-cancel-nonce' => wp_create_nonce( 'checkoutcom_paypal_cancel' ),
+			],
+			wc_get_checkout_url()
+		);
 
 		if ( ! $paypal_session_exist ) {
 			return;
@@ -173,15 +179,17 @@ class CKO_Paypal_Express {
 		// translators: %3$ is funding source like "PayPal" or "Venmo", other placeholders are html tags for a link.
 			esc_html__(
 				'You are currently paying with PayPal. %1$s%2$sChoose another payment method%3$s.',
-				'woocommerce-paypal-payments'
+				'checkout-com-unified-payments-api'
 			),
 			'<br/>',
 			'<a href="' . esc_url( $cancel_url ) . '">',
 			'</a>',
 		);
 
-		?></p><?php
-		echo ob_get_clean();
+		?>
+		</p>
+		<?php
+		echo ob_get_clean(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 	}
 
 	/**
@@ -190,8 +198,8 @@ class CKO_Paypal_Express {
 	public function express_cancel_session() {
 
 		if (
-				! isset( $_GET[ 'cko-paypal-session-cancel-nonce' ] )
-				|| ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET[ 'cko-paypal-session-cancel-nonce' ] ) ), 'checkoutcom_paypal_cancel' )
+				! isset( $_GET['cko-paypal-session-cancel-nonce'] )
+				|| ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['cko-paypal-session-cancel-nonce'] ) ), 'checkoutcom_paypal_cancel' )
 		) {
 			return;
 		}
@@ -238,7 +246,8 @@ class CKO_Paypal_Express {
 
 				WC_Checkoutcom_Utility::cko_set_session( 'cko_pc_details', $response );
 
-			} catch ( CheckoutApiException $ex ) {}
+			} catch ( CheckoutApiException $ex ) {
+			}
 		}
 
 		if ( isset( $cko_pc_details['payment_request']['shipping']['address'] ) ) {
@@ -258,23 +267,23 @@ class CKO_Paypal_Express {
 
 				case 'billing_address_1':
 				case 'shipping_address_1':
-					return $paypal_shipping_address[ 'address_line1' ];
+					return $paypal_shipping_address['address_line1'];
 
 				case 'billing_address_2':
 				case 'shipping_address_2':
-					return $paypal_shipping_address[ 'address_line2' ]  ?? '';
+					return $paypal_shipping_address['address_line2'] ?? '';
 
 				case 'billing_city':
 				case 'shipping_city':
-					return $paypal_shipping_address[ 'city' ];
+					return $paypal_shipping_address['city'];
 
 				case 'billing_postcode':
 				case 'shipping_postcode':
-					return $paypal_shipping_address[ 'zip' ];
+					return $paypal_shipping_address['zip'];
 
 				case 'billing_country':
 				case 'shipping_country':
-					return $paypal_shipping_address[ 'country' ];
+					return $paypal_shipping_address['country'];
 			}
 		}
 

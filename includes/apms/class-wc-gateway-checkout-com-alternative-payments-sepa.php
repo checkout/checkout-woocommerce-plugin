@@ -127,13 +127,14 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Sepa extends WC_Gateway_Check
 		if ( 0 >= $order->get_total() ) { // 0 cost order.
 			$message = esc_html__( 'Checkout.com - SEPA payment for free order.', 'checkout-com-unified-payments-api' );
 
-			// save src id for future use.
+			// phpcs:ignore WordPress.Security.NonceVerification.Missing
 			$post_data = sanitize_post( $_POST );
 			$method    = WC_Checkoutcom_Api_Request::get_apm_method( $post_data, $order, 'sepa' );
 
 			if ( ! empty( $method->id ) ) {
 				$status = WC_Admin_Settings::get_option( 'ckocom_order_captured', 'processing' );
 
+				// save src id for future use.
 				if ( class_exists( 'WC_Subscriptions_Order' ) ) {
 					WC_Checkoutcom_Subscription::save_source_id( $order_id, $order, $method->id );
 				}
@@ -251,7 +252,6 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Sepa extends WC_Gateway_Check
 			'result'   => 'success',
 			'redirect' => $this->get_return_url( $order ),
 		];
-
 	}
 
 	/**
@@ -266,7 +266,5 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Sepa extends WC_Gateway_Check
 	public function process_refund( $order_id, $amount = null, $reason = '' ) {
 
 		return parent::process_refund( $order_id, $amount, $reason );
-
 	}
-
 }
