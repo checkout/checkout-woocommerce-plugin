@@ -114,6 +114,5 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Boleto extends WC_Gateway_Che
 	public function process_refund( $order_id, $amount = null, $reason = '' ) {
 
 		return parent::process_refund( $order_id, $amount, $reason );
-
 	}
 }

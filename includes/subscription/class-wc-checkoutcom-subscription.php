@@ -7,7 +7,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-include_once WC_CHECKOUTCOM_PLUGIN_PATH . '/includes/api/class-wc-checkoutcom-api-request.php';
+require_once WC_CHECKOUTCOM_PLUGIN_PATH . '/includes/api/class-wc-checkoutcom-api-request.php';
 
 /**
  *  This class handles the payment for subscription renewal.

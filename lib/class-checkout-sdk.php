@@ -9,7 +9,7 @@ use Checkout\CheckoutSdk;
 use Checkout\Environment;
 use Checkout\CheckoutArgumentException;
 
-include_once dirname( __DIR__ ) . '/includes/api/class-wc-checkoutcom-utility.php';
+require_once dirname( __DIR__ ) . '/includes/api/class-wc-checkoutcom-utility.php';
 
 /**
  * Wrapper class around the Checkout.com SDK.
