@@ -479,10 +479,10 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 	 * @return void
 	 */
 	public function applepay_sesion() {
-        // phpcs:disable WordPress.Security.NonceVerification.Missing
-		$url          = isset( $_POST['url'] ) ? sanitize_url( $_POST['url'] ) : '';
-		$domain       = isset( $_POST['domain'] ) ? sanitize_url( $_POST['domain'] ) : '';
-		$display_name = isset( $_POST['displayName'] ) ? sanitize_url( $_POST['displayName'] ) : '';
+		// phpcs:disable WordPress.Security.NonceVerification.Missing
+		$url          = isset( $_POST['url'] ) ? sanitize_text_field( $_POST['url'] ) : '';
+		$domain       = isset( $_POST['domain'] ) ? sanitize_text_field( $_POST['domain'] ) : '';
+		$display_name = isset( $_POST['displayName'] ) ? sanitize_text_field( $_POST['displayName'] ) : '';
 		// phpcs:enable
 
 		$merchant_id     = $this->get_option( 'ckocom_apple_mercahnt_id' );
