@@ -1,10 +1,10 @@
 ﻿=== Checkout.com Payment Gateway ===
 Contributors: checkoutintegration
 Tags: checkout, payments, credit card, payment gateway, apple pay, google pay, payment request
-Requires at least: 4.0
+Requires at least: 5.0
 Stable tag: trunk
-Requires PHP: 7.2
-Tested up to: 6.0
+Requires PHP: 7.3
+Tested up to: 6.4.3
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -171,7 +171,48 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
-v4.4.12 3th March 2023
+v4.7.0 12th July 2024
+- **[tweak]** Upgrade Klarna integration
+
+v4.6.0 27th June 2024
+- **[feat]** Upgrade PayPal with Express Checkout
+- **[feat]** Update iDEAL APM with latest standard
+
+v4.5.0 15th Mar 2024
+- **[feat]** Upgrade checkout-sdk-php library
+- **[feat]** Updated PayPal integration
+- **[fix]** PHP notices and warnings
+
+v4.4.20 31st Jan 2024
+- **[tweak]** Add order note when 3ds redirection happens
+- **[tweak]** Disable new webhook event from webhook registration
+
+v4.4.19 17th Jan 2024
+- **[tweak]** Add new Webhook event types
+- **[fix]** PHP notices and warnings
+
+v4.4.18 11th Jan 2024
+- **[tweak]** Apple Pay button condition to show on checkout page
+- **[fix]** Idempotency key not working after failed payment request
+
+v4.4.17 4th Dec 2023
+- **[fix]** Fix incorrect use of method
+
+v4.4.16 24th Nov 2023
+- **[tweak]** WC HPOS related fixes
+- **[tweak]** Add new configuration section to add ABC fallback account for refund process
+- **[fix]** PHP Non-static method call statically error
+
+v4.4.15 26th Sep 2023
+- **[tweak]** Update IBAN input field validation and styling
+
+v4.4.14 20th March 2023
+- **[tweak]** Update Giropay source property and description property
+
+v4.4.13 15th March 2023
+- **[tweak]** Add payment retry if 3ds redirection link is expired with idempotency key
+
+v4.4.12 3rd March 2023
 - **[tweak]** Update style of co-badged cards choice option
 - **[tweak]** Implement idempotency key for payment request to avoid duplicate payment
 - **[fix]** Credit card input filed not showing on small screen device

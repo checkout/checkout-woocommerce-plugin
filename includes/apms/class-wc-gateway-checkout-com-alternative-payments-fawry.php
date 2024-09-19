@@ -55,7 +55,6 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Fawry extends WC_Gateway_Chec
 	/**
 	 * Process Fawry APM payment.
 	 *
-	 * @global $woocommerce
 	 * @param int $order_id Order ID.
 	 * @return array
 	 */
@@ -64,15 +63,13 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Fawry extends WC_Gateway_Chec
 			session_start();
 		}
 
-		global $woocommerce;
-
 		$order = wc_get_order( $order_id );
 
 		// create alternative payment.
 		$result = (array) WC_Checkoutcom_Api_Request::create_apm_payment( $order, self::PAYMENT_METHOD );
 
 		// check if result has error and return error message.
-		if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {
+		if ( ! empty( $result['error'] ) ) {
 			WC_Checkoutcom_Utility::wc_add_notice_self( $result['error'], 'error' );
 			return;
 		}
@@ -81,8 +78,8 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Fawry extends WC_Gateway_Chec
 		$message = '';
 
 		if ( self::PAYMENT_METHOD === $result['source']['type'] ) {
-			update_post_meta( $order_id, 'cko_fawry_reference_number', $result['source']['reference_number'] );
-			update_post_meta( $order_id, 'cko_payment_authorized', true );
+			$order->update_meta_data( 'cko_fawry_reference_number', $result['source']['reference_number'] );
+			$order->update_meta_data( 'cko_payment_authorized', true );
 
 			// Get cko auth status configured in admin.
 			$message = sprintf(
@@ -102,8 +99,8 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Fawry extends WC_Gateway_Chec
 			}
 		}
 
-		update_post_meta( $order_id, '_transaction_id', $result['id'] );
-		update_post_meta( $order_id, '_cko_payment_id', $result['id'] );
+		$order->set_transaction_id( $result['id'] );
+		$order->update_meta_data( '_cko_payment_id', $result['id'] );
 
 		// add notes for the order and update status.
 		$order->add_order_note( $message );

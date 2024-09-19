@@ -5,8 +5,7 @@
  * @package wc_checkout_com
  */
 
-use Checkout\CheckoutDefaultSdk;
-use Checkout\CheckoutFourSdk;
+use Checkout\CheckoutSdk;
 use Checkout\Environment;
 use Checkout\CheckoutArgumentException;
 
@@ -35,23 +34,29 @@ class Checkout_SDK {
 
 	/**
 	 * Constructor.
+	 *
+	 * @param bool $use_fallback Use Fallback account flag.
 	 */
-	public function __construct() {
-
+	public function __construct( $use_fallback = false ) {
 		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
 		$environment   = 'sandbox' === $core_settings['ckocom_environment'] ? Environment::sandbox() : Environment::production();
 
 		$this->nas_account_type = cko_is_nas_account();
 
-		if ( $this->nas_account_type ) {
-			$builder = CheckoutFourSdk::staticKeys();
+		if ( $this->nas_account_type && false === $use_fallback ) {
+			$builder = CheckoutSdk::builder()->staticKeys();
 		} else {
-			$builder = CheckoutDefaultSdk::staticKeys();
+			$builder = CheckoutSdk::builder()->previous()->staticKeys();
 		}
 
-		$builder->setPublicKey( $core_settings['ckocom_pk'] );
-		$builder->setSecretKey( $core_settings['ckocom_sk'] );
-		$builder->setEnvironment( $environment );
+		$builder->publicKey( $core_settings['ckocom_pk'] );
+		$builder->secretKey( $core_settings['ckocom_sk'] );
+		$builder->environment( $environment );
+
+		if ( $use_fallback ) {
+			$builder->publicKey( $core_settings['fallback_ckocom_pk'] );
+			$builder->secretKey( $core_settings['fallback_ckocom_sk'] );
+		}
 
 		try {
 
@@ -78,9 +83,9 @@ class Checkout_SDK {
 	 */
 	public function get_payment_request() {
 		if ( $this->nas_account_type ) {
-			return new Checkout\Payments\Four\Request\PaymentRequest();
+			return new Checkout\Payments\Request\PaymentRequest();
 		} else {
-			return new Checkout\Payments\PaymentRequest();
+			return new Checkout\Payments\Previous\PaymentRequest();
 		}
 	}
 
@@ -91,10 +96,9 @@ class Checkout_SDK {
 	 */
 	public function get_capture_request() {
 		if ( $this->nas_account_type ) {
-			return new Checkout\Payments\Four\CaptureRequest();
-		} else {
 			return new Checkout\Payments\CaptureRequest();
+		} else {
+			return new Checkout\Payments\Previous\CaptureRequest();
 		}
 	}
-
 }

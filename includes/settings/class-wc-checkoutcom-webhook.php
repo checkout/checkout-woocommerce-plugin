@@ -6,7 +6,7 @@
  */
 
 use Checkout\CheckoutApiException;
-use Checkout\Webhooks\WebhookRequest;
+use Checkout\Webhooks\Previous\WebhookRequest;
 
 include_once 'class-wc-checkoutcom-workflows.php';
 
@@ -146,6 +146,10 @@ class WC_Checkoutcom_Webhook {
 			'payment_captured',
 			'payment_chargeback',
 			'payment_declined',
+			'payment_authentication_failed',
+//			'payment_authorized',
+//			'payment_retry_scheduled',
+//			'payment_returned',
 			'payment_expired',
 			'payment_paid',
 			'payment_pending',

@@ -5,24 +5,24 @@
  * @package wc_checkout_com
  */
 
-use Checkout\Apm\Klarna\CreditSessionRequest;
 use Checkout\CheckoutApiException;
 use Checkout\CheckoutUtils;
 use Checkout\Common\Address;
+use Checkout\Common\AccountHolder;
 use Checkout\Common\ChallengeIndicatorType;
 use Checkout\Common\CustomerRequest;
-use Checkout\Common\Four\Product;
+use Checkout\Payments\Product;
 use Checkout\Payments\BillingDescriptor;
-use Checkout\Payments\PaymentRequest;
 use Checkout\Payments\PaymentType;
 use Checkout\Payments\PreferredSchema;
 use Checkout\Payments\ProcessingSettings;
 use Checkout\Payments\RefundRequest;
 use Checkout\Payments\ShippingDetails;
-use Checkout\Payments\Source\Apm\FawryProduct;
-use Checkout\Payments\Source\Apm\RequestPayPalSource;
-use Checkout\Payments\Source\RequestIdSource;
-use Checkout\Payments\Source\RequestTokenSource;
+use Checkout\Payments\Request\Source\Apm\FawryProduct;
+use Checkout\Payments\Previous\Source\Apm\RequestPayPalSource;
+use Checkout\Payments\Request\Source\Contexts\PaymentContextsKlarnaSource;
+use Checkout\Payments\Request\Source\RequestIdSource;
+use Checkout\Payments\Request\Source\RequestTokenSource;
 use Checkout\Payments\ThreeDsRequest;
 use Checkout\Payments\VoidRequest;
 use Checkout\Tokens\ApplePayTokenData;
@@ -44,6 +44,7 @@ class WC_Checkoutcom_Api_Request {
 	 * @param WC_Order $order Order object.
 	 * @param array    $arg  Arguments.
 	 * @param string   $subscription Subscription renewal flag.
+	 * @param bool     $retry_idempotency_key Retry idempotency.
 	 *
 	 * @return array
 	 */
@@ -64,11 +65,18 @@ class WC_Checkoutcom_Api_Request {
 		$checkout = new Checkout_SDK();
 
 		try {
-			$cko_idempotency_key = $request_param->metadata['order_id'] . '-' . $order->get_order_key();
+			$three_ds_action_id = ( ! empty( WC()->session ) ) ? WC()->session->get( '3ds_action_id' ) : null;
+
+			$cko_idempotency_key = sprintf(
+				'%s-%s-%s',
+				$request_param->metadata['order_id'],
+				$order->get_order_key(),
+				$three_ds_action_id
+			);
 
 			// Append time.
 			if ( true === $retry_idempotency_key ) {
-				$cko_idempotency_key .= '-' . date( 'Y-m-d h:i:s' );
+				$cko_idempotency_key .= '-' . gmdate( 'Y-m-d h:i:s' );
 			}
 
 			// Call to create charge.
@@ -108,7 +116,8 @@ class WC_Checkoutcom_Api_Request {
 
 				// Set payment id post meta if the payment id declined.
 				if ( 'Declined' === $response['status'] ) {
-					update_post_meta( $order->get_id(), '_cko_payment_id', $response['id'] );
+					$order->update_meta_data( '_cko_payment_id', $response['id'] );
+					$order->save();
 				}
 
 				$error_message = __( 'An error has occurred while processing your payment. Please check your card details and try again. ', 'checkout-com-unified-payments-api' );
@@ -123,6 +132,8 @@ class WC_Checkoutcom_Api_Request {
 				}
 
 				WC_Checkoutcom_Utility::logger( $error_message, $response );
+
+				WC()->session->set( '3ds_action_id', $response['action_id'] );
 
 				return [ 'error' => $error_message ];
 			}
@@ -161,7 +172,7 @@ class WC_Checkoutcom_Api_Request {
 		$mada_enable        = '1' === WC_Admin_Settings::get_option( 'ckocom_card_mada', '0' );
 		$save_card          = WC_Admin_Settings::get_option( 'ckocom_card_saved' );
 		$google_settings    = get_option( 'woocommerce_wc_checkout_com_google_pay_settings' );
-		$is_google_threeds  = 1 === absint( $google_settings['ckocom_google_threed'] ) && null === $subscription;
+		$is_google_threeds  = ! empty( $google_settings['ckocom_google_threed'] ) && 1 === absint( $google_settings['ckocom_google_threed'] ) && null === $subscription;
 		$is_paypal_renewal  = ( 'wc_checkout_com_paypal' === $order->get_payment_method() ) && ( ! is_null( $subscription ) );
 
 		$is_save_card   = false;
@@ -252,12 +263,19 @@ class WC_Checkoutcom_Api_Request {
 
 		$checkout              = new Checkout_SDK();
 		$payment               = $checkout->get_payment_request();
-		$payment->source       = $method;
 		$payment->capture      = $auto_capture;
 		$payment->amount       = $amount_cents;
 		$payment->currency     = $order->get_currency();
 		$payment->reference    = $order->get_order_number();
 		$payment->payment_type = PaymentType::$regular;
+
+		if ( 'giropay' === $method->type && cko_is_nas_account() ) {
+			$payment->description = $method->purpose;
+
+			unset( $method->purpose );
+		}
+
+		$payment->source = $method;
 
 		$email = $post_data['billing_email'];
 		$name  = $post_data['billing_first_name'] . ' ' . $post_data['billing_last_name'];
@@ -288,16 +306,17 @@ class WC_Checkoutcom_Api_Request {
 		// Check for the subscription flag.
 		if ( ! is_null( $subscription ) ) {
 			$payment->merchant_initiated = true;
-			$payment->payment_type       = 'Recurring';
+			$payment->payment_type       = PaymentType::$recurring;
 			$payment->capture            = true;
 
 			if ( 'wc_checkout_com_alternative_payments_sepa' !== $order->get_payment_method() ) {
-				$payment->previous_payment_id = get_post_meta( $arg['parent_order_id'], '_cko_payment_id', true ) ?? null;
+				$parent_order                 = wc_get_order( $arg['parent_order_id'] );
+				$payment->previous_payment_id = $parent_order->get_meta( '_cko_payment_id', true ) ?? null;
 			}
 		} elseif ( function_exists( 'wcs_order_contains_subscription' ) ) {
 			if ( wcs_order_contains_subscription( $order, 'parent' ) ) {
 				$payment->merchant_initiated = false;
-				$payment->payment_type       = 'Recurring';
+				$payment->payment_type       = PaymentType::$recurring;
 
 				// For PayPal subscription order.
 				if ( 'paypal' === $method->type ) {
@@ -571,7 +590,9 @@ class WC_Checkoutcom_Api_Request {
 
 				// Set payment id post meta if the payment id declined.
 				if ( 'Declined' === $response['status'] ) {
-					update_post_meta( $response['metadata']['order_id'], '_cko_payment_id', $response['id'] );
+					$order = wc_get_order( $response['metadata']['order_id'] );
+					$order->update_meta_data( '_cko_payment_id', $response['id'] );
+					$order->save();
 				}
 
 				$error_message = __( 'An error has occurred while processing your payment. Please check your card details and try again.', 'checkout-com-unified-payments-api' );
@@ -587,6 +608,8 @@ class WC_Checkoutcom_Api_Request {
 				}
 
 				WC_Checkoutcom_Utility::logger( $error_message, $response );
+
+				WC()->session->set( '3ds_action_id', $response['actions'][0]['id'] );
 
 				$arr = [ 'error' => $error_message ];
 
@@ -657,11 +680,13 @@ class WC_Checkoutcom_Api_Request {
 	/**
 	 * Perform capture.
 	 *
+	 * @param int $order_id Order ID.
+	 *
 	 * @return array|mixed
 	 */
-	public static function capture_payment() {
-		$order_id       = sanitize_text_field( $_POST['post_ID'] );
-		$cko_payment_id = get_post_meta( $order_id, '_cko_payment_id', true );
+	public static function capture_payment( $order_id ) {
+		$order          = wc_get_order( $order_id );
+		$cko_payment_id = $order->get_meta( '_cko_payment_id' );
 
 		// Check if cko_payment_id is empty.
 		if ( empty( $cko_payment_id ) ) {
@@ -670,7 +695,6 @@ class WC_Checkoutcom_Api_Request {
 			return [ 'error' => $error_message ];
 		}
 
-		$order         = wc_get_order( $order_id );
 		$amount        = $order->get_total();
 		$amount_cents  = WC_Checkoutcom_Utility::value_to_decimal( $amount, $order->get_currency() );
 		$gateway_debug = 'yes' === WC_Admin_Settings::get_option( 'cko_gateway_responses', 'no' );
@@ -684,7 +708,7 @@ class WC_Checkoutcom_Api_Request {
 
 			if ( 'Voided' === $details['status'] || 'Captured' === $details['status'] ) {
 				$error_message = sprintf(
-					/* translators: 1: Order ID. */
+				/* translators: 1: Order ID. */
 					esc_html__( 'Payment has already been voided or captured on Checkout.com hub for order Id : %s', 'checkout-com-unified-payments-api' ),
 					$order_id
 				);
@@ -701,7 +725,7 @@ class WC_Checkoutcom_Api_Request {
 
 			if ( ! WC_Checkoutcom_Utility::is_successful( $response ) ) {
 				$error_message = sprintf(
-					/* translators: 1: Order ID. */
+				/* translators: 1: Order ID. */
 					esc_html__( 'An error has occurred while processing your capture payment on Checkout.com hub. Order Id : %s', 'checkout-com-unified-payments-api' ),
 					$order_id
 				);
@@ -734,11 +758,13 @@ class WC_Checkoutcom_Api_Request {
 	/**
 	 * Perform Void.
 	 *
+	 * @param int $order_id Order ID.
+	 *
 	 * @return array|mixed
 	 */
-	public static function void_payment() {
-		$order_id       = sanitize_text_field( $_POST['post_ID'] );
-		$cko_payment_id = get_post_meta( $order_id, '_cko_payment_id', true );
+	public static function void_payment( $order_id ) {
+		$order          = wc_get_order( $order_id );
+		$cko_payment_id = $order->get_meta( '_cko_payment_id' );
 
 		// Check if cko_payment_id is empty.
 		if ( empty( $cko_payment_id ) ) {
@@ -758,7 +784,7 @@ class WC_Checkoutcom_Api_Request {
 
 			if ( 'Voided' === $details['status'] || 'Captured' === $details['status'] ) {
 				$error_message = sprintf(
-					/* translators: 1: Order ID. */
+				/* translators: 1: Order ID. */
 					esc_html__( 'Payment has already been voided or captured on Checkout.com hub for order Id : %s', 'checkout-com-unified-payments-api' ),
 					$order_id
 				);
@@ -775,7 +801,7 @@ class WC_Checkoutcom_Api_Request {
 
 			if ( ! WC_Checkoutcom_Utility::is_successful( $response ) ) {
 				$error_message = sprintf(
-					/* translators: 1: Order ID. */
+				/* translators: 1: Order ID. */
 					esc_html__( 'An error has occurred while processing your void payment on Checkout.com hub. Order Id : %s', 'checkout-com-unified-payments-api' ),
 					$order_id
 				);
@@ -814,7 +840,10 @@ class WC_Checkoutcom_Api_Request {
 	 * @return array|mixed
 	 */
 	public static function refund_payment( $order_id, $order ) {
-		$cko_payment_id = get_post_meta( $order_id, '_cko_payment_id', true );
+		$core_settings      = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$is_fallback_active = ( 'yes' === ( $core_settings['enable_fallback_ac'] ?? 'no' ) );
+
+		$cko_payment_id = $order->get_meta( '_cko_payment_id' );
 
 		// Check if cko_payment_id is empty.
 		if ( empty( $cko_payment_id ) ) {
@@ -838,8 +867,67 @@ class WC_Checkoutcom_Api_Request {
 		$checkout = new Checkout_SDK();
 
 		try {
-			// Check if payment is already voided or captured on checkout.com hub.
-			$details = $checkout->get_builder()->getPaymentsClient()->getPaymentDetails( $cko_payment_id );
+
+			try {
+				// Check if payment is already voided or captured on checkout.com hub.
+				$details = $checkout->get_builder()->getPaymentsClient()->getPaymentDetails( $cko_payment_id );
+
+			} catch ( CheckoutApiException $ex ) {
+
+				// Handle above try block exception.
+				if ( ! $is_fallback_active ) {
+					$error_message = esc_html__( 'An error has occurred while processing your refund. ', 'checkout-com-unified-payments-api' );
+
+					// check if gateway response is enabled from module settings.
+					if ( $gateway_debug ) {
+						$error_message .= $ex->getMessage();
+					}
+
+					WC_Checkoutcom_Utility::logger( $error_message, $ex );
+
+					return [ 'error' => $error_message ];
+				}
+
+				// Handle Retry with fallback account.
+				$checkout = new Checkout_SDK( true );
+				$details  = $checkout->get_builder()->getPaymentsClient()->getPaymentDetails( $cko_payment_id );
+
+				if ( 'Refunded' === $details['status'] && ! $refund_is_less ) {
+					$error_message = 'Payment has already been refunded on Checkout.com hub for order Id : ' . $order_id;
+
+					return [ 'error' => $error_message ];
+				}
+
+				$refund_request            = new RefundRequest();
+				$refund_request->reference = $order->get_order_number();
+
+				// Process partial refund if amount is less than order amount.
+				if ( $refund_is_less ) {
+					$refund_request->amount = $refund_amount_cents;
+
+					$_SESSION['cko-refund-is-less'] = $refund_is_less;
+				}
+
+				$order->add_order_note( esc_html__( 'Checkout.com Refund : Process via fallback account.', 'checkout-com-unified-payments-api' ) );
+
+				$response = $checkout->get_builder()->getPaymentsClient()->refundPayment( $cko_payment_id, $refund_request );
+
+				if ( ! WC_Checkoutcom_Utility::is_successful( $response ) ) {
+					/* translators: 1: Order ID. */
+					$error_message = sprintf( esc_html__( 'An error has occurred while processing your refund payment on Checkout.com hub. Order Id : %s', 'checkout-com-unified-payments-api' ), $order_id );
+
+					// Check if gateway response is enabled from module settings.
+					if ( $gateway_debug ) {
+						$error_message .= $response;
+					}
+
+					WC_Checkoutcom_Utility::logger( $error_message, $response );
+
+					return [ 'error' => $error_message ];
+				} else {
+					return $response;
+				}
+			}
 
 			if ( 'Refunded' === $details['status'] && ! $refund_is_less ) {
 				$error_message = 'Payment has already been refunded on Checkout.com hub for order Id : ' . $order_id;
@@ -854,7 +942,6 @@ class WC_Checkoutcom_Api_Request {
 			if ( $refund_is_less ) {
 				$refund_request->amount = $refund_amount_cents;
 
-				// Set is_mada in session.
 				$_SESSION['cko-refund-is-less'] = $refund_is_less;
 			}
 
@@ -877,35 +964,6 @@ class WC_Checkoutcom_Api_Request {
 			}
 		} catch ( CheckoutApiException $ex ) {
 			$error_message = esc_html__( 'An error has occurred while processing your refund. ', 'checkout-com-unified-payments-api' );
-
-			// check if gateway response is enabled from module settings.
-			if ( $gateway_debug ) {
-				$error_message .= $ex->getMessage();
-			}
-
-			WC_Checkoutcom_Utility::logger( $error_message, $ex );
-
-			return [ 'error' => $error_message ];
-		}
-	}
-
-	/**
-	 * Return ideal banks info.
-	 *
-	 * @return array
-	 */
-	public static function get_ideal_bank() {
-		$gateway_debug = 'yes' === WC_Admin_Settings::get_option( 'cko_gateway_responses', 'no' );
-
-		// Initialize the Checkout Api.
-		$checkout = new Checkout_SDK();
-
-		try {
-
-			return $checkout->get_builder()->getIdealClient()->getIssuers();
-
-		} catch ( CheckoutApiException $ex ) {
-			$error_message = __( 'An error has occured while retrieving ideal bank details.', 'checkout-com-unified-payments-api' );
 
 			// check if gateway response is enabled from module settings.
 			if ( $gateway_debug ) {
@@ -1028,8 +1086,23 @@ class WC_Checkoutcom_Api_Request {
 		$total_amount = WC()->cart->total;
 		$amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $total_amount, get_woocommerce_currency() );
 
-		foreach ( $items as $item => $values ) {
+		$woo_locale    = str_replace( '_', '-', get_locale() );
+		$locale        = substr( $woo_locale, 0, 5 );
 
+		$processing         = new Checkout\Payments\Contexts\PaymentContextsProcessing();
+		$processing->locale = strtolower( $locale );
+
+		$billing_address          = new Address();
+		$billing_address->country = WC()->customer->get_billing_country();
+
+		$account_holder                  = new AccountHolder();
+		$account_holder->billing_address =  $billing_address;
+
+		$source                 = new PaymentContextsKlarnaSource();
+		$source->account_holder = $account_holder;
+
+
+		foreach ( $items as $item => $values ) {
 			$_product         = wc_get_product( $values['data']->get_id() );
 			$wc_product       = wc_get_product( $values['product_id'] );
 			$price_excl_tax   = wc_get_price_excluding_tax( $wc_product );
@@ -1041,26 +1114,20 @@ class WC_Checkoutcom_Api_Request {
 				$unit_price_cents       = WC_Checkoutcom_Utility::value_to_decimal( $price_incl_tax, get_woocommerce_currency() );
 				$tax_amount             = $price_incl_tax - $price_excl_tax;
 				$total_tax_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $tax_amount, get_woocommerce_currency() );
-				$tax                    = WC_Tax::get_rates();
-				$reset_tax              = reset( $tax )['rate'];
-				$tax_rate               = round( $reset_tax );
 			} else {
-				$tax_rate               = 0;
 				$total_tax_amount_cents = 0;
 			}
 
-			$products[] = [
-				'name'                  => $_product->get_title(),
-				'quantity'              => $values['quantity'],
-				'unit_price'            => $unit_price_cents,
-				'tax_rate'              => $tax_rate * 100,
-				'total_amount'          => $unit_price_cents * $values['quantity'],
-				'total_tax_amount'      => $total_tax_amount_cents,
-				'type'                  => 'physical',
-				'reference'             => $_product->get_sku(),
-				'total_discount_amount' => 0,
+			$item                  = new Checkout\Payments\Contexts\PaymentContextsItems();
+			$item->name            = $_product->get_title();
+			$item->unit_price      = $unit_price_cents;
+			$item->quantity        = $values['quantity'];
+			$item->total_amount    = $unit_price_cents * $values['quantity'];
+			$item->reference       = $_product->get_sku();
+			$item->tax_amount      = $total_tax_amount_cents;
+			$item->discount_amount = 0;
 
-			];
+			$products[] = $item;
 		}
 
 		$chosen_methods  = wc_get_chosen_shipping_method_ids();
@@ -1076,67 +1143,50 @@ class WC_Checkoutcom_Api_Request {
 
 				$total_tax_amount       = WC()->cart->get_shipping_tax();
 				$total_tax_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $total_tax_amount, get_woocommerce_currency() );
-
-				$shipping_rates = WC_Tax::get_shipping_tax_rates();
-				$vat            = array_shift( $shipping_rates );
-
-				if ( isset( $vat['rate'] ) ) {
-					$shipping_tax_rate = round( $vat['rate'] * 100 );
-				} else {
-					$shipping_tax_rate = 0;
-				}
 			} else {
-				$shipping_tax_rate      = 0;
 				$total_tax_amount_cents = 0;
 			}
 
-			$products[] = [
-				'name'                  => $chosen_shipping,
-				'quantity'              => 1,
-				'unit_price'            => $shipping_amount_cents,
-				'tax_rate'              => $shipping_tax_rate,
-				'total_amount'          => $shipping_amount_cents,
-				'total_tax_amount'      => $total_tax_amount_cents,
-				'type'                  => 'shipping_fee',
-				'reference'             => $chosen_shipping,
-				'total_discount_amount' => 0,
-			];
+			$item                  = new Checkout\Payments\Contexts\PaymentContextsItems();
+			$item->name            = $chosen_shipping;
+			$item->unit_price      = $shipping_amount_cents;
+			$item->quantity        = 1;
+			$item->total_amount    = $shipping_amount_cents;
+			$item->reference       = $chosen_shipping;
+			$item->tax_amount      = $total_tax_amount_cents;
+			$item->discount_amount = 0;
+
+			$products[] = $item;
 		}
 
-		$total_tax_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( WC()->cart->get_total_tax(), get_woocommerce_currency() );
-
-		$gateway_debug = 'yes' === WC_Admin_Settings::get_option( 'cko_gateway_responses', 'no' );
-		$woo_locale    = str_replace( '_', '-', get_locale() );
-		$locale        = substr( $woo_locale, 0, 5 );
-		$country       = WC()->customer->get_billing_country();
+		$paymentContextsRequest               = new Checkout\Payments\Contexts\PaymentContextsRequest();
+		$paymentContextsRequest->source       = $source;
+		$paymentContextsRequest->amount       = $amount_cents;
+		$paymentContextsRequest->currency     = get_woocommerce_currency();
+		$paymentContextsRequest->payment_type = PaymentType::$regular;
+		$paymentContextsRequest->items        = $products;
+		$paymentContextsRequest->processing   = $processing;
 
 		// Initialize the Checkout Api.
 		$checkout = new Checkout_SDK();
 
 		try {
-			$credit_session_request                   = new CreditSessionRequest();
-			$credit_session_request->purchase_country = $country;
-			$credit_session_request->currency         = get_woocommerce_currency();
-			$credit_session_request->locale           = strtolower( $locale );
-			$credit_session_request->amount           = $amount_cents;
-			$credit_session_request->tax_amount       = $total_tax_amount_cents;
-			$credit_session_request->products         = $products;
+			$response = $checkout->get_builder()->getPaymentContextsClient()->createPaymentContexts( $paymentContextsRequest );
 
-			$builder = $checkout->get_builder();
+			WC_Checkoutcom_Utility::cko_set_session( 'cko_klarna_pc_id', $response['id'] );
 
-			// Klarna supports for ABC AC type only.
-			if ( method_exists( $builder, 'getKlarnaClient' ) ) {
-				return $builder->getKlarnaClient()->createCreditSession( $credit_session_request );
-			}
+			return $response;
+
 		} catch ( CheckoutApiException $ex ) {
-			$error_message = esc_html__( 'An error has occurred while creating klarna session.', 'checkout-com-unified-payments-api' );
+			$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
 
-			// Check if gateway response is enabled from module settings.
+			$error_message = 'An error has occurred while processing Klarna createPaymentContexts request. ';
+
 			if ( $gateway_debug ) {
 				$error_message .= $ex->getMessage();
 			}
 
-			WC_Checkoutcom_Utility::logger( $error_message, $ex );
+			WC_Checkoutcom_Utility::logger( $error_message, $ex->error_details );
 
 			return [ 'error' => $error_message ];
 		}
@@ -1398,22 +1448,30 @@ class WC_Checkoutcom_Api_Request {
 			return false;
 		}
 
-		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$core_settings      = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$is_fallback_active = ( 'yes' === ( $core_settings['enable_fallback_ac'] ?? 'no' ) );
 
 		$core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
-
-		$wp_request_headers = [
-			'Authorization' => $core_settings['ckocom_sk'],
-		];
 
 		$wp_response = wp_remote_post(
 			$url,
 			[
-				'headers' => $wp_request_headers,
+				'headers' => [ 'Authorization' => $core_settings['ckocom_sk'] ],
 			]
 		);
 
-		if ( 200 !== wp_remote_retrieve_response_code( $wp_response ) ) {
+		// If unauthorized & fallback ABC setup retry with those cred.
+		if ( 401 === wp_remote_retrieve_response_code( $wp_response ) && $is_fallback_active ) {
+
+			$wp_response = wp_remote_post(
+				$url,
+				[
+					'headers' => [ 'Authorization' => $core_settings['fallback_ckocom_sk'] ],
+				]
+			);
+
+		} elseif ( 200 !== wp_remote_retrieve_response_code( $wp_response ) ) {
+
 			WC_Checkoutcom_Utility::logger(
 				sprintf(
 					'An error has occurred while mandate cancel Order # %d request. Response code: %d',
@@ -1441,6 +1499,8 @@ class WC_Checkoutcom_Api_Request {
 
 	/**
 	 * Checks if URL is giving 200 OK response by pinging.
+	 *
+	 * @param string $url URL.
 	 *
 	 * @return bool
 	 */

@@ -71,7 +71,7 @@ class WC_Checkoutcom_Utility {
 	 *
 	 * @return float|int
 	 */
-	public function decimal_to_value( $amount, $currency_symbol ) {
+	public static function decimal_to_value( $amount, $currency_symbol ) {
 		$currency                    = strtoupper( $currency_symbol );
 		$three_decimal_currency_list = [ 'BHD', 'LYD', 'JOD', 'IQD', 'KWD', 'OMR', 'TND' ];
 		$zero_decimal_currency_list  = [
@@ -117,13 +117,13 @@ class WC_Checkoutcom_Utility {
 		// If the input of the delay is numeric.
 		if ( is_numeric( $delay ) ) {
 			// Get total seconds based on the hour input.
-			$total_seconds = $delay * 3600;
+			$total_seconds = round( $delay * 3600 );
 			// If the delay is 0 manually add a 10 seconds delay.
 			if ( 0 === $total_seconds ) {
 				$total_seconds += $default_seconds_delay;
 			}
 			$hours   = floor( $total_seconds / 3600 );
-			$minutes = floor( $total_seconds / 60 % 60 );
+			$minutes = floor( floor( $total_seconds / 60 ) % 60 );
 			$seconds = floor( $total_seconds % 60 );
 
 			// Return date and time in UTC with the delays added.
@@ -191,7 +191,7 @@ class WC_Checkoutcom_Utility {
 	 * @param string    $error_message Error message to log.
 	 * @param Exception $exception Exception object.
 	 */
-	public static function logger( $error_message, $exception ) {
+	public static function logger( $error_message, $exception = null ) {
 		$logger  = wc_get_logger();
 		$context = [ 'source' => 'wc_checkoutcom_gateway_log' ];
 
@@ -220,8 +220,8 @@ class WC_Checkoutcom_Utility {
 		$apm           = ! empty( $apm_setting['ckocom_apms_selector'] ) ? $apm_setting['ckocom_apms_selector'] : [];
 		$country_code  = WC()->customer->get_billing_country();
 
-		$abc_apms = [ 'alipay', 'bancontact', 'boleto', 'eps', 'fawry', 'giropay', 'ideal', 'klarna', 'knet', 'multibanco', 'poli', 'qpay', 'sepa', 'sofort' ];
-		$nas_apms = [ 'ideal', 'bancontact', 'eps', 'fawry', 'giropay', 'knet', 'multibanco', 'qpay', 'sofort' ];
+		$abc_apms = [ 'alipay', 'bancontact', 'boleto', 'eps', 'fawry', 'giropay', 'ideal', 'knet', 'multibanco', 'poli', 'qpay', 'sepa', 'sofort' ];
+		$nas_apms = [ 'ideal', 'bancontact', 'eps', 'fawry', 'giropay', 'klarna', 'knet', 'multibanco', 'qpay', 'sort' ];
 
 		if ( cko_is_nas_account() ) {
 			$apm = array_intersect( $apm, $nas_apms );
@@ -276,14 +276,30 @@ class WC_Checkoutcom_Utility {
 						|| $currency_code === 'NOR'
 						|| $currency_code === 'SEK'
 					) {
-						if ( $country_code === 'AT'
+						if ( $country_code === 'AU'
+							|| $country_code === 'AT'
+							|| $country_code === 'BE'
+							|| $country_code === 'CA'
+							|| $country_code === 'CZ'
 							|| $country_code === 'DK'
 							|| $country_code === 'FI'
+							|| $country_code === 'FR'
 							|| $country_code === 'DE'
+							|| $country_code === 'GR'
+							|| $country_code === 'IE'
+							|| $country_code === 'IT'
+							|| $country_code === 'MX'
 							|| $country_code === 'NL'
+							|| $country_code === 'NZ'
 							|| $country_code === 'NO'
+							|| $country_code === 'PL'
+							|| $country_code === 'PT'
+							|| $country_code === 'RO'
+							|| $country_code === 'ES'
 							|| $country_code === 'SE'
+							|| $country_code === 'CH'
 							|| $country_code === 'GB'
+							|| $country_code === 'US'
 						) {
 							array_push( $apm_array, $value );
 						}
@@ -433,4 +449,86 @@ class WC_Checkoutcom_Utility {
 		return $approved;
 	}
 
+
+	/**
+	 * Set WC session value by key.
+	 *
+	 * @param string $key Session key.
+	 * @param string $value Session value.
+	 *
+	 * @return false|void
+	 */
+	public static function cko_set_session( $key, $value ) {
+		if ( ! class_exists( 'WooCommerce' ) || null == WC()->session ) {
+			return false;
+		}
+
+		$cko_session = WC()->session->get( 'cko_session' );
+
+		if ( ! is_array( $cko_session ) ) {
+			$cko_session = [];
+		}
+
+		$cko_session[ $key ] = $value;
+
+		WC()->session->set( 'cko_session', $cko_session );
+	}
+
+	/**
+	 *  Get WC session value by key.
+	 *
+	 * @param string $key Session key.
+	 *
+	 * @return false|mixed
+	 */
+	public static function cko_get_session( $key ) {
+		if ( ! class_exists( 'WooCommerce' ) || null == WC()->session ) {
+			return false;
+		}
+
+		$cko_session = WC()->session->get( 'cko_session' );
+
+		if ( ! empty( $cko_session[ $key ] ) ) {
+			return $cko_session[ $key ];
+		}
+
+		return false;
+	}
+
+	/**
+	 * Check if cart has subscription item.
+	 *
+	 * @return bool
+	 */
+	public static function is_cart_contains_subscription() {
+		$cart = WC()->cart;
+
+		if ( $cart->is_empty() ) {
+			return false;
+		}
+
+		foreach ( $cart->get_cart() as $cart_item_key => $cart_item ) {
+			$product = $cart_item['data'];
+
+			if ( $product->is_type( 'subscription' ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	public static function is_paypal_express_available() {
+		$paypal_settings = get_option( 'woocommerce_wc_checkout_com_paypal_settings' );
+
+		$is_express_enable = ! empty( $paypal_settings['paypal_express'] ) && 'yes' === $paypal_settings['paypal_express'];
+
+		$available_payment_methods = WC()->payment_gateways()->get_available_payment_gateways();
+
+		if ( isset( $available_payment_methods['wc_checkout_com_paypal'] ) && $is_express_enable ) {
+			return true;
+		}
+
+		return false;
+	}
 }

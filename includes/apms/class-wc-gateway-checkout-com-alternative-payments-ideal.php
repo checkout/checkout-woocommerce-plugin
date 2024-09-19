@@ -37,17 +37,17 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Ideal extends WC_Gateway_Chec
 	public function payment_fields() {
 		// get available apms depending on currency.
 		$apm_available = WC_Checkoutcom_Utility::get_alternative_payment_methods();
+		$message       = __( 'Pay with iDEAL. You will be redirected upon place order', 'checkout-com-unified-payments-api' );
+
+		?>
+			<p style="margin-bottom: 0;"> <?php echo $message; ?> </p>
+		<?php
 
 		if ( ! in_array( self::PAYMENT_METHOD, $apm_available, true ) ) {
 			?>
 				<script>
 					jQuery('.payment_method_wc_checkout_com_alternative_payments_ideal').hide();
 				</script>
-			<?php
-		} else {
-			WC_Checkoutcom_Apm_Templates::get_ideal_bank();
-			?>
-			<script src='<?php echo WC_CHECKOUTCOM_PLUGIN_URL . '/assets/js/ideal.js'; ?>'></script>
 			<?php
 		}
 	}

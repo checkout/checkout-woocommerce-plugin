@@ -7,7 +7,7 @@
 
 use Checkout\CheckoutApiException;
 use Checkout\Common\CustomerRequest;
-use Checkout\Payments\Source\RequestTokenSource;
+use Checkout\Payments\Request\Source\RequestTokenSource;
 use Checkout\Payments\ThreeDsRequest;
 
 include_once dirname( __DIR__ ) . '/lib/class-checkout-sdk.php';
@@ -85,8 +85,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 	 * @return array
 	 */
 	public function add_payment_meta_field( $payment_meta, $subscription ) {
-		$subscription_id = $subscription->get_id();
-		$source_id       = get_post_meta( $subscription_id, '_cko_source_id', true );
+		$source_id = $subscription->get_meta( '_cko_source_id' );
 
 		$payment_meta[ $this->id ] = [
 			'post_meta' => [
@@ -118,6 +117,10 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		if ( ! is_cart() && ! is_checkout() && ! isset( $_GET['pay_for_order'] ) && ! is_add_payment_method_page() ) {
 			return;
 		}
+
+        if ( is_wc_endpoint_url( 'order-received' ) ) {
+            return;
+        }
 
 		// Styles.
 		if ( WC_Admin_Settings::get_option( 'ckocom_iframe_style', '0' ) ) {
@@ -479,10 +482,10 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		// Create payment with card token.
 		$result = (array) WC_Checkoutcom_Api_Request::create_payment( $order, $arg );
 
-        if ( isset( $result['3d_redirection_error'] ) && true === $result['3d_redirection_error'] ) {
-	        // Retry Create payment with card token.
-            $result = (array) WC_Checkoutcom_Api_Request::create_payment( $order, $arg, null, true );
-        }
+		if ( isset( $result['3d_redirection_error'] ) && true === $result['3d_redirection_error'] ) {
+			// Retry Create payment with card token.
+			$result = (array) WC_Checkoutcom_Api_Request::create_payment( $order, $arg, null, true );
+		}
 
 		// check if result has error and return error message.
 		if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {
@@ -504,6 +507,13 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 			} else {
 				WC()->session->set( 'wc-wc_checkout_com_cards-new-payment-method', 'no' );
 			}
+
+			$order->add_order_note(
+				sprintf(
+					esc_html__( 'Checkout.com 3d Redirect waiting. URL : %s', 'checkout-com-unified-payments-api' ),
+					$result['3d']
+				)
+			);
 
 			// Redirect to 3D secure page.
 			return [
@@ -531,8 +541,8 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		}
 
 		// Set action id as woo transaction id.
-		update_post_meta( $order_id, '_transaction_id', $result['action_id'] );
-		update_post_meta( $order_id, '_cko_payment_id', $result['id'] );
+		$order->set_transaction_id( $result['action_id'] );
+		$order->update_meta_data( '_cko_payment_id', $result['id'] );
 
 		// Get cko auth status configured in admin.
 		$status = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
@@ -555,7 +565,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		$order_status = $order->get_status();
 
 		if ( 'pending' === $order_status || 'failed' === $order_status ) {
-			update_post_meta( $order_id, 'cko_payment_authorized', true );
+			$order->update_meta_data( 'cko_payment_authorized', true );
 			$order->update_status( $status );
 		}
 
@@ -634,14 +644,14 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		}
 
 		// Set action id as woo transaction id.
-		update_post_meta( $order_id, '_transaction_id', $action['0']['id'] );
+		$order->set_transaction_id( $action['0']['id'] );
 
 		// if no action id and source is boleto or paypal.
 		if ( null == $action['0']['id'] && in_array( $result['source']['type'], [ 'paypal', 'boleto' ], true ) ) { // phpcs:ignore WordPress.PHP.StrictComparisons.LooseComparison -- Deliberate loose comparison.
-			update_post_meta( $order_id, '_transaction_id', $result['id'] );
+			$order->set_transaction_id( $result['id'] );
 		}
 
-		update_post_meta( $order_id, '_cko_payment_id', $result['id'] );
+		$order->update_meta_data( '_cko_payment_id', $result['id'] );
 
 		// Get cko auth status configured in admin.
 		$status = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
@@ -666,7 +676,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		}
 
 		if ( 'Captured' === $result['status'] ) {
-			update_post_meta( $order_id, 'cko_payment_captured', true );
+			$order->update_meta_data( 'cko_payment_captured', true );
 			$status = WC_Admin_Settings::get_option( 'ckocom_order_captured', 'processing' );
 
 			/* translators: %s: Action ID. */
@@ -698,7 +708,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		$order->add_order_note( $message );
 
 		if ( 'pending' === $order_status || 'failed' === $order_status ) {
-			update_post_meta( $order_id, 'cko_payment_authorized', true );
+			$order->update_meta_data( 'cko_payment_authorized', true );
 			$order->update_status( $status );
 		}
 
@@ -887,8 +897,9 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 			return;
 		}
 
-		if ( $order instanceof WC_Subscription && ! empty( $card_scheme ) ) {
-			update_post_meta( $order->get_id(), '_cko_preferred_scheme', $card_scheme );
+		if ( $order instanceof WC_Subscription ) {
+			$order->update_meta_data( '_cko_preferred_scheme', $card_scheme );
+			$order->save();
 		}
 
 		// Check for subscription and save source id.
@@ -897,7 +908,8 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 				$subscriptions = wcs_get_subscriptions_for_order( $order );
 
 				foreach ( $subscriptions as $subscription_obj ) {
-					update_post_meta( $subscription_obj->get_id(), '_cko_preferred_scheme', $card_scheme );
+					$subscription_obj->update_meta_data( '_cko_preferred_scheme', $card_scheme );
+					$subscription_obj->save();
 				}
 			}
 		}
@@ -924,8 +936,9 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		}
 
 		// Set action id as woo transaction id.
-		update_post_meta( $order_id, '_transaction_id', $result['action_id'] );
-		update_post_meta( $order_id, 'cko_payment_refunded', true );
+		$order->set_transaction_id( $result['action_id'] );
+		$order->update_meta_data( 'cko_payment_refunded', true );
+		$order->save();
 
 		/* translators: %s: Action ID. */
 		$message = sprintf( esc_html__( 'Checkout.com Payment refunded from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
@@ -955,7 +968,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 	 * @return bool|int|void
 	 */
 	public function webhook_handler() {
-		// webhook_url_format = http://localhost/wordpress-5.0.2/wordpress/?wc-api=wc_checkoutcom_webhook .
+		// webhook_url_format = http://example.com/?wc-api=wc_checkoutcom_webhook .
 
 		// Get webhook data.
 		$data = json_decode( file_get_contents( 'php://input' ) );
@@ -1009,10 +1022,28 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 			return http_response_code( 401 );
 		}
 
-		$payment_id = get_post_meta( $data->data->metadata->order_id, '_cko_payment_id', true );
+		$order      = false;
+		$payment_id = null;
+
+        if ( ! empty( $data->data->metadata->order_id ) ) {
+	        $order = wc_get_order( $data->data->metadata->order_id );
+        } elseif ( ! empty( $data->data->reference ) ) {
+	        $order = wc_get_order( $data->data->reference );
+
+            if ( isset( $data->data->metadata ) ) {
+	            $data->data->metadata->order_id = $data->data->reference;
+            } else {
+	            $data->data->metadata = new StdClass();
+	            $data->data->metadata->order_id = $data->data->reference;
+            }
+        }
+
+        if ( $order ) {
+            $payment_id = $order->get_meta( '_cko_payment_id' ) ?? null;
+        }
 
 		// check if payment ID matches that of the webhook.
-		if ( $payment_id !== $data->data->id ) {
+		if ( is_null( $payment_id ) || $payment_id !== $data->data->id ) {
 
 			$gateway_debug = 'yes' === WC_Admin_Settings::get_option( 'cko_gateway_responses', 'no' );
 			if ( $gateway_debug ) {
@@ -1051,6 +1082,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 				$response = WC_Checkout_Com_Webhook::cancel_payment( $data );
 				break;
 			case 'payment_declined':
+			case 'payment_authentication_failed':
 				$response = WC_Checkout_Com_Webhook::decline_payment( $data );
 				break;
 

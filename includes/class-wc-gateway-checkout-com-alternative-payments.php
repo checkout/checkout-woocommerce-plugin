@@ -106,15 +106,16 @@ class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway {
 		$result = (array) WC_Checkoutcom_Api_Request::refund_payment( $order_id, $order );
 
 		// check if result has error and return error message.
-		if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {
+		if ( ! empty( $result['error'] ) ) {
 			WC_Checkoutcom_Utility::wc_add_notice_self( $result['error'] );
 
 			return false;
 		}
 
 		// Set action id as woo transaction id.
-		update_post_meta( $order_id, '_transaction_id', $result['action_id'] );
-		update_post_meta( $order_id, 'cko_payment_refunded', true );
+		$order->set_transaction_id( $result['action_id'] );
+		$order->update_meta_data( 'cko_payment_refunded', true );
+		$order->save();
 
 		if ( isset( $_SESSION['cko-refund-is-less'] ) ) {
 			if ( $_SESSION['cko-refund-is-less'] ) {

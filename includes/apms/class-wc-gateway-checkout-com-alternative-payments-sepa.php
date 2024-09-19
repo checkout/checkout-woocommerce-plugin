@@ -51,8 +51,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Sepa extends WC_Gateway_Check
 	 * @return array
 	 */
 	public function add_payment_meta_field( $payment_meta, $subscription ) {
-		$subscription_id = $subscription->get_id();
-		$source_id       = get_post_meta( $subscription_id, '_cko_source_id', true );
+		$source_id = $subscription->get_meta( '_cko_source_id' );
 
 		$payment_meta[ $this->id ] = [
 			'post_meta' => [
@@ -88,7 +87,9 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Sepa extends WC_Gateway_Check
 					// check if apm is selected as payment method.
 					if (jQuery('#payment_method_wc_checkout_com_alternative_payments_sepa').is(':checked')) {
 
-						if (0 === jQuery('#sepa-iban').val().length) {
+						const iban = jQuery('#sepa-iban').val();
+
+						if (0 === iban.length) {
 							alert( '<?php esc_html_e( 'Please enter your bank accounts iban', 'checkout-com-unified-payments-api' ); ?>' );
 							return false;
 						}
@@ -173,8 +174,8 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Sepa extends WC_Gateway_Check
 
 			if ( ! empty( $mandate ) && ! empty( $result['source'] ) && self::PAYMENT_METHOD === $result['source']['type'] ) {
 
-				update_post_meta( $order_id, 'cko_sepa_mandate_reference', $mandate );
-				update_post_meta( $order_id, 'cko_payment_authorized', true );
+				$order->update_meta_data( 'cko_sepa_mandate_reference', $mandate );
+				$order->update_meta_data( 'cko_payment_authorized', true );
 
 				WC()->session->__unset( 'mandate_reference' );
 			}
@@ -232,8 +233,8 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Sepa extends WC_Gateway_Check
 			}
 		}
 
-		update_post_meta( $order_id, '_transaction_id', $result['id'] );
-		update_post_meta( $order_id, '_cko_payment_id', $result['id'] );
+		$order->set_transaction_id( $result['id'] );
+		$order->update_meta_data( '_cko_payment_id', $result['id'] );
 
 		// add notes for the order and update status.
 		$order->add_order_note( $message );

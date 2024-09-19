@@ -141,7 +141,6 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 			session_start();
 		}
 
-		global $woocommerce;
 		$order = new WC_Order( $order_id );
 
 		// create google token from Google payment data.
@@ -158,6 +157,13 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 
 		// Redirect to apm if redirection url is available.
 		if ( isset( $result['3d'] ) && ! empty( $result['3d'] ) ) {
+
+			$order->add_order_note(
+				sprintf(
+					esc_html__( 'Checkout.com 3d Redirect waiting. URL : %s', 'checkout-com-unified-payments-api' ),
+					$result['3d']
+				)
+			);
 
 			return [
 				'result'   => 'success',
@@ -177,8 +183,8 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 		}
 
 		// Set action id as woo transaction id.
-		update_post_meta( $order_id, '_transaction_id', $result['action_id'] );
-		update_post_meta( $order_id, '_cko_payment_id', $result['id'] );
+		$order->set_transaction_id( $result['action_id'] );
+		$order->update_meta_data( '_cko_payment_id', $result['id'] );
 
 		// Get cko auth status configured in admin.
 		$status = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
@@ -226,13 +232,14 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 		$result = (array) WC_Checkoutcom_Api_Request::refund_payment( $order_id, $order );
 
 		// check if result has error and return error message.
-		if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {
+		if ( ! empty( $result['error'] ) ) {
 			WC_Checkoutcom_Utility::wc_add_notice_self( $result['error'] );
 			return false;
 		}
 
 		// Set action id as woo transaction id.
-		update_post_meta( $order_id, '_transaction_id', $result['action_id'] );
+		$order->set_transaction_id( $result['action_id'] );
+		$order->save();
 
 		// Get cko auth status configured in admin.
 		$status = WC_Admin_Settings::get_option( 'ckocom_order_refunded', 'refunded' );
