@@ -204,15 +204,6 @@ msgstr ""
 msgid "Checkout.com Payment Captured - Action ID - %s"
 msgstr ""
 
-#: includes/apms/class-wc-gateway-checkout-com-alternative-payments-giropay.php:23
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:742
-msgid "Giropay"
-msgstr ""
-
-#: includes/apms/class-wc-gateway-checkout-com-alternative-payments-giropay.php:39
-msgid "Pay with Giropay. You will be redirected upon place order"
-msgstr ""
-
 #: includes/apms/class-wc-gateway-checkout-com-alternative-payments-ideal.php:25
 msgid "Ideal"
 msgstr ""

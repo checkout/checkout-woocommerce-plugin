@@ -20,7 +20,6 @@ include_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments
 include_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-klarna.php';
 include_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-sofort.php';
 include_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-fawry.php';
-include_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-giropay.php';
 include_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-multibanco.php';
 
 /**
