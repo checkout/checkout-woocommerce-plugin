@@ -454,7 +454,6 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 			! isset( $_POST['wc-wc_checkout_com_cards-payment-token'] ) &&
 			! empty( $_POST['cko-card-token'] )
 		) {
-			// New card with stripe enabled.
 			$arg = sanitize_text_field( $_POST['cko-card-token'] );
 		}
 
