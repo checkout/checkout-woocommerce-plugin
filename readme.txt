@@ -24,7 +24,7 @@ This plugin is an integration of Checkout.com and offers 6 payment modes. This p
 The payment form is embedded and shoppers complete payments without leaving your website. The Frames.js payment form is cross-browser and cross-device compatible, and can accept online payments from all major credit cards.
 
 = Alternative Payments =
-Users can place orders with the following alternative and local payment options used around the world: Alipay, Bancontact, Boleto, EPS, Fawry, Giropay, Ideal, Klarna, KNet, Poli, Sepa (WooCommerce subscription compatible), Sofort, Multibanco.
+Users can place orders with the following alternative and local payment options used around the world: Alipay, Bancontact, Boleto, EPS, Fawry, Ideal, Klarna, KNet, Poli, Sepa (WooCommerce subscription compatible), Sofort, Multibanco.
 
 = Google Pay Payments =
 Users can place orders with a Google Pay wallet.

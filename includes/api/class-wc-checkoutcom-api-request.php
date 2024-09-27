@@ -269,12 +269,6 @@ class WC_Checkoutcom_Api_Request {
 		$payment->reference    = $order->get_order_number();
 		$payment->payment_type = PaymentType::$regular;
 
-		if ( 'giropay' === $method->type && cko_is_nas_account() ) {
-			$payment->description = $method->purpose;
-
-			unset( $method->purpose );
-		}
-
 		$payment->source = $method;
 
 		$email = $post_data['billing_email'];

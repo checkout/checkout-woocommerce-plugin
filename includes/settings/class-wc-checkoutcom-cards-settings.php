@@ -750,7 +750,6 @@ class WC_Checkoutcom_Cards_Settings {
 				'options' => [
 					'alipay'     => __( 'Alipay', 'checkout-com-unified-payments-api' ),
 					'boleto'     => __( 'Boleto', 'checkout-com-unified-payments-api' ),
-					'giropay'    => __( 'Giropay', 'checkout-com-unified-payments-api' ),
 					'ideal'      => __( 'iDEAL', 'checkout-com-unified-payments-api' ),
 					'klarna'     => __( 'Klarna', 'checkout-com-unified-payments-api' ),
 					'poli'       => __( 'Poli', 'checkout-com-unified-payments-api' ),

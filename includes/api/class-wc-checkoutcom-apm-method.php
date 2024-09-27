@@ -13,7 +13,6 @@ use Checkout\Payments\Previous\Source\Apm\IntegrationType;
 use Checkout\Payments\Previous\Source\Apm\RequestAlipaySource;
 use Checkout\Payments\Previous\Source\Apm\RequestBoletoSource;
 use Checkout\Payments\Previous\Source\Apm\RequestEpsSource;
-use Checkout\Payments\Previous\Source\Apm\RequestGiropaySource;
 use Checkout\Payments\Previous\Source\Apm\RequestKlarnaSource;
 use Checkout\Payments\Previous\Source\Apm\RequestPoliSource;
 use Checkout\Payments\Previous\Source\Apm\RequestSepaSource;
@@ -106,19 +105,6 @@ class WC_Checkoutcom_APM_Method {
 
 		$method              = new RequestQPaySource();
 		$method->description = get_bloginfo( 'name' );
-
-		return $method;
-	}
-
-	/**
-	 * Returns the source data for the giropay APM.
-	 *
-	 * @return RequestGiropaySource
-	 */
-	public function giropay() {
-
-		$method          = new RequestGiropaySource();
-		$method->purpose = 'Giropay by Checkout.com';
 
 		return $method;
 	}
