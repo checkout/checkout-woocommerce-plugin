@@ -40,6 +40,7 @@ class Checkout_SDK {
 	public function __construct( $use_fallback = false ) {
 		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
 		$environment   = 'sandbox' === $core_settings['ckocom_environment'] ? Environment::sandbox() : Environment::production();
+		$subdomain     = ! isset( $core_settings['ckocom_region'] ) ? '--' : $core_settings['ckocom_region'];
 
 		$this->nas_account_type = cko_is_nas_account();
 
@@ -52,6 +53,10 @@ class Checkout_SDK {
 		$builder->publicKey( $core_settings['ckocom_pk'] );
 		$builder->secretKey( $core_settings['ckocom_sk'] );
 		$builder->environment( $environment );
+
+		if ( '--' !== $subdomain ) {
+			$builder->environmentSubdomain( $subdomain );
+		}
 
 		if ( $use_fallback ) {
 			$builder->publicKey( $core_settings['fallback_ckocom_pk'] );

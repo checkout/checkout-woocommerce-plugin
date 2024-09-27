@@ -99,6 +99,17 @@ class WC_Checkoutcom_Cards_Settings {
 				'desc_tip'    => true,
 				'default'     => 'yes',
 			],
+			'ckocom_region'       => [
+				'title'       => __( 'Region', 'checkout-com-unified-payments-api' ),
+				'type'        => 'select',
+				'description' => __( 'Choose subdomain for multi-region configration', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => true,
+				'options'     => [
+					'--'  => __( '--', 'checkout-com-unified-payments-api' ),
+					'ksa' => __( 'KSA', 'checkout-com-unified-payments-api' ),
+				],
+				'default'     => '--',
+			],
 			'ckocom_environment'  => [
 				'title'       => __( 'Environment', 'checkout-com-unified-payments-api' ),
 				'type'        => 'select',
