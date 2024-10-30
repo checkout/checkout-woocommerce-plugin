@@ -30,8 +30,8 @@ use Checkout\Tokens\ApplePayTokenRequest;
 use Checkout\Tokens\GooglePayTokenData;
 use Checkout\Tokens\GooglePayTokenRequest;
 
-include_once 'class-wc-checkoutcom-utility.php';
-include 'class-wc-checkoutcom-apm-method.php';
+require_once 'class-wc-checkoutcom-utility.php';
+require 'class-wc-checkoutcom-apm-method.php';
 
 /**
  * Class WC_Checkoutcom_Api_Request handles the API requests.
@@ -1080,8 +1080,8 @@ class WC_Checkoutcom_Api_Request {
 		$total_amount = WC()->cart->total;
 		$amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $total_amount, get_woocommerce_currency() );
 
-		$woo_locale    = str_replace( '_', '-', get_locale() );
-		$locale        = substr( $woo_locale, 0, 5 );
+		$woo_locale = str_replace( '_', '-', get_locale() );
+		$locale     = substr( $woo_locale, 0, 5 );
 
 		$processing         = new Checkout\Payments\Contexts\PaymentContextsProcessing();
 		$processing->locale = strtolower( $locale );
@@ -1090,7 +1090,7 @@ class WC_Checkoutcom_Api_Request {
 		$billing_address->country = WC()->customer->get_billing_country();
 
 		$account_holder                  = new AccountHolder();
-		$account_holder->billing_address =  $billing_address;
+		$account_holder->billing_address = $billing_address;
 
 		$source                 = new PaymentContextsKlarnaSource();
 		$source->account_holder = $account_holder;
@@ -1488,7 +1488,9 @@ class WC_Checkoutcom_Api_Request {
 	public static function is_using_saved_payment_method() {
 		$payment_method = isset( $_POST['payment_method'] ) ? wc_clean( wp_unslash( $_POST['payment_method'] ) ) : 'wc_checkout_com_cards';
 
-		return ( isset( $_POST[ 'wc-' . $payment_method . '-payment-token' ] ) && 'new' !== $_POST[ 'wc-' . $payment_method . '-payment-token' ] );
+		$payment_method = 'wc-' . $payment_method . '-payment-token';
+
+		return ( isset( $_POST[ $payment_method ] ) && 'new' !== $_POST[ $payment_method ] );
 	}
 
 	/**

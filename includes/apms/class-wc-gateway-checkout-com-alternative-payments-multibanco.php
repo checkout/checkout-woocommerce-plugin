@@ -57,7 +57,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Multibanco extends WC_Gateway
 	 *
 	 * @param  int $order_id Order ID.
 	 *
-	 * @return array
+	 * @return array|void
 	 */
 	public function process_payment( $order_id ) {
 		if ( ! session_id() ) {
@@ -85,5 +85,4 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Multibanco extends WC_Gateway
 			];
 		}
 	}
-
 }

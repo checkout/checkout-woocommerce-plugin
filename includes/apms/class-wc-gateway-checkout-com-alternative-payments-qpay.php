@@ -38,7 +38,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Qpay extends WC_Gateway_Check
 		$message       = __( 'Pay with QPay. You will be redirected upon place order', 'checkout-com-unified-payments-api' );
 
 		?>
-			<p style="margin-bottom: 0;"> <?php echo $message; ?> </p>
+			<p style="margin-bottom: 0;"> <?php echo esc_html( $message ); ?> </p>
 		<?php
 
 		if ( ! in_array( self::PAYMENT_METHOD, $apm_available, true ) ) {
@@ -48,7 +48,6 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Qpay extends WC_Gateway_Check
 				</script>
 			<?php
 		}
-
 	}
 
 	/**
@@ -96,6 +95,5 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Qpay extends WC_Gateway_Check
 	public function process_refund( $order_id, $amount = null, $reason = '' ) {
 
 		return parent::process_refund( $order_id, $amount, $reason );
-
 	}
 }

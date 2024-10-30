@@ -59,8 +59,9 @@ class WC_Checkoutcom_APM_Method {
 	 * @param array    $data Post data.
 	 * @param WC_Order $order Order object.
 	 */
-	function __construct( $data, $order ) {
+	public function __construct( $data, $order ) {
 
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing
 		self::$post       = sanitize_post( $_POST );
 		self::$data_info  = $data;
 		self::$order_info = $order;
@@ -319,6 +320,7 @@ class WC_Checkoutcom_APM_Method {
 	 */
 	public static function get_sepa_info() {
 
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		$get_data        = sanitize_post( $_GET );
 		$items           = WC()->cart->get_cart();
 		$is_subscription = false;

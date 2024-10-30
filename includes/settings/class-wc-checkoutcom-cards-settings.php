@@ -702,7 +702,7 @@ class WC_Checkoutcom_Cards_Settings {
 				'default'     => '',
 				'placeholder' => 'ABCD1EFGH2I3K',
 			],
-			'paypal_express' => [
+			'paypal_express'            => [
 				'title'       => __( 'PayPal Express', 'checkout-com-unified-payments-api' ),
 				'label'       => __( 'Enable PayPal Express', 'checkout-com-unified-payments-api' ),
 				'type'        => 'checkbox',

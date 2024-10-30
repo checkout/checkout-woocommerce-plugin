@@ -7,11 +7,12 @@
 
 defined( 'ABSPATH' ) || exit;
 
-include_once( 'settings/class-wc-checkoutcom-cards-settings.php' );
+require_once 'settings/class-wc-checkoutcom-cards-settings.php';
 
 /**
  * Class WC_Gateway_Checkout_Com_Apple_Pay for Apple Pay method.
  */
+#[AllowDynamicProperties]
 class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 
 	/**
@@ -47,7 +48,6 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		add_action( 'woocommerce_api_wc_checkoutcom_session', [ $this, 'applepay_sesion' ] );
 
 		add_action( 'woocommerce_api_wc_checkoutcom_generate_token', [ $this, 'applepay_token' ] );
-
 	}
 
 	/**
@@ -88,14 +88,14 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		$chosen_methods     = wc_get_chosen_shipping_method_ids();
 		$chosen_shipping    = $chosen_methods[0] ?? '';
 		$shipping_amount    = WC()->cart->get_shipping_total();
-		$checkout_fields    = json_encode( $woocommerce->checkout->checkout_fields, JSON_HEX_APOS );
+		$checkout_fields    = wp_json_encode( $woocommerce->checkout->checkout_fields, JSON_HEX_APOS );
 		$session_url        = str_replace( 'https:', 'https:', add_query_arg( 'wc-api', 'wc_checkoutcom_session', home_url( '/' ) ) );
 		$generate_token_url = str_replace( 'https:', 'https:', add_query_arg( 'wc-api', 'wc_checkoutcom_generate_token', home_url( '/' ) ) );
 		$apple_settings     = get_option( 'woocommerce_wc_checkout_com_apple_pay_settings' );
 		$mada_enabled       = isset( $apple_settings['enable_mada'] ) && ( 'yes' === $apple_settings['enable_mada'] );
 
 		if ( ! empty( $this->get_option( 'description' ) ) ) {
-			echo  $this->get_option( 'description' );
+			echo esc_html( $this->get_option( 'description' ) );
 		}
 
 		// get country of current user.
@@ -131,7 +131,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			hideAppleApplePayOption();
 			// If Apple Pay is available as a payment option, and enabled on the checkout page, un-hide the payment option.
 			if (window.ApplePaySession) {
-				var canMakePayments = ApplePaySession.canMakePayments("<?php echo $this->get_option( 'ckocom_apple_mercahnt_id' ); ?>");
+				var canMakePayments = ApplePaySession.canMakePayments("<?php echo esc_js( $this->get_option( 'ckocom_apple_mercahnt_id' ) ); ?>");
 
 				if ( canMakePayments ) {
 					setTimeout( function() {
@@ -148,9 +148,9 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			// Display the button and remove the default place order.
 			checkoutInitialiseApplePay = function () {
 				jQuery('#payment').append('<div id="' + applePayButtonId + '" class="apple-pay-button '
-				+ "<?php echo $this->get_option( 'ckocom_apple_type' ); ?>" + " "
-				+ "<?php echo $this->get_option( 'ckocom_apple_theme' ); ?>"  + '" lang="'
-				+ "<?php echo $this->get_option( 'ckocom_apple_language' ); ?>" + '"></div>');
+				+ "<?php echo esc_js( $this->get_option( 'ckocom_apple_type' ) ); ?>" + " "
+				+ "<?php echo esc_js( $this->get_option( 'ckocom_apple_theme' ) ); ?>"  + '" lang="'
+				+ "<?php echo esc_js( $this->get_option( 'ckocom_apple_language' ) ); ?>" + '"></div>');
 
 				jQuery('#ckocom_applePay').hide();
 			};
@@ -176,17 +176,17 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			 */
 			function getApplePayConfig() {
 
-				var networksSupported = <?php echo json_encode( $supported_networks ); ?>;
-				var merchantCapabilities = <?php echo json_encode( $merchant_capabilities ); ?>;
+				var networksSupported = <?php echo wp_json_encode( $supported_networks ); ?>;
+				var merchantCapabilities = <?php echo wp_json_encode( $merchant_capabilities ); ?>;
 
 				return {
-					currencyCode: "<?php echo get_woocommerce_currency(); ?>",
-					countryCode: "<?php echo $country_code; ?>",
+					currencyCode: "<?php echo esc_js( get_woocommerce_currency() ); ?>",
+					countryCode: "<?php echo esc_js( $country_code ); ?>",
 					merchantCapabilities: merchantCapabilities,
 					supportedNetworks: networksSupported,
 					total: {
 						label: window.location.host,
-						amount: "<?php echo $woocommerce->cart->total; ?>",
+						amount: "<?php echo esc_js( $woocommerce->cart->total ); ?>",
 						type: 'final'
 					}
 				}
@@ -219,19 +219,19 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 					var newTotal = {
 						type: 'final',
 						label: window.location.host,
-						amount: "<?php echo $woocommerce->cart->total; ?>",
+						amount: "<?php echo esc_js( $woocommerce->cart->total ); ?>",
 					};
 
 					var newLineItems = [
 						{
 							type: 'final',
 							label: 'Subtotal',
-							amount: "<?php echo $woocommerce->cart->subtotal; ?>"
+							amount: "<?php echo esc_js( $woocommerce->cart->subtotal ); ?>"
 						},
 						{
 							type: 'final',
-							label: 'Shipping - ' + "<?php echo $chosen_shipping; ?>",
-							amount: "<?php echo $shipping_amount; ?>"
+							label: 'Shipping - ' + "<?php echo esc_js( $chosen_shipping ); ?>",
+							amount: "<?php echo esc_js( $shipping_amount ); ?>"
 						}
 					];
 
@@ -276,10 +276,10 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			function performAppleUrlValidation(valURL, callback) {
 				jQuery.ajax({
 					type: 'POST',
-					url: "<?php echo $session_url; ?>",
+					url: "<?php echo esc_url( $session_url ); ?>",
 					data: {
 						url: valURL,
-						merchantId: "<?php echo $this->get_option( 'ckocom_apple_mercahnt_id' ); ?>",
+						merchantId: "<?php echo esc_js( $this->get_option( 'ckocom_apple_mercahnt_id' ) ); ?>",
 						domain: window.location.host,
 						displayName: window.location.host,
 					},
@@ -298,7 +298,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			function generateCheckoutToken(token, callback) {
 				jQuery.ajax({
 					type: 'POST',
-					url: "<?php echo $generate_token_url; ?>",
+					url: "<?php echo esc_url( $generate_token_url ); ?>",
 					data: {
 						token: token
 					},
@@ -479,17 +479,19 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 	 * @return void
 	 */
 	public function applepay_sesion() {
-		$url          = $_POST['url'];
-		$domain       = $_POST['domain'];
-		$display_name = $_POST['displayName'];
+		// phpcs:disable WordPress.Security.NonceVerification.Missing
+		$url          = isset( $_POST['url'] ) ? sanitize_text_field( $_POST['url'] ) : '';
+		$domain       = isset( $_POST['domain'] ) ? sanitize_text_field( $_POST['domain'] ) : '';
+		$display_name = isset( $_POST['displayName'] ) ? sanitize_text_field( $_POST['displayName'] ) : '';
+		// phpcs:enable
 
 		$merchant_id     = $this->get_option( 'ckocom_apple_mercahnt_id' );
 		$certificate     = $this->get_option( 'ckocom_apple_certificate' );
 		$certificate_key = $this->get_option( 'ckocom_apple_key' );
 
 		if (
-			'https' === parse_url( $url, PHP_URL_SCHEME ) &&
-			substr( parse_url( $url, PHP_URL_HOST ), - 10 ) === '.apple.com'
+			'https' === wp_parse_url( $url, PHP_URL_SCHEME ) &&
+			substr( wp_parse_url( $url, PHP_URL_HOST ), - 10 ) === '.apple.com'
 		) {
 			$ch = curl_init();
 
@@ -538,18 +540,17 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 	 *
 	 * @param int $order_id Order ID.
 	 *
-	 * @return array
+	 * @return array|void
 	 */
 	public function process_payment( $order_id ) {
 		if ( ! session_id() ) {
 			session_start();
 		}
 
-		global $woocommerce;
 		$order = new WC_Order( $order_id );
 
 		// create apple token from apple payment data.
-		$apple_token = $_POST['cko-apple-card-token'];
+		$apple_token = $_POST['cko-apple-card-token'] ?? ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing
 
 		// Check if apple token is not empty.
 		if ( empty( $apple_token ) ) {
@@ -559,7 +560,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		}
 
 		// Create payment with apple token.
-		$result = (array) ( new WC_Checkoutcom_Api_Request )->create_payment( $order, $apple_token );
+		$result = (array) ( new WC_Checkoutcom_Api_Request() )->create_payment( $order, $apple_token );
 
 		// check if result has error and return error message.
 		if ( ! empty( $result['error'] ) ) {
