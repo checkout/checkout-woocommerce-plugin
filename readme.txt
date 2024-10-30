@@ -171,9 +171,10 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
-v4.8.0 28th Ocyober 2024
+v4.8.0 30th October 2024
 - **[remove]** Giropay Payment Support
 - **[feat]** Add Multi-region (KSA) on-soil payment processing
+- **[fix]** PHP 8.2 and PHPCS
 
 v4.7.0 12th July 2024
 - **[tweak]** Upgrade Klarna integration
