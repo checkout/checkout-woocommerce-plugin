@@ -99,6 +99,17 @@ class WC_Checkoutcom_Cards_Settings {
 				'desc_tip'    => true,
 				'default'     => 'yes',
 			],
+			'ckocom_region'       => [
+				'title'       => __( 'Region', 'checkout-com-unified-payments-api' ),
+				'type'        => 'select',
+				'description' => __( 'Choose subdomain for multi-region configration', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => true,
+				'options'     => [
+					'--'  => __( '--', 'checkout-com-unified-payments-api' ),
+					'ksa' => __( 'KSA', 'checkout-com-unified-payments-api' ),
+				],
+				'default'     => '--',
+			],
 			'ckocom_environment'  => [
 				'title'       => __( 'Environment', 'checkout-com-unified-payments-api' ),
 				'type'        => 'select',
@@ -739,7 +750,6 @@ class WC_Checkoutcom_Cards_Settings {
 				'options' => [
 					'alipay'     => __( 'Alipay', 'checkout-com-unified-payments-api' ),
 					'boleto'     => __( 'Boleto', 'checkout-com-unified-payments-api' ),
-					'giropay'    => __( 'Giropay', 'checkout-com-unified-payments-api' ),
 					'ideal'      => __( 'iDEAL', 'checkout-com-unified-payments-api' ),
 					'klarna'     => __( 'Klarna', 'checkout-com-unified-payments-api' ),
 					'poli'       => __( 'Poli', 'checkout-com-unified-payments-api' ),

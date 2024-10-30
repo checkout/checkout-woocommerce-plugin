@@ -65,13 +65,19 @@ class WC_Checkoutcom_Workflows {
 	 */
 	public function __construct() {
 
-		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
-		$environment   = ( 'sandbox' === $core_settings['ckocom_environment'] );
+		$core_settings   = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$environment     = ( 'sandbox' === $core_settings['ckocom_environment'] );
+		$subdomain_check = isset( $core_settings['ckocom_region'] ) && '--' !== $core_settings['ckocom_region'];
 
 		$core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
 
 		$this->secret_key = $core_settings['ckocom_sk'];
-		$this->url        = $environment ? 'https://api.sandbox.checkout.com/workflows' : 'https://api.checkout.com/workflows';
+
+		if ( $subdomain_check ) {
+			$this->url = $environment ? 'https://' . $core_settings['ckocom_region'] . '.api.sandbox.checkout.com/workflows' : 'https://' . $core_settings['ckocom_region'] . '.api.checkout.com/workflows';
+		} else {
+			$this->url = $environment ? 'https://api.sandbox.checkout.com/workflows' : 'https://api.checkout.com/workflows';
+		}
 
 		$this->checkout = new Checkout_SDK();
 	}
