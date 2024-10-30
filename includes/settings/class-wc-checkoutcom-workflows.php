@@ -220,9 +220,9 @@ class WC_Checkoutcom_Workflows {
 				'payment_void_declined',
 				'payment_voided',
 				'payment_authentication_failed',
-//				'payment_authorized',
-//				'payment_retry_scheduled',
-//				'payment_returned',
+				// 'payment_authorized',
+				// 'payment_retry_scheduled',
+				// 'payment_returned',
 			],
 			'dispute'     => [
 				'dispute_canceled',
@@ -280,5 +280,4 @@ class WC_Checkoutcom_Workflows {
 
 		return $workflows;
 	}
-
 }

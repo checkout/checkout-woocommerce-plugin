@@ -444,5 +444,4 @@ class WC_Checkout_Com_Webhook {
 
 		return $order;
 	}
-
 }

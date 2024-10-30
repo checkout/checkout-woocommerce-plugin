@@ -10,21 +10,22 @@ use Checkout\Common\CustomerRequest;
 use Checkout\Payments\Request\Source\RequestTokenSource;
 use Checkout\Payments\ThreeDsRequest;
 
-include_once dirname( __DIR__ ) . '/lib/class-checkout-sdk.php';
+require_once dirname( __DIR__ ) . '/lib/class-checkout-sdk.php';
 
 if ( is_readable( dirname( __DIR__ ) . '/vendor/autoload.php' ) ) {
 	require dirname( __DIR__ ) . '/vendor/autoload.php';
 }
-include_once( 'settings/class-wc-checkoutcom-cards-settings.php' );
-include_once( 'settings/class-wc-checkoutcom-webhook.php' );
-include_once( 'settings/admin/class-wc-checkoutcom-admin.php' );
-include_once( 'api/class-wc-checkoutcom-api-request.php' );
-include_once( 'class-wc-checkout-com-webhook.php' );
-include_once( 'subscription/class-wc-checkoutcom-subscription.php' );
+require_once 'settings/class-wc-checkoutcom-cards-settings.php';
+require_once 'settings/class-wc-checkoutcom-webhook.php';
+require_once 'settings/admin/class-wc-checkoutcom-admin.php';
+require_once 'api/class-wc-checkoutcom-api-request.php';
+require_once 'class-wc-checkout-com-webhook.php';
+require_once 'subscription/class-wc-checkoutcom-subscription.php';
 
 /**
  * Class WC_Gateway_Checkout_Com_Cards for Card payment method.
  */
+#[AllowDynamicProperties]
 class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 
 	/**
@@ -118,9 +119,9 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 			return;
 		}
 
-        if ( is_wc_endpoint_url( 'order-received' ) ) {
-            return;
-        }
+		if ( is_wc_endpoint_url( 'order-received' ) ) {
+			return;
+		}
 
 		// Styles.
 		if ( WC_Admin_Settings::get_option( 'ckocom_iframe_style', '0' ) ) {
@@ -166,7 +167,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 	 * @return string|void
 	 */
 	public function init_form_fields() {
-		$this->form_fields = ( new WC_Checkoutcom_Cards_Settings )->core_settings();
+		$this->form_fields = ( new WC_Checkoutcom_Cards_Settings() )->core_settings();
 
 		$this->form_fields = array_merge(
 			$this->form_fields,
@@ -594,7 +595,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		}
 
 		// Verify session id.
-		$result = (array) ( new WC_Checkoutcom_Api_Request )->verify_session( $cko_session_id );
+		$result = (array) ( new WC_Checkoutcom_Api_Request() )->verify_session( $cko_session_id );
 
 		// Redirect to cart if an error occurred.
 		if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {
@@ -912,7 +913,6 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 				}
 			}
 		}
-
 	}
 
 	/**
@@ -1024,22 +1024,22 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		$order      = false;
 		$payment_id = null;
 
-        if ( ! empty( $data->data->metadata->order_id ) ) {
-	        $order = wc_get_order( $data->data->metadata->order_id );
-        } elseif ( ! empty( $data->data->reference ) ) {
-	        $order = wc_get_order( $data->data->reference );
+		if ( ! empty( $data->data->metadata->order_id ) ) {
+			$order = wc_get_order( $data->data->metadata->order_id );
+		} elseif ( ! empty( $data->data->reference ) ) {
+			$order = wc_get_order( $data->data->reference );
 
-            if ( isset( $data->data->metadata ) ) {
-	            $data->data->metadata->order_id = $data->data->reference;
-            } else {
-	            $data->data->metadata = new StdClass();
-	            $data->data->metadata->order_id = $data->data->reference;
-            }
-        }
+			if ( isset( $data->data->metadata ) ) {
+				$data->data->metadata->order_id = $data->data->reference;
+			} else {
+				$data->data->metadata           = new StdClass();
+				$data->data->metadata->order_id = $data->data->reference;
+			}
+		}
 
-        if ( $order ) {
-            $payment_id = $order->get_meta( '_cko_payment_id' ) ?? null;
-        }
+		if ( $order ) {
+			$payment_id = $order->get_meta( '_cko_payment_id' ) ?? null;
+		}
 
 		// check if payment ID matches that of the webhook.
 		if ( is_null( $payment_id ) || $payment_id !== $data->data->id ) {
@@ -1142,10 +1142,9 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 				'cardSchemeHeader'       => WC_Admin_Settings::get_option( 'ckocom_card_scheme_header_placeholder', 'Choose your type of card' ),
 			];
 
-			$localization = json_encode( $localization );
+			$localization = wp_json_encode( $localization );
 		}
 
 		return $localization;
 	}
-
 }
