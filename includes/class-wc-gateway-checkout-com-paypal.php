@@ -85,6 +85,11 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 						exit();
 					}
 					break;
+				
+					case 'empty_session':
+					error_log(print_r($_SESSION,true));
+					WC_Checkoutcom_Utility::cko_set_session( 'cko_paypal_order_id', '' );
+					WC_Checkoutcom_Utility::cko_set_session( 'cko_pc_id', '' );
 
 				case 'cc_capture':
 					WC_Checkoutcom_Utility::cko_set_session( 'cko_paypal_order_id', wc_clean( $_GET['paypal_order_id'] ) );
@@ -535,6 +540,7 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 
 		$vars = [
 			'create_order_url'              => add_query_arg( [ 'cko_paypal_action' => 'create_order' ], WC()->api_request_url( 'CKO_Paypal_Woocommerce' ) ),
+			'clear_session_url'				=> add_query_arg( [ 'cko_paypal_action' => 'empty_session' ], WC()->api_request_url( 'CKO_Paypal_Woocommerce' ) ),
 			'cc_capture'                    => add_query_arg( [ 'cko_paypal_action' => 'cc_capture' ], WC()->api_request_url( 'CKO_Paypal_Woocommerce' ) ),
 			'woocommerce_process_checkout'  => wp_create_nonce( 'woocommerce-process_checkout' ),
 			'is_cart_contains_subscription' => WC_Checkoutcom_Utility::is_cart_contains_subscription(),
