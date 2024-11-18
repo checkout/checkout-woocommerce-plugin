@@ -124,6 +124,12 @@ jQuery( function ( $ ) {
                     });
                 },
                 onCancel: function (data, actions) {
+                    fetch( cko_paypal_vars.clear_session_url, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded'
+                        },
+                    });
                     jQuery('.woocommerce').unblock();
                 },
                 onError: function (err) {
@@ -162,49 +168,4 @@ jQuery( function ( $ ) {
     } );
 
     return;
-
-    // Initialise PayPal when page is ready.
-    jQuery( document ).ready(function() {
-
-        let paypalButtonProps = {
-            onApprove: async function (data) {
-
-                jQuery('.woocommerce').block({message: null, overlayCSS: {background: '#fff', opacity: 0.6}});
-
-                jQuery.post(cko_paypal_vars.cc_capture + "&paypal_order_id=" + data.orderID + "&woocommerce-process-checkout-nonce=" + cko_paypal_vars.woocommerce_process_checkout, function (data) {
-                    if (typeof data.success !== 'undefined' && data.success !== true ) {
-                        var messages = data.data.messages ? data.data.messages : data.data;
-
-                        if ( 'string' === typeof messages || Array.isArray( messages ) ) {
-                            showError( messages );
-                        }
-                    } else {
-                        window.location.href = data.data.redirect;
-                    }
-                });
-            },
-            onCancel: function (data, actions) {
-                jQuery('.woocommerce').unblock();
-            },
-            onError: function (err) {
-                console.log(err);
-                jQuery('.woocommerce').unblock();
-            },
-        };
-
-        if ( cko_paypal_vars.is_cart_contains_subscription ) {
-            paypalButtonProps.createBillingAgreement = function( data, actions ) {
-                return cko_create_order_id();
-            };
-        } else {
-            paypalButtonProps.createOrder = function( data, actions ) {
-                return cko_create_order_id();
-            };
-        }
-
-        paypal.Buttons({ paypalButtonProps }).render( cko_paypal_vars.paypal_button_selector );
-    });
-
-
-
 });
