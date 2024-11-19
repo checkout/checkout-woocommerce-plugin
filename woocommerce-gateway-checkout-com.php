@@ -5,10 +5,10 @@
  * Description: Extends WooCommerce by Adding the Checkout.com Gateway.
  * Author: Checkout.com
  * Author URI: https://www.checkout.com/
- * Version: 4.8.0
+ * Version: 4.9.0
  * Requires Plugins: woocommerce
  * Requires at least: 5.0
- * Stable tag: 4.8.0
+ * Stable tag: 4.9.0
  * Tested up to: 6.4.1
  * WC tested up to: 8.3.1
  * Requires PHP: 7.3
@@ -25,7 +25,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Constants.
  */
-define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '4.8.0' );
+define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '4.9.0' );
 define( 'WC_CHECKOUTCOM_PLUGIN_URL', untrailingslashit( plugins_url( basename( plugin_dir_path( __FILE__ ) ), basename( __FILE__ ) ) ) );
 define( 'WC_CHECKOUTCOM_PLUGIN_PATH', untrailingslashit( plugin_dir_path( __FILE__ ) ) );
 
