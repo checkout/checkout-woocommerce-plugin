@@ -9,7 +9,7 @@
  * Requires Plugins: woocommerce
  * Requires at least: 5.0
  * Stable tag: 4.9.0
- * Tested up to: 6.4.1
+ * Tested up to: 6.7.0
  * WC tested up to: 8.3.1
  * Requires PHP: 7.3
  * Text Domain: checkout-com-unified-payments-api
