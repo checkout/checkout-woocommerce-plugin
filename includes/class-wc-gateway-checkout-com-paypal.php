@@ -107,6 +107,10 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 					WC_Checkoutcom_Utility::cko_set_session( 'cko_paypal_order_id', wc_clean( $_GET['paypal_order_id'] ) );
 					$this->cko_express_paypal_order_session();
 					break;
+
+				case 'order_pay':
+					$this->cko_create_order_request();
+					break;
 			}
 		}
 
@@ -254,6 +258,30 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 		}
 
 		$total_amount = WC()->cart->total;
+
+		// Logic for order-pay page.
+
+		$is_order_pay = get_option( 'woocommerce_checkout_pay_endpoint', 'order-pay' );
+
+		$nonce = isset( $_POST['woocommerce-pay-nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['woocommerce-pay-nonce'] ) ) : '';
+
+		if ( ! empty( $nonce ) && wp_verify_nonce( $nonce, 'woocommerce-pay' ) ) {
+			
+			$referer_url = isset( $_POST['_wp_http_referer'] ) ? esc_url_raw( wp_unslash( $_POST['_wp_http_referer'] ) ) : '';
+
+			if ( strpos( $referer_url, "/{$is_order_pay}/" ) !== false ) {
+				$parts = explode( '/', trim( $referer_url, '/' ) );
+
+				$order_pay_id = isset( $parts[2] ) ? absint( $parts[2] ) : 0;
+
+				$pay_order = wc_get_order( $order_pay_id );
+				
+				if ( $pay_order ) {
+					$total_amount = $pay_order->get_total();
+				}
+			}
+		}
+
 		$amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $total_amount, get_woocommerce_currency() );
 
 		$paymentContextsRequest->amount  = $amount_cents;
@@ -541,6 +569,7 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 			'create_order_url'              => add_query_arg( [ 'cko_paypal_action' => 'create_order' ], WC()->api_request_url( 'CKO_Paypal_Woocommerce' ) ),
 			'clear_session_url'             => add_query_arg( [ 'cko_paypal_action' => 'empty_session' ], WC()->api_request_url( 'CKO_Paypal_Woocommerce' ) ),
 			'cc_capture'                    => add_query_arg( [ 'cko_paypal_action' => 'cc_capture' ], WC()->api_request_url( 'CKO_Paypal_Woocommerce' ) ),
+			'order_pay_url'                 => add_query_arg( [ 'cko_paypal_action' => 'order_pay' ], WC()->api_request_url( 'CKO_Paypal_Woocommerce' ) ),
 			'woocommerce_process_checkout'  => wp_create_nonce( 'woocommerce-process_checkout' ),
 			'is_cart_contains_subscription' => WC_Checkoutcom_Utility::is_cart_contains_subscription(),
 			'paypal_button_selector'        => '#paypal-button-container',

@@ -159,10 +159,14 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			jQuery( document ).off( 'click', '#' + applePayButtonId );
 
 			jQuery( document ).on( 'click', '#' + applePayButtonId, function () {
-				var checkoutFields = '<?php echo $checkout_fields; ?>';
-				var result = isValidFormField(checkoutFields);
-
-				if(result){
+				var isOrderPayPage = jQuery(document.body).hasClass('woocommerce-order-pay');
+				
+				if( !isOrderPayPage ) {
+					var checkoutFields = '<?php echo $checkout_fields; ?>';
+					var result = isValidFormField(checkoutFields);
+				}
+				
+				if(result || isOrderPayPage){
 					var applePaySession = new ApplePaySession(3, getApplePayConfig());
 					handleApplePayEvents(applePaySession);
 					applePaySession.begin();
@@ -179,6 +183,36 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 				var networksSupported = <?php echo wp_json_encode( $supported_networks ); ?>;
 				var merchantCapabilities = <?php echo wp_json_encode( $merchant_capabilities ); ?>;
 
+				<?php
+
+				// Logic for order-pay page.
+
+				$total_price    = $woocommerce->cart->total;
+				$subtotal_price = $woocommerce->cart->subtotal;
+
+				// If on order-pay page, try fetching order total from the last order.
+				if ( is_wc_endpoint_url( 'order-pay' ) ) {
+
+					global $wp;
+
+					// Get order ID from URL if available.
+					$order_id = absint( $wp->query_vars['order-pay'] );
+
+					if ( ! $order_id && isset( $_GET['key'] ) ) {
+						$pay_order = wc_get_order( wc_get_order_id_by_order_key( sanitize_text_field( $_GET['key'] ) ) );
+					} else {
+						$pay_order = wc_get_order( $order_id );
+					}
+							
+					if ( $pay_order ) {
+						$total_price     = $pay_order->get_total();
+						$subtotal_price  = $pay_order->get_subtotal();
+						$shipping_amount = $pay_order->get_shipping_total();
+					}
+				}
+
+				?>
+
 				return {
 					currencyCode: "<?php echo esc_js( get_woocommerce_currency() ); ?>",
 					countryCode: "<?php echo esc_js( $country_code ); ?>",
@@ -186,7 +220,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 					supportedNetworks: networksSupported,
 					total: {
 						label: window.location.host,
-						amount: "<?php echo esc_js( $woocommerce->cart->total ); ?>",
+						amount: "<?php echo esc_js( $total_price ); ?>",
 						type: 'final'
 					}
 				}
@@ -219,14 +253,14 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 					var newTotal = {
 						type: 'final',
 						label: window.location.host,
-						amount: "<?php echo esc_js( $woocommerce->cart->total ); ?>",
+						amount: "<?php echo esc_js( $total_price ); ?>",
 					};
 
 					var newLineItems = [
 						{
 							type: 'final',
 							label: 'Subtotal',
-							amount: "<?php echo esc_js( $woocommerce->cart->subtotal ); ?>"
+							amount: "<?php echo esc_js( $subtotal_price ); ?>"
 						},
 						{
 							type: 'final',
