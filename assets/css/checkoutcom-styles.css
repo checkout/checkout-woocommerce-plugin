@@ -54,37 +54,13 @@
     }
 }
 /* This is the CSS needed to the the ApplePay Button -> */
-.apple-pay-button {
-    width: var(--wallet-button-width);
-    height: var(--wallet-button-height);
-    display: inline-block;
-    -webkit-appearance: -apple-pay-button;
-    cursor: pointer;
+apple-pay-button {
+    --apple-pay-button-width: var(--wallet-button-width);
+    --apple-pay-button-height: var(--wallet-button-height);
+    --apple-pay-button-border-radius: 3px;
+    --apple-pay-button-padding: 2px 0px;
+    --apple-pay-button-box-sizing: border-box;
     margin-top: 15px;
-}
-.apple-pay-button-with-text > * {
-    display: none;
-}
-.apple-pay-button-black-with-text {
-    -apple-pay-button-style: black;
-}
-.apple-pay-button-white-with-text {
-    -apple-pay-button-style: white;
-}
-.apple-pay-button-white-with-line-with-text {
-    -apple-pay-button-style: white-outline;
-}
-.apple-pay-button-text-book {
-    -apple-pay-button-type: book;
-}
-.apple-pay-button-text-buy {
-    -apple-pay-button-type: buy;
-}
-.apple-pay-button-text-check-out {
-    -apple-pay-button-type: check-out;
-}
-.apple-pay-button-text-donate {
-    -apple-pay-button-type: donate;
 }
 
 /* For mobile devices */

@@ -1,15 +1,15 @@
-# Copyright (C) 2024 Checkout.com
+# Copyright (C) 2025 Checkout.com
 # This file is distributed under the same license as the Checkout.com Payment Gateway plugin.
 msgid ""
 msgstr ""
-"Project-Id-Version: Checkout.com Payment Gateway 4.9.0\n"
+"Project-Id-Version: Checkout.com Payment Gateway 4.9.2\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/woocommerce-gateway-checkout-com\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2024-11-19T08:15:04+00:00\n"
+"POT-Creation-Date: 2025-03-25T08:33:57+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.9.0\n"
 "X-Domain: checkout-com-unified-payments-api\n"
@@ -345,21 +345,21 @@ msgstr ""
 #: includes/class-wc-gateway-checkout-com-alternative-payments.php:67
 #: includes/class-wc-gateway-checkout-com-apple-pay.php:66
 #: includes/class-wc-gateway-checkout-com-cards.php:178
-#: includes/class-wc-gateway-checkout-com-google-pay.php:101
-#: includes/class-wc-gateway-checkout-com-paypal.php:458
+#: includes/class-wc-gateway-checkout-com-google-pay.php:121
+#: includes/class-wc-gateway-checkout-com-paypal.php:486
 msgid "Other Settings"
 msgstr ""
 
 #. translators: %s: Action ID.
 #: includes/class-wc-gateway-checkout-com-alternative-payments.php:123
-#: includes/class-wc-gateway-checkout-com-apple-pay.php:642
+#: includes/class-wc-gateway-checkout-com-apple-pay.php:680
 #: includes/class-wc-gateway-checkout-com-cards.php:948
 msgid "Checkout.com Payment Partially refunded from Admin - Action ID : %s"
 msgstr ""
 
 #. translators: %s: Action ID.
 #: includes/class-wc-gateway-checkout-com-alternative-payments.php:132
-#: includes/class-wc-gateway-checkout-com-apple-pay.php:651
+#: includes/class-wc-gateway-checkout-com-apple-pay.php:689
 #: includes/class-wc-gateway-checkout-com-cards.php:943
 msgid "Checkout.com Payment refunded from Admin - Action ID : %s"
 msgstr ""
@@ -369,25 +369,25 @@ msgstr ""
 msgid "Apple Pay"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-apple-pay.php:557
+#: includes/class-wc-gateway-checkout-com-apple-pay.php:595
 #: includes/class-wc-gateway-checkout-com-cards.php:467
-#: includes/class-wc-gateway-checkout-com-google-pay.php:152
+#: includes/class-wc-gateway-checkout-com-google-pay.php:172
 msgid "There was an issue completing the payment."
 msgstr ""
 
 #. translators: %s: Action ID.
-#: includes/class-wc-gateway-checkout-com-apple-pay.php:585
+#: includes/class-wc-gateway-checkout-com-apple-pay.php:623
 #: includes/class-wc-gateway-checkout-com-cards.php:551
 #: includes/class-wc-gateway-checkout-com-cards.php:660
-#: includes/class-wc-gateway-checkout-com-google-pay.php:195
+#: includes/class-wc-gateway-checkout-com-google-pay.php:215
 msgid "Checkout.com Payment Authorised - Action ID : %s"
 msgstr ""
 
 #. translators: %s: Action ID.
-#: includes/class-wc-gateway-checkout-com-apple-pay.php:593
+#: includes/class-wc-gateway-checkout-com-apple-pay.php:631
 #: includes/class-wc-gateway-checkout-com-cards.php:559
 #: includes/class-wc-gateway-checkout-com-cards.php:668
-#: includes/class-wc-gateway-checkout-com-google-pay.php:203
+#: includes/class-wc-gateway-checkout-com-google-pay.php:223
 msgid "Checkout.com Payment Flagged - Action ID : %s"
 msgstr ""
 
@@ -459,7 +459,7 @@ msgstr ""
 
 #. translators: %s: URL
 #: includes/class-wc-gateway-checkout-com-cards.php:513
-#: includes/class-wc-gateway-checkout-com-google-pay.php:165
+#: includes/class-wc-gateway-checkout-com-google-pay.php:185
 msgid "Checkout.com 3d Redirect waiting. URL : %s"
 msgstr ""
 
@@ -492,14 +492,14 @@ msgid "Google Pay"
 msgstr ""
 
 #. translators: %s: Action ID.
-#: includes/class-wc-gateway-checkout-com-google-pay.php:250
-#: includes/class-wc-gateway-checkout-com-paypal.php:600
+#: includes/class-wc-gateway-checkout-com-google-pay.php:270
+#: includes/class-wc-gateway-checkout-com-paypal.php:629
 msgid "Checkout.com Payment refunded - Action ID : %s"
 msgstr ""
 
 #. translators: %s: Action ID.
-#: includes/class-wc-gateway-checkout-com-google-pay.php:255
-#: includes/class-wc-gateway-checkout-com-paypal.php:605
+#: includes/class-wc-gateway-checkout-com-google-pay.php:275
+#: includes/class-wc-gateway-checkout-com-paypal.php:634
 msgid "Checkout.com Payment Partially refunded - Action ID : %s"
 msgstr ""
 
@@ -509,8 +509,8 @@ msgstr ""
 msgid "PayPal"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-paypal.php:390
-#: includes/class-wc-gateway-checkout-com-paypal.php:432
+#: includes/class-wc-gateway-checkout-com-paypal.php:418
+#: includes/class-wc-gateway-checkout-com-paypal.php:460
 msgid "An error has occurred while PayPal payment request. "
 msgstr ""
 
@@ -1034,7 +1034,7 @@ msgid "Buy"
 msgstr ""
 
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:554
-msgid "Checkout out"
+msgid "Checkout"
 msgstr ""
 
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:555

@@ -546,26 +546,26 @@ class WC_Checkoutcom_Cards_Settings {
 				'desc_tip'    => true,
 				'default'     => '',
 			],
-			'ckocom_apple_type'        => [
+			'ckocom_apple_type'        => array(
 				'title'   => __( 'Button Type', 'checkout-com-unified-payments-api' ),
 				'type'    => 'select',
-				'options' => [
-					'apple-pay-button-text-buy'       => __( 'Buy', 'checkout-com-unified-payments-api' ),
-					'apple-pay-button-text-check-out' => __( 'Checkout out', 'checkout-com-unified-payments-api' ),
-					'apple-pay-button-text-book'      => __( 'Book', 'checkout-com-unified-payments-api' ),
-					'apple-pay-button-text-donate'    => __( 'Donate', 'checkout-com-unified-payments-api' ),
-					'apple-pay-button'                => __( 'Plain', 'checkout-com-unified-payments-api' ),
-				],
-			],
-			'ckocom_apple_theme'       => [
+				'options' => array(
+					'buy'       => __( 'Buy', 'checkout-com-unified-payments-api' ),
+					'check-out' => __( 'Checkout', 'checkout-com-unified-payments-api' ),
+					'book'      => __( 'Book', 'checkout-com-unified-payments-api' ),
+					'donate'    => __( 'Donate', 'checkout-com-unified-payments-api' ),
+					'plain'     => __( 'Plain', 'checkout-com-unified-payments-api' ),
+				),
+			),
+			'ckocom_apple_theme'       => array(
 				'title'   => __( 'Button Theme', 'checkout-com-unified-payments-api' ),
 				'type'    => 'select',
-				'options' => [
-					'apple-pay-button-black-with-text' => __( 'Black', 'checkout-com-unified-payments-api' ),
-					'apple-pay-button-white-with-text' => __( 'White', 'checkout-com-unified-payments-api' ),
-					'apple-pay-button-white-with-line-with-text' => __( 'White with outline', 'checkout-com-unified-payments-api' ),
-				],
-			],
+				'options' => array(
+					'black'         => __( 'Black', 'checkout-com-unified-payments-api' ),
+					'white'         => __( 'White', 'checkout-com-unified-payments-api' ),
+					'white-outline' => __( 'White with outline', 'checkout-com-unified-payments-api' ),
+				),
+			),
 			'ckocom_apple_language'    => [
 				'title'       => __( 'Button Language', 'checkout-com-unified-payments-api' ),
 				'type'        => 'text',

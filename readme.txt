@@ -171,6 +171,9 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v4.9.2 25th March 2025
+- **[feat]** Enable Apple-pay on all browsers
+
 v4.9.0 19th Novemeber 2024
 - **[fix]** 422 error on Paypal Payment Gateway
 
