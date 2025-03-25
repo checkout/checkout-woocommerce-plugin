@@ -118,6 +118,10 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		<p style="display:none" id="ckocom_applePay_not_actived">ApplePay is possible on this browser, but not currently activated.</p>
 		<p style="display:none" id="ckocom_applePay_not_possible">ApplePay is not available on this browser</p>
 
+		<script crossorigin
+            src="https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js"
+        ></script>
+
 		<script type="text/javascript">
 			// Magic strings used in file
 			var applePayOptionSelector = 'li.payment_method_wc_checkout_com_apple_pay';
@@ -147,18 +151,18 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 
 			// Display the button and remove the default place order.
 			checkoutInitialiseApplePay = function () {
-				jQuery('#payment').append('<div id="' + applePayButtonId + '" class="apple-pay-button '
-				+ "<?php echo esc_js( $this->get_option( 'ckocom_apple_type' ) ); ?>" + " "
-				+ "<?php echo esc_js( $this->get_option( 'ckocom_apple_theme' ) ); ?>"  + '" lang="'
-				+ "<?php echo esc_js( $this->get_option( 'ckocom_apple_language' ) ); ?>" + '"></div>');
+				jQuery( '#payment' ) . append(
+					'<apple-pay-button id="' + applePayButtonId + '" onclick="onApplePayButtonClicked()" type="' 
+					+ "<?php echo esc_js( $this->get_option( 'ckocom_apple_type' ) ); ?>" + '" buttonstyle="' 
+					+ "<?php echo esc_js( $this->get_option( 'ckocom_apple_theme' ) ); ?>" + '" locale="' 
+					+ "<?php echo esc_js( $this->get_option( 'ckocom_apple_language' ) ); ?>" + '"></apple-pay-button>'
+				);
 
 				jQuery('#ckocom_applePay').hide();
 			};
 
 			// Listen for when the Apple Pay button is pressed.
-			jQuery( document ).off( 'click', '#' + applePayButtonId );
-
-			jQuery( document ).on( 'click', '#' + applePayButtonId, function () {
+			function onApplePayButtonClicked() {
 				var isOrderPayPage = jQuery(document.body).hasClass('woocommerce-order-pay');
 				
 				if( !isOrderPayPage ) {
@@ -170,8 +174,8 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 					var applePaySession = new ApplePaySession(3, getApplePayConfig());
 					handleApplePayEvents(applePaySession);
 					applePaySession.begin();
-				}
-			});
+				} 
+			}
 
 			/**
 			 * Get the configuration needed to initialise the Apple Pay session.
