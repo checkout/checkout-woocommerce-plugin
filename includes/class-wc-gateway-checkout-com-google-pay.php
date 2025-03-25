@@ -70,6 +70,26 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 			$currency_code = get_woocommerce_currency();
 			$total_price   = WC()->cart->total;
 
+			// Logic for order-pay page.
+			// If on order-pay page, try fetching order total from the last order.
+			if ( is_wc_endpoint_url( 'order-pay' ) ) {
+
+				global $wp;
+
+				// Get order ID from URL if available.
+				$order_id = absint( $wp->query_vars['order-pay'] );
+
+				if ( ! $order_id && isset( $_GET['key'] ) ) {
+					$pay_order = wc_get_order( wc_get_order_id_by_order_key( sanitize_text_field( $_GET['key'] ) ) );
+				} else {
+					$pay_order = wc_get_order( $order_id );
+				}
+
+				if ( $pay_order ) {
+					$total_price = $pay_order->get_total();
+				}
+			}
+
 			$vars = [
 				'environment'   => $environment ? 'TEST' : 'PRODUCTION',
 				'public_key'    => $core_settings['ckocom_pk'],

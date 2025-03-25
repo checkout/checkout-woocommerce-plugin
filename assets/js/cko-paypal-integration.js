@@ -56,19 +56,38 @@ jQuery( function ( $ ) {
             .addClass( 'woocommerce-NoticeGroup woocommerce-NoticeGroup-checkout' )
             .append( ulWrapper );
 
-        jQuery('form.checkout .woocommerce-NoticeGroup').remove();
-        jQuery('form.checkout').prepend(wcNoticeDiv);
-        jQuery('.woocommerce, .form.checkout').removeClass('processing').unblock();
+        let scrollTarget;
 
-        jQuery('html, body').animate({
-            scrollTop: (jQuery('form.checkout').offset().top - 100 )
-        }, 1000 );
+        if ( jQuery('form.checkout').length ) {
+            jQuery('form.checkout .woocommerce-NoticeGroup').remove();
+            jQuery('form.checkout').prepend(wcNoticeDiv);
+            jQuery('.woocommerce, .form.checkout').removeClass('processing').unblock();
+            scrollTarget = jQuery('form.checkout');
+        } else if ( jQuery('.woocommerce-order-pay').length ) {
+            jQuery('.woocommerce-order-pay .woocommerce-NoticeGroup').remove();
+            jQuery('.woocommerce-order-pay').prepend(wcNoticeDiv);
+            jQuery('.woocommerce, .woocommerce-order-pay').removeClass('processing').unblock();
+            scrollTarget = jQuery('.woocommerce-order-pay');
+        }
+    
+        if ( scrollTarget ) {
+            jQuery('html, body').animate({
+                scrollTop: (scrollTarget.offset().top - 100)
+            }, 1000);
+        }
     };
 
     let cko_create_order_id = function () {
         let data = jQuery( cko_paypal_vars.paypal_button_selector ).closest('form').serialize();
 
-        return fetch( cko_paypal_vars.create_order_url, {
+        var cko_url = cko_paypal_vars.create_order_url;
+
+        var isOrderPayPage = jQuery(document.body).hasClass('woocommerce-order-pay');
+        if (isOrderPayPage){
+            cko_url = cko_paypal_vars.order_pay_url;
+        }
+
+        return fetch( cko_url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded'
@@ -96,7 +115,13 @@ jQuery( function ( $ ) {
             jQuery( '#payment #paypal-button-container' ).remove();
 
             if ( ! jQuery( '#payment' ).find( '#paypal-button-container' ).length ) {
-                jQuery( '#payment .place-order' ).append( '<div id="paypal-button-container" style="margin-top:15px; display:none;"></div>' );
+                var isOrderPayPage = jQuery(document.body).hasClass('woocommerce-order-pay');
+                if( isOrderPayPage ) {
+                    jQuery( '#payment > .form-row' ).append( '<div id="paypal-button-container" style="margin-top:15px; display:none;"></div>' );
+                }
+                else {
+                    jQuery( '#payment .place-order' ).append( '<div id="paypal-button-container" style="margin-top:15px; display:none;"></div>' );
+                }
             }
 
             // Initialize paypal button.
