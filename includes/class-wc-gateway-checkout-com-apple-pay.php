@@ -152,7 +152,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			// Display the button and remove the default place order.
 			checkoutInitialiseApplePay = function () {
 				jQuery( '#payment' ) . append(
-					'<apple-pay-button id="' + applePayButtonId + '" type="' 
+					'<apple-pay-button id="' + applePayButtonId + '" onclick="onApplePayButtonClicked()" type="' 
 					+ "<?php echo esc_js( $this->get_option( 'ckocom_apple_type' ) ); ?>" + '" buttonstyle="' 
 					+ "<?php echo esc_js( $this->get_option( 'ckocom_apple_theme' ) ); ?>" + '" locale="' 
 					+ "<?php echo esc_js( $this->get_option( 'ckocom_apple_language' ) ); ?>" + '"></apple-pay-button>'
@@ -162,18 +162,16 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			};
 
 			// Listen for when the Apple Pay button is pressed.
-			jQuery( document ).off( 'click', '#' + applePayButtonId );
-
-			jQuery( document ).on( 'click', '#' + applePayButtonId, function () {
+			function onApplePayButtonClicked() {
 				var checkoutFields = '<?php echo $checkout_fields; ?>';
 				var result = isValidFormField(checkoutFields);
 
-				if(result){
+				if (result) {
 					var applePaySession = new ApplePaySession(3, getApplePayConfig());
 					handleApplePayEvents(applePaySession);
 					applePaySession.begin();
-				}
-			});
+				} 
+			}
 
 			/**
 			 * Get the configuration needed to initialise the Apple Pay session.
