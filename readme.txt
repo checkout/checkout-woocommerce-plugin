@@ -171,10 +171,14 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v4.9.3 12th June 2025
+- **[disable]** Region Field from core settings
+- **[feat]** Hide Secret Key Field text & add a View Toggle Button
+
 v4.9.2 25th March 2025
 - **[feat]** Enable Apple-pay on all browsers
 
-v4.9.1 18th March 2024
+v4.9.1 18th March 2025
 - **[fix]** Payment gateways on `order-pay` page
 
 v4.9.0 19th Novemeber 2024

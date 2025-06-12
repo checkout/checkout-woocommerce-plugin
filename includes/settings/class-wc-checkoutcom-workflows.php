@@ -67,7 +67,7 @@ class WC_Checkoutcom_Workflows {
 
 		$core_settings   = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
 		$environment     = ( 'sandbox' === $core_settings['ckocom_environment'] );
-		$subdomain_check = isset( $core_settings['ckocom_region'] ) && '--' !== $core_settings['ckocom_region'];
+		$subdomain_check = isset( $core_settings['ckocom_region'] ) && 'global' !== $core_settings['ckocom_region'];
 
 		$core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
 
