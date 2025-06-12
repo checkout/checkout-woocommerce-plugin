@@ -99,16 +99,19 @@ class WC_Checkoutcom_Cards_Settings {
 				'desc_tip'    => true,
 				'default'     => 'yes',
 			],
-			'ckocom_region'       => [
+			'ckocom_region' => [
 				'title'       => __( 'Region', 'checkout-com-unified-payments-api' ),
 				'type'        => 'select',
-				'description' => __( 'Choose subdomain for multi-region configration', 'checkout-com-unified-payments-api' ),
+				'description' => __( 'Choose subdomain for multi-region configuration', 'checkout-com-unified-payments-api' ),
 				'desc_tip'    => true,
 				'options'     => [
-					'--'  => __( '--', 'checkout-com-unified-payments-api' ),
-					'ksa' => __( 'KSA', 'checkout-com-unified-payments-api' ),
+					'global' => __( 'Global', 'checkout-com-unified-payments-api' ),
+					'ksa'    => __( 'KSA', 'checkout-com-unified-payments-api' ),
 				],
-				'default'     => '--',
+				'default'     => 'global',
+				'custom_attributes' => [
+					'disabled' => 'disabled',
+				],
 			],
 			'ckocom_environment'  => [
 				'title'       => __( 'Environment', 'checkout-com-unified-payments-api' ),
@@ -142,7 +145,7 @@ class WC_Checkoutcom_Cards_Settings {
 			],
 			'ckocom_sk'           => [
 				'title'       => __( 'Secret Key', 'checkout-com-unified-payments-api' ),
-				'type'        => 'text',
+				'type'        => 'password',
 				/* translators: 1: HTML anchor opening tag, 2: HTML anchor closing tag. */
 				'description' => sprintf( __( 'You can %1$s find your secret key %2$s in the Checkout.com Hub', 'checkout-com-unified-payments-api' ), '<a class="checkoutcom-key-docs" target="_blank" href="' . esc_url( $docs_link ) . '">', '</a>' ),
 				'placeholder' => 'sk_xxx',

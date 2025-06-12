@@ -307,6 +307,30 @@ jQuery( function ( $ ) {
 				} );
 			} );
 
+		},
+
+		toggleSecretKeyVisibility: function () {
+			const field = $('#woocommerce_wc_checkout_com_cards_ckocom_sk');
+			if (!field.length) return;
+		
+			const wrapper = field.closest('td');
+		
+			// Create the toggle button
+			const toggleBtn = $('<button type="button" class="button button-secondary" style="margin-left: 10px;">View</button>');
+			toggleBtn.on('click', function (e) {
+				e.preventDefault();
+				const currentType = field.attr('type');
+				if (currentType === 'password') {
+					field.attr('type', 'text');
+					toggleBtn.text('Hide');
+				} else {
+					field.attr('type', 'password');
+					toggleBtn.text('View');
+				}
+			});
+		
+			// Append button after the input field
+			field.after(toggleBtn);
 		}
 	}
 
@@ -329,4 +353,7 @@ jQuery( function ( $ ) {
 	admin_functions.cardSettings();
 
 	admin_functions.webhookSettings();
+
+	// View toggle button for sk_xxx field.
+	admin_functions.toggleSecretKeyVisibility();
 } );
