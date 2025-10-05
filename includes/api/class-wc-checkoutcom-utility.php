@@ -186,68 +186,26 @@ class WC_Checkoutcom_Utility {
 	}
 
 	/**
-	 * Log data to file using enhanced logger.
+	 * Log data to file using WC logger.
 	 *
-	 * @param string    $message   Log message.
+	 * @param string    $error_message Error message to log.
 	 * @param Exception $exception Exception object.
-	 * @param string    $level     Log level (error, warning, info, debug).
-	 * @param array     $context   Additional context data.
 	 */
-	public static function logger( $message, $exception = null, $level = 'error', $context = [] ) {
+	public static function logger( $error_message, $exception = null ) {
+		$logger  = wc_get_logger();
+		$context = [ 'source' => 'wc_checkoutcom_gateway_log' ];
+
 		// Get file logging from module setting.
 		$file_logging = 'yes' === WC_Admin_Settings::get_option( 'cko_file_logging', 'no' );
 
-		if ( ! $file_logging ) {
-			return;
-		}
-
-		// Use enhanced logger if available
-		if ( class_exists( 'WC_Checkoutcom_Enhanced_Logger' ) ) {
-			$logger = WC_Checkoutcom_Enhanced_Logger::get_instance();
-			
-			// Add exception context if provided
-			if ( $exception ) {
-				$context['exception'] = [
-					'message' => $exception->getMessage(),
-					'code' => $exception->getCode(),
-					'file' => $exception->getFile(),
-					'line' => $exception->getLine(),
-					'trace' => $exception->getTraceAsString(),
-				];
-			}
-			
-			// Add order context if available
-			if ( isset( $context['order_id'] ) ) {
-				$context['order_id'] = $context['order_id'];
-			}
-			
-			// Log with appropriate level
-			switch ( strtolower( $level ) ) {
-				case 'debug':
-					$logger->debug( $message, $context );
-					break;
-				case 'info':
-					$logger->info( $message, $context );
-					break;
-				case 'warning':
-				case 'warn':
-					$logger->warning( $message, $context );
-					break;
-				case 'error':
-				default:
-					$logger->error( $message, $context );
-					break;
-			}
-		} else {
-			// Fallback to original WC logger
-			$wc_logger = wc_get_logger();
-			$wc_context = [ 'source' => 'wc_checkoutcom_gateway_log' ];
-
+		// Check if file logging is enabled.
+		if ( $file_logging ) {
 			// Log error message with exception.
-			$wc_logger->error( $message, $wc_context );
-			if ( $exception ) {
-				$wc_logger->error( wc_print_r( $exception, true ), $wc_context );
-			}
+			$logger->error( $error_message, $context );
+			$logger->error( wc_print_r( $exception, true ), $context );
+		} else {
+			// Log only error message.
+			$logger->error( $error_message, $context );
 		}
 	}
 
@@ -563,25 +521,8 @@ class WC_Checkoutcom_Utility {
 
 		$available_payment_methods = WC()->payment_gateways()->get_available_payment_gateways();
 
-		$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
-		$checkout_mode    = $checkout_setting['ckocom_checkout_mode'];
-
-		if ( $checkout_mode === 'classic' ) {
-			/**
-			 * If checkout_mode is classic, show express-paypal if enabled and 
-			 * if 'wc_checkout_com_paypal' is an available payment method on checkout.
-			 */
-			if ( isset( $available_payment_methods['wc_checkout_com_paypal'] ) && $is_express_enable ) {
-				return true;
-			}
-		}
-		else {
-			/**
-			 * If checkout_mode is flow, show express-paypal if enabled.
-			 */
-			if ( $is_express_enable ) {
-				return true;
-			}
+		if ( isset( $available_payment_methods['wc_checkout_com_paypal'] ) && $is_express_enable ) {
+			return true;
 		}
 
 		return false;

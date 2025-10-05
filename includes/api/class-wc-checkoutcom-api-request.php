@@ -74,30 +74,18 @@ class WC_Checkoutcom_Api_Request {
 				$three_ds_action_id
 			);
 
-		// Append time.
-		if ( true === $retry_idempotency_key ) {
-			$cko_idempotency_key .= '-' . gmdate( 'Y-m-d h:i:s' );
-		}
+			// Append time.
+			if ( true === $retry_idempotency_key ) {
+				$cko_idempotency_key .= '-' . gmdate( 'Y-m-d h:i:s' );
+			}
 
-		// Call to create charge.
-		$response = $checkout->get_builder()->getPaymentsClient()->requestPayment( $request_param, $cko_idempotency_key );
+			// Call to create charge.
+			$response = $checkout->get_builder()->getPaymentsClient()->requestPayment( $request_param, $cko_idempotency_key );
 
 			// Check if payment successful.
 			if ( WC_Checkoutcom_Utility::is_successful( $response ) ) {
 				// Check if payment is 3D secure.
 				if ( WC_Checkoutcom_Utility::is_pending( $response ) ) {
-
-					WC_Checkoutcom_Utility::logger(
-						'Payment pending - 3DS authentication required',
-						null,
-						'info',
-						[
-							'order_id' => $order->get_id(),
-							'payment_id' => $response['id'] ?? null,
-							'action_id' => $response['action_id'] ?? null,
-						]
-					);
-
 					// Check if SEPA renewal order.
 					if ( $is_sepa_renewal || $is_google_pay_renewal || $is_apple_pay_renewal || $is_paypal_renewal ) {
 
@@ -116,31 +104,12 @@ class WC_Checkoutcom_Api_Request {
 					} else {
 						$error_message = __( 'An error has occurred while processing your payment. Redirection link not found', 'checkout-com-unified-payments-api' );
 
-						WC_Checkoutcom_Utility::logger(
-							$error_message,
-							null,
-							'error',
-							[
-								'order_id' => $order->get_id(),
-								'payment_id' => $response['id'] ?? null,
-								'response_status' => $response['status'] ?? null,
-							]
-						);
+						WC_Checkoutcom_Utility::logger( $error_message, null );
 
 						return [ 'error' => $error_message ];
 					}
 				} else {
 
-					WC_Checkoutcom_Utility::logger(
-						'Payment successful - no 3DS required',
-						null,
-						'info',
-						[
-							'order_id' => $order->get_id(),
-							'payment_id' => $response['id'] ?? null,
-							'status' => $response['status'] ?? null,
-						]
-					);
 					return $response;
 				}
 			} else {
@@ -162,18 +131,7 @@ class WC_Checkoutcom_Api_Request {
 					}
 				}
 
-				WC_Checkoutcom_Utility::logger(
-					$error_message,
-					null,
-					'error',
-					[
-						'order_id' => $order->get_id(),
-						'payment_id' => $response['id'] ?? null,
-						'response_status' => $response['status'] ?? null,
-						'response_code' => $response['response_code'] ?? null,
-						'response_summary' => $response['response_summary'] ?? null,
-					]
-				);
+				WC_Checkoutcom_Utility::logger( $error_message, $response );
 
 				WC()->session->set( '3ds_action_id', $response['action_id'] );
 
@@ -210,11 +168,6 @@ class WC_Checkoutcom_Api_Request {
 		$amount_cents       = WC_Checkoutcom_Utility::value_to_decimal( $amount, $order->get_currency() );
 		$three_d            = '1' === WC_Admin_Settings::get_option( 'ckocom_card_threed', '0' ) && null === $subscription;
 		$attempt_no_three_d = '1' === WC_Admin_Settings::get_option( 'ckocom_card_notheed', '0' );
-		
-		// Get additional 3DS configuration from card settings
-		$challenge_indicator = WC_Admin_Settings::get_option( 'ckocom_card_3ds_challenge_indicator', 'no_preference' );
-		$exemption = WC_Admin_Settings::get_option( 'ckocom_card_3ds_exemption', '' );
-		$allow_upgrade = 'yes' === WC_Admin_Settings::get_option( 'ckocom_card_3ds_allow_upgrade', 'yes' );
 		$dynamic_descriptor = '1' === WC_Admin_Settings::get_option( 'ckocom_card_desctiptor', '0' );
 		$mada_enable        = '1' === WC_Admin_Settings::get_option( 'ckocom_card_mada', '0' );
 		$save_card          = WC_Admin_Settings::get_option( 'ckocom_card_saved' );
@@ -288,23 +241,6 @@ class WC_Checkoutcom_Api_Request {
 			$method = WC_Checkoutcom_Api_Request::get_apm_method( $post_data, $order, $arg );
 
 			$payment_option = $method->type;
-		} elseif ( 'wc_checkout_com_flow' === $post_data['payment_method'] ) {
-			if ( self::is_using_saved_payment_method() ) {
-				// Saved card used.
-				// Load token id ($arg).
-				$token = WC_Payment_Tokens::get( $arg );
-
-				$card_scheme = $token->get_meta( 'preferred_scheme' );
-
-				// Get source_id from $token.
-				$source_id = $token->get_token();
-
-				$method     = new RequestIdSource();
-				$method->id = $source_id;
-
-				$is_save_card = true;
-
-			}
 		} elseif ( ! is_null( $subscription ) ) {
 
 			$method     = new RequestIdSource();
@@ -386,19 +322,7 @@ class WC_Checkoutcom_Api_Request {
 		$three_ds              = new ThreeDsRequest();
 		$three_ds->enabled     = $three_d;
 		$three_ds->attempt_n3d = $attempt_no_three_d;
-		$three_ds->allow_upgrade = $allow_upgrade;
-		
-		// Set challenge indicator based on configuration
-		if ( $challenge_indicator !== 'no_preference' ) {
-			$three_ds->challenge_indicator = $challenge_indicator;
-		}
-		
-		// Set exemption if configured
-		if ( $exemption !== 'none' ) {
-			$three_ds->exemption = $exemption;
-		}
 
-		// Override challenge indicator for save card scenarios if not already set
 		if ( 'wc_checkout_com_cards' === $post_data['payment_method']
 			&& $three_d
 			&& $save_card
@@ -406,7 +330,6 @@ class WC_Checkoutcom_Api_Request {
 				isset( $post_data['wc-wc_checkout_com_cards-new-payment-method'] )
 				&& sanitize_text_field( $post_data['wc-wc_checkout_com_cards-new-payment-method'] )
 			)
-			&& $challenge_indicator === 'no_preference'
 		) {
 			$three_ds->challenge_indicator = ChallengeIndicatorType::$challenge_requested_mandate;
 		}
@@ -911,20 +834,14 @@ class WC_Checkoutcom_Api_Request {
 	 * @return array|mixed
 	 */
 	public static function refund_payment( $order_id, $order ) {
-		WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Starting refund process for order ID: $order_id" );
-		
 		$core_settings      = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
 		$is_fallback_active = ( 'yes' === ( $core_settings['enable_fallback_ac'] ?? 'no' ) );
 
-		WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Fallback active: " . ( $is_fallback_active ? 'yes' : 'no' ) );
-
 		$cko_payment_id = $order->get_meta( '_cko_payment_id' );
-		WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Payment ID from order meta: $cko_payment_id" );
 
 		// Check if cko_payment_id is empty.
 		if ( empty( $cko_payment_id ) ) {
 			$error_message = __( 'An error has occurred. No Cko Payment Id', 'checkout-com-unified-payments-api' );
-			WC_Checkoutcom_Utility::logger( "REFUND DEBUG: ERROR - No payment ID found" );
 
 			return [ 'error' => $error_message ];
 		}
@@ -935,34 +852,24 @@ class WC_Checkoutcom_Api_Request {
 		$refund_amount       = str_replace( ',', '.', sanitize_text_field( $_POST['refund_amount'] ) );
 		$refund_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $refund_amount, $order->get_currency() );
 
-		WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Order amount: $order_amount ({$order_amount_cents} cents)" );
-		WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Refund amount: $refund_amount ({$refund_amount_cents} cents)" );
-		WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Currency: " . $order->get_currency() );
-
 		// Check if refund amount is less than order amount.
 		$refund_is_less = $refund_amount_cents < $order_amount_cents;
-		WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Is partial refund: " . ( $refund_is_less ? 'yes' : 'no' ) );
 
 		$gateway_debug = 'yes' === WC_Admin_Settings::get_option( 'cko_gateway_responses', 'no' );
 
 		// Initialize the Checkout Api.
 		$checkout = new Checkout_SDK();
-		WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Checkout SDK initialized" );
 
 		try {
 
 			try {
-				WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Getting payment details for payment ID: $cko_payment_id" );
 				// Check if payment is already voided or captured on checkout.com hub.
 				$details = $checkout->get_builder()->getPaymentsClient()->getPaymentDetails( $cko_payment_id );
-				WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Payment details retrieved. Status: " . ( $details['status'] ?? 'unknown' ) );
 
 			} catch ( CheckoutApiException $ex ) {
-				WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Exception getting payment details: " . $ex->getMessage() );
 
 				// Handle above try block exception.
 				if ( ! $is_fallback_active ) {
-					WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Fallback not active, returning error" );
 					$error_message = esc_html__( 'An error has occurred while processing your refund. ', 'checkout-com-unified-payments-api' );
 
 					// check if gateway response is enabled from module settings.
@@ -975,36 +882,28 @@ class WC_Checkoutcom_Api_Request {
 					return [ 'error' => $error_message ];
 				}
 
-				WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Trying fallback account" );
 				// Handle Retry with fallback account.
 				$checkout = new Checkout_SDK( true );
 				$details  = $checkout->get_builder()->getPaymentsClient()->getPaymentDetails( $cko_payment_id );
-				WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Fallback payment details retrieved. Status: " . ( $details['status'] ?? 'unknown' ) );
 
 				if ( 'Refunded' === $details['status'] && ! $refund_is_less ) {
 					$error_message = 'Payment has already been refunded on Checkout.com hub for order Id : ' . $order_id;
-					WC_Checkoutcom_Utility::logger( "REFUND DEBUG: ERROR - Payment already refunded (fallback)" );
 
 					return [ 'error' => $error_message ];
 				}
 
-				WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Creating refund request via fallback account" );
 				$refund_request            = new RefundRequest();
 				$refund_request->reference = $order->get_order_number();
 
 				// Process partial refund if amount is less than order amount.
 				if ( $refund_is_less ) {
 					$refund_request->amount = $refund_amount_cents;
-					WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Setting partial refund amount: $refund_amount_cents" );
 
 					$_SESSION['cko-refund-is-less'] = $refund_is_less;
-				} else {
-					WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Full refund (no amount set)" );
 				}
 
 				$order->add_order_note( esc_html__( 'Checkout.com Refund : Process via fallback account.', 'checkout-com-unified-payments-api' ) );
 
-				WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Sending refund request to Checkout.com (fallback)" );
 				$response = $checkout->get_builder()->getPaymentsClient()->refundPayment( $cko_payment_id, $refund_request );
 
 				if ( ! WC_Checkoutcom_Utility::is_successful( $response ) ) {
@@ -1026,30 +925,23 @@ class WC_Checkoutcom_Api_Request {
 
 			if ( 'Refunded' === $details['status'] && ! $refund_is_less ) {
 				$error_message = 'Payment has already been refunded on Checkout.com hub for order Id : ' . $order_id;
-				WC_Checkoutcom_Utility::logger( "REFUND DEBUG: ERROR - Payment already refunded (main account)" );
 
 				return [ 'error' => $error_message ];
 			}
 
-			WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Creating refund request via main account" );
 			$refund_request            = new RefundRequest();
 			$refund_request->reference = $order->get_order_number();
 
 			// Process partial refund if amount is less than order amount.
 			if ( $refund_is_less ) {
 				$refund_request->amount = $refund_amount_cents;
-				WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Setting partial refund amount: $refund_amount_cents" );
 
 				$_SESSION['cko-refund-is-less'] = $refund_is_less;
-			} else {
-				WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Full refund (no amount set)" );
 			}
 
-			WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Sending refund request to Checkout.com (main account)" );
 			$response = $checkout->get_builder()->getPaymentsClient()->refundPayment( $cko_payment_id, $refund_request );
 
 			if ( ! WC_Checkoutcom_Utility::is_successful( $response ) ) {
-				WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Refund request failed (main account)" );
 				/* translators: 1: Order ID. */
 				$error_message = sprintf( esc_html__( 'An error has occurred while processing your refund payment on Checkout.com hub. Order Id : %s', 'checkout-com-unified-payments-api' ), $order_id );
 
@@ -1062,12 +954,9 @@ class WC_Checkoutcom_Api_Request {
 
 				return [ 'error' => $error_message ];
 			} else {
-				WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Refund request successful (main account)" );
-				WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Response: " . print_r( $response, true ) );
 				return $response;
 			}
 		} catch ( CheckoutApiException $ex ) {
-			WC_Checkoutcom_Utility::logger( "REFUND DEBUG: CheckoutApiException caught: " . $ex->getMessage() );
 			$error_message = esc_html__( 'An error has occurred while processing your refund. ', 'checkout-com-unified-payments-api' );
 
 			// check if gateway response is enabled from module settings.
@@ -1264,24 +1153,6 @@ class WC_Checkoutcom_Api_Request {
 			$products[] = $item;
 		}
 
-		// Build metadata for Klarna payment context
-		global $wp_version;
-		$woocommerce = WC();
-		
-		$udf5 = sprintf(
-			'Platform Data - WordPress %s / Woocommerce %s, Integration Data - Checkout.com %s, SDK Data - PHP SDK %s, Payment Method - Klarna, Server - %s',
-			$wp_version,
-			$woocommerce->version,
-			WC_CHECKOUTCOM_PLUGIN_VERSION,
-			CheckoutUtils::PROJECT_VERSION,
-			get_site_url()
-		);
-
-		$metadata = [
-			'udf5'           => $udf5,
-			'payment_method' => 'klarna',
-		];
-
 		$paymentContextsRequest               = new Checkout\Payments\Contexts\PaymentContextsRequest();
 		$paymentContextsRequest->source       = $source;
 		$paymentContextsRequest->amount       = $amount_cents;
@@ -1289,7 +1160,6 @@ class WC_Checkoutcom_Api_Request {
 		$paymentContextsRequest->payment_type = PaymentType::$regular;
 		$paymentContextsRequest->items        = $products;
 		$paymentContextsRequest->processing   = $processing;
-		$paymentContextsRequest->metadata     = $metadata;
 
 		// Initialize the Checkout Api.
 		$checkout = new Checkout_SDK();
@@ -1316,13 +1186,12 @@ class WC_Checkoutcom_Api_Request {
 		}
 	}
 
-
 	/**
 	 * Return cart information.
 	 *
 	 * @return array
 	 */
-	public static function get_cart_info( $flow = false ) {
+	public static function get_cart_info() {
 
 		if ( ! WC()->cart ) {
 			return [];
@@ -1333,105 +1202,42 @@ class WC_Checkoutcom_Api_Request {
 
 		$total_amount = WC()->cart->total;
 		$amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $total_amount, get_woocommerce_currency() );
-		$currency        = get_woocommerce_currency();
-
-		$contains_subscription_product = false;
-		$contains_virtual_product	   = false;
 
 		foreach ( $items as $item => $values ) {
 
 			$_product         = wc_get_product( $values['data']->get_id() );
 			$wc_product       = wc_get_product( $values['product_id'] );
+			$price_excl_tax   = wc_get_price_excluding_tax( $wc_product );
+			$unit_price_cents = WC_Checkoutcom_Utility::value_to_decimal( $price_excl_tax, get_woocommerce_currency() );
 
-			if( $flow ) {
-				$quantity   = $values['quantity'];
+			if ( $wc_product->is_taxable() ) {
 
-				$price_excl_tax   = wc_get_price_excluding_tax( $wc_product );
-				$unit_price_cents = WC_Checkoutcom_Utility::value_to_decimal( $price_excl_tax, get_woocommerce_currency() );
+				$price_incl_tax         = wc_get_price_including_tax( $wc_product );
+				$unit_price_cents       = WC_Checkoutcom_Utility::value_to_decimal( $price_incl_tax, get_woocommerce_currency() );
+				$tax_amount             = $price_incl_tax - $price_excl_tax;
+				$total_tax_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $tax_amount, get_woocommerce_currency() );
 
-				// WooCommerce subtotal before coupon, total after coupon
-				$line_subtotal = $values['line_subtotal'];
-				$line_total    = $values['line_total'];
+				$tax       = WC_Tax::get_rates();
+				$reset_tax = reset( $tax )['rate'];
+				$tax_rate  = round( $reset_tax );
 
-				// Discount Price
-				$unit_discount       = ( $line_subtotal - $line_total ) / $quantity;
-				$discount_total_cents = WC_Checkoutcom_Utility::value_to_decimal( $unit_discount * $quantity, $currency );
-
-				// Tax info
-				if ( $wc_product->is_taxable() ) {
-					$price_excl_tax   = wc_get_price_including_tax( $wc_product );
-					$price_incl_tax   = ( $values['line_total'] + $values['line_tax'] ) / $quantity;
-					$tax_amount       = $price_incl_tax - $price_excl_tax;
-					$tax_rate         = round( reset( WC_Tax::get_rates() )['rate'] ?? 0 );
-					$tax_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $tax_amount * $quantity, $currency );
-				} else {
-					$tax_rate         = 0;
-					$tax_amount_cents = 0;
-				}
-
-				// Subscription or not.
-				if ( class_exists( 'WC_Subscriptions_Product' ) ) {
-					$is_subscription = WC_Subscriptions_Product::is_subscription( $_product );
-				} else {
-					$is_subscription = false;
-				}
-
-				if ( $is_subscription ) {
-					$contains_subscription_product = true;
-				}
-
-				if ( $_product->is_virtual() ) {
-					$contains_virtual_product = true;
-				}
-
-				// Set unit price to zero for free subscriptions (including trial subscriptions)
-				$final_unit_price = $unit_price_cents;
-				if ( $is_subscription && $line_total == 0 ) {
-					$final_unit_price = 0;
-				}
-
-				$products[] = [
-					'name'                  => $_product->get_title(),
-					'quantity'              => $quantity,
-					'unit_price'            => $final_unit_price,
-					'total_amount'          => ( $unit_price_cents * $quantity ) - $discount_total_cents,
-					'tax_amount'      		=> $tax_amount_cents,
-					'reference'             => $_product->get_sku(),
-					'discount_amount' 		=> $discount_total_cents,
-					'is_subscription'		=> $is_subscription,
-				];
 			} else {
-				$price_excl_tax   = wc_get_price_excluding_tax( $wc_product );
-				$unit_price_cents = WC_Checkoutcom_Utility::value_to_decimal( $price_excl_tax, get_woocommerce_currency() );
-
-				if ( $wc_product->is_taxable() ) {
-
-					$price_incl_tax         = wc_get_price_including_tax( $wc_product );
-					$unit_price_cents       = WC_Checkoutcom_Utility::value_to_decimal( $price_incl_tax, get_woocommerce_currency() );
-					$tax_amount             = $price_incl_tax - $price_excl_tax;
-					$total_tax_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $tax_amount, get_woocommerce_currency() );
-
-					$tax       = WC_Tax::get_rates();
-					$reset_tax = reset( $tax )['rate'];
-					$tax_rate  = round( $reset_tax );
-
-				} else {
-					$tax_rate               = 0;
-					$total_tax_amount_cents = 0;
-				}
-
-				$products[] = [
-					'name'                  => $_product->get_title(),
-					'quantity'              => $values['quantity'],
-					'unit_price'            => $unit_price_cents,
-					'tax_rate'              => $tax_rate * 100,
-					'total_amount'          => $unit_price_cents * $values['quantity'],
-					'total_tax_amount'      => $total_tax_amount_cents,
-					'type'                  => 'physical',
-					'reference'             => $_product->get_sku(),
-					'total_discount_amount' => 0,
-				];
+				$tax_rate               = 0;
+				$total_tax_amount_cents = 0;
 			}
+
+			$products[] = [
+				'name'                  => $_product->get_title(),
+				'quantity'              => $values['quantity'],
+				'unit_price'            => $unit_price_cents,
+				'tax_rate'              => $tax_rate * 100,
+				'total_amount'          => $unit_price_cents * $values['quantity'],
+				'total_tax_amount'      => $total_tax_amount_cents,
+				'type'                  => 'physical',
+				'reference'             => $_product->get_sku(),
+				'total_discount_amount' => 0,
+
+			];
 		}
 
 		$chosen_methods  = wc_get_chosen_shipping_method_ids();
@@ -1462,31 +1268,17 @@ class WC_Checkoutcom_Api_Request {
 					$total_tax_amount_cents = 0;
 				}
 
-				// Only add total_tax_amount and total_discount_amount if flow is false.
-				if ( ! $flow ) {
-					$products[] = [
-						'name'                  => $chosen_shipping,
-						'quantity'              => 1,
-						'unit_price'            => $shipping_amount_cents,
-						'tax_rate'              => $shipping_tax_rate,
-						'total_amount'          => $shipping_amount_cents,
-						'total_tax_amount'      => $total_tax_amount_cents,
-						'type'                  => 'shipping_fee',
-						'reference'             => $chosen_shipping,
-						'total_discount_amount' => 0,
-					];
-				} else {
-					$products[] = [
-						'name'                  => $chosen_shipping,
-						'quantity'              => 1,
-						'unit_price'            => $shipping_amount_cents,
-						'total_amount'          => $shipping_amount_cents,
-						'tax_amount'      		=> $total_tax_amount_cents,
-						'reference'             => $chosen_shipping,
-						'discount_amount' 		=> 0,
-						'is_subscription'		=> $is_subscription,
-					];
-				}
+				$products[] = [
+					'name'                  => $chosen_shipping,
+					'quantity'              => 1,
+					'unit_price'            => $shipping_amount_cents,
+					'tax_rate'              => $shipping_tax_rate,
+					'total_amount'          => $shipping_amount_cents,
+					'total_tax_amount'      => $total_tax_amount_cents,
+					'type'                  => 'shipping_fee',
+					'reference'             => $chosen_shipping,
+					'total_discount_amount' => 0,
+				];
 			}
 		}
 
@@ -1510,190 +1302,11 @@ class WC_Checkoutcom_Api_Request {
 				'phone'           => WC()->customer->get_billing_phone(),
 				'country'         => WC()->customer->get_billing_country(),
 			],
-			'shipping_address'  => [
-				'given_name'      => WC()->customer->get_shipping_first_name(),
-				'family_name'     => WC()->customer->get_shipping_last_name(),
-				'street_address'  => WC()->customer->get_shipping_address_1(),
-				'street_address2' => WC()->customer->get_shipping_address_2(),
-				'postal_code'     => WC()->customer->get_shipping_postcode(),
-				'city'            => WC()->customer->get_shipping_city(),
-				'region'          => WC()->customer->get_shipping_state(),
-				'country'         => WC()->customer->get_shipping_country(),
-			],
 			'order_amount'      => $amount_cents,
 			'order_tax_amount'  => $total_tax_amount_cents,
 			'order_lines'       => $products,
-			'contains_subscription_product' => $contains_subscription_product,
-			'contains_virtual_product' => $contains_virtual_product,
 		];
 	}
-
-	/**
-	 * Return order information on order-pay page.
-	 *
-	 * @return array
-	 */
-	public static function get_order_info( $order_id, $flow = false ) {
-		$order = wc_get_order( $order_id );
-		if ( ! $order ) {
-			return [];
-		}
-	
-		$products  = [];
-		$currency  = $order->get_currency();
-		$total_tax = $order->get_total_tax();
-
-		$contains_subscription_product = false;
-	
-		foreach ( $order->get_items() as $item ) {
-			$product  = $item->get_product();
-			$quantity = $item->get_quantity();
-			$line_subtotal = $item->get_subtotal();
-			$line_total    = $item->get_total();
-	
-			if ( $flow ) {
-				$unit_price        = $line_subtotal / $quantity;
-				$unit_discount     = ( $line_subtotal - $line_total ) / $quantity;
-				$discounted_unit   = $unit_price - $unit_discount;
-				$unit_price_cents  = WC_Checkoutcom_Utility::value_to_decimal( $discounted_unit, $currency );
-				$discount_total_cents = WC_Checkoutcom_Utility::value_to_decimal( $unit_discount * $quantity, $currency );
-			} else {
-				$unit_price        = $line_total / $quantity;
-				$unit_price_cents  = WC_Checkoutcom_Utility::value_to_decimal( $unit_price, $currency );
-				$discount_total_cents = 0;
-			}
-
-			// Tax info
-			if ( $product->is_taxable() ) {
-				$price_excl_tax   = $line_total / $quantity;
-				$price_incl_tax   = ( $item['line_total'] + $item['line_tax'] ) / $quantity;
-				$tax_amount       = $price_incl_tax - $price_excl_tax;
-				$tax_rate         = round( reset( WC_Tax::get_rates() )['rate'] ?? 0 );
-				$tax_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $tax_amount * $quantity, $currency );
-			} else {
-				$tax_rate         = 0;
-				$tax_amount_cents = 0;
-			}
-
-			// Subscription or not.
-			if ( class_exists( 'WC_Subscriptions_Product' ) ) {
-				$is_subscription = WC_Subscriptions_Product::is_subscription( $product );
-			} else {
-				$is_subscription = false;
-			}
-
-			if ( $is_subscription ) {
-				$contains_subscription_product = true;
-			}
-
-			$products[] = [
-				'name'                  => $product->get_title(),
-				'quantity'              => $quantity,
-				'unit_price'            => $unit_price_cents,
-				'total_amount'          => $unit_price_cents * $quantity,
-				'tax_amount'      		=> $tax_amount_cents,
-				'reference'             => $product->get_sku(),
-				'discount_amount' 		=> $discount_total_cents,
-				'is_subscription'		=> $is_subscription,
-			];
-		}
-
-		$chosen_methods  = wc_get_chosen_shipping_method_ids();
-		$chosen_shipping = $chosen_methods[0];
-
-		// Add shipping line
-		if ( 'free_shipping' !== $chosen_shipping ) {
-			$shipping_amount       = $order->get_shipping_total();
-			$shipping_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $shipping_amount, get_woocommerce_currency() );
-
-			if ( $shipping_amount_cents > 0 ) {
-				if ( $order->get_shipping_tax() > 0 ) {
-					$shipping_amount       = $order->get_shipping_total() + $order->get_shipping_tax();
-					$shipping_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $shipping_amount, get_woocommerce_currency() );
-
-					$total_tax_amount       = $order->get_shipping_tax();
-					$total_tax_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $total_tax_amount, get_woocommerce_currency() );
-
-					$shipping_rates = WC_Tax::get_shipping_tax_rates();
-					$vat            = array_shift( $shipping_rates );
-
-					if ( isset( $vat['rate'] ) ) {
-						$shipping_tax_rate = round( $vat['rate'] * 100 );
-					} else {
-						$shipping_tax_rate = 0;
-					}
-				} else {
-					$shipping_tax_rate      = 0;
-					$total_tax_amount_cents = 0;
-				}
-
-				// Only add total_tax_amount and total_discount_amount if flow is false.
-				if ( ! $flow ) {
-					$products[] = [
-						'name'                  => $chosen_shipping,
-						'quantity'              => 1,
-						'unit_price'            => $shipping_amount_cents,
-						'tax_rate'              => $shipping_tax_rate,
-						'total_amount'          => $shipping_amount_cents,
-						'total_tax_amount'      => $total_tax_amount_cents,
-						'reference'             => $chosen_shipping,
-						'total_discount_amount' => 0,
-					];
-				} else {
-					$products[] = [
-						'name'                  => $chosen_shipping,
-						'quantity'              => 1,
-						'unit_price'            => $shipping_amount_cents,
-						'total_amount'          => $shipping_amount_cents,
-						'tax_amount'      		=> $total_tax_amount_cents,
-						'reference'             => $chosen_shipping,
-						'discount_amount' 		=> 0,
-						'is_subscription'		=> $is_subscription,
-					];
-				}
-			}
-		}
-
-		$payment_type = PaymentType::$regular;
-
-		if ( $order->is_created_via( 'admin' ) ) {
-			$payment_type = PaymentType::$moto;
-		}
-	
-		return [
-			'purchase_country'  => $order->get_billing_country(),
-			'purchase_currency' => $currency,
-			'locale'            => get_locale(),
-			'billing_address'   => [
-				'given_name'      => $order->get_billing_first_name(),
-				'family_name'     => $order->get_billing_last_name(),
-				'email'           => $order->get_billing_email(),
-				'street_address'  => $order->get_billing_address_1(),
-				'street_address2' => $order->get_billing_address_2(),
-				'postal_code'     => $order->get_billing_postcode(),
-				'city'            => $order->get_billing_city(),
-				'region'          => $order->get_billing_state(),
-				'phone'           => $order->get_billing_phone(),
-				'country'         => $order->get_billing_country(),
-			],
-			'shipping_address'  => [
-				'given_name'      => WC()->customer->get_shipping_first_name(),
-				'family_name'     => WC()->customer->get_shipping_last_name(),
-				'street_address'  => WC()->customer->get_shipping_address_1(),
-				'street_address2' => WC()->customer->get_shipping_address_2(),
-				'postal_code'     => WC()->customer->get_shipping_postcode(),
-				'city'            => WC()->customer->get_shipping_city(),
-				'region'          => WC()->customer->get_shipping_state(),
-				'country'         => WC()->customer->get_shipping_country(),
-			],
-			'order_amount'      => WC_Checkoutcom_Utility::value_to_decimal( $order->get_total(), $currency ),
-			'order_tax_amount'  => WC_Checkoutcom_Utility::value_to_decimal( $total_tax, $currency ),
-			'order_lines'       => $products,
-			'order_id'			=> $order_id,
-			'payment_type'		=> $payment_type,
-			'contains_subscription_product' => $contains_subscription_product,
-		];
-	}	
 
 	/**
 	 * Return order product information.
@@ -1876,24 +1489,6 @@ class WC_Checkoutcom_Api_Request {
 		$payment_method = isset( $_POST['payment_method'] ) ? wc_clean( wp_unslash( $_POST['payment_method'] ) ) : 'wc_checkout_com_cards';
 
 		$payment_method = 'wc-' . $payment_method . '-payment-token';
-
-		if ( 'wc-wc_checkout_com_flow-payment-token' === $payment_method ) {
-			$flow_token  = 'wc-wc_checkout_com_flow-payment-token';
-			$card_token  = 'wc-wc_checkout_com_cards-payment-token';
-	
-			// Case 1: Flow saved card selected.
-			if ( isset( $_POST[ $flow_token ] ) && ! empty( $_POST[ $flow_token ] ) && 'new' !== $_POST[ $flow_token ] ) {
-				return ( isset( $_POST[ $flow_token ] ) && 'new' !== $_POST[ $flow_token ] );
-			}
-	
-			// Case 2: Card gateway saved card selected inside flow.
-			if ( isset( $_POST[ $card_token ] ) && ! empty( $_POST[ $card_token ] ) && 'new' !== $_POST[ $card_token ] ) {
-				return ( isset( $_POST[ $card_token ] ) && 'new' !== $_POST[ $card_token ] );
-			}
-	
-			// Case 3: No saved card → new flow payment.
-			return false;
-		}
 
 		return ( isset( $_POST[ $payment_method ] ) && 'new' !== $_POST[ $payment_method ] );
 	}
