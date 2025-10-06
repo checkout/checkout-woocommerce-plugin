@@ -1044,6 +1044,12 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 		// check if saved card enable from module setting.
 		if ( $save_card ) {
+			// Migrate old saved cards for logged-in users
+			if ( is_user_logged_in() ) {
+				$user_id = get_current_user_id();
+				$this->migrate_old_saved_cards( $user_id );
+			}
+
 			// Show Available Saved cards for Classic.
 			$cards_gateway = WC()->payment_gateways()->payment_gateways()['wc_checkout_com_cards'] ?? null;
 			if ( $cards_gateway ) {
@@ -1323,6 +1329,61 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			?>
 		</div>
 		<?php
+	}
+
+	/**
+	 * Migrate old saved cards to be compatible with Flow integration.
+	 * This function helps users with saved cards from previous plugin versions.
+	 *
+	 * @param int $user_id User ID.
+	 * @return void
+	 */
+	public function migrate_old_saved_cards( $user_id ) {
+		// Get all tokens for this user from the classic cards gateway
+		$classic_gateway = new WC_Gateway_Checkout_Com_Cards();
+		$tokens = WC_Payment_Tokens::get_tokens( array(
+			'user_id'    => $user_id,
+			'gateway_id' => $classic_gateway->id,
+			'limit'      => 100,
+		) );
+
+		foreach ( $tokens as $token ) {
+			// Check if this token already exists for Flow gateway
+			$flow_tokens = WC_Payment_Tokens::get_tokens( array(
+				'user_id'    => $user_id,
+				'gateway_id' => $this->id,
+				'limit'      => 100,
+			) );
+
+			$token_exists = false;
+			foreach ( $flow_tokens as $flow_token ) {
+				if ( $flow_token->get_token() === $token->get_token() ) {
+					$token_exists = true;
+					break;
+				}
+			}
+
+			// If token doesn't exist for Flow, create it
+			if ( ! $token_exists ) {
+				$new_token = new WC_Payment_Token_CC();
+				$new_token->set_token( $token->get_token() );
+				$new_token->set_gateway_id( $this->id );
+				$new_token->set_card_type( $token->get_card_type() );
+				$new_token->set_last4( $token->get_last4() );
+				$new_token->set_expiry_month( $token->get_expiry_month() );
+				$new_token->set_expiry_year( $token->get_expiry_year() );
+				$new_token->set_user_id( $user_id );
+
+				// Copy metadata from old token
+				$old_meta = $token->get_meta_data();
+				foreach ( $old_meta as $meta ) {
+					$new_token->add_meta_data( $meta->key, $meta->value, true );
+				}
+
+				$new_token->save();
+				WC_Checkoutcom_Utility::logger( 'Migrated old saved card to Flow gateway for user: ' . $user_id );
+			}
+		}
 	}
 
 	/**

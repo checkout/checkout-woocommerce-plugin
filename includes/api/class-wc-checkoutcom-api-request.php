@@ -244,10 +244,34 @@ class WC_Checkoutcom_Api_Request {
 				// Load token id ($arg).
 				$token = WC_Payment_Tokens::get( $arg );
 
-				$card_scheme = $token->get_meta( 'preferred_scheme' );
+				// Enhanced error handling for old saved cards
+				if ( ! $token ) {
+					WC_Checkoutcom_Utility::logger( 'Error: Token not found for ID: ' . $arg );
+					return array(
+						'error' => array(
+							'type'    => 'token_error',
+							'message' => 'Saved payment method not found. Please try using a new payment method.',
+						),
+					);
+				}
 
-				// Get source_id from $token.
+				// Get source_id from $token with validation
 				$source_id = $token->get_token();
+				if ( empty( $source_id ) ) {
+					WC_Checkoutcom_Utility::logger( 'Error: Empty source_id for token ID: ' . $arg );
+					return array(
+						'error' => array(
+							'type'    => 'token_error',
+							'message' => 'Invalid saved payment method. Please try using a new payment method.',
+						),
+					);
+				}
+
+				// Safely get card scheme metadata (may not exist in old tokens)
+				$card_scheme = $token->get_meta( 'preferred_scheme' );
+				if ( empty( $card_scheme ) ) {
+					WC_Checkoutcom_Utility::logger( 'Warning: No preferred_scheme metadata for token ID: ' . $arg . ' (likely old saved card)' );
+				}
 
 				$method     = new RequestIdSource();
 				$method->id = $source_id;
@@ -257,6 +281,8 @@ class WC_Checkoutcom_Api_Request {
 				if ( WC_Admin_Settings::get_option( 'ckocom_card_require_cvv' ) ) {
 					$method->cvv = $post_data['wc_checkout_com_flow-card-cvv'];
 				}
+
+				WC_Checkoutcom_Utility::logger( 'Flow saved card processing - Token ID: ' . $arg . ', Source ID: ' . $source_id . ', Card Scheme: ' . ( $card_scheme ?: 'none' ) );
 			} else {
 				// New payment via Flow - this shouldn't happen as Flow handles new payments differently
 				// But we need to handle it to prevent null method
