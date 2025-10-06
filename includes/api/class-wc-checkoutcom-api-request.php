@@ -236,6 +236,34 @@ class WC_Checkoutcom_Api_Request {
 
 			$method = new RequestPayPalSource();
 
+		} elseif ( 'wc_checkout_com_flow' === $post_data['payment_method'] ) {
+			$payment_option = 'Flow';
+
+			if ( self::is_using_saved_payment_method() ) {
+				// Saved card used with Flow.
+				// Load token id ($arg).
+				$token = WC_Payment_Tokens::get( $arg );
+
+				$card_scheme = $token->get_meta( 'preferred_scheme' );
+
+				// Get source_id from $token.
+				$source_id = $token->get_token();
+
+				$method     = new RequestIdSource();
+				$method->id = $source_id;
+
+				$is_save_card = true;
+
+				if ( WC_Admin_Settings::get_option( 'ckocom_card_require_cvv' ) ) {
+					$method->cvv = $post_data['wc_checkout_com_flow-card-cvv'];
+				}
+			} else {
+				// New payment via Flow - this shouldn't happen as Flow handles new payments differently
+				// But we need to handle it to prevent null method
+				$method        = new RequestTokenSource();
+				$method->token = $arg;
+			}
+
 		} elseif ( in_array( $arg, $apms_selected, true ) ) {
 			// Alternative payment method selected.
 			$method = WC_Checkoutcom_Api_Request::get_apm_method( $post_data, $order, $arg );
@@ -245,6 +273,17 @@ class WC_Checkoutcom_Api_Request {
 
 			$method     = new RequestIdSource();
 			$method->id = $arg['source_id'];
+		}
+
+		// Safety check to prevent null method error
+		if ( null === $method ) {
+			WC_Checkoutcom_Utility::logger( 'Error: Payment method is null in get_request_param' );
+			return array(
+				'error' => array(
+					'type'    => 'request_error',
+					'message' => 'Payment method not supported or invalid.',
+				),
+			);
 		}
 
 		if ( 'klarna' !== $method->type ) {
