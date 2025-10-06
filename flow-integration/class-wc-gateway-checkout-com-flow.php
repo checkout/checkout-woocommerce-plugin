@@ -1045,7 +1045,8 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// check if saved card enable from module setting.
 		if ( $save_card ) {
 			// Migrate old saved cards for logged-in users (only once)
-			if ( is_user_logged_in() ) {
+			// Skip migration for MOTO orders (admin-created orders)
+			if ( is_user_logged_in() && ! $order_pay_order ) {
 				$user_id = get_current_user_id();
 				$this->migrate_old_saved_cards( $user_id );
 			}
