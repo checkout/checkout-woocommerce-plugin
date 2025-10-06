@@ -734,6 +734,7 @@ var ckoFlow = {
 								if (!window.flowUserInteracted) {
 									console.log('[FLOW] User clicked on Flow component - marking as interacted');
 									window.flowUserInteracted = true;
+									window.flowSavedCardSelected = false; // Reset saved card flag when user interacts with Flow
 								}
 							}, { once: false });
 							
@@ -741,6 +742,7 @@ var ckoFlow = {
 								if (!window.flowUserInteracted) {
 									console.log('[FLOW] User focused on Flow field - marking as interacted');
 									window.flowUserInteracted = true;
+									window.flowSavedCardSelected = false; // Reset saved card flag when user interacts with Flow
 								}
 							}, { capture: true });
 							
@@ -748,6 +750,7 @@ var ckoFlow = {
 								if (!window.flowUserInteracted) {
 									console.log('[FLOW] User typing in Flow field - marking as interacted');
 									window.flowUserInteracted = true;
+									window.flowSavedCardSelected = false; // Reset saved card flag when user interacts with Flow
 								}
 							}, { capture: true });
 							
@@ -1115,12 +1118,16 @@ document.addEventListener("DOMContentLoaded", function () {
  */
 document.addEventListener("DOMContentLoaded", function () {
 	
-	// Listen for saved card clicks to reset Flow interaction flag
+	// Listen for saved card clicks to reset Flow interaction flag and set saved card flag
 	jQuery(document).on('click', 'input[name="wc-wc_checkout_com_flow-payment-token"]', function() {
 		const selectedId = jQuery(this).attr('id');
 		if (selectedId && selectedId !== 'wc-wc_checkout_com_flow-payment-token-new') {
-			console.log('[FLOW] Saved card selected - resetting Flow interaction flag');
+			console.log('[FLOW] Saved card selected - resetting Flow interaction flag and setting saved card flag');
 			window.flowUserInteracted = false;
+			window.flowSavedCardSelected = true;
+		} else if (selectedId === 'wc-wc_checkout_com_flow-payment-token-new') {
+			console.log('[FLOW] New payment method selected - clearing saved card flag');
+			window.flowSavedCardSelected = false;
 		}
 	});
 	
@@ -1139,13 +1146,15 @@ document.addEventListener("DOMContentLoaded", function () {
 				const savedCardSelected = jQuery('input[name="wc-wc_checkout_com_flow-payment-token"]:checked');
 				const isUsingSavedCard = savedCardSelected.length > 0 && savedCardSelected.attr('id') !== 'wc-wc_checkout_com_flow-payment-token-new';
 				const userInteractedWithFlow = window.flowUserInteracted === true;
+				const savedCardFlagSet = window.flowSavedCardSelected === true;
 				
 				console.log('[FLOW] Place Order Check - Saved card selected:', isUsingSavedCard);
 				console.log('[FLOW] Place Order Check - Saved card ID:', savedCardSelected.attr('id'));
 				console.log('[FLOW] Place Order Check - User interacted with Flow:', userInteractedWithFlow);
+				console.log('[FLOW] Place Order Check - Saved card flag set:', savedCardFlagSet);
 				
 				// If using saved card AND user hasn't interacted with Flow, let WooCommerce handle it
-				if (isUsingSavedCard && !userInteractedWithFlow) {
+				if ((isUsingSavedCard || savedCardFlagSet) && !userInteractedWithFlow) {
 					console.log('[FLOW] ✅ Using saved card (no Flow interaction) - allowing normal WooCommerce submission');
 					console.log('[FLOW] Returning early - no Flow validation needed');
 					// Don't prevent default, let form submit normally through WooCommerce
@@ -1226,16 +1235,18 @@ document.addEventListener("DOMContentLoaded", function () {
 						// Check if a saved card is selected AND if Flow component is valid
 						const savedCardSelected = jQuery('input[name="wc-wc_checkout_com_flow-payment-token"]:checked');
 						const isUsingSavedCard = savedCardSelected.length > 0 && savedCardSelected.attr('id') !== 'wc-wc_checkout_com_flow-payment-token-new';
+						const savedCardFlagSet = window.flowSavedCardSelected === true;
 						
 						// Check if Flow component has valid data (user has entered payment details)
 						const flowHasData = ckoFlow.flowComponent && document.querySelector('[data-testid="checkout-web-component-root"]');
 						
 						console.log('[FLOW] Place Order - Saved card selected:', isUsingSavedCard);
+						console.log('[FLOW] Place Order - Saved card flag set:', savedCardFlagSet);
 						console.log('[FLOW] Place Order - Flow has data:', !!flowHasData);
 
 						// CRITICAL: Only use saved card if selected AND Flow doesn't have new payment data
 						// If user has entered data in Flow, use Flow even if a saved card is selected
-						if (isUsingSavedCard && !flowHasData) {
+						if ((isUsingSavedCard || savedCardFlagSet) && !flowHasData) {
 							console.log('[FLOW] Submitting form with saved card (Flow not used)');
 							form.submit();
 							return;

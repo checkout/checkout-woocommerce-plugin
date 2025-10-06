@@ -468,6 +468,10 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 								const isDefault = $defaultCardRadio.attr('checked') === 'checked' || $defaultCardRadio.prop('defaultChecked');
 								console.log('[FLOW PHP] Auto-selected ' + (isDefault ? 'default' : 'first') + ' saved card in saved_cards_first mode');
 								console.log('[FLOW PHP] Selected card ID:', $defaultCardRadio.attr('id'));
+								
+								// CRITICAL: Set a flag to indicate saved card is selected
+								window.flowSavedCardSelected = true;
+								window.flowUserInteracted = false; // Reset interaction flag
 							}
 						}
 							
@@ -830,6 +834,10 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 								const isDefault = $defaultCardRadio.attr('checked') === 'checked' || $defaultCardRadio.prop('defaultChecked');
 								console.log('[FLOW PHP] Auto-selected ' + (isDefault ? 'default' : 'first') + ' saved card in saved_cards_first mode');
 								console.log('[FLOW PHP] Selected card ID:', $defaultCardRadio.attr('id'));
+								
+								// CRITICAL: Set a flag to indicate saved card is selected
+								window.flowSavedCardSelected = true;
+								window.flowUserInteracted = false; // Reset interaction flag
 							}
 						}
 							
