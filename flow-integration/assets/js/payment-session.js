@@ -1262,6 +1262,18 @@ document.addEventListener("DOMContentLoaded", function () {
 					if (window.location.pathname.includes('/' + orderPaySlug + '/')) {
 
 						document.getElementById("flow-container").style.display = "block";
+						
+						// Check if Flow component is loaded
+						if (!ckoFlow.flowComponent) {
+							console.log('[FLOW] Order-pay page - Flow component not loaded yet, waiting...');
+							// Wait a bit for Flow component to load
+							setTimeout(() => {
+								if (!ckoFlow.flowComponent) {
+									console.error('[FLOW] Order-pay page - Flow component failed to load');
+									showError('Payment form failed to load. Please refresh the page and try again.');
+								}
+							}, 3000);
+						}
 
 						// Check if a saved card is selected AND if Flow component is valid
 						const savedCardSelected = jQuery('input[name="wc-wc_checkout_com_flow-payment-token"]:checked');
@@ -1281,14 +1293,15 @@ document.addEventListener("DOMContentLoaded", function () {
 						}
 
 						// Place order for FLOW (new payment method).
-						// For order-pay pages, always submit the form directly instead of using Flow component submit
-						// This ensures proper redirection to success page
-						console.log('[FLOW] Order-pay page detected - submitting form directly for proper redirection');
-						
-						// Add a small delay to ensure all data is set
-						setTimeout(() => {
-							orderPayForm.submit();
-						}, 100);
+						// Check if Flow component is available and has payment data
+						if (ckoFlow.flowComponent && ckoFlow.flowComponent.isValid && ckoFlow.flowComponent.isValid()) {
+							console.log('[FLOW] Order-pay page - Flow component is valid, submitting via Flow');
+							ckoFlow.flowComponent.submit();
+						} else {
+							console.log('[FLOW] Order-pay page - Flow component not ready, showing error');
+							showError('Payment form is not ready. Please wait a moment and try again.');
+							return;
+						}
 						
 					}
 				} else {
@@ -1335,13 +1348,18 @@ document.addEventListener("DOMContentLoaded", function () {
 						}
 
 						// Place order for FLOW (new payment method).
-						if (ckoFlow.flowComponent) {
+						if (ckoFlow.flowComponent && ckoFlow.flowComponent.isValid && ckoFlow.flowComponent.isValid()) {
 							console.log('[FLOW] Submitting via Flow component (new payment)');
 							ckoFlow.flowComponent.submit();
 						} else {
-							// Fallback: submit form if Flow component not available
-							console.log('[FLOW] Flow component not available, submitting form');
-							form.submit();
+							// Flow component not ready - show error instead of submitting empty form
+							console.log('[FLOW] Flow component not ready - Component exists:', !!ckoFlow.flowComponent);
+							console.log('[FLOW] Flow component not ready - isValid method exists:', !!(ckoFlow.flowComponent && ckoFlow.flowComponent.isValid));
+							if (ckoFlow.flowComponent && ckoFlow.flowComponent.isValid) {
+								console.log('[FLOW] Flow component not ready - isValid result:', ckoFlow.flowComponent.isValid());
+							}
+							showError('Payment form is not ready. Please wait a moment and try again.');
+							return;
 						}
 					});
 
