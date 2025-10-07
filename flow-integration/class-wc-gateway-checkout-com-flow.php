@@ -1857,7 +1857,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 		// For Flow payments, be more flexible with payment ID matching
 		// Flow payments might not have payment ID set yet, or might have different ID format
-		if ( is_null( $payment_id ) ) {
+		if ( $order && is_null( $payment_id ) ) {
 			// If no payment ID is set, try to set it from the webhook
 			WC_Checkoutcom_Utility::logger( 'Flow webhook: No payment ID found in order, setting from webhook: ' . $data->data->id );
 			$order->set_transaction_id( $data->data->id );
@@ -1865,9 +1865,14 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			$order->update_meta_data( '_cko_flow_payment_id', $data->data->id );
 			$order->save();
 			$payment_id = $data->data->id;
-		} elseif ( $payment_id !== $data->data->id ) {
+		} elseif ( $order && $payment_id !== $data->data->id ) {
 			// Payment ID exists but doesn't match - log but don't fail for Flow payments
 			WC_Checkoutcom_Utility::logger( 'Flow webhook: Payment ID mismatch - Order: ' . $payment_id . ', Webhook: ' . $data->data->id . ' - Continuing processing' );
+		} elseif ( ! $order ) {
+			// No order found - this is a critical error for webhook processing
+			WC_Checkoutcom_Utility::logger( 'Flow webhook: CRITICAL - No order found for webhook processing. Payment ID: ' . ($data->data->id ?? 'NULL') );
+			http_response_code( 404 );
+			wp_die( 'Order not found', 'Webhook Error', array( 'response' => 404 ) );
 		}
 
 		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Event Type Data' );
