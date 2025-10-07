@@ -1284,6 +1284,8 @@ document.addEventListener("DOMContentLoaded", function () {
 						
 						console.log('[FLOW] Order Pay - Saved card selected:', isUsingSavedCard);
 						console.log('[FLOW] Order Pay - Flow has data:', !!flowHasData);
+						console.log('[FLOW] Order Pay - Flow component exists:', !!ckoFlow.flowComponent);
+						console.log('[FLOW] Order Pay - Flow component valid:', !!(ckoFlow.flowComponent && ckoFlow.flowComponent.isValid && ckoFlow.flowComponent.isValid()));
 
 						// CRITICAL: Only use saved card if selected AND Flow doesn't have new payment data
 						if (isUsingSavedCard && !flowHasData) {
@@ -1299,6 +1301,11 @@ document.addEventListener("DOMContentLoaded", function () {
 							ckoFlow.flowComponent.submit();
 						} else {
 							console.log('[FLOW] Order-pay page - Flow component not ready, showing error');
+							console.log('[FLOW] Order-pay page - Component exists:', !!ckoFlow.flowComponent);
+							console.log('[FLOW] Order-pay page - isValid method exists:', !!(ckoFlow.flowComponent && ckoFlow.flowComponent.isValid));
+							if (ckoFlow.flowComponent && ckoFlow.flowComponent.isValid) {
+								console.log('[FLOW] Order-pay page - isValid result:', ckoFlow.flowComponent.isValid());
+							}
 							showError('Payment form is not ready. Please wait a moment and try again.');
 							return;
 						}
