@@ -513,10 +513,14 @@ class WC_Checkoutcom_Api_Request {
 			}
 		}
 
-		// If this is MOTO order(Created via admin paid by customer from email).
-		if ( $order->is_created_via( 'admin' ) ) {
+		// If this is MOTO order (Admin-created order + Order-pay page + Guest customer).
+		$is_order_pay_page = ! empty( $_GET['pay_for_order'] ) && (bool) $_GET['pay_for_order'];
+		$is_guest_customer = $order->get_customer_id() == 0; // Guest customer = no customer account
+		
+		if ( $order->is_created_via( 'admin' ) && $is_order_pay_page && $is_guest_customer ) {
 			$payment->payment_type = PaymentType::$moto;
 			unset( $payment->three_ds );
+			WC_Checkoutcom_Utility::logger( 'MOTO payment type set - Admin order + Order-pay page + Guest customer. Order ID: ' . $order->get_id() );
 		}
 
 		// PayPal add items to payment.
@@ -1479,7 +1483,36 @@ class WC_Checkoutcom_Api_Request {
 
 		// Add payment type information if requested (for MOTO orders)
 		if ( $include_payment_type ) {
-			$order_info['payment_type'] = $order->is_created_via( 'admin' ) ? 'MOTO' : 'Regular';
+			// MOTO only for: Admin-created order + Order-pay page + Guest customer
+			$is_order_pay_page = ! empty( $_GET['pay_for_order'] ) && (bool) $_GET['pay_for_order'];
+			$is_guest_customer = $order->get_customer_id() == 0; // Guest customer = no customer account
+			$is_admin_created = $order->is_created_via( 'admin' );
+			$is_moto_payment = $is_admin_created && $is_order_pay_page && $is_guest_customer;
+			
+			// Enhanced debug logging with more details
+			WC_Checkoutcom_Utility::logger( 'Order info MOTO detection - Order ID: ' . $order->get_id() . 
+				', Admin created: ' . ($is_admin_created ? 'YES' : 'NO') . 
+				', Order-pay page: ' . ($is_order_pay_page ? 'YES' : 'NO') . 
+				', Guest customer: ' . ($is_guest_customer ? 'YES' : 'NO') . 
+				', Billing email: ' . $order->get_billing_email() . 
+				', GET pay_for_order: ' . (isset($_GET['pay_for_order']) ? $_GET['pay_for_order'] : 'NOT SET') .
+				', Created via: ' . $order->get_created_via() .
+				', Customer ID: ' . $order->get_customer_id() .
+				', Final MOTO: ' . ($is_moto_payment ? 'YES' : 'NO')
+			);
+			
+			$order_info['payment_type'] = $is_moto_payment ? 'MOTO' : 'Regular';
+			
+			if ( $is_moto_payment ) {
+				WC_Checkoutcom_Utility::logger( 'Order info: MOTO payment type set - Admin order + Order-pay page + Guest customer. Order ID: ' . $order->get_id() );
+			} else {
+				// Log why it's not MOTO
+				$reasons = [];
+				if (!$is_admin_created) $reasons[] = 'not admin created';
+				if (!$is_order_pay_page) $reasons[] = 'not order-pay page';
+				if (!$is_guest_customer) $reasons[] = 'not guest customer';
+				WC_Checkoutcom_Utility::logger( 'Order info: NOT MOTO - Reasons: ' . implode(', ', $reasons) . '. Order ID: ' . $order->get_id() );
+			}
 		}
 
 		return $order_info;

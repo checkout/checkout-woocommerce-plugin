@@ -121,7 +121,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 		$order_pay_order_id = null;
 		$order_pay_order = null;
-		if ( is_checkout() && isset( $_GET['pay_for_order'] ) && isset( $_GET['key'] ) ) {
+		if ( is_wc_endpoint_url( 'order-pay' ) ) {
 			global $wp;
 			// We are on the order-pay page. Retrives order_id from order-pay page
 			$order_pay_order_id = absint( $wp->query_vars['order-pay'] ?? 0 );
@@ -138,18 +138,24 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			<?php if ( is_user_logged_in() ) : ?>
 
 				<?php if ( $order_pay_order ) : ?>
-					<?php if ( $order_pay_order->is_created_via( 'admin' ) ) : ?>
+					<?php 
+					// Only hide save card options for MOTO orders (Admin order + Order-pay page + Guest customer)
+					$is_admin_created = $order_pay_order->is_created_via( 'admin' );
+					$is_guest_customer = $order_pay_order->get_customer_id() == 0;
+					$is_moto_order = $is_admin_created && $is_guest_customer;
+					?>
+					<?php if ( $is_moto_order ) : ?>
 						<script>
 							const orderPayTargetNode = document.body;
 
-							// Hide Saved payment method for admin-created orders (MOTO).
+							// Hide Saved payment method for MOTO orders (Admin order + Order-pay page + Guest customer).
 							// IMPORTANT: Hide the accordion container, not just the list inside
 							const orderPayObserver = new MutationObserver((mutationsList, observer) => {
 								// Hide the accordion container (which contains the saved cards)
 								const $accordion = jQuery('.saved-cards-accordion-container');
 								if ($accordion.length) {
 									$accordion.hide();
-									console.log('[FLOW] Hiding saved cards accordion for admin-created order');
+									console.log('[FLOW] Hiding saved cards accordion for MOTO order');
 								}
 								
 								// Also hide any saved payment methods that aren't wrapped yet
@@ -158,11 +164,11 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 									$element.hide();
 								}
 								
-								// Hide the "Save to account" checkbox for MOTO orders
+								// Hide the "Save to account" checkbox for MOTO orders (Admin order + Order-pay page + Guest customer)
 								const $saveNew = jQuery('.woocommerce-SavedPaymentMethods-saveNew');
 								if ($saveNew.length) {
 									$saveNew.hide();
-									console.log('[FLOW] Hiding save to account checkbox for admin-created order');
+									console.log('[FLOW] Hiding save to account checkbox for MOTO order');
 								}
 								
 								// Also hide the checkbox by its ID
@@ -185,7 +191,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 							jQuery('.saved-cards-accordion-container').hide();
 							jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide();
 							
-							// Hide the "Save to account" checkbox for MOTO orders
+							// Hide the "Save to account" checkbox for MOTO orders (Admin order + Order-pay page + Guest customer)
 							jQuery('.woocommerce-SavedPaymentMethods-saveNew').hide();
 							jQuery('#wc-wc_checkout_com_flow-new-payment-method').closest('p').hide();
 						</script>
@@ -1395,13 +1401,15 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	 * @return void
 	 */
 	public function element_form_save_card( $save_card ) {
+		// Only render the save card checkbox div if save card feature is enabled
+		if ( ! $save_card ) {
+			return;
+		}
 		?>
 		<!-- Show save card checkbox if this is selected on admin-->
 		<div class="cko-save-card-checkbox" style="display: none">
 			<?php
-			if ( $save_card ) {
-				$this->save_payment_method_checkbox();
-			}
+			$this->save_payment_method_checkbox();
 			?>
 		</div>
 		<?php
@@ -1679,25 +1687,47 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	 */
 	public function webhook_handler() {
 		// webhook_url_format = http://example.com/?wc-api=wc_checkoutcom_webhook .
+		
+		WC_Checkoutcom_Utility::logger( '=== WEBHOOK DEBUG: Flow webhook handler started ===' );
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Request method: ' . $_SERVER['REQUEST_METHOD'] );
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Request URI: ' . $_SERVER['REQUEST_URI'] );
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: User agent: ' . ($_SERVER['HTTP_USER_AGENT'] ?? 'Not set') );
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Content type: ' . ($_SERVER['CONTENT_TYPE'] ?? 'Not set') );
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Content length: ' . ($_SERVER['CONTENT_LENGTH'] ?? 'Not set') );
 
 		// Check if Flow mode is enabled - if not, let Cards handler process the webhook
 		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
 		$checkout_mode = $core_settings['ckocom_checkout_mode'] ?? 'cards';
 		
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Core settings retrieved: ' . print_r($core_settings, true) );
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Checkout mode: ' . $checkout_mode );
+		
 		if ( 'flow' !== $checkout_mode ) {
 			// Flow mode is not enabled, don't process webhook in Flow handler
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Flow mode not enabled, exiting webhook handler' );
 			return;
 		}
+		
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Flow mode confirmed, continuing webhook processing' );
 
 		try {
 			// Get webhook data.
-			$data = json_decode( file_get_contents( 'php://input' ) );
+			$raw_input = file_get_contents( 'php://input' );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Raw input received: ' . $raw_input );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Raw input length: ' . strlen($raw_input) );
+			
+			$data = json_decode( $raw_input );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: JSON decode result: ' . print_r($data, true) );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: JSON last error: ' . json_last_error_msg() );
 
 		// Return to home page if empty data.
 		if ( empty( $data ) ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Empty data received, redirecting to home' );
 			wp_redirect( get_home_url() );
 			exit();
 		}
+		
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Data validation passed, continuing processing' );
 
 		// Create apache function if not exist to get header authorization.
 		if ( ! function_exists( 'apache_request_headers' ) ) {
@@ -1728,39 +1758,64 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		}
 
 		$header           = array_change_key_case( apache_request_headers(), CASE_LOWER );
-		$header_signature = $header['cko-signature'];
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: All headers: ' . print_r($header, true) );
+		
+		$header_signature = $header['cko-signature'] ?? null;
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: CKO signature from header: ' . ($header_signature ?? 'NOT FOUND') );
 
 		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
 		$raw_event     = file_get_contents( 'php://input' );
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Raw event for signature verification: ' . $raw_event );
 
 		// For webhook signature verification, use the same logic as the working version
 		$core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
 		$secret_key = $core_settings['ckocom_sk'];
-
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Secret key (masked): ' . substr($secret_key, 0, 10) . '...' );
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Is NAS account: ' . (cko_is_nas_account() ? 'YES' : 'NO') );
 
 		$signature = WC_Checkoutcom_Utility::verify_signature( $raw_event, $secret_key, $header_signature );
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Signature verification result: ' . ($signature ? 'VALID' : 'INVALID') );
 
 		// check if cko signature matches.
 		if ( false === $signature ) {
-			WC_Checkoutcom_Utility::logger('Invalid signature - returning 401');
+			WC_Checkoutcom_Utility::logger('WEBHOOK DEBUG: Invalid signature - returning 401');
+			WC_Checkoutcom_Utility::logger('WEBHOOK DEBUG: Signature verification failed with:');
+			WC_Checkoutcom_Utility::logger('WEBHOOK DEBUG: - Raw event: ' . $raw_event);
+			WC_Checkoutcom_Utility::logger('WEBHOOK DEBUG: - Header signature: ' . ($header_signature ?? 'NULL'));
+			WC_Checkoutcom_Utility::logger('WEBHOOK DEBUG: - Secret key: ' . substr($secret_key, 0, 10) . '...');
         	$this->send_response(401, 'Unauthorized: Invalid signature');
 		}
+		
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Signature verification passed, continuing with order processing' );
 
 		$order      = false;
 		$payment_id = null;
 
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Starting order lookup process' );
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Webhook data structure: ' . print_r($data, true) );
+
 		if ( ! empty( $data->data->metadata->order_id ) ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Looking for order by metadata order_id: ' . $data->data->metadata->order_id );
 			$order = wc_get_order( $data->data->metadata->order_id );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order found by metadata order_id: ' . ($order ? 'YES (ID: ' . $order->get_id() . ')' : 'NO') );
 		} elseif ( ! empty( $data->data->reference ) ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Looking for order by reference: ' . $data->data->reference );
 			$order = wc_get_order( $data->data->reference );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order found by reference: ' . ($order ? 'YES (ID: ' . $order->get_id() . ')' : 'NO') );
 
 			if ( isset( $data->data->metadata ) ) {
 				$data->data->metadata->order_id = $data->data->reference;
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Set metadata order_id to reference: ' . $data->data->reference );
 			} else {
 				$data->data->metadata           = new StdClass();
 				$data->data->metadata->order_id = $data->data->reference;
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Created metadata object with order_id: ' . $data->data->reference );
 			}
+		} else {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: No order_id in metadata and no reference found' );
 		}
+		
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order lookup result: ' . ($order ? 'FOUND (ID: ' . $order->get_id() . ')' : 'NOT FOUND') );
 
 		// If order is still not found, try using _cko_flow_payment_id.
 		if ( ! $order && ! empty( $data->data->id ) ) {
@@ -1788,10 +1843,17 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 		if ( $order ) {
 			$payment_id = $order->get_meta( '_cko_payment_id' ) ?? null;
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order found, getting payment ID from meta' );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order ID: ' . $order->get_id() );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order status: ' . $order->get_status() );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order transaction ID: ' . $order->get_transaction_id() );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: All order meta data: ' . print_r($order->get_meta_data(), true) );
+		} else {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: No order found, cannot get payment ID' );
 		}
 
-		WC_Checkoutcom_Utility::logger( '$payment_id: ' . $payment_id );
-		WC_Checkoutcom_Utility::logger( '$data->data->id: ' . $data->data->id );
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Payment ID from order: ' . ($payment_id ?? 'NULL') );
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Payment ID from webhook: ' . ($data->data->id ?? 'NULL') );
 
 		// For Flow payments, be more flexible with payment ID matching
 		// Flow payments might not have payment ID set yet, or might have different ID format
@@ -1808,48 +1870,67 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			WC_Checkoutcom_Utility::logger( 'Flow webhook: Payment ID mismatch - Order: ' . $payment_id . ', Webhook: ' . $data->data->id . ' - Continuing processing' );
 		}
 
-		WC_Checkoutcom_Utility::logger( 'DEBUG: Event Type Data' );
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Event Type Data' );
 		WC_Checkoutcom_Utility::logger(print_r($data,true));
 
 		// Get webhook event type from data.
 		$event_type = $data->type;
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Processing event type: ' . $event_type );
 
 		switch ( $event_type ) {
 			case 'card_verified':
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Processing card_verified event' );
 				$response = WC_Checkout_Com_Webhook::card_verified( $data );
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: card_verified response: ' . print_r($response, true) );
 				break;
 			case 'payment_approved':
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Processing payment_approved event' );
 				$response = WC_Checkout_Com_Webhook::authorize_payment( $data );
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: payment_approved response: ' . print_r($response, true) );
 				break;
 			case 'payment_captured':
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Processing payment_captured event' );
 				$response = WC_Checkout_Com_Webhook::capture_payment( $data );
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: payment_captured response: ' . print_r($response, true) );
 				break;
 			case 'payment_voided':
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Processing payment_voided event' );
 				$response = WC_Checkout_Com_Webhook::void_payment( $data );
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: payment_voided response: ' . print_r($response, true) );
 				break;
 			case 'payment_capture_declined':
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Processing payment_capture_declined event' );
 				$response = WC_Checkout_Com_Webhook::capture_declined( $data );
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: payment_capture_declined response: ' . print_r($response, true) );
 				break;
 			case 'payment_refunded':
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Processing payment_refunded event' );
 				$response = WC_Checkout_Com_Webhook::refund_payment( $data );
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: payment_refunded response: ' . print_r($response, true) );
 				break;
 			case 'payment_canceled':
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Processing payment_canceled event' );
 				$response = WC_Checkout_Com_Webhook::cancel_payment( $data );
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: payment_canceled response: ' . print_r($response, true) );
 				break;
 			case 'payment_declined':
 			case 'payment_authentication_failed':
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Processing ' . $event_type . ' event' );
 				$response = WC_Checkout_Com_Webhook::decline_payment( $data );
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: ' . $event_type . ' response: ' . print_r($response, true) );
 				break;
 
 			default:
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Unknown event type: ' . $event_type . ', using default response' );
 				$response = true;
 				break;
 		}
 
 		$http_code = $response ? 200 : 400;
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Final response code: ' . $http_code );
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Final response value: ' . print_r($response, true) );
 
-		WC_Checkoutcom_Utility::logger( $event_type . 'with response' . $http_code );
-
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Sending response - Code: ' . $http_code . ', Message: ' . ($response ? 'OK' : 'Failed') );
 		$this->send_response($http_code, $response ? 'OK' : 'Failed');
 		
 		} catch ( Exception $e ) {
@@ -1864,14 +1945,21 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	 */
 	private function send_response($status_code, $message) {
 		// WP-friendly way.
+		WC_Checkoutcom_Utility::logger("WEBHOOK DEBUG: Preparing to send response - Status: $status_code, Message: $message");
+		
 		status_header($status_code);
 		header('Content-Type: application/json; charset=utf-8');
-		echo wp_json_encode([
+		
+		$response_data = [
 			'status'  => $status_code,
 			'message' => $message,
-		]);
+		];
+		
+		WC_Checkoutcom_Utility::logger("WEBHOOK DEBUG: Response data: " . wp_json_encode($response_data));
+		echo wp_json_encode($response_data);
 
-		WC_Checkoutcom_Utility::logger("Sent HTTP status: $status_code with message: $message");
+		WC_Checkoutcom_Utility::logger("WEBHOOK DEBUG: Sent HTTP status: $status_code with message: $message");
+		WC_Checkoutcom_Utility::logger("=== WEBHOOK DEBUG: Flow webhook handler completed ===");
 		exit; // Prevent WP from sending 200.
 	}
 }

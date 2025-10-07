@@ -521,8 +521,25 @@ class WC_Checkoutcom_Utility {
 
 		$available_payment_methods = WC()->payment_gateways()->get_available_payment_gateways();
 
-		if ( isset( $available_payment_methods['wc_checkout_com_paypal'] ) && $is_express_enable ) {
-			return true;
+		$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$checkout_mode    = $checkout_setting['ckocom_checkout_mode'];
+
+		if ( $checkout_mode === 'classic' ) {
+			/**
+			 * If checkout_mode is classic, show express-paypal if enabled and 
+			 * if 'wc_checkout_com_paypal' is an available payment method on checkout.
+			 */
+			if ( isset( $available_payment_methods['wc_checkout_com_paypal'] ) && $is_express_enable ) {
+				return true;
+			}
+		}
+		else {
+			/**
+			 * If checkout_mode is flow, show express-paypal if enabled.
+			 */
+			if ( $is_express_enable ) {
+				return true;
+			}
 		}
 
 		return false;

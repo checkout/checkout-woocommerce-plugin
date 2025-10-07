@@ -36,6 +36,74 @@ define( 'WC_CHECKOUTCOM_PLUGIN_PATH', untrailingslashit( plugin_dir_path( __FILE
 add_action( 'plugins_loaded', 'init_checkout_com_gateway_class', 0 );
 
 /**
+ * Make billing details read-only on order-pay page
+ * This ensures customers can't modify billing information that was set when the order was created
+ */
+add_action( 'wp_enqueue_scripts', 'cko_make_order_pay_billing_readonly' );
+function cko_make_order_pay_billing_readonly() {
+	// Only on order-pay page
+	if ( ! is_wc_endpoint_url( 'order-pay' ) ) {
+		return;
+	}
+	
+	// Add CSS to make billing details read-only
+	wp_add_inline_style( 'woocommerce-general', '
+		.woocommerce-order-pay #billing_first_name, 
+		.woocommerce-order-pay #billing_last_name, 
+		.woocommerce-order-pay #billing_company,
+		.woocommerce-order-pay #billing_address_1, 
+		.woocommerce-order-pay #billing_address_2, 
+		.woocommerce-order-pay #billing_city,
+		.woocommerce-order-pay #billing_state, 
+		.woocommerce-order-pay #billing_postcode, 
+		.woocommerce-order-pay #billing_country,
+		.woocommerce-order-pay #billing_phone, 
+		.woocommerce-order-pay #billing_email,
+		.woocommerce-order-pay .woocommerce-billing-fields input,
+		.woocommerce-order-pay .woocommerce-billing-fields select,
+		.woocommerce-order-pay .woocommerce-billing-fields textarea {
+			background-color: #f9f9f9 !important;
+			border: 1px solid #ddd !important;
+			color: #666 !important;
+			cursor: not-allowed !important;
+			pointer-events: none !important;
+			opacity: 0.7 !important;
+		}
+		.woocommerce-order-pay .woocommerce-billing-fields label {
+			color: #666 !important;
+			font-weight: normal !important;
+		}
+		.woocommerce-order-pay .woocommerce-billing-fields h3::after {
+			content: " (from your order - read only)";
+			font-size: 12px;
+			font-weight: normal;
+			color: #999;
+		}
+	' );
+	
+	// Add JavaScript to disable billing fields
+	wp_add_inline_script( 'wc-checkout', '
+		jQuery(document).ready(function($) {
+			console.log("🔥🔥🔥 [CKO DEBUG] Order-pay page detected - making billing fields read-only 🔥🔥🔥");
+			
+			// Disable all billing fields
+			var billingFields = $("#billing_first_name, #billing_last_name, #billing_company, #billing_address_1, #billing_address_2, #billing_city, #billing_state, #billing_postcode, #billing_country, #billing_phone, #billing_email");
+			console.log("[CKO DEBUG] Found billing fields:", billingFields.length);
+			billingFields.prop("disabled", true);
+			
+			// Also disable any selects in billing fields
+			var billingSelects = $(".woocommerce-billing-fields select");
+			console.log("[CKO DEBUG] Found billing selects:", billingSelects.length);
+			billingSelects.prop("disabled", true);
+			
+			console.log("[CKO DEBUG] Billing fields disabled successfully on order-pay page");
+		});
+	' );
+}
+
+
+
+/**
  * Declare compatibility with HPOS.
  * https://github.com/woocommerce/woocommerce/wiki/High-Performance-Order-Storage-Upgrade-Recipe-Book#declaring-extension-incompatibility
  */
@@ -200,6 +268,222 @@ function cko_check_if_empty() {
 				wc_add_notice( esc_html__( 'Please enter a valid cvv.', 'checkout-com-unified-payments-api' ), 'error' );
 			}
 		}
+	}
+}
+
+// Hook into order creation and updates
+add_action( 'woocommerce_new_order', 'cko_validate_manual_order_creation' );
+add_action( 'woocommerce_update_order', 'cko_validate_manual_order_creation' );
+add_action( 'save_post', 'cko_validate_manual_order_on_save' );
+add_action( 'admin_init', 'cko_check_incomplete_orders' );
+
+/**
+ * Validate manual order creation to ensure billing address and email are set.
+ * This prevents issues when using Flow payment on order-pay page.
+ *
+ * @param int $order_id Order ID.
+ */
+function cko_validate_manual_order_creation( $order_id ) {
+	$order = wc_get_order( $order_id );
+	
+	// Only validate admin-created orders (manual orders)
+	if ( ! $order || ! $order->is_created_via( 'admin' ) ) {
+		return;
+	}
+	
+	// Log for debugging
+	WC_Checkoutcom_Utility::logger( 'Validating manual order creation. Order ID: ' . $order_id );
+	
+	// Check if billing email is missing or invalid
+	$billing_email = $order->get_billing_email();
+	if ( empty( $billing_email ) || ! is_email( $billing_email ) ) {
+		// Log the issue
+		WC_Checkoutcom_Utility::logger( 'Manual order created without valid billing email. Order ID: ' . $order_id );
+		
+		// Set a transient to show notice on next admin page load
+		set_transient( 'cko_validation_email_' . $order_id, true, 60 );
+	}
+	
+	// Check if billing address is missing
+	$billing_address_1 = $order->get_billing_address_1();
+	$billing_city = $order->get_billing_city();
+	$billing_country = $order->get_billing_country();
+	
+	if ( empty( $billing_address_1 ) || empty( $billing_city ) || empty( $billing_country ) ) {
+		// Log the issue
+		WC_Checkoutcom_Utility::logger( 'Manual order created without complete billing address. Order ID: ' . $order_id );
+		
+		// Set a transient to show notice on next admin page load
+		set_transient( 'cko_validation_address_' . $order_id, true, 60 );
+	}
+}
+
+/**
+ * Validate order when saved via admin (different hook)
+ *
+ * @param int $post_id Post ID.
+ */
+function cko_validate_manual_order_on_save( $post_id ) {
+	// Only process shop_order posts
+	if ( get_post_type( $post_id ) !== 'shop_order' ) {
+		return;
+	}
+	
+	$order = wc_get_order( $post_id );
+	
+	// Only validate admin-created orders (manual orders)
+	if ( ! $order || ! $order->is_created_via( 'admin' ) ) {
+		return;
+	}
+	
+	// Log for debugging
+	WC_Checkoutcom_Utility::logger( 'Validating manual order on save. Order ID: ' . $post_id );
+	
+	$validation_errors = array();
+	
+	// Check if billing email is missing or invalid
+	$billing_email = $order->get_billing_email();
+	if ( empty( $billing_email ) || ! is_email( $billing_email ) ) {
+		$validation_errors[] = __( 'Billing email is required for Flow payments to work properly.', 'checkout-com-unified-payments-api' );
+		WC_Checkoutcom_Utility::logger( 'Manual order saved without valid billing email. Order ID: ' . $post_id );
+	}
+	
+	// Check if billing address is missing
+	$billing_address_1 = $order->get_billing_address_1();
+	$billing_city = $order->get_billing_city();
+	$billing_country = $order->get_billing_country();
+	
+	if ( empty( $billing_address_1 ) || empty( $billing_city ) || empty( $billing_country ) ) {
+		$validation_errors[] = __( 'Complete billing address is required for Flow payments to work properly.', 'checkout-com-unified-payments-api' );
+		WC_Checkoutcom_Utility::logger( 'Manual order saved without complete billing address. Order ID: ' . $post_id );
+	}
+	
+	// If there are validation errors, prevent saving and show error
+	if ( ! empty( $validation_errors ) ) {
+		// Log the blocking
+		WC_Checkoutcom_Utility::logger( 'BLOCKING order creation due to validation errors: ' . implode( ', ', $validation_errors ) );
+		
+		// Show error message and stop execution
+		$error_message = '<h2>❌ Order Creation Blocked</h2>';
+		$error_message .= '<p><strong>Checkout.com Flow:</strong> Cannot create order with missing required information.</p>';
+		$error_message .= '<ul>';
+		foreach ( $validation_errors as $error ) {
+			$error_message .= '<li>' . esc_html( $error ) . '</li>';
+		}
+		$error_message .= '</ul>';
+		$error_message .= '<p><strong>Please:</strong></p>';
+		$error_message .= '<ol>';
+		$error_message .= '<li>Go back to the order form</li>';
+		$error_message .= '<li>Add the missing billing email and address</li>';
+		$error_message .= '<li>Try creating the order again</li>';
+		$error_message .= '</ol>';
+		$error_message .= '<p><a href="javascript:history.back()">← Go Back</a></p>';
+		
+		wp_die( $error_message, 'Order Creation Blocked', array( 'response' => 400 ) );
+	}
+}
+
+/**
+ * Check for incomplete orders and show persistent warnings
+ */
+function cko_check_incomplete_orders() {
+	// Only run in admin and on order-related pages
+	if ( ! is_admin() || ! current_user_can( 'manage_woocommerce' ) ) {
+		return;
+	}
+	
+	// Get current screen
+	$screen = get_current_screen();
+	if ( ! $screen || ( $screen->id !== 'shop_order' && $screen->id !== 'edit-shop_order' ) ) {
+		return;
+	}
+	
+	// Get order ID from URL
+	$order_id = 0;
+	if ( isset( $_GET['post'] ) && get_post_type( $_GET['post'] ) === 'shop_order' ) {
+		$order_id = intval( $_GET['post'] );
+	}
+	
+	if ( ! $order_id ) {
+		return;
+	}
+	
+	$order = wc_get_order( $order_id );
+	if ( ! $order || ! $order->is_created_via( 'admin' ) ) {
+		return;
+	}
+	
+	// Check if order is incomplete
+	$billing_email = $order->get_billing_email();
+	$billing_address_1 = $order->get_billing_address_1();
+	$billing_city = $order->get_billing_city();
+	$billing_country = $order->get_billing_country();
+	
+	$is_incomplete = false;
+	$missing_fields = array();
+	
+	if ( empty( $billing_email ) || ! is_email( $billing_email ) ) {
+		$is_incomplete = true;
+		$missing_fields[] = 'billing email';
+	}
+	
+	if ( empty( $billing_address_1 ) || empty( $billing_city ) || empty( $billing_country ) ) {
+		$is_incomplete = true;
+		$missing_fields[] = 'complete billing address';
+	}
+	
+	if ( $is_incomplete ) {
+		// Set a persistent notice
+		add_action( 'admin_notices', function() use ( $missing_fields, $order_id ) {
+			echo '<div class="notice notice-error is-dismissible">';
+			echo '<p><strong>⚠️ Checkout.com Flow Warning:</strong> ';
+			echo 'This manual order is missing: ' . implode( ', ', $missing_fields ) . '. ';
+			echo 'Flow payments will fail without this information. ';
+			echo 'Please complete the order details before proceeding with payment.';
+			echo '</p></div>';
+		});
+	}
+}
+
+// Show admin notices based on transients
+add_action( 'admin_notices', 'cko_show_validation_notices' );
+
+/**
+ * Show validation notices in admin
+ */
+function cko_show_validation_notices() {
+	// Get current order ID if we're on an order edit page
+	global $post;
+	$order_id = 0;
+	
+	if ( isset( $_GET['post'] ) && get_post_type( $_GET['post'] ) === 'shop_order' ) {
+		$order_id = intval( $_GET['post'] );
+	} elseif ( $post && $post->post_type === 'shop_order' ) {
+		$order_id = $post->ID;
+	}
+	
+	if ( ! $order_id ) {
+		return;
+	}
+	
+	// Check for email validation notice
+	if ( get_transient( 'cko_validation_email_' . $order_id ) ) {
+		delete_transient( 'cko_validation_email_' . $order_id );
+		echo '<div class="notice notice-warning is-dismissible">';
+		echo '<p><strong>Checkout.com Flow:</strong> ';
+		echo esc_html__( 'Manual orders require a valid billing email address for Flow payments to work properly. Please add a billing email to this order.', 'checkout-com-unified-payments-api' );
+		echo ' <a href="' . esc_url( admin_url( 'post.php?post=' . $order_id . '&action=edit' ) ) . '">' . esc_html__( 'Edit Order', 'checkout-com-unified-payments-api' ) . '</a>';
+		echo '</p></div>';
+	}
+	
+	// Check for address validation notice
+	if ( get_transient( 'cko_validation_address_' . $order_id ) ) {
+		delete_transient( 'cko_validation_address_' . $order_id );
+		echo '<div class="notice notice-warning is-dismissible">';
+		echo '<p><strong>Checkout.com Flow:</strong> ';
+		echo esc_html__( 'Manual orders require a complete billing address for Flow payments to work properly. Please add billing address details to this order.', 'checkout-com-unified-payments-api' );
+		echo ' <a href="' . esc_url( admin_url( 'post.php?post=' . $order_id . '&action=edit' ) ) . '">' . esc_html__( 'Edit Order', 'checkout-com-unified-payments-api' ) . '</a>';
+		echo '</p></div>';
 	}
 }
 

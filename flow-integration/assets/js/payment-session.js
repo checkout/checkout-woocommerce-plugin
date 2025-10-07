@@ -300,13 +300,19 @@ var ckoFlow = {
 				},
 			};
 			
-			// Check if this is a MOTO order (admin-created order)
-			const isMotoOrder = jQuery("#order-pay-info")?.data("order-pay")?.payment_type === 'MOTO';
+			// Check if this is a MOTO order (admin-created order + order-pay page + guest customer)
+			const orderPayInfo = jQuery("#order-pay-info")?.data("order-pay");
+			const isMotoOrder = orderPayInfo?.payment_type === 'MOTO';
+			
+			console.log('[FLOW DEBUG] MOTO Detection - Payment Type:', orderPayInfo?.payment_type, 'Is MOTO:', isMotoOrder);
 			
 			// Override payment type for MOTO orders
 			if (isMotoOrder) {
 				payment_type = 'MOTO';
 				console.log('[FLOW] MOTO order detected - setting payment_type to MOTO');
+				console.log('[FLOW] MOTO conditions: Admin order + Order-pay page + Guest customer');
+			} else {
+				console.log('[FLOW] Not a MOTO order - using regular payment type:', payment_type);
 			}
 			
 			// Update payment type in the request
@@ -318,13 +324,15 @@ var ckoFlow = {
 			if (isMotoOrder) {
 				console.log('[FLOW] MOTO order detected - hardcoding to show only card payment method');
 				paymentSessionRequest.enabled_payment_methods = ['card'];
+				console.log('[FLOW] MOTO: Set enabled_payment_methods to:', paymentSessionRequest.enabled_payment_methods);
 			} else if (cko_flow_vars.enabled_payment_methods && 
 			    Array.isArray(cko_flow_vars.enabled_payment_methods) && 
 			    cko_flow_vars.enabled_payment_methods.length > 0) {
 				paymentSessionRequest.enabled_payment_methods = cko_flow_vars.enabled_payment_methods;
-				console.log('[FLOW] Enabled payment methods (sent to API):', cko_flow_vars.enabled_payment_methods);
+				console.log('[FLOW] Regular: Enabled payment methods (sent to API):', cko_flow_vars.enabled_payment_methods);
 			} else {
 				console.log('[FLOW] No payment methods filter - all available methods will be shown');
+				console.log('[FLOW] cko_flow_vars.enabled_payment_methods:', cko_flow_vars.enabled_payment_methods);
 			}
 			
 			console.log('[FLOW] Complete Payment Session Request:', paymentSessionRequest);
@@ -463,6 +471,8 @@ var ckoFlow = {
 					if (saveCardCheckbox) {
 						saveCardCheckbox.style.display = 'none';
 						console.log('[FLOW] onReady - ✓ Save card checkbox hidden (will show on card selection)');
+					} else {
+						console.log('[FLOW] onReady - Save card checkbox not available (feature disabled)');
 					}
 					
 					// Step 4: Mark Flow as ready - triggers CSS animations and visibility rules
@@ -535,24 +545,20 @@ var ckoFlow = {
 							const orderPayForm = jQuery('form#order_review');
 							const checkoutForm = jQuery("form.checkout");
 							
-							console.log('[FLOW DEBUG] Is order-pay page:', isOrderPayPage);
-							console.log('[FLOW DEBUG] Order pay form exists:', orderPayForm.length > 0);
-							console.log('[FLOW DEBUG] Checkout form exists:', checkoutForm.length > 0);
 							
 							if ( isOrderPayPage && orderPayForm.length > 0 ) {
-								// MOTO order - submit order-pay form
-								const isMotoOrder = jQuery("#order-pay-info")?.data("order-pay")?.payment_type === 'MOTO';
+								// Check if this is a MOTO order
+								const orderPayInfo = jQuery("#order-pay-info")?.data("order-pay");
+								const isMotoOrder = orderPayInfo?.payment_type === 'MOTO';
 								console.log('[FLOW] Submitting order pay form for redirect to order confirmation (MOTO: ' + (isMotoOrder ? 'YES' : 'NO') + ')');
-								console.log('[FLOW DEBUG] Order pay form action:', orderPayForm.attr('action'));
-								console.log('[FLOW DEBUG] Order pay form method:', orderPayForm.attr('method'));
-								console.log('[FLOW DEBUG] Payment method selected:', jQuery('input[name="payment_method"]:checked').val());
-								orderPayForm.submit();
+								
+								// Add a small delay to ensure all data is set
+								setTimeout(() => {
+									orderPayForm.submit();
+								}, 100);
 							} else {
 								// Regular checkout - submit checkout form
 								console.log('[FLOW] Submitting checkout form for redirect to order confirmation');
-								console.log('[FLOW DEBUG] Form action:', checkoutForm.attr('action'));
-								console.log('[FLOW DEBUG] Form method:', checkoutForm.attr('method'));
-								console.log('[FLOW DEBUG] Payment method selected:', jQuery('input[name="payment_method"]:checked').val());
 								checkoutForm.submit();
 							}
 						}
@@ -641,16 +647,20 @@ var ckoFlow = {
 
 						// Control Save to Account checkbox visibility based on payment type
 						const saveCardCheckbox = jQuery('.cko-save-card-checkbox');
-						if ( component.selectedType === "card" ) {
-							saveCardCheckbox.addClass('wc-cko-flow-card-on');
-							saveCardCheckbox.css('display', 'block'); // Use .css() to set inline style
-							saveCardCheckbox.show();
-							console.log('[FLOW] onChange - Showing Save to Account checkbox for CARD');
+						if ( saveCardCheckbox.length > 0 ) {
+							if ( component.selectedType === "card" ) {
+								saveCardCheckbox.addClass('wc-cko-flow-card-on');
+								saveCardCheckbox.css('display', 'block'); // Use .css() to set inline style
+								saveCardCheckbox.show();
+								console.log('[FLOW] onChange - Showing Save to Account checkbox for CARD');
+							} else {
+								saveCardCheckbox.removeClass('wc-cko-flow-card-on');
+								saveCardCheckbox.css('display', 'none'); // Use .css() to set inline style
+								saveCardCheckbox.hide();
+								console.log('[FLOW] onChange - Hiding Save to Account checkbox for', component.selectedType);
+							}
 						} else {
-							saveCardCheckbox.removeClass('wc-cko-flow-card-on');
-							saveCardCheckbox.css('display', 'none'); // Use .css() to set inline style
-							saveCardCheckbox.hide();
-							console.log('[FLOW] onChange - Hiding Save to Account checkbox for', component.selectedType);
+							console.log('[FLOW] onChange - Save card checkbox not available (feature disabled)');
 						}
 
 						console.log(
@@ -775,6 +785,8 @@ var ckoFlow = {
 				// Step 3: Hide save card checkbox initially
 				if (saveCardCheckbox) {
 					saveCardCheckbox.style.display = 'none';
+				} else {
+					console.log('[FLOW] Mount - Save card checkbox not available (feature disabled)');
 				}
 				
 				// Step 4: Mark Flow as ready
@@ -1260,14 +1272,14 @@ document.addEventListener("DOMContentLoaded", function () {
 						}
 
 						// Place order for FLOW (new payment method).
-						if (ckoFlow.flowComponent) {
-							console.log('[FLOW] Submitting order pay via Flow component (new payment)');
-							ckoFlow.flowComponent.submit();
-						} else {
-							// Fallback: submit form if Flow component not available
-							console.log('[FLOW] Flow component not available, submitting order pay form');
+						// For order-pay pages, always submit the form directly instead of using Flow component submit
+						// This ensures proper redirection to success page
+						console.log('[FLOW] Order-pay page detected - submitting form directly for proper redirection');
+						
+						// Add a small delay to ensure all data is set
+						setTimeout(() => {
 							orderPayForm.submit();
-						}
+						}, 100);
 						
 					}
 				} else {
@@ -1765,12 +1777,13 @@ document.addEventListener('DOMContentLoaded', function () {
  * If so, it ensures that no saved payment tokens are pre-selected.
  * 
  * - Looks for the #order-pay-info element and reads its "order-pay" data attribute.
- * - If payment_type is "MOTO":
+ * - If payment_type is "MOTO" (Admin order + Order-pay page + Guest customer):
  *   - Finds all saved payment token radio inputs from Checkout.com (Flow & Cards).
  *   - Iterates through them and unchecks each one, forcing the user to actively select a payment method.
  */
 document.addEventListener('DOMContentLoaded', function () {
-	if ( jQuery("#order-pay-info")?.data("order-pay")?.payment_type === 'MOTO' ) {
+	const orderPayInfo = jQuery("#order-pay-info")?.data("order-pay");
+	if ( orderPayInfo?.payment_type === 'MOTO' ) {
 		console.log('here');
 		const radios = document.querySelectorAll(
 			'input[name="wc-wc_checkout_com_flow-payment-token"], input[name="wc-wc_checkout_com_cards-payment-token"]'
