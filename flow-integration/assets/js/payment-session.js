@@ -1519,7 +1519,7 @@ jQuery(function ($) {
 				)
 			) {
 				let cartData = $("#cart-info").data("cart");
-				if ( !cartData["contains_virtual_product"] ) {
+				if ( !cartData || !cartData["contains_virtual_product"] ) {
 					console.log(
 						"Neither billing nor the shipping checkbox. Returning early..."
 					);
@@ -1574,7 +1574,7 @@ jQuery(function ($) {
 		}
 
 		let cartData = $("#cart-info").data("cart");
-		if ( !virtual && cartData["contains_virtual_product"] && $('#ship-to-different-address-checkbox').length === 0 ) {
+		if ( !virtual && cartData && cartData["contains_virtual_product"] && $('#ship-to-different-address-checkbox').length === 0 ) {
 			debouncedTyping(e);
 			virtual = true;
 		}
