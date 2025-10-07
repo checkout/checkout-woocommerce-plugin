@@ -124,8 +124,16 @@ jQuery( function ( $ ) {
                 }
             }
 
-            // Initialize paypal button.
-            paypal.Buttons({ ...this.paypalButtonProps() }).render( cko_paypal_vars.paypal_button_selector );
+            // Initialize paypal button only if container exists and PayPal SDK is available.
+            if ( typeof paypal !== 'undefined' && jQuery( cko_paypal_vars.paypal_button_selector ).length ) {
+                try {
+                    paypal.Buttons({ ...this.paypalButtonProps() }).render( cko_paypal_vars.paypal_button_selector );
+                } catch (error) {
+                    console.log('[PayPal] Error initializing PayPal button:', error);
+                }
+            } else {
+                console.log('[PayPal] Container not found or PayPal SDK not available, skipping PayPal button initialization');
+            }
 
             this.updateButtonVisibility();
         },

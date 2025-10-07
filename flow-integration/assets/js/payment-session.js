@@ -27,6 +27,12 @@ var ckoFlow = {
 	 * creating a payment session, and mounting the Checkout component.
 	 */
 	loadFlow: async () => {
+		// Check if cko_flow_vars is available
+		if (typeof cko_flow_vars === 'undefined') {
+			console.error('[FLOW] cko_flow_vars is not defined. Flow cannot be initialized.');
+			return;
+		}
+		
 		console.log('🚀🚀🚀 PAYMENT-SESSION.JS LOADED - VERSION: 2025-01-05-19:30 🚀🚀🚀');
 		
 		// Show skeleton loader and disable place order button
@@ -52,20 +58,20 @@ var ckoFlow = {
 		let amount = cartInfo["order_amount"];
 		let currency = cartInfo["purchase_currency"];
 
-		let reference = "WOO" + cko_flow_vars.ref_session;
+		let reference = "WOO" + (cko_flow_vars.ref_session || 'default');
 
 		let email =
 			cartInfo["billing_address"]["email"] ||
-			document.getElementById("billing_email").value;
+			(document.getElementById("billing_email") ? document.getElementById("billing_email").value : '');
 		let family_name =
 			cartInfo["billing_address"]["family_name"] ||
-			document.getElementById("billing_last_name").value;
+			(document.getElementById("billing_last_name") ? document.getElementById("billing_last_name").value : '');
 		let given_name =
 			cartInfo["billing_address"]["given_name"] ||
-			document.getElementById("billing_first_name").value;
+			(document.getElementById("billing_first_name") ? document.getElementById("billing_first_name").value : '');
 		let phone =
 			cartInfo["billing_address"]["phone"] ||
-			document.getElementById("billing_phone").value;
+			(document.getElementById("billing_phone") ? document.getElementById("billing_phone").value : '');
 
 		let address1 = shippingAddress1 = cartInfo["billing_address"]["street_address"];
 		let address2 = shippingAddress2 = cartInfo["billing_address"]["street_address2"];
@@ -92,6 +98,18 @@ var ckoFlow = {
 		let description = 'Payment from ' + cko_flow_vars.site_url + ' for [ ' +  products + ' ]';
 
 		let orderId = cartInfo["order_id"];
+		console.log('[FLOW DEBUG] Initial orderId from cartInfo:', orderId);
+		console.log('[FLOW DEBUG] Current URL pathname:', window.location.pathname);
+		console.log('[FLOW DEBUG] Current URL search:', window.location.search);
+		
+		// For MOTO orders (order-pay page), get order ID from URL if not in cartInfo
+		if ( ! orderId && window.location.pathname.includes('/order-pay/') ) {
+			const urlParams = new URLSearchParams(window.location.search);
+			orderId = urlParams.get('order_id') || urlParams.get('order-pay');
+			console.log('[FLOW DEBUG] MOTO order detected - Order ID from URL:', orderId);
+		}
+		
+		console.log('[FLOW DEBUG] Final orderId:', orderId);
 
 		let payment_type = cko_flow_vars.regular_payment_type;
 
@@ -282,9 +300,25 @@ var ckoFlow = {
 				},
 			};
 			
+			// Check if this is a MOTO order (admin-created order)
+			const isMotoOrder = jQuery("#order-pay-info")?.data("order-pay")?.payment_type === 'MOTO';
+			
+			// Override payment type for MOTO orders
+			if (isMotoOrder) {
+				payment_type = 'MOTO';
+				console.log('[FLOW] MOTO order detected - setting payment_type to MOTO');
+			}
+			
+			// Update payment type in the request
+			paymentSessionRequest.payment_type = payment_type;
+			
 			// Add enabled_payment_methods if specified by merchant
 			// Only send if array has items (empty array means show all methods)
-			if (cko_flow_vars.enabled_payment_methods && 
+			// For MOTO orders, hardcode to only show card payment method
+			if (isMotoOrder) {
+				console.log('[FLOW] MOTO order detected - hardcoding to show only card payment method');
+				paymentSessionRequest.enabled_payment_methods = ['card'];
+			} else if (cko_flow_vars.enabled_payment_methods && 
 			    Array.isArray(cko_flow_vars.enabled_payment_methods) && 
 			    cko_flow_vars.enabled_payment_methods.length > 0) {
 				paymentSessionRequest.enabled_payment_methods = cko_flow_vars.enabled_payment_methods;
@@ -491,12 +525,35 @@ var ckoFlow = {
 							}
 							console.log('[FLOW DEBUG] ====================================');
 
-							if ( ! orderId ) {
-								// Trigger WooCommerce order placement on checkout page.
-								jQuery("form.checkout").submit();
-							} else {
-								const orderPayForm = jQuery('form#order_review');
+							// CRITICAL: Don't submit form here - let the normal form submission handle it
+							// The Flow component has already processed the payment, now we need to let
+							// the normal WooCommerce form submission trigger the process_payment method
+							console.log('[FLOW] Payment completed - Flow component handled payment, now submitting form for backend processing');
+							
+							// Detect if this is a MOTO order (order-pay page) or regular checkout
+							const isOrderPayPage = window.location.pathname.includes('/order-pay/');
+							const orderPayForm = jQuery('form#order_review');
+							const checkoutForm = jQuery("form.checkout");
+							
+							console.log('[FLOW DEBUG] Is order-pay page:', isOrderPayPage);
+							console.log('[FLOW DEBUG] Order pay form exists:', orderPayForm.length > 0);
+							console.log('[FLOW DEBUG] Checkout form exists:', checkoutForm.length > 0);
+							
+							if ( isOrderPayPage && orderPayForm.length > 0 ) {
+								// MOTO order - submit order-pay form
+								const isMotoOrder = jQuery("#order-pay-info")?.data("order-pay")?.payment_type === 'MOTO';
+								console.log('[FLOW] Submitting order pay form for redirect to order confirmation (MOTO: ' + (isMotoOrder ? 'YES' : 'NO') + ')');
+								console.log('[FLOW DEBUG] Order pay form action:', orderPayForm.attr('action'));
+								console.log('[FLOW DEBUG] Order pay form method:', orderPayForm.attr('method'));
+								console.log('[FLOW DEBUG] Payment method selected:', jQuery('input[name="payment_method"]:checked').val());
 								orderPayForm.submit();
+							} else {
+								// Regular checkout - submit checkout form
+								console.log('[FLOW] Submitting checkout form for redirect to order confirmation');
+								console.log('[FLOW DEBUG] Form action:', checkoutForm.attr('action'));
+								console.log('[FLOW DEBUG] Form method:', checkoutForm.attr('method'));
+								console.log('[FLOW DEBUG] Payment method selected:', jQuery('input[name="payment_method"]:checked').val());
+								checkoutForm.submit();
 							}
 						}
 					},
@@ -956,8 +1013,12 @@ function handleFlowPaymentSelection() {
 		
 		console.log('[FLOW DEBUG] CSS controls saved cards via data-saved-payment-order:', document.body.getAttribute('data-saved-payment-order'));
 	} else {
-		flowContainer.style.display = "none";
-		placeOrderElement.style.display = "block";
+		if (flowContainer) {
+			flowContainer.style.display = "none";
+		}
+		if (placeOrderElement) {
+			placeOrderElement.style.display = "block";
+		}
 		// Remove Flow-specific classes when switching to another payment method
 		document.body.classList.remove("flow-method-selected", "flow-ready");
 	}
@@ -1423,27 +1484,21 @@ jQuery(function ($) {
 				);
 			}
 
-			// Fetch updated cart info via AJAX GET request.
-			fetch(cko_flow_vars.ajax_url + "?action=get_cart_info")
-				.then((res) => res.json())
-				.then((data) => {
-					if (data.success) {
-
-						// Update #cart-info with the latest cart data.
-						const $cartDiv = jQuery("#cart-info");
-						$cartDiv.attr("data-cart", JSON.stringify(data.data));
-						$cartDiv.data("cart", data.data);
-
-						// Update global state and re-trigger payment flow setup.
-						cartInfo = data.data;
-						ckoFlowInitialized = false;
-						handleFlowPaymentSelection();
-
-					}
-				})
-				.catch((err) => {
-					console.error("Failed to fetch cart info:", err);
-				});
+			// Use existing cart data instead of fetching via AJAX
+			// The cart info is already available in the HTML data-cart attribute
+			const $cartDiv = jQuery("#cart-info");
+			const existingCartData = $cartDiv.data("cart");
+			
+			if (existingCartData) {
+				console.log('[FLOW DEBUG] Using existing cart data:', existingCartData);
+				
+				// Update global state and re-trigger payment flow setup.
+				cartInfo = existingCartData;
+				ckoFlowInitialized = false;
+				handleFlowPaymentSelection();
+			} else {
+				console.log('[FLOW DEBUG] No existing cart data found, skipping Flow re-initialization');
+			}
 		}
 	};
 

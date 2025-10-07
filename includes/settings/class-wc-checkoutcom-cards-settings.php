@@ -1399,7 +1399,7 @@ class WC_Checkoutcom_Cards_Settings {
 					'type'        => 'multiselect',
 					'class'       => 'wc-enhanced-select',
 					'css'         => 'width: 400px;',
-					'description' => __( 'Select which payment methods to enable at checkout. Leave empty to enable all available methods. Select "Card" if you want only specific methods to show.', 'checkout-com-unified-payments-api' ),
+					'description' => __( 'Select which payment methods to enable at checkout. Leave empty to enable all available methods. Select "Card" if you want only specific methods to show. Note: MOTO orders (admin-created orders) will always allow all payment methods regardless of this setting.', 'checkout-com-unified-payments-api' ),
 					'desc_tip'    => true,
 					'options'     => array(
 						// Card payments

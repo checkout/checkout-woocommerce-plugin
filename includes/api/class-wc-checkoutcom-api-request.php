@@ -1374,6 +1374,118 @@ class WC_Checkoutcom_Api_Request {
 	}
 
 	/**
+	 * Get order information for Flow integration.
+	 * Similar to get_cart_info() but for existing orders.
+	 *
+	 * @param int $order_id Order ID.
+	 * @param bool $include_payment_type Whether to include payment type information.
+	 *
+	 * @return array
+	 */
+	public static function get_order_info( $order_id, $include_payment_type = false ) {
+		$order = wc_get_order( $order_id );
+		
+		if ( ! $order ) {
+			return [];
+		}
+
+		$items = $order->get_items();
+		$products = [];
+
+		$total_amount = $order->get_total();
+		$amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $total_amount, $order->get_currency() );
+
+		foreach ( $items as $item ) {
+			$product = $item->get_product();
+			
+			if ( ! $product ) {
+				continue;
+			}
+
+			$price_excl_tax = $item->get_subtotal();
+			$unit_price_cents = WC_Checkoutcom_Utility::value_to_decimal( $price_excl_tax / $item->get_quantity(), $order->get_currency() );
+
+			$tax_amount = $item->get_subtotal_tax();
+			$total_tax_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $tax_amount, $order->get_currency() );
+
+			// Calculate tax rate
+			$tax_rate = 0;
+			if ( $price_excl_tax > 0 ) {
+				$tax_rate = round( ( $tax_amount / $price_excl_tax ) * 100 );
+			}
+
+			$products[] = [
+				'name'                  => $item->get_name(),
+				'quantity'              => $item->get_quantity(),
+				'unit_price'            => $unit_price_cents,
+				'tax_rate'              => $tax_rate * 100,
+				'total_amount'          => WC_Checkoutcom_Utility::value_to_decimal( $price_excl_tax, $order->get_currency() ),
+				'total_tax_amount'      => $total_tax_amount_cents,
+				'type'                  => 'physical',
+				'reference'             => $product->get_sku() ?: $product->get_id(),
+				'total_discount_amount' => WC_Checkoutcom_Utility::value_to_decimal( $item->get_subtotal() - $item->get_total(), $order->get_currency() ),
+			];
+		}
+
+		// Add shipping if present
+		$shipping_total = $order->get_shipping_total();
+		if ( $shipping_total > 0 ) {
+			$shipping_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $shipping_total, $order->get_currency() );
+			$shipping_tax = $order->get_shipping_tax();
+			$shipping_tax_cents = WC_Checkoutcom_Utility::value_to_decimal( $shipping_tax, $order->get_currency() );
+
+			$shipping_tax_rate = 0;
+			if ( $shipping_total > 0 ) {
+				$shipping_tax_rate = round( ( $shipping_tax / $shipping_total ) * 100 );
+			}
+
+			$products[] = [
+				'name'                  => 'Shipping',
+				'quantity'              => 1,
+				'unit_price'            => $shipping_amount_cents,
+				'tax_rate'              => $shipping_tax_rate * 100,
+				'total_amount'          => $shipping_amount_cents,
+				'total_tax_amount'      => $shipping_tax_cents,
+				'type'                  => 'shipping_fee',
+				'reference'             => 'shipping',
+				'total_discount_amount' => 0,
+			];
+		}
+
+		$woo_locale = str_replace( '_', '-', get_locale() );
+		$locale = substr( $woo_locale, 0, 5 );
+		$total_tax_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $order->get_total_tax(), $order->get_currency() );
+
+		$order_info = [
+			'purchase_country'  => $order->get_billing_country(),
+			'purchase_currency' => $order->get_currency(),
+			'locale'            => strtolower( $locale ),
+			'billing_address'   => [
+				'given_name'      => $order->get_billing_first_name(),
+				'family_name'     => $order->get_billing_last_name(),
+				'email'           => $order->get_billing_email(),
+				'street_address'  => $order->get_billing_address_1(),
+				'street_address2' => $order->get_billing_address_2(),
+				'postal_code'     => $order->get_billing_postcode(),
+				'city'            => $order->get_billing_city(),
+				'region'          => $order->get_billing_state(),
+				'phone'           => $order->get_billing_phone(),
+				'country'         => $order->get_billing_country(),
+			],
+			'order_amount'      => $amount_cents,
+			'order_tax_amount'  => $total_tax_amount_cents,
+			'order_lines'       => $products,
+		];
+
+		// Add payment type information if requested (for MOTO orders)
+		if ( $include_payment_type ) {
+			$order_info['payment_type'] = $order->is_created_via( 'admin' ) ? 'MOTO' : 'Regular';
+		}
+
+		return $order_info;
+	}
+
+	/**
 	 * Return order product information.
 	 * Docs: https://www.checkout.com/docs/payments/payment-methods/paypal#Request_example
 	 *

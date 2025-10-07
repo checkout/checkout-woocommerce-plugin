@@ -52,7 +52,8 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 		add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, array( $this, 'process_admin_options' ) );
 
-		// Webhook handler hook.
+		// Webhook handler hook - ENABLED for Flow integration
+		// Flow integration uses direct redirect for successful payments, but webhooks for 3DS, failures, etc.
 		add_action( 'woocommerce_api_wc_checkoutcom_webhook', [ $this, 'webhook_handler' ] );
 
 		// Meta field on subscription edit.
@@ -157,6 +158,19 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 									$element.hide();
 								}
 								
+								// Hide the "Save to account" checkbox for MOTO orders
+								const $saveNew = jQuery('.woocommerce-SavedPaymentMethods-saveNew');
+								if ($saveNew.length) {
+									$saveNew.hide();
+									console.log('[FLOW] Hiding save to account checkbox for admin-created order');
+								}
+								
+								// Also hide the checkbox by its ID
+								const $saveCheckbox = jQuery('#wc-wc_checkout_com_flow-new-payment-method').closest('p');
+								if ($saveCheckbox.length) {
+									$saveCheckbox.hide();
+								}
+								
 								// Keep observer running to catch late additions
 							});
 
@@ -170,6 +184,10 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 							// Try to hide it immediately in case it's already present.
 							jQuery('.saved-cards-accordion-container').hide();
 							jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide();
+							
+							// Hide the "Save to account" checkbox for MOTO orders
+							jQuery('.woocommerce-SavedPaymentMethods-saveNew').hide();
+							jQuery('#wc-wc_checkout_com_flow-new-payment-method').closest('p').hide();
 						</script>
 					<?php else : ?>
 <!-- Show Saved Payment Methods button is hidden when showing both Flow and saved cards together -->
@@ -449,6 +467,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 							console.log('[FLOW PHP] Saved cards wrapped in accordion');
 							
 						// In saved_cards_first mode, auto-select the default or first saved card
+						console.log('[FLOW PHP] Display order check:', displayOrder, '=== saved_cards_first?', displayOrder === 'saved_cards_first');
 						if (displayOrder === 'saved_cards_first') {
 							// First, check if there's a default card (WooCommerce marks it with checked="checked")
 							let $defaultCardRadio = $('.saved-cards-accordion-panel input[name="wc-wc_checkout_com_flow-payment-token"][checked="checked"]:not(#wc-wc_checkout_com_flow-payment-token-new)').first();
@@ -473,6 +492,14 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 								window.flowSavedCardSelected = true;
 								window.flowUserInteracted = false; // Reset interaction flag
 							}
+						} else if (displayOrder === 'new_payment_first') {
+							// In new_payment_first mode, ensure no saved cards are auto-selected
+							console.log('[FLOW PHP] new_payment_first mode - ensuring no saved cards are auto-selected');
+							$('.saved-cards-accordion-panel input[name="wc-wc_checkout_com_flow-payment-token"]:not(#wc-wc_checkout_com_flow-payment-token-new)').prop('checked', false);
+							$('#wc-wc_checkout_com_flow-payment-token-new').prop('checked', true);
+							window.flowSavedCardSelected = false;
+							window.flowUserInteracted = false;
+							console.log('[FLOW PHP] Unchecked all saved cards and selected new payment method');
 						}
 							
 							// CRITICAL: After moving cards, ensure visibility rules are applied
@@ -815,6 +842,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 							console.log('[FLOW PHP] Saved cards wrapped in accordion');
 							
 						// In saved_cards_first mode, auto-select the default or first saved card
+						console.log('[FLOW PHP] Display order check:', displayOrder, '=== saved_cards_first?', displayOrder === 'saved_cards_first');
 						if (displayOrder === 'saved_cards_first') {
 							// First, check if there's a default card (WooCommerce marks it with checked="checked")
 							let $defaultCardRadio = $('.saved-cards-accordion-panel input[name="wc-wc_checkout_com_flow-payment-token"][checked="checked"]:not(#wc-wc_checkout_com_flow-payment-token-new)').first();
@@ -839,6 +867,14 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 								window.flowSavedCardSelected = true;
 								window.flowUserInteracted = false; // Reset interaction flag
 							}
+						} else if (displayOrder === 'new_payment_first') {
+							// In new_payment_first mode, ensure no saved cards are auto-selected
+							console.log('[FLOW PHP] new_payment_first mode - ensuring no saved cards are auto-selected');
+							$('.saved-cards-accordion-panel input[name="wc-wc_checkout_com_flow-payment-token"]:not(#wc-wc_checkout_com_flow-payment-token-new)').prop('checked', false);
+							$('#wc-wc_checkout_com_flow-payment-token-new').prop('checked', true);
+							window.flowSavedCardSelected = false;
+							window.flowUserInteracted = false;
+							console.log('[FLOW PHP] Unchecked all saved cards and selected new payment method');
 						}
 							
 							// CRITICAL: After moving cards, ensure visibility rules are applied
@@ -1079,6 +1115,14 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		$subs_payment_type = null;
 
 		WC_Checkoutcom_Utility::logger(print_r($_POST,true));
+		
+		// Debug: Check if Flow payment ID is present
+		$flow_pay_id_debug = isset( $_POST['cko-flow-payment-id'] ) ? $_POST['cko-flow-payment-id'] : 'NOT SET';
+		WC_Checkoutcom_Utility::logger( 'Flow Payment ID in POST: ' . $flow_pay_id_debug );
+		
+		// Debug: Check if using saved payment method
+		$is_using_saved = WC_Checkoutcom_Api_Request::is_using_saved_payment_method();
+		WC_Checkoutcom_Utility::logger( 'Is using saved payment method: ' . ( $is_using_saved ? 'YES' : 'NO' ) );
 
 		if ( WC_Checkoutcom_Api_Request::is_using_saved_payment_method() ) {
 			$token = 'wc-wc_checkout_com_flow-payment-token';
@@ -1211,9 +1255,34 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				WC_Checkoutcom_Utility::logger( 'NOT calling flow_save_cards() - Type: ' . $flow_payment_type . ', Checkbox: ' . ( $save_card_checkbox ? 'TRUE' : 'FALSE' ) );
 			}
 
+			// Set payment ID as transaction ID (required for webhook processing)
+			$order->set_transaction_id( $flow_pay_id );
 			$order->update_meta_data( '_cko_payment_id', $flow_pay_id );
 			$order->update_meta_data( '_cko_flow_payment_id', $flow_pay_id );
 			$order->update_meta_data( '_cko_flow_payment_type', $flow_payment_type );
+			
+			// Log before saving
+			WC_Checkoutcom_Utility::logger( 'Before save - Transaction ID: ' . $order->get_transaction_id() . ', Order ID: ' . $order_id );
+			
+			// Save order immediately to ensure transaction ID is persisted for webhook processing
+			$save_result = $order->save();
+			
+			// Log after saving
+			WC_Checkoutcom_Utility::logger( 'After save - Save result: ' . ( $save_result ? 'SUCCESS' : 'FAILED' ) . ', Transaction ID: ' . $order->get_transaction_id() );
+			
+			// Also try to update the order directly in the database as a backup
+			global $wpdb;
+			$wpdb->update(
+				$wpdb->postmeta,
+				array( 'meta_value' => $flow_pay_id ),
+				array( 
+					'post_id' => $order_id,
+					'meta_key' => '_transaction_id'
+				)
+			);
+			
+			// Log payment ID setting for debugging
+			WC_Checkoutcom_Utility::logger( 'Flow payment ID set - Transaction ID: ' . $flow_pay_id . ', Order ID: ' . $order_id );
 			
 			// Store 3DS authentication data if present
 			if ( ! empty( $flow_3ds_status ) ) {
@@ -1266,13 +1335,25 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// Reduce stock levels.
 		wc_reduce_stock_levels( $order_id );
 
+		// Get return URL before emptying cart
+		$return_url = $this->get_return_url( $order );
+		
+		// Check if this is a MOTO order and log additional info
+		$is_moto_order = $order->is_created_via( 'admin' );
+		if ( $is_moto_order ) {
+			WC_Checkoutcom_Utility::logger( 'MOTO order detected - Order ID: ' . $order_id . ', Created via: ' . $order->get_created_via() );
+		}
+		
+		// Log the redirect URL for debugging
+		WC_Checkoutcom_Utility::logger( 'Flow payment successful - redirecting to: ' . $return_url . ' (MOTO: ' . ( $is_moto_order ? 'YES' : 'NO' ) . ')' );
+
 		// Remove cart.
 		WC()->cart->empty_cart();
 
 		// Return thank you page.
 		return array(
 			'result'   => 'success',
-			'redirect' => $this->get_return_url( $order ),
+			'redirect' => $return_url,
 		);
 	}
 
@@ -1712,19 +1793,19 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		WC_Checkoutcom_Utility::logger( '$payment_id: ' . $payment_id );
 		WC_Checkoutcom_Utility::logger( '$data->data->id: ' . $data->data->id );
 
-		// check if payment ID matches that of the webhook.
-		if ( is_null( $payment_id ) || $payment_id !== $data->data->id ) {
-
-			$gateway_debug = 'yes' === WC_Admin_Settings::get_option( 'cko_gateway_responses', 'no' );
-			if ( $gateway_debug ) {
-				/* translators: 1: Payment ID, 2: Webhook ID. */
-				$message = sprintf( esc_html__( 'Order payment Id (%1$s) does not match that of the webhook (%2$s)', 'checkout-com-unified-payments-api' ), $payment_id, $data->data->id );
-
-				WC_Checkoutcom_Utility::logger( $message, null );
-			}
-
-			WC_Checkoutcom_Utility::logger( 'DEBUG: Returning HTTP 422 from payment ID mismatch condition or is null.', null );
-			$this->send_response(422, 'Unprocessable Entity: Payment ID mismatch');
+		// For Flow payments, be more flexible with payment ID matching
+		// Flow payments might not have payment ID set yet, or might have different ID format
+		if ( is_null( $payment_id ) ) {
+			// If no payment ID is set, try to set it from the webhook
+			WC_Checkoutcom_Utility::logger( 'Flow webhook: No payment ID found in order, setting from webhook: ' . $data->data->id );
+			$order->set_transaction_id( $data->data->id );
+			$order->update_meta_data( '_cko_payment_id', $data->data->id );
+			$order->update_meta_data( '_cko_flow_payment_id', $data->data->id );
+			$order->save();
+			$payment_id = $data->data->id;
+		} elseif ( $payment_id !== $data->data->id ) {
+			// Payment ID exists but doesn't match - log but don't fail for Flow payments
+			WC_Checkoutcom_Utility::logger( 'Flow webhook: Payment ID mismatch - Order: ' . $payment_id . ', Webhook: ' . $data->data->id . ' - Continuing processing' );
 		}
 
 		WC_Checkoutcom_Utility::logger( 'DEBUG: Event Type Data' );

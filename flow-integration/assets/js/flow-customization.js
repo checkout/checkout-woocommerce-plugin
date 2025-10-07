@@ -100,6 +100,9 @@ window.locale = cko_flow_customization_vars.flow_component_locale;
 
 function isValidJson(str) {
     try {
+        if (!str || str.trim() === '' || str === 'null' || str === 'undefined') {
+            return false;
+        }
         JSON.parse(str);
         return true;
     } catch (error) {
@@ -108,6 +111,12 @@ function isValidJson(str) {
 	}
 }
 
-window.translations = isValidJson(cko_flow_customization_vars.flow_component_translation)
-    ? JSON.parse(cko_flow_customization_vars.flow_component_translation)
-    : {};
+// Safely parse translation data with fallback
+window.translations = {};
+if (typeof cko_flow_customization_vars !== 'undefined' && 
+    cko_flow_customization_vars.flow_component_translation && 
+    isValidJson(cko_flow_customization_vars.flow_component_translation)) {
+    window.translations = JSON.parse(cko_flow_customization_vars.flow_component_translation);
+} else {
+    console.log('[FLOW] No valid translation data found, using empty translations object');
+}

@@ -68,8 +68,13 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		// Redirection hook.
 		add_action( 'woocommerce_api_wc_checkoutcom_callback', [ $this, 'callback_handler' ] );
 
-		// Webhook handler hook.
-		add_action( 'woocommerce_api_wc_checkoutcom_webhook', [ $this, 'webhook_handler' ] );
+		// Webhook handler hook - only register if not in Flow mode
+		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$checkout_mode = $core_settings['ckocom_checkout_mode'] ?? 'classic';
+		
+		if ( 'flow' !== $checkout_mode ) {
+			add_action( 'woocommerce_api_wc_checkoutcom_webhook', [ $this, 'webhook_handler' ] );
+		}
 
 		// Payment scripts.
 		add_action( 'wp_enqueue_scripts', [ $this, 'payment_scripts' ] );
