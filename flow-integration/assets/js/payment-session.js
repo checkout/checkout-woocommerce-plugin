@@ -491,12 +491,17 @@ var ckoFlow = {
 		 * Called when the payment is completed successfully.
 		 */
 		onPaymentCompleted: (_component, paymentResponse) => {
+						console.log('[FLOW] onPaymentCompleted called with response:', paymentResponse);
+						
 						if (paymentResponse.id) {
 							hideLoadingOverlay(2);
 
 							// Set the hidden input values.
 							jQuery("#cko-flow-payment-id").val(paymentResponse.id);
 							jQuery("#cko-flow-payment-type").val(paymentResponse?.type || "");
+							
+							console.log('[FLOW] ✅ Payment ID set:', paymentResponse.id);
+							console.log('[FLOW] ✅ Payment type set:', paymentResponse?.type || "");
 							
 							// Handle 3DS authentication if present
 							if (paymentResponse.three_ds && paymentResponse.three_ds.status) {
@@ -561,6 +566,10 @@ var ckoFlow = {
 								console.log('[FLOW] Submitting checkout form for redirect to order confirmation');
 								checkoutForm.submit();
 							}
+						} else {
+							console.error('[FLOW] ❌ Payment response missing ID:', paymentResponse);
+							console.error('[FLOW] ❌ Payment response keys:', Object.keys(paymentResponse || {}));
+							showError('Payment response is missing required data. Please try again.');
 						}
 					},
 

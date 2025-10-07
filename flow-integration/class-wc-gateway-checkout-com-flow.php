@@ -1222,6 +1222,15 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 			// Check if $flow_pay_id is not empty.
 			if ( empty( $flow_pay_id ) ) {
+				// Enhanced debugging for missing payment ID
+				WC_Checkoutcom_Utility::logger( '=== MISSING PAYMENT ID DEBUG ===' );
+				WC_Checkoutcom_Utility::logger( 'POST data keys: ' . print_r( array_keys( $_POST ), true ) );
+				WC_Checkoutcom_Utility::logger( 'cko-flow-payment-id value: ' . ( isset( $_POST['cko-flow-payment-id'] ) ? $_POST['cko-flow-payment-id'] : 'NOT SET' ) );
+				WC_Checkoutcom_Utility::logger( 'cko-flow-payment-type value: ' . ( isset( $_POST['cko-flow-payment-type'] ) ? $_POST['cko-flow-payment-type'] : 'NOT SET' ) );
+				WC_Checkoutcom_Utility::logger( 'User agent: ' . ( isset( $_SERVER['HTTP_USER_AGENT'] ) ? $_SERVER['HTTP_USER_AGENT'] : 'NOT SET' ) );
+				WC_Checkoutcom_Utility::logger( 'Referer: ' . ( isset( $_SERVER['HTTP_REFERER'] ) ? $_SERVER['HTTP_REFERER'] : 'NOT SET' ) );
+				WC_Checkoutcom_Utility::logger( '=== END MISSING PAYMENT ID DEBUG ===' );
+				
 				WC_Checkoutcom_Utility::wc_add_notice_self( __( 'There was an issue completing the payment. Please complete the payment.', 'checkout-com-unified-payments-api' ), 'error' );
 
 				return;
