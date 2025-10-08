@@ -557,10 +557,15 @@ var ckoFlow = {
 								const isMotoOrder = orderPayInfo?.payment_type === 'MOTO';
 								console.log('[FLOW] Submitting order pay form for redirect to order confirmation (MOTO: ' + (isMotoOrder ? 'YES' : 'NO') + ')');
 								
-								// Add a small delay to ensure all data is set
-								setTimeout(() => {
-									orderPayForm.submit();
-								}, 100);
+								// Debug: Log form data before submission
+								console.log('[FLOW] Form action URL:', orderPayForm.attr('action'));
+								console.log('[FLOW] Form method:', orderPayForm.attr('method'));
+								console.log('[FLOW] Payment ID in form:', jQuery("#cko-flow-payment-id").val());
+								console.log('[FLOW] Payment type in form:', jQuery("#cko-flow-payment-type").val());
+								
+								// Submit form immediately for proper redirection
+								console.log('[FLOW] About to submit order pay form...');
+								orderPayForm.submit();
 							} else {
 								// Regular checkout - submit checkout form
 								console.log('[FLOW] Submitting checkout form for redirect to order confirmation');
