@@ -491,7 +491,10 @@ var ckoFlow = {
 		 * Called when the payment is completed successfully.
 		 */
 		onPaymentCompleted: (_component, paymentResponse) => {
+						console.log('[FLOW] ===== onPaymentCompleted CALLED =====');
 						console.log('[FLOW] onPaymentCompleted called with response:', paymentResponse);
+						console.log('[FLOW] Current URL:', window.location.href);
+						console.log('[FLOW] Is order-pay page:', window.location.pathname.includes('/order-pay/'));
 						
 						if (paymentResponse.id) {
 							hideLoadingOverlay(2);
@@ -564,7 +567,21 @@ var ckoFlow = {
 								console.log('[FLOW] Payment type in form:', jQuery("#cko-flow-payment-type").val());
 								
 								// Submit form immediately for proper redirection
+								console.log('[FLOW] ===== SUBMITTING ORDER PAY FORM =====');
 								console.log('[FLOW] About to submit order pay form...');
+								console.log('[FLOW] Form element:', orderPayForm[0]);
+								console.log('[FLOW] Form action:', orderPayForm.attr('action'));
+								console.log('[FLOW] Form method:', orderPayForm.attr('method'));
+								console.log('[FLOW] Payment ID being submitted:', jQuery("#cko-flow-payment-id").val());
+								
+								// Add event listener to track form submission
+								orderPayForm.on('submit', function(e) {
+									console.log('[FLOW] ===== FORM SUBMIT EVENT TRIGGERED =====');
+									console.log('[FLOW] Form submit event fired');
+									console.log('[FLOW] Event target:', e.target);
+									console.log('[FLOW] Form data being submitted:', orderPayForm.serialize());
+								});
+								
 								orderPayForm.submit();
 							} else {
 								// Regular checkout - submit checkout form
