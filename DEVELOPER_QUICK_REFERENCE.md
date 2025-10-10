@@ -105,6 +105,48 @@ if (isMotoOrder) {
 }
 ```
 
+### Issue: Order-Pay 3DS Redirect Problems
+**Cause**: Wrong URL construction or form submission
+**Fix**: Proper order-pay handling
+```javascript
+// Extract order ID from URL path
+const pathMatch = window.location.pathname.match(/\/order-pay\/(\d+)\//);
+const orderId = pathMatch ? pathMatch[1] : null;
+const orderKey = new URLSearchParams(window.location.search).get('key');
+
+// Construct proper redirect URL
+const orderReceivedUrl = `${window.location.origin}/checkout/order-received/${orderId}/?key=${orderKey}`;
+
+// Submit correct form after 3DS
+if (window.location.pathname.includes('/order-pay/')) {
+    jQuery("form[name='checkout']").submit();
+} else {
+    jQuery("form.checkout").submit();
+}
+```
+
+### Issue: Cardholder Name Not Auto-Populated on Order-Pay
+**Cause**: Form fields disabled on order-pay pages
+**Fix**: Extract from order data attributes
+```javascript
+const isOrderPayPage = window.location.pathname.includes('/order-pay/');
+if (isOrderPayPage) {
+    const orderPayInfoElement = document.getElementById("order-pay-info");
+    const orderData = orderPayInfoElement?.getAttribute("data-order-pay");
+    
+    if (orderData) {
+        const parsedData = JSON.parse(orderData);
+        const givenName = parsedData.billing_address?.given_name || "";
+        const familyName = parsedData.billing_address?.family_name || "";
+        const cardholderName = `${givenName} ${familyName}`.trim();
+        
+        if (cardholderName) {
+            window.componentOptions.card.data = { cardholderName: cardholderName };
+        }
+    }
+}
+```
+
 ---
 
 ## 📊 Debugging
@@ -145,7 +187,7 @@ console.log('[FLOW] Component state:', flowComponent);
 
 ### MOTO Order Flow
 ```
-1. Admin creates order → 2. Order pay page → 3. Card only → 4. MOTO payment → 5. Redirect
+1. Admin creates order → 2. Order pay page → 3. Card only → 4. MOTO payment → 5. 3DS (if required) → 6. Redirect to order-received
 ```
 
 ### Saved Card Flow
@@ -240,5 +282,5 @@ git push origin feature/flow-integration-v5.0.0-beta
 
 ---
 
-**Last Updated**: January 7, 2025  
+**Last Updated**: January 10, 2025  
 **Version**: 5.0.0_beta

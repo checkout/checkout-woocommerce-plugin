@@ -275,8 +275,55 @@ define('CKO_DEBUG_LOGGING', true);
 - **Auto-scaling**: Dynamic buffer sizing based on load
 - **Predictive cleanup**: ML-based log retention optimization
 
+## Production Cleanup Guidelines
+
+### Debug Log Removal
+Before deploying to production, ensure all debug logs are removed:
+
+```javascript
+// Remove all console.log statements with debug prefixes
+// Remove: console.log('[FLOW DEBUG]', data);
+// Remove: console.log('[CURRENT VERSION]', data);
+// Remove: console.log('[WORKING VERSION]', data);
+// Remove: console.log('[REDIRECT ANALYSIS]', data);
+```
+
+### Version Identifiers
+Update version identifiers for production releases:
+
+```javascript
+// Production version identifier
+console.log('🚀🚀🚀 PAYMENT-SESSION.JS LOADED - VERSION: 2025-01-10-23:10-PRODUCTION-READY 🚀🚀🚀');
+```
+
+### Performance Monitoring
+Enable production-appropriate logging levels:
+
+```php
+// Production logging configuration
+define('CKO_LOG_LEVEL', 'ERROR'); // Only log errors in production
+define('CKO_ENABLE_PERFORMANCE_MONITORING', true);
+define('CKO_ENABLE_DEBUG_LOGGING', false);
+```
+
+## Recent Implementation Updates
+
+### Order-Pay 3DS Handling (January 10, 2025)
+- **Fixed**: 3DS redirects on order-pay pages now properly redirect to order-received page
+- **Fixed**: Order ID extraction from URL path instead of query parameters
+- **Fixed**: Correct form submission (order-pay vs checkout forms)
+- **Fixed**: Cardholder name auto-population on order-pay pages
+
+### Key Changes Made:
+1. **URL Construction**: Order-pay pages now redirect to `/checkout/order-received/{order_id}/?key={order_key}`
+2. **Form Submission**: Different forms submitted based on page type
+3. **Data Extraction**: Billing information extracted from order data attributes
+4. **Production Cleanup**: All debug logs removed for production deployment
+
 ## Conclusion
 
 The enhanced logging system provides significant improvements in performance, debugging capabilities, and operational efficiency. The system is designed to scale with your business while providing detailed insights into system behavior and performance.
+
+**Latest Updates**: Order-pay 3DS handling has been completely fixed with proper URL construction, form submission, and cardholder name auto-population. All changes have been tested and are production-ready.
 
 For support or questions about the enhanced logging system, please refer to the plugin documentation or contact the development team.

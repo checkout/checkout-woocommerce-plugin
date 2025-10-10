@@ -33,7 +33,7 @@
          │                       │              └─────────────────┘
 ```
 
-## 2. MOTO Order Flow
+## 2. MOTO Order Flow (Updated with 3DS Support)
 
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
@@ -50,6 +50,12 @@
          │                       │                       │
          │                       │                       ▼
          │                       │              ┌─────────────────┐
+         │                       │              │ Auto-populate   │
+         │                       │              │ Cardholder Name │
+         │                       │              └─────────────────┘
+         │                       │                       │
+         │                       │                       ▼
+         │                       │              ┌─────────────────┐
          │                       │              │ Flow Component  │
          │                       │              │ (Card Only)     │
          │                       │              └─────────────────┘
@@ -62,8 +68,15 @@
          │                       │                       │
          │                       │                       ▼
          │                       │              ┌─────────────────┐
-         │                       │              │ Process &       │
-         │                       │              │ Redirect        │
+         │                       │              │ 3DS Challenge   │
+         │                       │              │ (If Required)   │
+         │                       │              └─────────────────┘
+         │                       │                       │
+         │                       │                       ▼
+         │                       │              ┌─────────────────┐
+         │                       │              │ Redirect to     │
+         │                       │              │ Order-Received  │
+         │                       │              │ Page            │
          │                       │              └─────────────────┘
 ```
 
@@ -94,7 +107,7 @@
          │                       │              └─────────────────┘
 ```
 
-## 4. 3DS Authentication Flow
+## 4. 3DS Authentication Flow (Updated for Order-Pay)
 
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
@@ -123,8 +136,18 @@
          │                       │                       │
          │                       │                       ▼
          │                       │              ┌─────────────────┐
+         │                       │              │ Submit Correct  │
+         │                       │              │ Form Based on   │
+         │                       │              │ Page Type       │
+         │                       │              └─────────────────┘
+         │                       │                       │
+         │                       │                       ▼
+         │                       │              ┌─────────────────┐
          │                       │              │ Redirect to     │
+         │                       │              │ Order-Received  │
+         │                       │              │ (Order-Pay) or  │
          │                       │              │ Thank You Page  │
+         │                       │              │ (Checkout)      │
          │                       │              └─────────────────┘
 ```
 
@@ -296,6 +319,71 @@ Payment Request → Check 3DS Requirements → Challenge or Direct → Complete
 Payment Status → Check if Webhook Needed → Process Accordingly → Complete
 ```
 
+## 9. Cardholder Name Auto-Population Flow
+
+```
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│  Order-Pay Page │    │  Check if Card   │    │  Extract Order  │
+│  Loads          │───►│  Holder Name     │───►│  Data from      │
+│                 │    │  Enabled         │    │  Attributes     │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+         │                       │                       │
+         │                       │                       ▼
+         │                       │              ┌─────────────────┐
+         │                       │              │ Parse Billing   │
+         │                       │              │ Address Data    │
+         │                       │              └─────────────────┘
+         │                       │                       │
+         │                       │                       ▼
+         │                       │              ┌─────────────────┐
+         │                       │              │ Combine First   │
+         │                       │              │ & Last Name     │
+         │                       │              └─────────────────┘
+         │                       │                       │
+         │                       │                       ▼
+         │                       │              ┌─────────────────┐
+         │                       │              │ Set Cardholder  │
+         │                       │              │ Name in Flow    │
+         │                       │              │ Component       │
+         │                       │              └─────────────────┘
+```
+
+## 10. Order-Pay 3DS Redirect Flow
+
+```
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│  3DS Challenge  │    │  Extract Order   │    │  Construct      │
+│  Completed      │───►│  ID from URL     │───►│  Order-Received │
+│                 │    │  Path            │    │  URL            │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+         │                       │                       │
+         │                       │                       ▼
+         │                       │              ┌─────────────────┐
+         │                       │              │ Set Success &   │
+         │                       │              │ Failure URLs    │
+         │                       │              └─────────────────┘
+         │                       │                       │
+         │                       │                       ▼
+         │                       │              ┌─────────────────┐
+         │                       │              │ Submit Order-Pay │
+         │                       │              │ Form (not       │
+         │                       │              │ Checkout Form)  │
+         │                       │              └─────────────────┘
+         │                       │                       │
+         │                       │                       ▼
+         │                       │              ┌─────────────────┐
+         │                       │              │ Redirect to     │
+         │                       │              │ Order-Received  │
+         │                       │              │ Page            │
+         │                       │              └─────────────────┘
+```
+
 ---
 
 **Note**: These diagrams represent the high-level flow. Actual implementation includes additional error handling, validation, and edge cases not shown here for clarity.
+
+**Recent Updates (January 10, 2025)**:
+- Order-pay 3DS flow now properly redirects to order-received page
+- Cardholder name auto-population works on order-pay pages
+- Proper form submission based on page type (order-pay vs checkout)
+- Order ID extraction from URL path instead of query parameters

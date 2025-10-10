@@ -666,6 +666,74 @@ if (isMotoOrder) {
 }
 ```
 
+### 5. Order-Pay 3DS Redirect Issues
+**Problem**: 3DS payments on order-pay page redirect to wrong URL or show "Actions: Pay Cancel"
+**Solution**: Proper URL construction and form submission for order-pay pages
+
+```javascript
+// Fix: Extract order ID from URL path and construct proper redirect URLs
+const isOrderPayPage = window.location.pathname.includes('/order-pay/');
+if (isOrderPayPage) {
+    // Extract order ID from URL path like /order-pay/4127/
+    const pathMatch = window.location.pathname.match(/\/order-pay\/(\d+)\//);
+    const orderId = pathMatch ? pathMatch[1] : null;
+    const orderKey = new URLSearchParams(window.location.search).get('key');
+    
+    // Construct order-received URL
+    const orderReceivedUrl = `${window.location.origin}/checkout/order-received/${orderId}/?key=${orderKey}`;
+    
+    // Set success/failure URLs to order-received page
+    paymentSessionRequest.success_url = orderReceivedUrl;
+    paymentSessionRequest.failure_url = orderReceivedUrl;
+}
+
+// Fix: Submit correct form after 3DS completion
+if (window.location.pathname.includes('/order-pay/')) {
+    jQuery("form[name='checkout']").submit(); // Order-pay form
+} else {
+    jQuery("form.checkout").submit(); // Regular checkout form
+}
+```
+
+### 6. Cardholder Name Not Auto-Populated on Order-Pay
+**Problem**: Cardholder name field not populated on order-pay pages
+**Solution**: Extract billing information from order data attributes
+
+```javascript
+// Fix: Get billing info from order data on order-pay pages
+const isOrderPayPage = window.location.pathname.includes('/order-pay/');
+if (isOrderPayPage) {
+    let orderData = null;
+    const orderPayInfoElement = document.getElementById("order-pay-info");
+    const cartInfoElement = document.getElementById("cart-info");
+    
+    if (orderPayInfoElement) {
+        orderData = orderPayInfoElement.getAttribute("data-order-pay");
+    } else if (cartInfoElement) {
+        orderData = cartInfoElement.getAttribute("data-cart");
+    }
+    
+    if (orderData) {
+        try {
+            const parsedData = JSON.parse(orderData);
+            if (parsedData.billing_address) {
+                const givenName = parsedData.billing_address.given_name || "";
+                const familyName = parsedData.billing_address.family_name || "";
+                const cardholderName = `${givenName} ${familyName}`.trim();
+                
+                if (cardholderName) {
+                    window.componentOptions.card.data = {
+                        cardholderName: cardholderName,
+                    };
+                }
+            }
+        } catch (e) {
+            console.error('Error parsing order data:', e);
+        }
+    }
+}
+```
+
 ### Debugging Tools
 
 #### 1. Console Logging
@@ -721,6 +789,6 @@ For additional support or questions, refer to:
 
 ---
 
-**Last Updated**: January 7, 2025  
+**Last Updated**: January 10, 2025  
 **Version**: 5.0.0_beta  
 **Author**: Development Team
