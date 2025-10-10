@@ -33,7 +33,7 @@ var ckoFlow = {
 			return;
 		}
 		
-		console.log('🚀🚀🚀 PAYMENT-SESSION.JS LOADED - VERSION: 2025-01-10-23:10-PRODUCTION-READY 🚀🚀🚀');
+		console.log('🚀🚀🚀 PAYMENT-SESSION.JS LOADED - VERSION: 2025-10-11-00:05-DISCOUNT-CALCULATION-FIX 🚀🚀🚀');
 		
 		// Check if we're on a redirect page with payment parameters - if so, don't initialize Flow
 		const urlParams = new URLSearchParams(window.location.search);

@@ -1297,16 +1297,23 @@ class WC_Checkoutcom_Api_Request {
 
 			if( $flow ) {
 				$quantity   = $values['quantity'];
+				$line_subtotal = $values['line_subtotal'];
+				$line_total    = $values['line_total'];
+
+				// Discount Price
+				$unit_discount       = ( $line_subtotal - $line_total ) / $quantity;
+				$discount_total_cents = WC_Checkoutcom_Utility::value_to_decimal( $unit_discount * $quantity, $currency );
+
 				// Flow-specific logic for cart items
 				$products[] = [
 					'name'                  => $_product->get_title(),
 					'quantity'              => $quantity,
 					'unit_price'            => $unit_price_cents,
-					'total_amount'          => $unit_price_cents * $quantity,
+					'total_amount'          => ( $unit_price_cents * $quantity ) - $discount_total_cents,
 					'tax_amount'            => $total_tax_amount_cents,
 					'type'                  => 'physical',
 					'reference'             => $_product->get_sku(),
-					'discount_amount'       => 0,
+					'discount_amount'       => $discount_total_cents,
 				];
 			} else {
 				$products[] = [
@@ -1440,8 +1447,9 @@ class WC_Checkoutcom_Api_Request {
 			if ( $flow ) {
 				$unit_price        = $line_subtotal / $quantity;
 				$unit_discount     = ( $line_subtotal - $line_total ) / $quantity;
-				$unit_price_cents  = WC_Checkoutcom_Utility::value_to_decimal( $unit_price, $order->get_currency() );
-				$discount_cents    = WC_Checkoutcom_Utility::value_to_decimal( $unit_discount, $order->get_currency() );
+				$discounted_unit   = $unit_price - $unit_discount;
+				$unit_price_cents  = WC_Checkoutcom_Utility::value_to_decimal( $discounted_unit, $order->get_currency() );
+				$discount_total_cents = WC_Checkoutcom_Utility::value_to_decimal( $unit_discount * $quantity, $order->get_currency() );
 				$tax_amount        = $item->get_subtotal_tax();
 				$total_tax_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $tax_amount, $order->get_currency() );
 
@@ -1449,11 +1457,11 @@ class WC_Checkoutcom_Api_Request {
 					'name'                  => $item->get_name(),
 					'quantity'              => $quantity,
 					'unit_price'            => $unit_price_cents,
-					'total_amount'          => WC_Checkoutcom_Utility::value_to_decimal( $line_subtotal, $order->get_currency() ),
+					'total_amount'          => $unit_price_cents * $quantity,
 					'tax_amount'            => $total_tax_amount_cents,
 					'type'                  => 'physical',
 					'reference'             => $product->get_sku() ?: $product->get_id(),
-					'discount_amount'       => $discount_cents,
+					'discount_amount'       => $discount_total_cents,
 				];
 			} else {
 				$price_excl_tax = $item->get_subtotal();
