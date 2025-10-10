@@ -1260,7 +1260,7 @@ class WC_Checkoutcom_Api_Request {
 	 *
 	 * @return array
 	 */
-	public static function get_cart_info() {
+	public static function get_cart_info( $flow = false ) {
 
 		if ( ! WC()->cart ) {
 			return [];
@@ -1295,18 +1295,32 @@ class WC_Checkoutcom_Api_Request {
 				$total_tax_amount_cents = 0;
 			}
 
-			$products[] = [
-				'name'                  => $_product->get_title(),
-				'quantity'              => $values['quantity'],
-				'unit_price'            => $unit_price_cents,
-				'tax_rate'              => $tax_rate * 100,
-				'total_amount'          => $unit_price_cents * $values['quantity'],
-				'total_tax_amount'      => $total_tax_amount_cents,
-				'type'                  => 'physical',
-				'reference'             => $_product->get_sku(),
-				'total_discount_amount' => 0,
-
-			];
+			if( $flow ) {
+				$quantity   = $values['quantity'];
+				// Flow-specific logic for cart items
+				$products[] = [
+					'name'                  => $_product->get_title(),
+					'quantity'              => $quantity,
+					'unit_price'            => $unit_price_cents,
+					'total_amount'          => $unit_price_cents * $quantity,
+					'tax_amount'            => $total_tax_amount_cents,
+					'type'                  => 'physical',
+					'reference'             => $_product->get_sku(),
+					'discount_amount'       => 0,
+				];
+			} else {
+				$products[] = [
+					'name'                  => $_product->get_title(),
+					'quantity'              => $values['quantity'],
+					'unit_price'            => $unit_price_cents,
+					'tax_rate'              => $tax_rate * 100,
+					'total_amount'          => $unit_price_cents * $values['quantity'],
+					'total_tax_amount'      => $total_tax_amount_cents,
+					'type'                  => 'physical',
+					'reference'             => $_product->get_sku(),
+					'total_discount_amount' => 0,
+				];
+			}
 		}
 
 		$chosen_methods  = wc_get_chosen_shipping_method_ids();
@@ -1337,17 +1351,30 @@ class WC_Checkoutcom_Api_Request {
 					$total_tax_amount_cents = 0;
 				}
 
-				$products[] = [
-					'name'                  => $chosen_shipping,
-					'quantity'              => 1,
-					'unit_price'            => $shipping_amount_cents,
-					'tax_rate'              => $shipping_tax_rate,
-					'total_amount'          => $shipping_amount_cents,
-					'total_tax_amount'      => $total_tax_amount_cents,
-					'type'                  => 'shipping_fee',
-					'reference'             => $chosen_shipping,
-					'total_discount_amount' => 0,
-				];
+				// Only add total_tax_amount and total_discount_amount if flow is false.
+				if ( ! $flow ) {
+					$products[] = [
+						'name'                  => $chosen_shipping,
+						'quantity'              => 1,
+						'unit_price'            => $shipping_amount_cents,
+						'tax_rate'              => $shipping_tax_rate,
+						'total_amount'          => $shipping_amount_cents,
+						'total_tax_amount'      => $total_tax_amount_cents,
+						'type'                  => 'shipping_fee',
+						'reference'             => $chosen_shipping,
+						'total_discount_amount' => 0,
+					];
+				} else {
+					$products[] = [
+						'name'                  => $chosen_shipping,
+						'quantity'              => 1,
+						'unit_price'            => $shipping_amount_cents,
+						'total_amount'          => $shipping_amount_cents,
+						'tax_amount'            => $total_tax_amount_cents,
+						'reference'             => $chosen_shipping,
+						'discount_amount'       => 0,
+					];
+				}
 			}
 		}
 
@@ -1382,11 +1409,11 @@ class WC_Checkoutcom_Api_Request {
 	 * Similar to get_cart_info() but for existing orders.
 	 *
 	 * @param int $order_id Order ID.
-	 * @param bool $include_payment_type Whether to include payment type information.
+	 * @param bool $flow Whether this is for Flow integration (affects field names).
 	 *
 	 * @return array
 	 */
-	public static function get_order_info( $order_id, $include_payment_type = false ) {
+	public static function get_order_info( $order_id, $flow = false ) {
 		$order = wc_get_order( $order_id );
 		
 		if ( ! $order ) {
@@ -1406,29 +1433,53 @@ class WC_Checkoutcom_Api_Request {
 				continue;
 			}
 
-			$price_excl_tax = $item->get_subtotal();
-			$unit_price_cents = WC_Checkoutcom_Utility::value_to_decimal( $price_excl_tax / $item->get_quantity(), $order->get_currency() );
+			$line_subtotal = $item->get_subtotal();
+			$quantity      = $item->get_quantity();
+			$line_total    = $item->get_total();
+	
+			if ( $flow ) {
+				$unit_price        = $line_subtotal / $quantity;
+				$unit_discount     = ( $line_subtotal - $line_total ) / $quantity;
+				$unit_price_cents  = WC_Checkoutcom_Utility::value_to_decimal( $unit_price, $order->get_currency() );
+				$discount_cents    = WC_Checkoutcom_Utility::value_to_decimal( $unit_discount, $order->get_currency() );
+				$tax_amount        = $item->get_subtotal_tax();
+				$total_tax_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $tax_amount, $order->get_currency() );
 
-			$tax_amount = $item->get_subtotal_tax();
-			$total_tax_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $tax_amount, $order->get_currency() );
+				$products[] = [
+					'name'                  => $item->get_name(),
+					'quantity'              => $quantity,
+					'unit_price'            => $unit_price_cents,
+					'total_amount'          => WC_Checkoutcom_Utility::value_to_decimal( $line_subtotal, $order->get_currency() ),
+					'tax_amount'            => $total_tax_amount_cents,
+					'type'                  => 'physical',
+					'reference'             => $product->get_sku() ?: $product->get_id(),
+					'discount_amount'       => $discount_cents,
+				];
+			} else {
+				$price_excl_tax = $item->get_subtotal();
+				$unit_price_cents = WC_Checkoutcom_Utility::value_to_decimal( $price_excl_tax / $item->get_quantity(), $order->get_currency() );
 
-			// Calculate tax rate
-			$tax_rate = 0;
-			if ( $price_excl_tax > 0 ) {
-				$tax_rate = round( ( $tax_amount / $price_excl_tax ) * 100 );
+				$tax_amount = $item->get_subtotal_tax();
+				$total_tax_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $tax_amount, $order->get_currency() );
+
+				// Calculate tax rate
+				$tax_rate = 0;
+				if ( $price_excl_tax > 0 ) {
+					$tax_rate = round( ( $tax_amount / $price_excl_tax ) * 100 );
+				}
+
+				$products[] = [
+					'name'                  => $item->get_name(),
+					'quantity'              => $item->get_quantity(),
+					'unit_price'            => $unit_price_cents,
+					'tax_rate'              => $tax_rate * 100,
+					'total_amount'          => WC_Checkoutcom_Utility::value_to_decimal( $price_excl_tax, $order->get_currency() ),
+					'total_tax_amount'      => $total_tax_amount_cents,
+					'type'                  => 'physical',
+					'reference'             => $product->get_sku() ?: $product->get_id(),
+					'total_discount_amount' => WC_Checkoutcom_Utility::value_to_decimal( $item->get_subtotal() - $item->get_total(), $order->get_currency() ),
+				];
 			}
-
-			$products[] = [
-				'name'                  => $item->get_name(),
-				'quantity'              => $item->get_quantity(),
-				'unit_price'            => $unit_price_cents,
-				'tax_rate'              => $tax_rate * 100,
-				'total_amount'          => WC_Checkoutcom_Utility::value_to_decimal( $price_excl_tax, $order->get_currency() ),
-				'total_tax_amount'      => $total_tax_amount_cents,
-				'type'                  => 'physical',
-				'reference'             => $product->get_sku() ?: $product->get_id(),
-				'total_discount_amount' => WC_Checkoutcom_Utility::value_to_decimal( $item->get_subtotal() - $item->get_total(), $order->get_currency() ),
-			];
 		}
 
 		// Add shipping if present
@@ -1443,17 +1494,30 @@ class WC_Checkoutcom_Api_Request {
 				$shipping_tax_rate = round( ( $shipping_tax / $shipping_total ) * 100 );
 			}
 
-			$products[] = [
-				'name'                  => 'Shipping',
-				'quantity'              => 1,
-				'unit_price'            => $shipping_amount_cents,
-				'tax_rate'              => $shipping_tax_rate * 100,
-				'total_amount'          => $shipping_amount_cents,
-				'total_tax_amount'      => $shipping_tax_cents,
-				'type'                  => 'shipping_fee',
-				'reference'             => 'shipping',
-				'total_discount_amount' => 0,
-			];
+			// Only add total_tax_amount and total_discount_amount if flow is false.
+			if ( ! $flow ) {
+				$products[] = [
+					'name'                  => 'Shipping',
+					'quantity'              => 1,
+					'unit_price'            => $shipping_amount_cents,
+					'tax_rate'              => $shipping_tax_rate * 100,
+					'total_amount'          => $shipping_amount_cents,
+					'total_tax_amount'      => $shipping_tax_cents,
+					'type'                  => 'shipping_fee',
+					'reference'             => 'shipping',
+					'total_discount_amount' => 0,
+				];
+			} else {
+				$products[] = [
+					'name'                  => 'Shipping',
+					'quantity'              => 1,
+					'unit_price'            => $shipping_amount_cents,
+					'total_amount'          => $shipping_amount_cents,
+					'tax_amount'            => $shipping_tax_cents,
+					'reference'             => 'shipping',
+					'discount_amount'       => 0,
+				];
+			}
 		}
 
 		$woo_locale = str_replace( '_', '-', get_locale() );
@@ -1482,7 +1546,7 @@ class WC_Checkoutcom_Api_Request {
 		];
 
 		// Add payment type information if requested (for MOTO orders)
-		if ( $include_payment_type ) {
+		if ( $flow ) {
 			// MOTO only for: Admin-created order + Order-pay page + Guest customer
 			$is_order_pay_page = ! empty( $_GET['pay_for_order'] ) && (bool) $_GET['pay_for_order'];
 			$is_guest_customer = $order->get_customer_id() == 0; // Guest customer = no customer account
@@ -1527,7 +1591,7 @@ class WC_Checkoutcom_Api_Request {
 	 * @return array
 	 */
 	public static function get_paypal_products( $order ) {
-		$cart_info = WC_Checkoutcom_Api_Request::get_cart_info();
+		$cart_info = WC_Checkoutcom_Api_Request::get_cart_info(false);
 		$products  = [];
 
 		if ( $cart_info ) {
