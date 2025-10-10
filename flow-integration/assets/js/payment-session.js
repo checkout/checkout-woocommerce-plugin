@@ -33,7 +33,7 @@ var ckoFlow = {
 			return;
 		}
 		
-		console.log('🚀🚀🚀 PAYMENT-SESSION.JS LOADED - VERSION: 2025-10-11-00:05-DISCOUNT-CALCULATION-FIX 🚀🚀🚀');
+		console.log('🚀🚀🚀 PAYMENT-SESSION.JS LOADED - VERSION: 2025-10-11-00:15-SAVED-CARD-SUBMISSION-FIX 🚀🚀🚀');
 		
 		// Check if we're on a redirect page with payment parameters - if so, don't initialize Flow
 		const urlParams = new URLSearchParams(window.location.search);
@@ -1320,11 +1320,17 @@ document.addEventListener("DOMContentLoaded", function () {
 						// Place order for FLOW.
 						if (ckoFlow.flowComponent) {
 							// console.log('[CURRENT VERSION] Flow component exists');
+							
+							// Check if a saved card is actually selected (not just if saved cards are enabled)
+							const selectedSavedCard = jQuery('input[name="wc-wc_checkout_com_flow-payment-token"]:checked:not(#wc-wc_checkout_com_flow-payment-token-new)');
+							const savedCardSelected = selectedSavedCard.length > 0;
 							const savedCardEnabled = document.querySelector('[data-testid="checkout-web-component-root"]').classList.contains('saved-card-is-enabled');
+							
+							// console.log('[CURRENT VERSION] Saved card selected:', savedCardSelected);
 							// console.log('[CURRENT VERSION] Saved card enabled:', savedCardEnabled);
 							
-							if( savedCardEnabled ) {
-								// console.log('[CURRENT VERSION] Saved card enabled - submitting order-pay form directly');
+							if( savedCardSelected || savedCardEnabled ) {
+								// console.log('[CURRENT VERSION] Saved card selected/enabled - submitting order-pay form directly');
 								orderPayForm.submit();
 							} else {
 								// console.log('[CURRENT VERSION] No saved card - calling flow component submit');
@@ -1354,11 +1360,17 @@ document.addEventListener("DOMContentLoaded", function () {
 						// Place order for FLOW.
 						if (ckoFlow.flowComponent) {
 							// console.log('[CURRENT VERSION] Flow component exists for checkout');
+							
+							// Check if a saved card is actually selected (not just if saved cards are enabled)
+							const selectedSavedCard = jQuery('input[name="wc-wc_checkout_com_flow-payment-token"]:checked:not(#wc-wc_checkout_com_flow-payment-token-new)');
+							const savedCardSelected = selectedSavedCard.length > 0;
 							const savedCardEnabled = document.querySelector('[data-testid="checkout-web-component-root"]').classList.contains('saved-card-is-enabled');
+							
+							// console.log('[CURRENT VERSION] Saved card selected for checkout:', savedCardSelected);
 							// console.log('[CURRENT VERSION] Saved card enabled for checkout:', savedCardEnabled);
 							
-							if( savedCardEnabled ) {
-								// console.log('[CURRENT VERSION] Saved card enabled - submitting checkout form directly');
+							if( savedCardSelected || savedCardEnabled ) {
+								// console.log('[CURRENT VERSION] Saved card selected/enabled - submitting checkout form directly');
 								form.submit();
 							} else {
 								// console.log('[CURRENT VERSION] No saved card - calling flow component submit for checkout');
