@@ -1115,6 +1115,36 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		}
 
 		$order = new WC_Order( $order_id );
+		
+		// DUPLICATE PREVENTION: Check if this order has already been processed
+		$existing_transaction_id = $order->get_transaction_id();
+		$flow_payment_id = isset( $_POST['cko-flow-payment-id'] ) ? $_POST['cko-flow-payment-id'] : '';
+		
+		if ( ! empty( $existing_transaction_id ) ) {
+			WC_Checkoutcom_Utility::logger( 'DUPLICATE PREVENTION: Order ' . $order_id . ' already has transaction ID: ' . $existing_transaction_id . ' - skipping processing' );
+			
+			// Return success to prevent error, but don't process again
+			return array(
+				'result'   => 'success',
+				'redirect' => $this->get_return_url( $order ),
+			);
+		}
+		
+		// DUPLICATE PREVENTION: Check if this payment ID has already been processed
+		if ( ! empty( $flow_payment_id ) ) {
+			$existing_payment = $order->get_meta( '_cko_payment_id' );
+			if ( $existing_payment === $flow_payment_id ) {
+				WC_Checkoutcom_Utility::logger( 'DUPLICATE PREVENTION: Order ' . $order_id . ' already processed with payment ID: ' . $flow_payment_id . ' - skipping processing' );
+				
+				// Return success to prevent error, but don't process again
+				return array(
+					'result'   => 'success',
+					'redirect' => $this->get_return_url( $order ),
+				);
+			}
+		}
+		
+		WC_Checkoutcom_Utility::logger( 'Processing payment for order: ' . $order_id );
 
 		$flow_result = null;
 
@@ -1237,75 +1267,20 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			}
 
 			$flow_payment_type = isset( $_POST['cko-flow-payment-type'] ) ? sanitize_text_field( $_POST['cko-flow-payment-type'] ) : '';
-			$flow_3ds_status = isset( $_POST['cko-flow-3ds-status'] ) ? sanitize_text_field( $_POST['cko-flow-3ds-status'] ) : '';
-			$flow_3ds_auth_id = isset( $_POST['cko-flow-3ds-auth-id'] ) ? sanitize_text_field( $_POST['cko-flow-3ds-auth-id'] ) : '';
 
 			if ( "card" === $flow_payment_type ) {
 				$subs_payment_type = $flow_payment_type;
 			}
 
-			// Debug: Log all possible checkbox field names
-			WC_Checkoutcom_Utility::logger( '=== SAVE CARD DEBUG ===' );
-			WC_Checkoutcom_Utility::logger( 'Flow Payment Type: ' . $flow_payment_type );
-			WC_Checkoutcom_Utility::logger( 'Checking for save card checkbox...' );
-			WC_Checkoutcom_Utility::logger( 'wc-wc_checkout_com_flow-new-payment-method: ' . ( isset( $_POST['wc-wc_checkout_com_flow-new-payment-method'] ) ? $_POST['wc-wc_checkout_com_flow-new-payment-method'] : 'NOT SET' ) );
-			WC_Checkoutcom_Utility::logger( 'wc_checkout_com_flow-new-payment-method: ' . ( isset( $_POST['wc_checkout_com_flow-new-payment-method'] ) ? $_POST['wc_checkout_com_flow-new-payment-method'] : 'NOT SET' ) );
-			
-			// Check multiple possible checkbox names
-			$save_card_checkbox = false;
-			if ( isset( $_POST['wc-wc_checkout_com_flow-new-payment-method'] ) && $_POST['wc-wc_checkout_com_flow-new-payment-method'] === 'true' ) {
-				$save_card_checkbox = true;
-			} elseif ( isset( $_POST['wc-wc_checkout_com_flow-new-payment-method'] ) && $_POST['wc-wc_checkout_com_flow-new-payment-method'] === 'on' ) {
-				$save_card_checkbox = true;
-			} elseif ( isset( $_POST['wc_checkout_com_flow-new-payment-method'] ) ) {
-				$save_card_checkbox = true;
-			}
-			
-			WC_Checkoutcom_Utility::logger( 'Save card checkbox result: ' . ( $save_card_checkbox ? 'TRUE' : 'FALSE' ) );
+			$save_card_checkbox = isset( $_POST['wc-wc_checkout_com_flow-new-payment-method'] ) && $_POST['wc-wc_checkout_com_flow-new-payment-method'] === 'true';
 
 			if ( 'card' === $flow_payment_type && $save_card_checkbox ) {
-				WC_Checkoutcom_Utility::logger( 'Calling flow_save_cards()...' );
 				$this->flow_save_cards( $order, $flow_pay_id );
-			} else {
-				WC_Checkoutcom_Utility::logger( 'NOT calling flow_save_cards() - Type: ' . $flow_payment_type . ', Checkbox: ' . ( $save_card_checkbox ? 'TRUE' : 'FALSE' ) );
 			}
 
-			// Set payment ID as transaction ID (required for webhook processing)
-			$order->set_transaction_id( $flow_pay_id );
 			$order->update_meta_data( '_cko_payment_id', $flow_pay_id );
 			$order->update_meta_data( '_cko_flow_payment_id', $flow_pay_id );
 			$order->update_meta_data( '_cko_flow_payment_type', $flow_payment_type );
-			
-			// Log before saving
-			WC_Checkoutcom_Utility::logger( 'Before save - Transaction ID: ' . $order->get_transaction_id() . ', Order ID: ' . $order_id );
-			
-			// Save order immediately to ensure transaction ID is persisted for webhook processing
-			$save_result = $order->save();
-			
-			// Log after saving
-			WC_Checkoutcom_Utility::logger( 'After save - Save result: ' . ( $save_result ? 'SUCCESS' : 'FAILED' ) . ', Transaction ID: ' . $order->get_transaction_id() );
-			
-			// Also try to update the order directly in the database as a backup
-			global $wpdb;
-			$wpdb->update(
-				$wpdb->postmeta,
-				array( 'meta_value' => $flow_pay_id ),
-				array( 
-					'post_id' => $order_id,
-					'meta_key' => '_transaction_id'
-				)
-			);
-			
-			// Log payment ID setting for debugging
-			WC_Checkoutcom_Utility::logger( 'Flow payment ID set - Transaction ID: ' . $flow_pay_id . ', Order ID: ' . $order_id );
-			
-			// Store 3DS authentication data if present
-			if ( ! empty( $flow_3ds_status ) ) {
-				$order->update_meta_data( '_cko_flow_3ds_status', $flow_3ds_status );
-			}
-			if ( ! empty( $flow_3ds_auth_id ) ) {
-				$order->update_meta_data( '_cko_flow_3ds_auth_id', $flow_3ds_auth_id );
-			}
 
 			if ( ! in_array( $flow_payment_type, array( 'card', 'googlepay', 'applepay' ), true ) ) {
 				$order->update_meta_data( 'cko_payment_authorized', true );
@@ -1361,15 +1336,21 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		
 		// Log the redirect URL for debugging
 		WC_Checkoutcom_Utility::logger( 'Flow payment successful - redirecting to: ' . $return_url . ' (MOTO: ' . ( $is_moto_order ? 'YES' : 'NO' ) . ')' );
+		WC_Checkoutcom_Utility::logger( 'Order status updated to: ' . $status . ', Order ID: ' . $order_id );
+		WC_Checkoutcom_Utility::logger( 'Transaction ID set to: ' . $order->get_transaction_id() );
 
 		// Remove cart.
 		WC()->cart->empty_cart();
 
 		// Return thank you page.
-		return array(
+		$redirect_result = array(
 			'result'   => 'success',
 			'redirect' => $return_url,
 		);
+		
+		WC_Checkoutcom_Utility::logger( 'Returning redirect result: ' . print_r( $redirect_result, true ) );
+		
+		return $redirect_result;
 	}
 
 	/**

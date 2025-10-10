@@ -83,12 +83,65 @@ window.saved_payment = cko_flow_customization_vars.flow_saved_payment;
 
 document.addEventListener("DOMContentLoaded", function () {
 	if (show_card_holder_name === "yes") {
-		let family_name = document.getElementById("billing_last_name")?.value || "";
-		let given_name = document.getElementById("billing_first_name")?.value || "";
+		// Function to set cardholder name
+		function setCardholderName() {
+			let family_name = "";
+			let given_name = "";
+			
+			// Check if we're on order-pay page
+			const isOrderPayPage = window.location.pathname.includes('/order-pay/');
+			
+			if (isOrderPayPage) {
+				// For order-pay pages, get billing info from order data instead of form fields
+				// The order data is available in the cart-info or order-pay-info data attribute
+				let orderData = null;
+				
+				// Try to get order data from cart-info or order-pay-info
+				const cartInfoElement = document.getElementById("cart-info");
+				const orderPayInfoElement = document.getElementById("order-pay-info");
+				
+				if (orderPayInfoElement) {
+					orderData = orderPayInfoElement.getAttribute("data-order-pay");
+				} else if (cartInfoElement) {
+					orderData = cartInfoElement.getAttribute("data-cart");
+				}
+				
+				if (orderData) {
+					try {
+						const parsedData = JSON.parse(orderData);
+						
+						// Get billing info from order data
+						if (parsedData.billing_address) {
+							given_name = parsedData.billing_address.given_name || "";
+							family_name = parsedData.billing_address.family_name || "";
+						}
+					} catch (e) {
+						console.error('[FLOW CARDHOLDER] Error parsing order data:', e);
+					}
+				}
+				
+				// Fallback: try to get from form fields (even if disabled)
+				if (!given_name && !family_name) {
+					family_name = document.getElementById("billing_last_name")?.value || "";
+					given_name = document.getElementById("billing_first_name")?.value || "";
+				}
+			} else {
+				// For regular checkout pages, get from form fields
+				family_name = document.getElementById("billing_last_name")?.value || "";
+				given_name = document.getElementById("billing_first_name")?.value || "";
+			}
 
-		window.componentOptions.card.data = {
-			cardholderName: `${given_name} ${family_name}`.trim(),
-		};
+			const cardholderName = `${given_name} ${family_name}`.trim();
+			
+			if (cardholderName) {
+				window.componentOptions.card.data = {
+					cardholderName: cardholderName,
+				};
+			}
+		}
+		
+		// Set cardholder name immediately
+		setCardholderName();
 	}
 });
 

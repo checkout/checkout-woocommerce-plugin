@@ -1158,6 +1158,86 @@ function cko_validate_checkout() {
 	wp_send_json_success( array( 'message' => __( 'Validation successful', 'checkout-com-unified-payments-api' ) ) );
 }
 
+add_action( 'wp_ajax_cko_get_payment_session', 'cko_get_payment_session' );
+add_action( 'wp_ajax_nopriv_cko_get_payment_session', 'cko_get_payment_session' );
+
+/**
+ * Retrieves payment session details from Checkout.com via AJAX.
+ */
+function cko_get_payment_session() {
+	// Get the session ID from the request
+	$session_id = isset( $_REQUEST['session_id'] ) ? sanitize_text_field( $_REQUEST['session_id'] ) : '';
+	
+	if ( empty( $session_id ) ) {
+		wp_send_json_error( array( 'message' => __( 'Session ID is required', 'checkout-com-unified-payments-api' ) ) );
+	}
+	
+	WC_Checkoutcom_Utility::logger( '=== GET PAYMENT SESSION ===' );
+	WC_Checkoutcom_Utility::logger( 'Session ID: ' . $session_id );
+	
+	try {
+		// Get Checkout.com API settings
+		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$environment   = ! empty( $core_settings['ckocom_environment'] ) ? $core_settings['ckocom_environment'] : 'sandbox';
+		$secret_key    = $environment === 'sandbox' 
+			? ( ! empty( $core_settings['ckocom_sk'] ) ? $core_settings['ckocom_sk'] : '' )
+			: ( ! empty( $core_settings['ckocom_sk_live'] ) ? $core_settings['ckocom_sk_live'] : '' );
+		
+		if ( empty( $secret_key ) ) {
+			WC_Checkoutcom_Utility::logger( 'Error: Secret key not configured' );
+			wp_send_json_error( array( 'message' => __( 'Payment gateway not properly configured', 'checkout-com-unified-payments-api' ) ) );
+		}
+		
+		// Make API call to Checkout.com to get payment session details
+		$api_url = $environment === 'sandbox' 
+			? 'https://api.sandbox.checkout.com/payment-sessions/' . $session_id
+			: 'https://api.checkout.com/payment-sessions/' . $session_id;
+		
+		WC_Checkoutcom_Utility::logger( 'API URL: ' . $api_url );
+		
+		$response = wp_remote_get(
+			$api_url,
+			array(
+				'headers' => array(
+					'Authorization' => 'Bearer ' . $secret_key,
+					'Content-Type'  => 'application/json',
+				),
+				'timeout' => 30,
+			)
+		);
+		
+		if ( is_wp_error( $response ) ) {
+			WC_Checkoutcom_Utility::logger( 'WP Error: ' . $response->get_error_message() );
+			wp_send_json_error( array( 'message' => __( 'Could not retrieve payment session', 'checkout-com-unified-payments-api' ) ) );
+		}
+		
+		$body = wp_remote_retrieve_body( $response );
+		$data = json_decode( $body, true );
+		
+		WC_Checkoutcom_Utility::logger( 'API Response: ' . print_r( $data, true ) );
+		
+		// Check if we have payment data
+		if ( isset( $data['payment'] ) && isset( $data['payment']['id'] ) ) {
+			$payment_data = array(
+				'payment_id'      => $data['payment']['id'],
+				'payment_type'    => isset( $data['payment']['source']['type'] ) ? $data['payment']['source']['type'] : 'card',
+				'three_ds_status' => isset( $data['payment']['3ds']['status'] ) ? $data['payment']['3ds']['status'] : '',
+				'three_ds_auth_id' => isset( $data['payment']['3ds']['authentication_id'] ) ? $data['payment']['3ds']['authentication_id'] : '',
+			);
+			
+			WC_Checkoutcom_Utility::logger( 'Payment data extracted: ' . print_r( $payment_data, true ) );
+			
+			wp_send_json_success( $payment_data );
+		} else {
+			WC_Checkoutcom_Utility::logger( 'Error: Payment data not found in response' );
+			wp_send_json_error( array( 'message' => __( 'Payment data not found', 'checkout-com-unified-payments-api' ) ) );
+		}
+	} catch ( Exception $e ) {
+		WC_Checkoutcom_Utility::logger( 'Exception: ' . $e->getMessage() );
+		wp_send_json_error( array( 'message' => __( 'An error occurred while processing the payment session', 'checkout-com-unified-payments-api' ) ) );
+	}
+}
+
 /**
  * Register a custom REST API route for checking payment status.
  */

@@ -33,7 +33,23 @@ var ckoFlow = {
 			return;
 		}
 		
-		console.log('🚀🚀🚀 PAYMENT-SESSION.JS LOADED - VERSION: 2025-01-05-19:30 🚀🚀🚀');
+		console.log('🚀🚀🚀 PAYMENT-SESSION.JS LOADED - VERSION: 2025-01-10-23:10-PRODUCTION-READY 🚀🚀🚀');
+		
+		// Check if we're on a redirect page with payment parameters - if so, don't initialize Flow
+		const urlParams = new URLSearchParams(window.location.search);
+		const paymentId = urlParams.get("cko-payment-id");
+		const sessionId = urlParams.get("cko-session-id");
+		const status = urlParams.get("status");
+		
+		if ((paymentId || sessionId) && status === 'succeeded') {
+			console.log('[FLOW] ===== REDIRECT PAGE DETECTED - SKIPPING FLOW INITIALIZATION =====');
+			console.log('[FLOW] Payment ID:', paymentId);
+			console.log('[FLOW] Session ID:', sessionId);
+			console.log('[FLOW] Status:', status);
+			console.log('[FLOW] This is a 3DS payment completion - Flow initialization skipped');
+			console.log('[FLOW] Payment already processed successfully, redirect handler will handle the completion');
+			return;
+		}
 		
 		// Show skeleton loader and disable place order button
 		const skeleton = document.getElementById("flow-skeleton");
@@ -102,11 +118,12 @@ var ckoFlow = {
 		console.log('[FLOW DEBUG] Current URL pathname:', window.location.pathname);
 		console.log('[FLOW DEBUG] Current URL search:', window.location.search);
 		
-		// For MOTO orders (order-pay page), get order ID from URL if not in cartInfo
+		// For MOTO orders (order-pay page), get order ID from URL path if not in cartInfo
 		if ( ! orderId && window.location.pathname.includes('/order-pay/') ) {
-			const urlParams = new URLSearchParams(window.location.search);
-			orderId = urlParams.get('order_id') || urlParams.get('order-pay');
-			console.log('[FLOW DEBUG] MOTO order detected - Order ID from URL:', orderId);
+			// Extract order ID from URL path like /order-pay/4127/
+			const pathMatch = window.location.pathname.match(/\/order-pay\/(\d+)\//);
+			orderId = pathMatch ? pathMatch[1] : null;
+			console.log('[FLOW DEBUG] MOTO order detected - Order ID from URL path:', orderId);
 		}
 		
 		console.log('[FLOW DEBUG] Final orderId:', orderId);
@@ -275,8 +292,41 @@ var ckoFlow = {
 						country: shippingCountry,
 					},
 				},
-				success_url: window.location.origin + "/" + cko_flow_vars.checkoutSlug + "/?status=succeeded",
-				failure_url: window.location.origin + "/" + cko_flow_vars.checkoutSlug + "/?status=failed",
+				// Determine success and failure URLs based on current page
+				success_url: (() => {
+					const isOrderPayPage = window.location.pathname.includes('/order-pay/');
+					if (isOrderPayPage) {
+						// For order-pay pages, redirect to order-received page with order key
+						const orderId = window.location.pathname.match(/\/order-pay\/(\d+)\//)?.[1];
+						const orderKey = new URLSearchParams(window.location.search).get('key');
+						if (orderId && orderKey) {
+							return window.location.origin + "/checkout/order-received/" + orderId + "/?key=" + orderKey;
+						} else {
+							// Fallback to checkout page if order details not found
+							return window.location.origin + "/" + cko_flow_vars.checkoutSlug + "/?status=succeeded&from=order-pay";
+						}
+					} else {
+						// For regular checkout pages
+						return window.location.origin + "/" + cko_flow_vars.checkoutSlug + "/?status=succeeded";
+					}
+				})(),
+				failure_url: (() => {
+					const isOrderPayPage = window.location.pathname.includes('/order-pay/');
+					if (isOrderPayPage) {
+						// For order-pay pages, redirect to order-received page with order key
+						const orderId = window.location.pathname.match(/\/order-pay\/(\d+)\//)?.[1];
+						const orderKey = new URLSearchParams(window.location.search).get('key');
+						if (orderId && orderKey) {
+							return window.location.origin + "/checkout/order-received/" + orderId + "/?key=" + orderKey;
+						} else {
+							// Fallback to checkout page if order details not found
+							return window.location.origin + "/" + cko_flow_vars.checkoutSlug + "/?status=failed&from=order-pay";
+						}
+					} else {
+						// For regular checkout pages
+						return window.location.origin + "/" + cko_flow_vars.checkoutSlug + "/?status=failed";
+					}
+				})(),
 				metadata: metadata,
 				payment_method_configuration: {
 					card: {
@@ -318,6 +368,39 @@ var ckoFlow = {
 			// Update payment type in the request
 			paymentSessionRequest.payment_type = payment_type;
 			
+			// Simple implementation: For order-pay pages, always redirect to order-received page after 3DS
+			const isOrderPayPage = window.location.pathname.includes('/order-pay/');
+			if (isOrderPayPage) {
+				// Extract order ID and key from current order-pay URL
+				const orderId = window.location.pathname.match(/\/order-pay\/(\d+)\//)?.[1];
+				const orderKey = new URLSearchParams(window.location.search).get('key');
+				
+				if (orderId && orderKey) {
+					// Simple: Always redirect to order-received page after 3DS completion
+					const orderReceivedUrl = window.location.origin + "/checkout/order-received/" + orderId + "/?key=" + orderKey;
+					paymentSessionRequest.success_url = orderReceivedUrl;
+					paymentSessionRequest.failure_url = orderReceivedUrl;
+					console.log('[FLOW] 🎯 SIMPLE IMPLEMENTATION: Order-pay 3DS will redirect to order-received page');
+					console.log('[FLOW] Order ID:', orderId);
+					console.log('[FLOW] Order Key:', orderKey);
+					console.log('[FLOW] Success URL:', paymentSessionRequest.success_url);
+					console.log('[FLOW] Failure URL:', paymentSessionRequest.failure_url);
+				} else {
+					console.error('[FLOW] ❌ ERROR: Could not extract order ID or key from order-pay URL');
+					console.error('[FLOW] Current URL:', window.location.href);
+					console.error('[FLOW] Order ID found:', orderId);
+					console.error('[FLOW] Order Key found:', orderKey);
+					// Fallback to checkout page
+					paymentSessionRequest.success_url = window.location.origin + "/" + cko_flow_vars.checkoutSlug + "/?status=succeeded&from=order-pay";
+					paymentSessionRequest.failure_url = window.location.origin + "/" + cko_flow_vars.checkoutSlug + "/?status=failed&from=order-pay";
+				}
+			} else {
+				// For regular checkout, use the standard URLs
+				paymentSessionRequest.success_url = window.location.origin + "/" + cko_flow_vars.checkoutSlug + "/?status=succeeded";
+				paymentSessionRequest.failure_url = window.location.origin + "/" + cko_flow_vars.checkoutSlug + "/?status=failed";
+				console.log('[FLOW] Regular checkout - using standard success/failure URLs');
+			}
+			
 			// Add enabled_payment_methods if specified by merchant
 			// Only send if array has items (empty array means show all methods)
 			// For MOTO orders, hardcode to only show card payment method
@@ -357,6 +440,9 @@ var ckoFlow = {
 
 			// Debug: Log payment session response
 			console.log('[FLOW] Payment Session Response:', paymentSession);
+			
+			// Store payment session ID globally for access in callbacks
+			window.currentPaymentSessionId = paymentSession.id;
 
 			/*
 			 * Handle API Session errors returned from Checkout.com.
@@ -401,19 +487,20 @@ var ckoFlow = {
 					console.log('[FLOW PERFORMANCE] Initializing Checkout Web Component...');
 				}
 				
-		const checkout = await CheckoutWebComponents({
-			publicKey: cko_flow_vars.PKey,
+		// Debug: Log Flow component configuration
+		console.log('[FLOW] Flow Component Configuration:', {
+			publicKey: cko_flow_vars.PKey ? 'SET' : 'NOT SET',
 			environment: cko_flow_vars.env,
 			locale: window.locale,
-			paymentSession,
-			appearance: window.appearance,
-			componentOptions: window.componentOptions,
-			translations: window.translations,
-			/*
-			 * Called when the component is ready.
-			 * Validate WooCommerce checkout before showing payment UI.
-			 */
-			onReady: () => {
+			paymentSessionId: paymentSession.id,
+			paymentSessionSecret: paymentSession.payment_session_secret ? 'SET' : 'NOT SET',
+			appearance: window.appearance ? 'SET' : 'NOT SET',
+			componentOptions: window.componentOptions ? 'SET' : 'NOT SET',
+			translations: window.translations ? 'SET' : 'NOT SET'
+		});
+		
+		// Define callback functions BEFORE passing them to CheckoutWebComponents
+		const onReady = () => {
 				try {
 					console.log('🔥🔥🔥 [FLOW] onReady FIRED! 🔥🔥🔥');
 					hideLoadingOverlay();
@@ -485,148 +572,90 @@ var ckoFlow = {
 					console.error('❌❌❌ [FLOW] onReady ERROR:', error);
 					console.error('Error stack:', error.stack);
 				}
-			},
+			};
 
 		/*
 		 * Called when the payment is completed successfully.
 		 */
-		onPaymentCompleted: (_component, paymentResponse) => {
-						console.log('[FLOW] ===== onPaymentCompleted CALLED =====');
-						console.log('[FLOW] onPaymentCompleted called with response:', paymentResponse);
-						console.log('[FLOW] Current URL:', window.location.href);
-						console.log('[FLOW] Is order-pay page:', window.location.pathname.includes('/order-pay/'));
-						
-						if (paymentResponse.id) {
-							hideLoadingOverlay(2);
+		const onPaymentCompleted = (_component, paymentResponse) => {
+		
+		// Check if this is a 3DS authentication response
+		if (paymentResponse.threeDs && paymentResponse.threeDs.challenged) {
+			// 3DS challenge detected - user will be redirected to 3DS page
+			return;
+		}
+			
+			if (paymentResponse.id) {
+				hideLoadingOverlay(2);
 
-							// Set the hidden input values.
-							jQuery("#cko-flow-payment-id").val(paymentResponse.id);
-							jQuery("#cko-flow-payment-type").val(paymentResponse?.type || "");
-							
-							console.log('[FLOW] ✅ Payment ID set:', paymentResponse.id);
-							console.log('[FLOW] ✅ Payment type set:', paymentResponse?.type || "");
-							
-							// Handle 3DS authentication if present
-							if (paymentResponse.three_ds && paymentResponse.three_ds.status) {
-								jQuery("#cko-flow-3ds-status").val(paymentResponse.three_ds.status);
-								if (paymentResponse.three_ds.authentication_id) {
-									jQuery("#cko-flow-3ds-auth-id").val(paymentResponse.three_ds.authentication_id);
-								}
-							}
-							
-							// CRITICAL: Capture "Save to Account" checkbox value
-							// The checkbox needs to be set to 'true' (string) for PHP to process it
-							const saveCardCheckbox = jQuery('#wc-wc_checkout_com_flow-new-payment-method');
-							console.log('[FLOW DEBUG] ====== SAVE CARD CHECKBOX DEBUG ======');
-							console.log('[FLOW DEBUG] Save checkbox element found:', saveCardCheckbox.length > 0);
-							console.log('[FLOW DEBUG] Save checkbox is checked:', saveCardCheckbox.is(':checked'));
-							console.log('[FLOW DEBUG] Save checkbox current value:', saveCardCheckbox.val());
-							console.log('[FLOW DEBUG] Save checkbox name:', saveCardCheckbox.attr('name'));
-							console.log('[FLOW DEBUG] Save checkbox type:', saveCardCheckbox.attr('type'));
-							console.log('[FLOW DEBUG] Save checkbox visible:', saveCardCheckbox.is(':visible'));
-							
-							// CRITICAL: Unselect any saved card tokens since we're using Flow for new payment
-							// This prevents the backend from thinking we're using a saved card
-							jQuery('input[name="wc-wc_checkout_com_flow-payment-token"]').prop('checked', false);
-							console.log('[FLOW] Unchecked all saved card tokens - using Flow for new payment');
-							
-							if (saveCardCheckbox.length && saveCardCheckbox.is(':checked')) {
-								// Set checkbox value explicitly to 'true' string as expected by PHP
-								saveCardCheckbox.val('true');
-								console.log('[FLOW] ✅ Save to Account checkbox is checked - will save card');
-								console.log('[FLOW DEBUG] Save checkbox value after setting:', saveCardCheckbox.val());
-								console.log('[FLOW DEBUG] Save checkbox prop checked:', saveCardCheckbox.prop('checked'));
-							} else {
-								console.log('[FLOW] ❌ Save to Account checkbox is NOT checked - will not save card');
-								console.log('[FLOW DEBUG] Checkbox length:', saveCardCheckbox.length);
-								console.log('[FLOW DEBUG] Checkbox is checked:', saveCardCheckbox.is(':checked'));
-							}
-							console.log('[FLOW DEBUG] ====================================');
+				// Set the hidden input values.
+				jQuery("#cko-flow-payment-id").val(paymentResponse.id);
+				jQuery("#cko-flow-payment-type").val(paymentResponse?.type || "");
 
-							// CRITICAL: Don't submit form here - let the normal form submission handle it
-							// The Flow component has already processed the payment, now we need to let
-							// the normal WooCommerce form submission trigger the process_payment method
-							console.log('[FLOW] Payment completed - Flow component handled payment, now submitting form for backend processing');
-							
-							// Detect if this is a MOTO order (order-pay page) or regular checkout
-							const isOrderPayPage = window.location.pathname.includes('/order-pay/');
-							const orderPayForm = jQuery('form#order_review');
-							const checkoutForm = jQuery("form.checkout");
-							
-							
-							if ( isOrderPayPage && orderPayForm.length > 0 ) {
-								// Check if this is a MOTO order
-								const orderPayInfo = jQuery("#order-pay-info")?.data("order-pay");
-								const isMotoOrder = orderPayInfo?.payment_type === 'MOTO';
-								console.log('[FLOW] Submitting order pay form for redirect to order confirmation (MOTO: ' + (isMotoOrder ? 'YES' : 'NO') + ')');
-								
-								// Debug: Log form data before submission
-								console.log('[FLOW] Form action URL:', orderPayForm.attr('action'));
-								console.log('[FLOW] Form method:', orderPayForm.attr('method'));
-								console.log('[FLOW] Payment ID in form:', jQuery("#cko-flow-payment-id").val());
-								console.log('[FLOW] Payment type in form:', jQuery("#cko-flow-payment-type").val());
-								
-								// Submit form immediately for proper redirection
-								console.log('[FLOW] ===== SUBMITTING ORDER PAY FORM =====');
-								console.log('[FLOW] About to submit order pay form...');
-								console.log('[FLOW] Form element:', orderPayForm[0]);
-								console.log('[FLOW] Form action:', orderPayForm.attr('action'));
-								console.log('[FLOW] Form method:', orderPayForm.attr('method'));
-								console.log('[FLOW] Payment ID being submitted:', jQuery("#cko-flow-payment-id").val());
-								
-								// Add event listener to track form submission
-								orderPayForm.on('submit', function(e) {
-									console.log('[FLOW] ===== FORM SUBMIT EVENT TRIGGERED =====');
-									console.log('[FLOW] Form submit event fired');
-									console.log('[FLOW] Event target:', e.target);
-									console.log('[FLOW] Form data being submitted:', orderPayForm.serialize());
-								});
-								
-								orderPayForm.submit();
-							} else {
-								// Regular checkout - submit checkout form
-								console.log('[FLOW] Submitting checkout form for redirect to order confirmation');
-								checkoutForm.submit();
-							}
-						} else {
-							console.error('[FLOW] ❌ Payment response missing ID:', paymentResponse);
-							console.error('[FLOW] ❌ Payment response keys:', Object.keys(paymentResponse || {}));
-							showError('Payment response is missing required data. Please try again.');
-						}
-					},
+				if ( ! orderId ) {
+					// Trigger WooCommerce order placement on checkout page.
+					jQuery("form.checkout").submit();
+				} else {
+					// For order-pay pages, submit the order-pay form
+					jQuery('form#order_review').submit();
+				}
+			}
+		};
 
 				/*
 				 * Triggered when user submits the payment using Place Order Button of Woocommerce.
 				 */
-				onSubmit: async (component) => {
-					console.log("[FLOW] ===== onSubmit START =====");
-					console.log("[FLOW] Payment Button Submitted");
-					console.log("[FLOW] Component state:", {
-						type: component.type,
-						selectedType: component.selectedType,
-						isValid: component.isValid ? component.isValid() : 'unknown'
-					});
+				const onSubmit = async (component) => {
 					showLoadingOverlay(2);
-						
-						// CRITICAL: Save checkbox state before potential 3DS redirect
-						const saveCardCheckbox = jQuery('#wc-wc_checkout_com_flow-new-payment-method');
-						if (saveCardCheckbox.length && saveCardCheckbox.is(':checked')) {
-							sessionStorage.setItem('cko_save_card_checked', 'true');
-							console.log('[FLOW] onSubmit - Saved checkbox state to sessionStorage');
-						} else {
-							sessionStorage.removeItem('cko_save_card_checked');
-							console.log('[FLOW] onSubmit - Cleared checkbox state from sessionStorage');
-						}
-
-						return { continue: true };
-					},
+					return { continue: true };
+				};
 
 				/*
 				 * Triggered on component state change.
 				 */
-				onChange: (component) => {
-
+				const onChange = (component) => {
 					hideLoadingOverlay();
+					
+					// Initialize tracking variables if not exists
+					if (!window.onChangeTracking) {
+						window.onChangeTracking = {
+							lastState: {},
+							lastProcessedTime: 0,
+							processingCount: 0
+						};
+					}
+					
+					const now = Date.now();
+					const currentState = {
+						selectedType: component.selectedType,
+						componentType: component.type,
+						isValid: component.isValid ? component.isValid() : false
+					};
+					
+					// Check if state has actually changed
+					const stateChanged = (
+						window.onChangeTracking.lastState.selectedType !== currentState.selectedType ||
+						window.onChangeTracking.lastState.componentType !== currentState.componentType ||
+						window.onChangeTracking.lastState.isValid !== currentState.isValid
+					);
+					
+					// Rate limiting: don't process more than once every 50ms
+					const timeSinceLastProcess = now - window.onChangeTracking.lastProcessedTime;
+					const shouldRateLimit = timeSinceLastProcess < 50;
+					
+					// Only process if state actually changed AND enough time has passed
+					if (!stateChanged || shouldRateLimit) {
+						window.onChangeTracking.processingCount++;
+						if (window.onChangeTracking.processingCount % 10 === 0) {
+							console.log(`[FLOW] onChange - Skipped ${window.onChangeTracking.processingCount} duplicate events`);
+						}
+						return;
+					}
+					
+					// Update tracking
+					window.onChangeTracking.lastState = { ...currentState };
+					window.onChangeTracking.lastProcessedTime = now;
+					window.onChangeTracking.processingCount = 0;
 					
 					console.log('[FLOW] ===== onChange START =====');
 					console.log('[FLOW] onChange - Selected Type:', component.selectedType);
@@ -639,72 +668,72 @@ var ckoFlow = {
 					// fires on initial load. Instead, we use click/focus/input listeners
 					// to detect actual user interaction with Flow fields.
 
-						const hiddenTypes = [
-							"applepay",
-							"googlepay",
-							"octopus",
-							"paypal",
-							"twint",
-							"venmo",
-							"wechatpay"
-						];
+					const hiddenTypes = [
+						"applepay",
+						"googlepay",
+						"octopus",
+						"paypal",
+						"twint",
+						"venmo",
+						"wechatpay"
+					];
 
-			const placeOrderButton = document.querySelector("#place_order");
+					const placeOrderButton = document.querySelector("#place_order");
 
-		// Hide place order button on digital wallets.
-		if (hiddenTypes.includes(component.selectedType)) {
-			if (placeOrderButton) placeOrderButton.style.display = "none";
-			console.log('[FLOW] onChange - Hiding Place Order button');
-		} else {
-			if (placeOrderButton) placeOrderButton.style.display = "block";
-			console.log('[FLOW] onChange - Showing Place Order button');
-		}
+					// Hide place order button on digital wallets.
+					if (hiddenTypes.includes(component.selectedType)) {
+						if (placeOrderButton) placeOrderButton.style.display = "none";
+						console.log('[FLOW] onChange - Hiding Place Order button');
+					} else {
+						if (placeOrderButton) placeOrderButton.style.display = "block";
+						console.log('[FLOW] onChange - Showing Place Order button');
+					}
 					
 					console.log('[FLOW] ===== onChange END =====');
 						
-						// Pre-validate for apple pay.
-						if ( component.selectedType === "applepay" ) {
-							const applePayButton = document.querySelector('button[aria-label="Apple Pay"]');
-							applePayButton.disabled = true;
+					// Pre-validate for apple pay.
+					if ( component.selectedType === "applepay" ) {
+						const applePayButton = document.querySelector('button[aria-label="Apple Pay"]');
+						applePayButton.disabled = true;
 
-							const form = jQuery("form.checkout");
+						const form = jQuery("form.checkout");
 
-							if ( ! orderId ) {
-								validateCheckout(form, function (response) {
-									applePayButton.disabled = false;
-								});
-							}
+						if ( ! orderId ) {
+							validateCheckout(form, function (response) {
+								applePayButton.disabled = false;
+							});
 						}
+					}
 
-						// Control Save to Account checkbox visibility based on payment type
-						const saveCardCheckbox = jQuery('.cko-save-card-checkbox');
-						if ( saveCardCheckbox.length > 0 ) {
-							if ( component.selectedType === "card" ) {
-								saveCardCheckbox.addClass('wc-cko-flow-card-on');
-								saveCardCheckbox.css('display', 'block'); // Use .css() to set inline style
-								saveCardCheckbox.show();
-								console.log('[FLOW] onChange - Showing Save to Account checkbox for CARD');
-							} else {
-								saveCardCheckbox.removeClass('wc-cko-flow-card-on');
-								saveCardCheckbox.css('display', 'none'); // Use .css() to set inline style
-								saveCardCheckbox.hide();
-								console.log('[FLOW] onChange - Hiding Save to Account checkbox for', component.selectedType);
-							}
+					// Control Save to Account checkbox visibility based on payment type
+					const saveCardCheckbox = jQuery('.cko-save-card-checkbox');
+					if ( saveCardCheckbox.length > 0 ) {
+						if ( component.selectedType === "card" ) {
+							saveCardCheckbox.addClass('wc-cko-flow-card-on');
+							saveCardCheckbox.css('display', 'block'); // Use .css() to set inline style
+							saveCardCheckbox.show();
+							console.log('[FLOW] onChange - Showing Save to Account checkbox for CARD');
 						} else {
-							console.log('[FLOW] onChange - Save card checkbox not available (feature disabled)');
+							saveCardCheckbox.removeClass('wc-cko-flow-card-on');
+							saveCardCheckbox.css('display', 'none'); // Use .css() to set inline style
+							saveCardCheckbox.hide();
+							console.log('[FLOW] onChange - Hiding Save to Account checkbox for', component.selectedType);
 						}
+					} else {
+						console.log('[FLOW] onChange - Save card checkbox not available (feature disabled)');
+					}
 
-						console.log(
-							`[FLOW] onChange() -> isValid: "${component.isValid()}" for "${
-								component.type
-							}"`
-						);
-					},
+					console.log(
+						`[FLOW] onChange() -> isValid: "${component.isValid()}" for "${
+							component.type
+						}"`
+					);
+				};
 
 					/*
 					 * Triggered on component click.
 					 */
-					handleClick: (component) => {
+					const handleClick = (component) => {
 
 						if(component.type==="applepay") {
 							return {continue: true};
@@ -721,12 +750,12 @@ var ckoFlow = {
 								resolve({ continue: true });
 							});
 						});
-					},
+					};
 
 				/*
 				 * Triggered on any error in the component.
 				 */
-				onError: (component, error) => {
+				const onError = (component, error) => {
 					console.log("[FLOW] onError", error, "Component", component.type);
 
 					// Hide loading overlay and skeleton.
@@ -758,8 +787,37 @@ var ckoFlow = {
 									"checkout-com-unified-payments-api"
 								)
 						);
-					},
-				});
+					};
+
+		// Debug: Log callback functions
+		console.log('[FLOW] Callback Functions:', {
+			onReady: typeof onReady,
+			onPaymentCompleted: typeof onPaymentCompleted,
+			onSubmit: typeof onSubmit,
+			onChange: typeof onChange,
+			handleClick: typeof handleClick,
+			onError: typeof onError
+		});
+		
+		// Debug: Make onPaymentCompleted globally accessible for testing
+		window.testOnPaymentCompleted = onPaymentCompleted;
+		console.log('[FLOW] onPaymentCompleted callback is now globally accessible as window.testOnPaymentCompleted');
+		
+		const checkout = await CheckoutWebComponents({
+			publicKey: cko_flow_vars.PKey,
+			environment: cko_flow_vars.env,
+			locale: window.locale,
+			paymentSession,
+			appearance: window.appearance,
+			componentOptions: window.componentOptions,
+			translations: window.translations,
+			onReady,
+			onPaymentCompleted,
+			onSubmit,
+			onChange,
+			handleClick,
+			onError
+		});
 
 				const flowComponent = checkout.create(window.componentName, {
 					showPayButton: false,
@@ -1245,33 +1303,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
 			// If the Flow payment method is selected, proceed with validation and order placement.
 			if (flowPayment && flowPayment.checked) {
-				
-				// CRITICAL: Check if a saved card is selected AND if user hasn't interacted with Flow
-				const savedCardSelected = jQuery('input[name="wc-wc_checkout_com_flow-payment-token"]:checked');
-				const isUsingSavedCard = savedCardSelected.length > 0 && savedCardSelected.attr('id') !== 'wc-wc_checkout_com_flow-payment-token-new';
-				const userInteractedWithFlow = window.flowUserInteracted === true;
-				const savedCardFlagSet = window.flowSavedCardSelected === true;
-				
-				console.log('[FLOW] Place Order Check - Saved card selected:', isUsingSavedCard);
-				console.log('[FLOW] Place Order Check - Saved card ID:', savedCardSelected.attr('id'));
-				console.log('[FLOW] Place Order Check - User interacted with Flow:', userInteractedWithFlow);
-				console.log('[FLOW] Place Order Check - Saved card flag set:', savedCardFlagSet);
-				
-				// If using saved card AND user hasn't interacted with Flow, let WooCommerce handle it
-				if ((isUsingSavedCard || savedCardFlagSet) && !userInteractedWithFlow) {
-					console.log('[FLOW] ✅ Using saved card (no Flow interaction) - allowing normal WooCommerce submission');
-					console.log('[FLOW] Returning early - no Flow validation needed');
-					// Don't prevent default, let form submit normally through WooCommerce
-					return;
-				}
-				
-				// If user interacted with Flow, unselect saved cards and use Flow
-				if (userInteractedWithFlow) {
-					console.log('[FLOW] User interacted with Flow - will use Flow payment');
-					jQuery('input[name="wc-wc_checkout_com_flow-payment-token"]').prop('checked', false);
-				}
-				
-				// Only prevent default and use Flow logic if NOT using saved card OR user interacted with Flow
 				event.preventDefault();
 
 				const form = jQuery("form.checkout");
@@ -1282,210 +1313,78 @@ document.addEventListener("DOMContentLoaded", function () {
 					const orderPayForm = jQuery('form#order_review');
 
 					if (window.location.pathname.includes('/' + orderPaySlug + '/')) {
+						// console.log('[CURRENT VERSION] Order-pay page confirmed, showing flow container');
 
 						document.getElementById("flow-container").style.display = "block";
-						
-						// Check if Flow component is loaded
-						if (!ckoFlow.flowComponent) {
-							console.log('[FLOW] Order-pay page - Flow component not loaded yet, waiting...');
-							// Wait a bit for Flow component to load
-							setTimeout(() => {
-								if (!ckoFlow.flowComponent) {
-									console.error('[FLOW] Order-pay page - Flow component failed to load');
-									showError('Payment form failed to load. Please refresh the page and try again.');
-								}
-							}, 3000);
-						}
 
-						// Check if a saved card is selected AND if Flow component is valid
-						const savedCardSelected = jQuery('input[name="wc-wc_checkout_com_flow-payment-token"]:checked');
-						const isUsingSavedCard = savedCardSelected.length > 0 && savedCardSelected.attr('id') !== 'wc-wc_checkout_com_flow-payment-token-new';
-						
-						// Check if Flow component has valid data (user has entered payment details)
-						const flowHasData = ckoFlow.flowComponent && document.querySelector('[data-testid="checkout-web-component-root"]');
-						
-						console.log('[FLOW] Order Pay - Saved card selected:', isUsingSavedCard);
-						console.log('[FLOW] Order Pay - Flow has data:', !!flowHasData);
-						console.log('[FLOW] Order Pay - Flow component exists:', !!ckoFlow.flowComponent);
-						console.log('[FLOW] Order Pay - Flow component valid:', !!(ckoFlow.flowComponent && ckoFlow.flowComponent.isValid && ckoFlow.flowComponent.isValid()));
-
-						// CRITICAL: Only use saved card if selected AND Flow doesn't have new payment data
-						if (isUsingSavedCard && !flowHasData) {
-							console.log('[FLOW] Submitting order pay form with saved card (Flow not used)');
-							orderPayForm.submit();
-							return;
-						}
-
-						// Place order for FLOW (new payment method).
-						// Check if Flow component is available and has payment data
-						if (ckoFlow.flowComponent && ckoFlow.flowComponent.isValid && ckoFlow.flowComponent.isValid()) {
-							console.log('[FLOW] Order-pay page - Flow component is valid, submitting via Flow');
-							ckoFlow.flowComponent.submit();
-						} else {
-							console.log('[FLOW] Order-pay page - Flow component not ready, showing error');
-							console.log('[FLOW] Order-pay page - Component exists:', !!ckoFlow.flowComponent);
-							console.log('[FLOW] Order-pay page - isValid method exists:', !!(ckoFlow.flowComponent && ckoFlow.flowComponent.isValid));
-							if (ckoFlow.flowComponent && ckoFlow.flowComponent.isValid) {
-								console.log('[FLOW] Order-pay page - isValid result:', ckoFlow.flowComponent.isValid());
+						// Place order for FLOW.
+						if (ckoFlow.flowComponent) {
+							// console.log('[CURRENT VERSION] Flow component exists');
+							const savedCardEnabled = document.querySelector('[data-testid="checkout-web-component-root"]').classList.contains('saved-card-is-enabled');
+							// console.log('[CURRENT VERSION] Saved card enabled:', savedCardEnabled);
+							
+							if( savedCardEnabled ) {
+								// console.log('[CURRENT VERSION] Saved card enabled - submitting order-pay form directly');
+								orderPayForm.submit();
+							} else {
+								// console.log('[CURRENT VERSION] No saved card - calling flow component submit');
+								ckoFlow.flowComponent.submit();
 							}
-							showError('Payment form is not ready. Please wait a moment and try again.');
-							return;
+						} else {
+							// console.log('[CURRENT VERSION] No flow component found');
+						}
+
+						// Place order for saved card.
+						if (!ckoFlow.flowComponent) {
+							// console.log('[CURRENT VERSION] No flow component - submitting order-pay form for saved card');
+							orderPayForm.submit();
 						}
 						
+					} else {
+						// console.log('[CURRENT VERSION] Not an order-pay page, skipping');
 					}
 				} else {
-					
-					console.log('[FLOW] Checkpoint: Reached validation block');
+					// console.log('[CURRENT VERSION] Checkout form found - handling regular checkout');
 
-					// CRITICAL: Double-check saved card status before validation
-					const savedCardSelectedCheck = jQuery('input[name="wc-wc_checkout_com_flow-payment-token"]:checked');
-					const isUsingSavedCardCheck = savedCardSelectedCheck.length > 0 && savedCardSelectedCheck.attr('id') !== 'wc-wc_checkout_com_flow-payment-token-new';
-					const userInteractedWithFlowCheck = window.flowUserInteracted === true;
-					
-					console.log('[FLOW] Validation Checkpoint - Saved card:', isUsingSavedCardCheck, 'Flow interaction:', userInteractedWithFlowCheck);
-					
-					// If using saved card and no Flow interaction, submit form directly (skip validation)
-					if (isUsingSavedCardCheck && !userInteractedWithFlowCheck) {
-						console.log('[FLOW] ✅ Checkpoint: Submitting with saved card, skipping Flow validation');
-						form.submit();
-						return;
-					}
-
-					// Validate checkout before proceeding with Flow payment
-					console.log('[FLOW] Proceeding with Flow validation...');
+					// Validate checkout before proceeding.
 					validateCheckout(form, function (response) {
+						// console.log('[CURRENT VERSION] Checkout validation response:', response);
 						document.getElementById("flow-container").style.display = "block";
 
-						// Check if a saved card is selected AND if Flow component is valid
-						const savedCardSelected = jQuery('input[name="wc-wc_checkout_com_flow-payment-token"]:checked');
-						const isUsingSavedCard = savedCardSelected.length > 0 && savedCardSelected.attr('id') !== 'wc-wc_checkout_com_flow-payment-token-new';
-						const savedCardFlagSet = window.flowSavedCardSelected === true;
-						
-						// Check if Flow component has valid data (user has entered payment details)
-						const flowHasData = ckoFlow.flowComponent && document.querySelector('[data-testid="checkout-web-component-root"]');
-						
-						console.log('[FLOW] Place Order - Saved card selected:', isUsingSavedCard);
-						console.log('[FLOW] Place Order - Saved card flag set:', savedCardFlagSet);
-						console.log('[FLOW] Place Order - Flow has data:', !!flowHasData);
-
-						// CRITICAL: Only use saved card if selected AND Flow doesn't have new payment data
-						// If user has entered data in Flow, use Flow even if a saved card is selected
-						if ((isUsingSavedCard || savedCardFlagSet) && !flowHasData) {
-							console.log('[FLOW] Submitting form with saved card (Flow not used)');
-							form.submit();
-							return;
+						// Place order for FLOW.
+						if (ckoFlow.flowComponent) {
+							// console.log('[CURRENT VERSION] Flow component exists for checkout');
+							const savedCardEnabled = document.querySelector('[data-testid="checkout-web-component-root"]').classList.contains('saved-card-is-enabled');
+							// console.log('[CURRENT VERSION] Saved card enabled for checkout:', savedCardEnabled);
+							
+							if( savedCardEnabled ) {
+								// console.log('[CURRENT VERSION] Saved card enabled - submitting checkout form directly');
+								form.submit();
+							} else {
+								// console.log('[CURRENT VERSION] No saved card - calling flow component submit for checkout');
+								ckoFlow.flowComponent.submit();
+							}
+						} else {
+							// console.log('[CURRENT VERSION] No flow component found for checkout');
 						}
 
-						// Place order for FLOW (new payment method).
-						if (ckoFlow.flowComponent && ckoFlow.flowComponent.isValid && ckoFlow.flowComponent.isValid()) {
-							console.log('[FLOW] Submitting via Flow component (new payment)');
-							ckoFlow.flowComponent.submit();
-						} else {
-							// Flow component not ready - show error instead of submitting empty form
-							console.log('[FLOW] Flow component not ready - Component exists:', !!ckoFlow.flowComponent);
-							console.log('[FLOW] Flow component not ready - isValid method exists:', !!(ckoFlow.flowComponent && ckoFlow.flowComponent.isValid));
-							if (ckoFlow.flowComponent && ckoFlow.flowComponent.isValid) {
-								console.log('[FLOW] Flow component not ready - isValid result:', ckoFlow.flowComponent.isValid());
-							}
-							showError('Payment form is not ready. Please wait a moment and try again.');
-							return;
+						// Place order for saved card.
+						if (!ckoFlow.flowComponent) {
+							// console.log('[CURRENT VERSION] No flow component - submitting checkout form for saved card');
+							form.submit();
 						}
 					});
 
 				}
+			} else {
+				// console.log('[CURRENT VERSION] Flow payment method not selected or not found');
 			}
 		}
 	});
 });
 
-/**
- * Handle asynchronous payment return flow.
- * This checks for a payment ID in the URL, verifies its status via an API call,
- * and either submits the checkout form or displays an error.
- */
+// Removed complex 3DS redirect handling - keeping it simple like the working version
 
-// Extract the 'cko-payment-id' parameter from the URL query string.
-const paymentId = new URLSearchParams(window.location.search).get(
-	"cko-payment-id"
-);
-// Proceed only if a payment ID is found.
-if (paymentId) {
-
-	// Fetch payment status from the server using the async endpoint.
-	fetch(`${cko_flow_vars.async_url}?paymentId=${paymentId}`)
-		.then((res) => res.json())
-		.then((data) => {
-
-			// If payment is approved, set hidden fields with the payment data and submit checkout form.
-			if (data.approved) {
-				jQuery("#cko-flow-payment-id").val(data.id);
-				jQuery("#cko-flow-payment-type").val(data.source?.type || "");
-				
-				// Handle 3DS authentication data if present
-				if (data.three_ds && data.three_ds.status) {
-					jQuery("#cko-flow-3ds-status").val(data.three_ds.status);
-					if (data.three_ds.authentication_id) {
-						jQuery("#cko-flow-3ds-auth-id").val(data.three_ds.authentication_id);
-					}
-				}
-				
-			// CRITICAL: Unselect any saved card tokens for async payments
-			jQuery('input[name="wc-wc_checkout_com_flow-payment-token"]').prop('checked', false);
-			console.log('[FLOW] Async payment - Unchecked all saved card tokens');
-			
-			// CRITICAL: Restore and capture "Save to Account" checkbox value for async payments
-			const saveCardCheckbox = jQuery('#wc-wc_checkout_com_flow-new-payment-method');
-			console.log('[FLOW DEBUG ASYNC] ====== SAVE CARD CHECKBOX DEBUG (ASYNC) ======');
-			console.log('[FLOW DEBUG ASYNC] Save checkbox found:', saveCardCheckbox.length > 0);
-			
-			// CRITICAL: Restore checkbox state from sessionStorage (set before 3DS redirect)
-			const wasSaveCardChecked = sessionStorage.getItem('cko_save_card_checked') === 'true';
-			console.log('[FLOW DEBUG ASYNC] Checkbox state from sessionStorage:', wasSaveCardChecked);
-			console.log('[FLOW DEBUG ASYNC] Save checkbox is checked (before restore):', saveCardCheckbox.is(':checked'));
-			
-			if (saveCardCheckbox.length && wasSaveCardChecked) {
-				// Restore the checkbox state
-				saveCardCheckbox.prop('checked', true);
-				saveCardCheckbox.val('true');
-				console.log('[FLOW] ✅ Async payment - Restored "Save to Account" checkbox state');
-				console.log('[FLOW DEBUG ASYNC] Save checkbox is checked (after restore):', saveCardCheckbox.is(':checked'));
-				console.log('[FLOW DEBUG ASYNC] Save checkbox value after setting:', saveCardCheckbox.val());
-				
-				// Clear sessionStorage after use
-				sessionStorage.removeItem('cko_save_card_checked');
-			} else if (saveCardCheckbox.length && saveCardCheckbox.is(':checked')) {
-				// Checkbox is already checked (edge case)
-				saveCardCheckbox.val('true');
-				console.log('[FLOW] ✅ Async payment - Save to Account checkbox is already checked');
-				console.log('[FLOW DEBUG ASYNC] Save checkbox value after setting:', saveCardCheckbox.val());
-			} else {
-				console.log('[FLOW] ❌ Async payment - Save to Account checkbox is NOT checked');
-			}
-			console.log('[FLOW DEBUG ASYNC] ===============================================');
-
-				jQuery("form.checkout").submit();
-			} else {
-
-				// If payment is not approved, show an error message to the user.
-				showError(
-					wp.i18n.__(
-						"Payment Failed. Please try some another payment method.",
-						"checkout-com-unified-payments-api"
-					)
-				);
-
-				// Clean up the URL by removing the query parameters.
-				const urlWithoutQuery =
-					window.location.origin + window.location.pathname;
-				window.history.replaceState({}, document.title, urlWithoutQuery);
-			}
-		})
-		.catch((err) => {
-
-			// Log any network or parsing errors in the console.
-			console.error("Error fetching payment status:", err);
-		});
-}
 let virtual = false;
 /**
  * Handle checkout flow-container rendering on various field changes.
@@ -1849,3 +1748,61 @@ document.addEventListener('DOMContentLoaded', function () {
 		});
 	}
 });
+
+/**
+ * Handle asynchronous payment return flow.
+ * This checks for a payment ID in the URL, verifies its status via an API call,
+ * and either submits the checkout form or displays an error.
+ */
+
+// Extract the 'cko-payment-id' parameter from the URL query string.
+const paymentId = new URLSearchParams(window.location.search).get(
+	"cko-payment-id"
+);
+// Async payment handler - handles 3DS redirects
+
+
+// Proceed only if a payment ID is found.
+if (paymentId) {
+
+	// Fetch payment status from the server using the async endpoint.
+	fetch(`${cko_flow_vars.async_url}?paymentId=${paymentId}`)
+		.then((res) => res.json())
+		.then((data) => {
+
+			// If payment is approved, set hidden fields with the payment data and submit checkout form.
+			if (data.approved) {
+				jQuery("#cko-flow-payment-id").val(data.id);
+				jQuery("#cko-flow-payment-type").val(data.source?.type || "");
+				
+				// Check if we're on order-pay page
+				if (window.location.pathname.includes('/order-pay/')) {
+					jQuery("form[name='checkout']").submit();
+				} else {
+					jQuery("form.checkout").submit();
+				}
+			} else {
+
+				// If payment is not approved, show an error message to the user.
+				showError(
+					wp.i18n.__(
+						"Payment Failed. Please try some another payment method.",
+						"checkout-com-unified-payments-api"
+					)
+				);
+
+				// Clean up the URL by removing the query parameters.
+				const urlWithoutQuery =
+					window.location.origin + window.location.pathname;
+				window.history.replaceState({}, document.title, urlWithoutQuery);
+			}
+		})
+		.catch((err) => {
+			// console.log('[CURRENT VERSION] Error fetching payment status:', err);
+
+			// Log any network or parsing errors in the console.
+			console.error("Error fetching payment status:", err);
+		});
+} else {
+	// console.log('[CURRENT VERSION] No payment ID found in URL, skipping async handler');
+}
