@@ -196,14 +196,6 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 							jQuery('#wc-wc_checkout_com_flow-new-payment-method').closest('p').hide();
 						</script>
 					<?php else : ?>
-<!-- Show Saved Payment Methods button is hidden when showing both Flow and saved cards together -->
-					<div class="button-container" style="display: none;">
-					<label class="wp-style-button" style="display: none;" id="show-saved-methods-btn">
-						<input type="radio" name="payment_method_selector" onclick="toggleRadio(this, handleShowSavedMethods)"/>
-						<?php esc_html_e( 'Show Saved Payment Methods', 'checkout-com-unified-payments-api' ); ?>
-					</label>
-					</div>
-
 					<script>
 						// Expose saved payment display order to JavaScript
 						window.saved_payment = '<?php echo esc_js( $flow_saved_card ); ?>';
@@ -379,7 +371,6 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 							});
 							
 							const $savedMethods = $('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods');
-							const $showSavedBtn = $('#show-saved-methods-btn');
 
 						const totalCount = $savedMethods.toArray().reduce((sum, el) => {
 							return sum + parseInt($(el).data('count') || 0, 10);
@@ -575,13 +566,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					}, 100);
 				});
 
-						window.toggleRadio = function(radio, callback) {
-								radio.checked = false;
-								if (typeof callback === 'function') {
-									callback();
-								}
-							};
-						});
+					});
 
 						// Don't hide save card checkbox on page load - let Flow component control it
 
@@ -594,14 +579,6 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					</script>
 					<?php endif; ?>
 				<?php else : ?>
-<!-- Show Saved Payment Methods button is hidden when showing both Flow and saved cards together -->
-					<div class="button-container" style="display: none;">
-					<label class="wp-style-button" style="display: none;" id="show-saved-methods-btn">
-						<input type="radio" name="payment_method_selector" onclick="toggleRadio(this, handleShowSavedMethods)"/>
-						<?php esc_html_e( 'Show Saved Payment Methods', 'checkout-com-unified-payments-api' ); ?>
-					</label>
-					</div>
-
 				<script>
 					// Expose saved payment display order to JavaScript
 					window.saved_payment = '<?php echo esc_js( $flow_saved_card ); ?>';
@@ -754,7 +731,6 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 						});
 						
 						const $savedMethods = $('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods');
-						const $showSavedBtn = $('#show-saved-methods-btn');
 
 				const totalCount = $savedMethods.toArray().reduce((sum, el) => {
 					return sum + parseInt($(el).data('count') || 0, 10);
@@ -950,12 +926,6 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					}, 100);
 				});
 
-				window.toggleRadio = function(radio, callback) {
-							radio.checked = false;
-							if (typeof callback === 'function') {
-								callback();
-							}
-						};
 					});
 
 					// Don't hide save card checkbox on page load - let Flow component control it
@@ -1044,6 +1014,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		<input type="hidden" id="cko-flow-payment-type" name="cko-flow-payment-type" value="" />
 		<input type="hidden" id="cko-flow-3ds-status" name="cko-flow-3ds-status" value="" />
 		<input type="hidden" id="cko-flow-3ds-auth-id" name="cko-flow-3ds-auth-id" value="" />
+		<input type="hidden" id="cko-flow-save-card-persist" name="cko-flow-save-card-persist" value="" />
 		<?php 
 
 		if ( ! is_user_logged_in() ) :
@@ -1086,20 +1057,104 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 		// check if saved card enable from module setting.
 		if ( $save_card ) {
-			// Migrate old saved cards for logged-in users (only once)
-			// Skip migration for MOTO orders (admin-created orders)
-			if ( is_user_logged_in() && ! $order_pay_order ) {
-				$user_id = get_current_user_id();
-				$this->migrate_old_saved_cards( $user_id );
-			}
-
-			// Only show Flow saved cards to avoid duplicates
-			// The classic cards gateway saved cards are now migrated to Flow
+			// Show saved cards from BOTH Flow and Classic Cards gateways
+			// No migration needed - backend already handles both token types
 			$this->saved_payment_methods();
 		}
 
 		// Render Save Card input.
 		$this->element_form_save_card( $save_card );
+	}
+
+	/**
+	 * Override saved_payment_methods to show tokens from BOTH Flow and Classic Cards gateways.
+	 * This allows merchants upgrading from Classic Cards to Flow to see their existing saved cards.
+	 * No migration needed - the backend already handles both token types seamlessly.
+	 *
+	 * @since 5.0.0
+	 * @return void
+	 */
+	public function saved_payment_methods() {
+		if ( ! is_user_logged_in() ) {
+			return;
+		}
+
+		$user_id = get_current_user_id();
+
+		// Get tokens from BOTH gateways
+		$flow_tokens = WC_Payment_Tokens::get_customer_tokens( $user_id, $this->id );
+		
+		$classic_gateway = new WC_Gateway_Checkout_Com_Cards();
+		$classic_tokens = WC_Payment_Tokens::get_customer_tokens( $user_id, $classic_gateway->id );
+
+		// Merge both token arrays
+		$all_tokens = array_merge( $flow_tokens, $classic_tokens );
+
+		// Log token retrieval for debugging
+		WC_Checkoutcom_Utility::logger( '=== MULTI-GATEWAY TOKEN RETRIEVAL ===' );
+		WC_Checkoutcom_Utility::logger( 'User ID: ' . $user_id );
+		WC_Checkoutcom_Utility::logger( 'Flow tokens found: ' . count( $flow_tokens ) );
+		WC_Checkoutcom_Utility::logger( 'Classic Cards tokens found: ' . count( $classic_tokens ) );
+		WC_Checkoutcom_Utility::logger( 'Total tokens (before dedup): ' . count( $all_tokens ) );
+
+		if ( empty( $all_tokens ) ) {
+			WC_Checkoutcom_Utility::logger( 'No saved cards found - skipping display' );
+			return;
+		}
+
+		// Remove duplicates based on token value (source ID)
+		$unique_tokens = array();
+		$seen_tokens = array();
+		foreach ( $all_tokens as $token ) {
+			$token_value = $token->get_token();
+			if ( ! in_array( $token_value, $seen_tokens, true ) ) {
+				$unique_tokens[] = $token;
+				$seen_tokens[] = $token_value;
+			}
+		}
+		
+		WC_Checkoutcom_Utility::logger( 'Unique tokens (after dedup): ' . count( $unique_tokens ) );
+		WC_Checkoutcom_Utility::logger( '=== END MULTI-GATEWAY TOKEN RETRIEVAL ===' );
+
+		// Display saved payment methods (without extra label - already handled by accordion)
+		?>
+		<ul class="woocommerce-SavedPaymentMethods wc-saved-payment-methods" data-count="<?php echo count( $unique_tokens ); ?>">
+			<?php
+			$default_token_id = WC_Payment_Tokens::get_customer_default_token( $user_id );
+			foreach ( $unique_tokens as $token ) {
+				$is_default = ( $token->get_id() == $default_token_id );
+				$gateway_source = ( $token->get_gateway_id() === $this->id ) ? 'Flow' : 'Classic';
+				?>
+				<li class="woocommerce-SavedPaymentMethods-token">
+					<input id="wc-<?php echo esc_attr( $this->id ); ?>-payment-token-<?php echo esc_attr( $token->get_id() ); ?>" 
+						type="radio" 
+						name="wc-<?php echo esc_attr( $this->id ); ?>-payment-token" 
+						value="<?php echo esc_attr( $token->get_id() ); ?>" 
+						<?php checked( $is_default, true ); ?> 
+						class="woocommerce-SavedPaymentMethods-tokenInput" 
+						data-gateway-source="<?php echo esc_attr( $gateway_source ); ?>" />
+					<label for="wc-<?php echo esc_attr( $this->id ); ?>-payment-token-<?php echo esc_attr( $token->get_id() ); ?>">
+						<?php echo esc_html( sprintf( __( '%s ending in %s (expires %s/%s)', 'checkout-com-unified-payments-api' ), $token->get_card_type(), $token->get_last4(), $token->get_expiry_month(), $token->get_expiry_year() ) ); ?>
+						<?php if ( $is_default ) : ?>
+							<span class="woocommerce-SavedPaymentMethods-token-default"><?php esc_html_e( '(default)', 'checkout-com-unified-payments-api' ); ?></span>
+						<?php endif; ?>
+					</label>
+				</li>
+				<?php
+			}
+			?>
+			<li class="woocommerce-SavedPaymentMethods-new">
+				<input id="wc-<?php echo esc_attr( $this->id ); ?>-payment-token-new" 
+					type="radio" 
+					name="wc-<?php echo esc_attr( $this->id ); ?>-payment-token" 
+					value="new" 
+					<?php checked( empty( $default_token_id ), true ); ?> />
+				<label for="wc-<?php echo esc_attr( $this->id ); ?>-payment-token-new">
+					<?php esc_html_e( 'Use a new payment method', 'checkout-com-unified-payments-api' ); ?>
+				</label>
+			</li>
+		</ul>
+		<?php
 	}
 
 	/**
@@ -1144,24 +1199,73 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			}
 		}
 		
-		WC_Checkoutcom_Utility::logger( 'Processing payment for order: ' . $order_id );
+	$flow_result = null;
 
-		$flow_result = null;
+	$subs_payment_type = null;
 
-		$subs_payment_type = null;
-
-		WC_Checkoutcom_Utility::logger(print_r($_POST,true));
+	// 3DS RETURN HANDLER: If we already have a payment ID from Flow (after 3DS redirect),
+	// don't create a new payment - just fetch the payment details and complete the order
+	if ( ! empty( $flow_payment_id ) && isset( $_POST['cko-flow-payment-type'] ) ) {
 		
-		// Debug: Check if Flow payment ID is present
-		$flow_pay_id_debug = isset( $_POST['cko-flow-payment-id'] ) ? $_POST['cko-flow-payment-id'] : 'NOT SET';
-		WC_Checkoutcom_Utility::logger( 'Flow Payment ID in POST: ' . $flow_pay_id_debug );
+	// Fetch the payment details from Checkout.com to verify and get status
+		try {
+		$checkout = new Checkout_SDK();
+		$payment_details = $checkout->get_builder()->getPaymentsClient()->getPaymentDetails( $flow_payment_id );
 		
-		// Debug: Check if using saved payment method
-		$is_using_saved = WC_Checkoutcom_Api_Request::is_using_saved_payment_method();
-		WC_Checkoutcom_Utility::logger( 'Is using saved payment method: ' . ( $is_using_saved ? 'YES' : 'NO' ) );
-
-		if ( WC_Checkoutcom_Api_Request::is_using_saved_payment_method() ) {
-			$token = 'wc-wc_checkout_com_flow-payment-token';
+		// Convert to result format expected by the rest of the code
+			$result = array(
+				'id' => $payment_details['id'],
+				'action_id' => isset( $payment_details['actions'][0]['id'] ) ? $payment_details['actions'][0]['id'] : '',
+				'status' => $payment_details['status'],
+				'approved' => isset( $payment_details['approved'] ) ? $payment_details['approved'] : false,
+				'response_code' => isset( $payment_details['response_code'] ) ? $payment_details['response_code'] : '',
+				'response_summary' => isset( $payment_details['response_summary'] ) ? $payment_details['response_summary'] : '',
+			'3d' => null, // No 3DS redirect needed, we're returning from 3DS
+		);
+		
+		// Set transaction ID and payment ID in order meta
+			$order->set_transaction_id( $result['action_id'] );
+			$order->update_meta_data( '_cko_payment_id', $flow_payment_id );
+			$order->update_meta_data( '_cko_flow_payment_id', $flow_payment_id );
+			$flow_payment_type = isset( $_POST['cko-flow-payment-type'] ) ? sanitize_text_field( $_POST['cko-flow-payment-type'] ) : 'card';
+			$order->update_meta_data( '_cko_flow_payment_type', $flow_payment_type );
+			// Store order number/reference for webhook lookup (works with Sequential Order Numbers plugins)
+			$order->update_meta_data( '_cko_order_reference', $order->get_order_number() );
+			
+			// CRITICAL: Save order immediately so webhooks can find it (especially for fast APM payments)
+			$order->save();
+			WC_Checkoutcom_Utility::logger( 'Order meta saved immediately for webhook lookup (3DS return) - Order ID: ' . $order_id . ', Payment ID: ' . $flow_payment_id );
+			
+		// Set variables for card saving logic below
+		$flow_pay_id = $flow_payment_id;
+		
+		// Set status and message for the order (was missing!)
+		$status = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
+		$message = sprintf( esc_html__( 'Checkout.com Payment Authorised - using FLOW (3DS return): %s', 'checkout-com-unified-payments-api' ), $flow_payment_type );
+		
+		// Check if payment was flagged
+		if ( isset( $result['risk']['flagged'] ) && $result['risk']['flagged'] ) {
+			$status = WC_Admin_Settings::get_option( 'ckocom_order_flagged', 'flagged' );
+			$message = sprintf( esc_html__( 'Checkout.com Payment Flagged (3DS return) - Payment ID: %s', 'checkout-com-unified-payments-api' ), $flow_payment_id );
+		}
+		
+		// Mark as authorized for APM payments
+		if ( ! in_array( $flow_payment_type, array( 'card', 'googlepay', 'applepay' ), true ) ) {
+			$order->update_meta_data( 'cko_payment_authorized', true );
+		}
+		
+		// Continue with card saving logic after this if/elseif/else structure
+			
+	} catch ( Exception $e ) {
+		WC_Checkoutcom_Utility::logger( '3DS return error: ' . $e->getMessage() );
+		WC_Checkoutcom_Utility::wc_add_notice_self( __( 'An error occurred while processing your payment. Please try again.', 'checkout-com-unified-payments-api' ) );
+		return;
+	}
+	
+	// Skip saved card and normal Flow payment logic since we're returning from 3DS
+	// Jump directly to card saving logic below
+	} elseif ( WC_Checkoutcom_Api_Request::is_using_saved_payment_method() ) {
+		$token = 'wc-wc_checkout_com_flow-payment-token';
 
 			if ( ! isset( $_POST[ $token ] ) ) {
 				$token = 'wc-wc_checkout_com_cards-payment-token';
@@ -1245,44 +1349,34 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			if ( 'pending' === $order_status || 'failed' === $order_status ) {
 				$order->update_meta_data( 'cko_payment_authorized', true );
 			}
+	}
+	else {
+		$flow_pay_id = isset( $_POST['cko-flow-payment-id'] ) ? sanitize_text_field( $_POST['cko-flow-payment-id'] ) : '';
+
+		// Check if $flow_pay_id is not empty.
+		if ( empty( $flow_pay_id ) ) {
+			WC_Checkoutcom_Utility::wc_add_notice_self( __( 'There was an issue completing the payment. Please complete the payment.', 'checkout-com-unified-payments-api' ), 'error' );
+
+			return;
 		}
-		else {
 
-			$flow_pay_id = isset( $_POST['cko-flow-payment-id'] ) ? sanitize_text_field( $_POST['cko-flow-payment-id'] ) : '';
+	$flow_payment_type = isset( $_POST['cko-flow-payment-type'] ) ? sanitize_text_field( $_POST['cko-flow-payment-type'] ) : '';
 
-			// Check if $flow_pay_id is not empty.
-			if ( empty( $flow_pay_id ) ) {
-				// Enhanced debugging for missing payment ID
-				WC_Checkoutcom_Utility::logger( '=== MISSING PAYMENT ID DEBUG ===' );
-				WC_Checkoutcom_Utility::logger( 'POST data keys: ' . print_r( array_keys( $_POST ), true ) );
-				WC_Checkoutcom_Utility::logger( 'cko-flow-payment-id value: ' . ( isset( $_POST['cko-flow-payment-id'] ) ? $_POST['cko-flow-payment-id'] : 'NOT SET' ) );
-				WC_Checkoutcom_Utility::logger( 'cko-flow-payment-type value: ' . ( isset( $_POST['cko-flow-payment-type'] ) ? $_POST['cko-flow-payment-type'] : 'NOT SET' ) );
-				WC_Checkoutcom_Utility::logger( 'User agent: ' . ( isset( $_SERVER['HTTP_USER_AGENT'] ) ? $_SERVER['HTTP_USER_AGENT'] : 'NOT SET' ) );
-				WC_Checkoutcom_Utility::logger( 'Referer: ' . ( isset( $_SERVER['HTTP_REFERER'] ) ? $_SERVER['HTTP_REFERER'] : 'NOT SET' ) );
-				WC_Checkoutcom_Utility::logger( '=== END MISSING PAYMENT ID DEBUG ===' );
-				
-				WC_Checkoutcom_Utility::wc_add_notice_self( __( 'There was an issue completing the payment. Please complete the payment.', 'checkout-com-unified-payments-api' ), 'error' );
+	if ( "card" === $flow_payment_type ) {
+		$subs_payment_type = $flow_payment_type;
+	}
 
-				return;
-			}
+	$order->update_meta_data( '_cko_payment_id', $flow_pay_id );
+	$order->update_meta_data( '_cko_flow_payment_id', $flow_pay_id );
+	$order->update_meta_data( '_cko_flow_payment_type', $flow_payment_type );
+	// Store order number/reference for webhook lookup (works with Sequential Order Numbers plugins)
+	$order->update_meta_data( '_cko_order_reference', $order->get_order_number() );
+	
+	// CRITICAL: Save order immediately so webhooks can find it (especially for fast APM payments)
+	$order->save();
+	WC_Checkoutcom_Utility::logger( 'Order meta saved immediately for webhook lookup - Order ID: ' . $order_id . ', Payment ID: ' . $flow_pay_id );
 
-			$flow_payment_type = isset( $_POST['cko-flow-payment-type'] ) ? sanitize_text_field( $_POST['cko-flow-payment-type'] ) : '';
-
-			if ( "card" === $flow_payment_type ) {
-				$subs_payment_type = $flow_payment_type;
-			}
-
-			$save_card_checkbox = isset( $_POST['wc-wc_checkout_com_flow-new-payment-method'] ) && $_POST['wc-wc_checkout_com_flow-new-payment-method'] === 'true';
-
-			if ( 'card' === $flow_payment_type && $save_card_checkbox ) {
-				$this->flow_save_cards( $order, $flow_pay_id );
-			}
-
-			$order->update_meta_data( '_cko_payment_id', $flow_pay_id );
-			$order->update_meta_data( '_cko_flow_payment_id', $flow_pay_id );
-			$order->update_meta_data( '_cko_flow_payment_type', $flow_payment_type );
-
-			if ( ! in_array( $flow_payment_type, array( 'card', 'googlepay', 'applepay' ), true ) ) {
+		if ( ! in_array( $flow_payment_type, array( 'card', 'googlepay', 'applepay' ), true ) ) {
 				$order->update_meta_data( 'cko_payment_authorized', true );
 			}
 
@@ -1306,10 +1400,45 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					$flow_result = $result->get_data();
 					error_log(print_r($flow_result,true));
 				}
-			}
 		}
+	}
 
-		if ( class_exists( 'WC_Subscriptions_Order' ) && $flow_result !== null ) {
+	// Card saving logic (runs for both normal Flow payments and 3DS returns)
+	// Check if $flow_pay_id is set (it's set in both the 3DS return handler and normal Flow payment)
+	if ( isset( $flow_pay_id ) && ! empty( $flow_pay_id ) ) {
+		$flow_payment_type_for_save = isset( $flow_payment_type ) ? $flow_payment_type : ( isset( $_POST['cko-flow-payment-type'] ) ? sanitize_text_field( $_POST['cko-flow-payment-type'] ) : '' );
+		
+		// Check if customer wants to save card
+		// Priority: 1. Hidden field (survives 3DS), 2. POST data, 3. Session
+		$save_card_enabled = WC_Admin_Settings::get_option( 'ckocom_card_saved' );
+		
+		// Check hidden field first (persists across 3DS redirects)
+		$save_card_hidden = isset( $_POST['cko-flow-save-card-persist'] ) ? sanitize_text_field( $_POST['cko-flow-save-card-persist'] ) : '';
+		
+		// Fallback to POST checkbox
+		$save_card_post = isset( $_POST['wc-wc_checkout_com_flow-new-payment-method'] ) ? sanitize_text_field( $_POST['wc-wc_checkout_com_flow-new-payment-method'] ) : '';
+		
+		// Fallback to session
+		$save_card_session = WC()->session->get( 'wc-wc_checkout_com_flow-new-payment-method' );
+		
+		// Determine if checkbox was checked (priority: hidden field > POST > session)
+		$save_card_checkbox = false;
+		if ( 'yes' === $save_card_hidden ) {
+			$save_card_checkbox = true;
+		} elseif ( 'true' === $save_card_post || 'yes' === $save_card_post ) {
+			$save_card_checkbox = true;
+		} elseif ( 'yes' === $save_card_session ) {
+			$save_card_checkbox = true;
+	}
+
+	if ( 'card' === $flow_payment_type_for_save && $save_card_enabled && $save_card_checkbox ) {
+		$this->flow_save_cards( $order, $flow_pay_id );
+		// Clear the session variable after processing
+		WC()->session->__unset( 'wc-wc_checkout_com_flow-new-payment-method' );
+	}
+}
+
+	if ( class_exists( 'WC_Subscriptions_Order' ) && $flow_result !== null ) {
 			// Save source id for subscription.
 			WC_Checkoutcom_Subscription::save_source_id( $order_id, $order, $flow_result['source']['id'] );
 
@@ -1361,13 +1490,22 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	 */
 	public function flow_save_cards( $order, $pay_id ) {
 
+		WC_Checkoutcom_Utility::logger( '=== FLOW_SAVE_CARDS METHOD START ===' );
+		WC_Checkoutcom_Utility::logger( 'Order ID: ' . $order->get_id() );
+		WC_Checkoutcom_Utility::logger( 'Payment ID: ' . $pay_id );
+		WC_Checkoutcom_Utility::logger( 'User ID: ' . $order->get_user_id() );
+
 		$save_card = WC_Admin_Settings::get_option( 'ckocom_card_saved' );
+		WC_Checkoutcom_Utility::logger( 'Admin Save Card Setting: ' . ( $save_card ? 'ENABLED' : 'DISABLED' ) );
 
 		// Check if save card is enable and customer select to save card.
 		if ( ! $save_card ) {
+			WC_Checkoutcom_Utility::logger( 'Save card disabled in admin - exiting' );
+			WC_Checkoutcom_Utility::logger( '=== FLOW_SAVE_CARDS METHOD END ===' );
 			return;
 		}
 
+		WC_Checkoutcom_Utility::logger( 'Fetching payment details from Checkout.com API...' );
 		$request  = new \WP_REST_Request( 'GET', '/ckoplugin/v1/payment-status' );
 		$request->set_query_params( [ 'paymentId' => $pay_id ] );
 
@@ -1375,12 +1513,17 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 		if ( is_wp_error( $result ) ) {
 			$error_message = $result->get_error_message();
-			WC_Checkoutcom_Utility::logger( "There was an error in saving cards: $error_message" ); // phpcs:ignore
+			WC_Checkoutcom_Utility::logger( "ERROR in saving cards: $error_message" ); // phpcs:ignore
+			WC_Checkoutcom_Utility::logger( '=== FLOW_SAVE_CARDS METHOD END (ERROR) ===' );
 		} else {
 			$data = $result->get_data();
+			WC_Checkoutcom_Utility::logger( 'Payment data retrieved successfully' );
+			WC_Checkoutcom_Utility::logger( 'Payment data: ' . print_r( $data, true ) );
 		}
 		
+		WC_Checkoutcom_Utility::logger( 'Calling save_token method...' );
 		$this->save_token( $order->get_user_id(), $data );
+		WC_Checkoutcom_Utility::logger( '=== FLOW_SAVE_CARDS METHOD END ===' );
 	}
 
 	/**
@@ -1406,78 +1549,22 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	}
 
 	/**
-	 * Migrate old saved cards to be compatible with Flow integration.
-	 * This function helps users with saved cards from previous plugin versions.
+	 * DEPRECATED: Migrate old saved cards to be compatible with Flow integration.
+	 * 
+	 * This function is no longer needed as of version 5.0.0.
+	 * The saved_payment_methods() function now automatically displays tokens from BOTH
+	 * Flow and Classic Cards gateways, and the backend payment processing already
+	 * handles both token types seamlessly. No migration is required.
 	 *
+	 * @deprecated 5.0.0 No longer needed - tokens from both gateways are shown automatically
 	 * @param int $user_id User ID.
 	 * @return void
 	 */
 	public function migrate_old_saved_cards( $user_id ) {
-		// Check if migration has already been done for this user
-		$migration_done = get_user_meta( $user_id, '_cko_flow_migration_done', true );
-		if ( $migration_done ) {
-			return; // Migration already completed
-		}
-
-		// Get all tokens for this user from the classic cards gateway
-		$classic_gateway = new WC_Gateway_Checkout_Com_Cards();
-		$tokens = WC_Payment_Tokens::get_tokens( array(
-			'user_id'    => $user_id,
-			'gateway_id' => $classic_gateway->id,
-			'limit'      => 100,
-		) );
-
-		if ( empty( $tokens ) ) {
-			// No old tokens to migrate, mark as done
-			update_user_meta( $user_id, '_cko_flow_migration_done', true );
-			return;
-		}
-
-		// Get existing Flow tokens to avoid duplicates
-		$flow_tokens = WC_Payment_Tokens::get_tokens( array(
-			'user_id'    => $user_id,
-			'gateway_id' => $this->id,
-			'limit'      => 100,
-		) );
-
-		$existing_flow_tokens = array();
-		foreach ( $flow_tokens as $flow_token ) {
-			$existing_flow_tokens[] = $flow_token->get_token();
-		}
-
-		$migrated_count = 0;
-		foreach ( $tokens as $token ) {
-			// Skip if token already exists in Flow gateway
-			if ( in_array( $token->get_token(), $existing_flow_tokens, true ) ) {
-				continue;
-			}
-
-			// Create new token for Flow gateway
-			$new_token = new WC_Payment_Token_CC();
-			$new_token->set_token( $token->get_token() );
-			$new_token->set_gateway_id( $this->id );
-			$new_token->set_card_type( $token->get_card_type() );
-			$new_token->set_last4( $token->get_last4() );
-			$new_token->set_expiry_month( $token->get_expiry_month() );
-			$new_token->set_expiry_year( $token->get_expiry_year() );
-			$new_token->set_user_id( $user_id );
-
-			// Copy metadata from old token
-			$old_meta = $token->get_meta_data();
-			foreach ( $old_meta as $meta ) {
-				$new_token->add_meta_data( $meta->key, $meta->value, true );
-			}
-
-			$new_token->save();
-			$migrated_count++;
-		}
-
-		// Mark migration as completed
-		update_user_meta( $user_id, '_cko_flow_migration_done', true );
-		
-		if ( $migrated_count > 0 ) {
-			WC_Checkoutcom_Utility::logger( 'Migrated ' . $migrated_count . ' old saved cards to Flow gateway for user: ' . $user_id );
-		}
+		// This function is deprecated and no longer performs any action.
+		// Kept for backward compatibility in case it's called by other code.
+		WC_Checkoutcom_Utility::logger( 'migrate_old_saved_cards() called but is deprecated - no action taken. Tokens from both gateways are now shown automatically.' );
+		return;
 	}
 
 	/**
@@ -1489,8 +1576,16 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	 * @return void
 	 */
 	public function save_token( $user_id, $payment_response ) {
+		WC_Checkoutcom_Utility::logger( '=== SAVE_TOKEN METHOD START ===' );
+		WC_Checkoutcom_Utility::logger( 'User ID: ' . $user_id );
+		WC_Checkoutcom_Utility::logger( 'Payment Response is null: ' . ( is_null( $payment_response ) ? 'YES' : 'NO' ) );
+		
 		// Check if payment response is not null.
 		if ( ! is_null( $payment_response ) ) {
+			WC_Checkoutcom_Utility::logger( 'Payment response received, checking for duplicates...' );
+			WC_Checkoutcom_Utility::logger( 'Source ID: ' . ( isset( $payment_response['source']['id'] ) ? $payment_response['source']['id'] : 'NOT SET' ) );
+			WC_Checkoutcom_Utility::logger( 'Fingerprint: ' . ( isset( $payment_response['source']['fingerprint'] ) ? $payment_response['source']['fingerprint'] : 'NOT SET' ) );
+			
 			// argument to check token.
 			$arg = array(
 				'user_id'    => $user_id,
@@ -1500,11 +1595,14 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 			// Query token by userid and gateway id.
 			$token = WC_Payment_Tokens::get_tokens( $arg );
+			WC_Checkoutcom_Utility::logger( 'Found ' . count( $token ) . ' existing Flow tokens for this user' );
 
 			foreach ( $token as $tok ) {
 				$fingerprint = $tok->get_meta( 'fingerprint', true );
 				// do not save source if it already exists in db.
 				if ( $fingerprint === $payment_response['source']['fingerprint'] ) {
+					WC_Checkoutcom_Utility::logger( 'Card already exists in Flow tokens (fingerprint match) - NOT saving' );
+					WC_Checkoutcom_Utility::logger( '=== SAVE_TOKEN METHOD END (DUPLICATE FLOW) ===' );
 					return;
 				}
 			}
@@ -1521,15 +1619,20 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 			// Query token by userid and gateway id.
 			$token_classic = WC_Payment_Tokens::get_tokens( $arg_classic );
+			WC_Checkoutcom_Utility::logger( 'Found ' . count( $token_classic ) . ' existing Classic Cards tokens for this user' );
 
 			foreach ( $token_classic as $tokc ) {
 				$token_data = $tokc->get_data();
 				// do not save source if it already exists in db.
 				if ( $token_data['token'] === $payment_response['source']['id'] ) {
+					WC_Checkoutcom_Utility::logger( 'Card already exists in Classic Cards tokens (source ID match) - NOT saving' );
+					WC_Checkoutcom_Utility::logger( '=== SAVE_TOKEN METHOD END (DUPLICATE CLASSIC) ===' );
 					return;
 				}
 			}
 
+			WC_Checkoutcom_Utility::logger( 'No duplicates found - saving new token...' );
+			
 			// Save source_id in db.
 			$token = new WC_Payment_Token_CC();
 			$token->set_token( (string) $payment_response['source']['id'] );
@@ -1543,7 +1646,13 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			// Add the `fingerprint` metadata.
 			$token->add_meta_data( 'fingerprint', $payment_response['source']['fingerprint'], true );
 
-			$token->save();
+			$save_result = $token->save();
+			WC_Checkoutcom_Utility::logger( 'Token save result: ' . ( $save_result ? 'SUCCESS' : 'FAILED' ) );
+			WC_Checkoutcom_Utility::logger( 'Token ID: ' . $token->get_id() );
+			WC_Checkoutcom_Utility::logger( '=== SAVE_TOKEN METHOD END (SAVED) ===' );
+		} else {
+			WC_Checkoutcom_Utility::logger( 'Payment response is NULL - cannot save token' );
+			WC_Checkoutcom_Utility::logger( '=== SAVE_TOKEN METHOD END (NULL RESPONSE) ===' );
 		}
 	}
 
@@ -1781,55 +1890,134 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		$order      = false;
 		$payment_id = null;
 
-		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Starting order lookup process' );
-		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Webhook data structure: ' . print_r($data, true) );
+	WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Starting order lookup process' );
+	WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Webhook data structure: ' . print_r($data, true) );
 
-		if ( ! empty( $data->data->metadata->order_id ) ) {
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Looking for order by metadata order_id: ' . $data->data->metadata->order_id );
-			$order = wc_get_order( $data->data->metadata->order_id );
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order found by metadata order_id: ' . ($order ? 'YES (ID: ' . $order->get_id() . ')' : 'NO') );
-		} elseif ( ! empty( $data->data->reference ) ) {
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Looking for order by reference: ' . $data->data->reference );
-			$order = wc_get_order( $data->data->reference );
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order found by reference: ' . ($order ? 'YES (ID: ' . $order->get_id() . ')' : 'NO') );
-
-			if ( isset( $data->data->metadata ) ) {
-				$data->data->metadata->order_id = $data->data->reference;
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Set metadata order_id to reference: ' . $data->data->reference );
-			} else {
-				$data->data->metadata           = new StdClass();
-				$data->data->metadata->order_id = $data->data->reference;
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Created metadata object with order_id: ' . $data->data->reference );
-			}
+	// Method 1: Try order_id from metadata (order-pay page has this)
+	if ( ! empty( $data->data->metadata->order_id ) ) {
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Looking for order by metadata order_id: ' . $data->data->metadata->order_id );
+		$order = wc_get_order( $data->data->metadata->order_id );
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order found by metadata order_id: ' . ($order ? 'YES (ID: ' . $order->get_id() . ')' : 'NO') );
+	}
+	
+	// Method 2: Try payment session ID (works for regular checkout)
+	if ( ! $order && ! empty( $data->data->metadata->cko_payment_session_id ) ) {
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Looking for order by payment session ID: ' . $data->data->metadata->cko_payment_session_id );
+		
+		$orders = wc_get_orders( array(
+			'limit'      => 1,
+			'meta_key'   => '_cko_payment_session_id',
+			'meta_value' => $data->data->metadata->cko_payment_session_id,
+			'return'     => 'objects',
+		) );
+		
+		if ( ! empty( $orders ) ) {
+			$order = $orders[0];
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order found by payment session ID: YES (ID: ' . $order->get_id() . ')' );
 		} else {
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: No order_id in metadata and no reference found' );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order found by payment session ID: NO' );
 		}
+	}
+	
+	// Method 3: Try reference (order number) via our stored meta
+	if ( ! $order && ! empty( $data->data->reference ) ) {
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Looking for order by reference: ' . $data->data->reference );
+		
+		// Try direct lookup first (works for numeric order IDs)
+		$order = wc_get_order( $data->data->reference );
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Direct lookup result: ' . ($order ? 'YES (ID: ' . $order->get_id() . ')' : 'NO') );
+		
+		// Try our stored reference meta (works with ANY order number format including Sequential Order Numbers)
+		if ( ! $order ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Searching by _cko_order_reference meta: ' . $data->data->reference );
+			
+			$orders = wc_get_orders( array(
+				'limit'      => 1,
+				'meta_key'   => '_cko_order_reference',
+				'meta_value' => $data->data->reference,
+				'return'     => 'objects',
+			) );
+			
+			if ( ! empty( $orders ) ) {
+				$order = $orders[0];
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order found by _cko_order_reference meta: YES (ID: ' . $order->get_id() . ')' );
+			} else {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order found by _cko_order_reference meta: NO' );
+			}
+		}
+		
+		// If still not found, try the Sequential Order Numbers plugin meta key
+		if ( ! $order ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Searching by _order_number meta: ' . $data->data->reference );
+			
+			$orders = wc_get_orders( array(
+				'limit'      => 1,
+				'meta_key'   => '_order_number',
+				'meta_value' => $data->data->reference,
+				'return'     => 'objects',
+			) );
+			
+			if ( ! empty( $orders ) ) {
+				$order = $orders[0];
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order found by _order_number meta: YES (ID: ' . $order->get_id() . ')' );
+			} else {
+				// Try searching by post name (order number might be stored there)
+				global $wpdb;
+				$post_id = $wpdb->get_var( $wpdb->prepare(
+					"SELECT ID FROM {$wpdb->posts} WHERE post_type IN ('shop_order', 'shop_order_placehold') AND post_name = %s LIMIT 1",
+					sanitize_title( $data->data->reference )
+				) );
+				
+				if ( $post_id ) {
+					$order = wc_get_order( $post_id );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order found by post_name: YES (ID: ' . $order->get_id() . ')' );
+				} else {
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order NOT found by any method' );
+				}
+			}
+		}
+
+		if ( $order && isset( $data->data->metadata ) ) {
+			$data->data->metadata->order_id = $order->get_id();
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Set metadata order_id to: ' . $order->get_id() );
+		} elseif ( $order ) {
+			$data->data->metadata           = new StdClass();
+			$data->data->metadata->order_id = $order->get_id();
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Created metadata object with order_id: ' . $order->get_id() );
+		}
+	} else {
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: No order_id in metadata and no reference found' );
+	}
 		
 		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order lookup result: ' . ($order ? 'FOUND (ID: ' . $order->get_id() . ')' : 'NOT FOUND') );
 
-		// If order is still not found, try using _cko_flow_payment_id.
-		if ( ! $order && ! empty( $data->data->id ) ) {
-			$orders = wc_get_orders( array(
-				'limit'        => 1,
-				'meta_key'     => '_cko_flow_payment_id',
-				'meta_value'   => $data->data->id,
-				'return'       => 'objects',
-			) );
+	// Method 4: Try payment ID (works when order has been processed)
+	if ( ! $order && ! empty( $data->data->id ) ) {
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Looking for order by payment ID: ' . $data->data->id );
+		
+		$orders = wc_get_orders( array(
+			'limit'        => 1,
+			'meta_key'     => '_cko_flow_payment_id',
+			'meta_value'   => $data->data->id,
+			'return'       => 'objects',
+		) );
 
-			if ( ! empty( $orders ) ) {
-				$order = $orders[0];
+		if ( ! empty( $orders ) ) {
+			$order = $orders[0];
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order found by payment ID: YES (ID: ' . $order->get_id() . ')' );
 
-				// Add order_id to $data->data->metadata.
-				if ( isset( $data->data->metadata ) && is_object( $data->data->metadata ) ) {
-					$data->data->metadata->order_id = $order->get_id();
-				} else {
-					// If metadata is missing or not an object, create it.
-					$data->data->metadata = (object) array( 'order_id' => $order->get_id() );
-				}
+			// Add order_id to $data->data->metadata.
+			if ( isset( $data->data->metadata ) && is_object( $data->data->metadata ) ) {
+				$data->data->metadata->order_id = $order->get_id();
 			} else {
-				WC_Checkoutcom_Utility::logger( 'Order not found.' );
+				// If metadata is missing or not an object, create it.
+				$data->data->metadata = (object) array( 'order_id' => $order->get_id() );
 			}
+		} else {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order found by payment ID: NO' );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: This is normal for webhooks that arrive before process_payment() completes' );
 		}
+	}
 
 		if ( $order ) {
 			$payment_id = $order->get_meta( '_cko_payment_id' ) ?? null;

@@ -11,7 +11,9 @@ document.addEventListener("DOMContentLoaded", function () {
 			if (innerDiv && !innerDiv.id) {
 				innerDiv.id = "flow-container";
                 innerDiv.style.padding = "0";
-				console.log('[FLOW CONTAINER] Set flow-container id on payment_box div');
+				if (typeof ckoLogger !== 'undefined') {
+					ckoLogger.debug('Set flow-container id on payment_box div');
+				}
 				
 				// IMPORTANT: Check for saved payment methods (not accordion, which is created later)
 				// The .woocommerce-SavedPaymentMethods elements exist in DOM immediately (PHP rendered)
@@ -26,11 +28,15 @@ document.addEventListener("DOMContentLoaded", function () {
 				});
 				
 				if (hasSavedCards) {
-					console.log('[FLOW CONTAINER] Skipping Flow accordion - saved cards exist (count > 0), using simple layout');
+					if (typeof ckoLogger !== 'undefined') {
+						ckoLogger.debug('Skipping Flow accordion - saved cards exist (count > 0), using simple layout');
+					}
 					return; // Don't wrap in accordion when saved cards are present
 				}
 				
-				console.log('[FLOW CONTAINER] No saved cards found, using default label (no accordion wrapper)');
+				if (typeof ckoLogger !== 'undefined') {
+					ckoLogger.debug('No saved cards found, using default label (no accordion wrapper)');
+				}
 				
 				// DISABLED: Don't wrap Flow in accordion when no saved cards
 				// Use the default WooCommerce payment method label instead
@@ -72,7 +78,9 @@ document.addEventListener("DOMContentLoaded", function () {
 					// Move innerDiv (flow-container) into the accordion panel
 					document.getElementById('flow-accordion-panel').appendChild(innerDiv);
 					
-					console.log('[FLOW CONTAINER] Flow wrapped in accordion (no saved cards)');
+					if (typeof ckoLogger !== 'undefined') {
+						ckoLogger.debug('Flow wrapped in accordion (no saved cards)');
+					}
 				}
 				*/
 			}
@@ -82,20 +90,26 @@ document.addEventListener("DOMContentLoaded", function () {
 	addPaymentMethod();
 
 	jQuery(document).on("updated_checkout", function () {
-		console.log('[FLOW CONTAINER] updated_checkout event fired, re-checking...');
+		if (typeof ckoLogger !== 'undefined') {
+			ckoLogger.debug('updated_checkout event fired, re-checking...');
+		}
 		addPaymentMethod();
 	});
 	
 	// Additional check after a delay to catch late-rendered saved cards
 	setTimeout(function() {
-		console.log('[FLOW CONTAINER] Delayed check for saved cards...');
+		if (typeof ckoLogger !== 'undefined') {
+			ckoLogger.debug('Delayed check for saved cards...');
+		}
 		
 		// If saved cards accordion was created after initial load, remove Flow accordion if it exists
 		const savedCardsAccordion = document.querySelector('.saved-cards-accordion-container');
 		const flowAccordion = document.querySelector('.flow-accordion-container');
 		
 		if (savedCardsAccordion && flowAccordion) {
-			console.log('[FLOW CONTAINER] REMOVING Flow accordion - saved cards were created after initial load');
+			if (typeof ckoLogger !== 'undefined') {
+				ckoLogger.debug('REMOVING Flow accordion - saved cards were created after initial load');
+			}
 			
 			// Move flow-container out of the accordion
 			const flowContainer = document.getElementById('flow-container');
@@ -104,7 +118,9 @@ document.addEventListener("DOMContentLoaded", function () {
 				flowAccordion.parentNode.insertBefore(flowContainer, flowAccordion);
 				// Remove the flow accordion wrapper
 				flowAccordion.remove();
-				console.log('[FLOW CONTAINER] Flow accordion removed, using simple layout');
+				if (typeof ckoLogger !== 'undefined') {
+					ckoLogger.debug('Flow accordion removed, using simple layout');
+				}
 			}
 		}
 	}, 1000);

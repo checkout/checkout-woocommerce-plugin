@@ -656,11 +656,11 @@ function callback_for_setting_up_scripts() {
 		$auto_capture = '1' === WC_Admin_Settings::get_option( 'ckocom_card_autocap', '1' );
 		$capture_delay_hours = WC_Admin_Settings::get_option( 'ckocom_card_cap_delay', '0' );
 		
-		// Get Flow-specific settings
-		$flow_settings = get_option( 'woocommerce_wc_checkout_com_flow_settings' );
-		$performance_logging = isset( $flow_settings['flow_performance_logging'] ) && 'yes' === $flow_settings['flow_performance_logging'];
-		
-		// Get enabled payment methods from Flow settings
+	// Get Flow-specific settings
+	$flow_settings = get_option( 'woocommerce_wc_checkout_com_flow_settings' );
+	$debug_logging = isset( $flow_settings['flow_debug_logging'] ) && 'yes' === $flow_settings['flow_debug_logging'];
+	
+	// Get enabled payment methods from Flow settings
 		$enabled_payment_methods = isset( $flow_settings['flow_enabled_payment_methods'] ) ? $flow_settings['flow_enabled_payment_methods'] : array();
 		// Ensure it's an array
 		if ( ! is_array( $enabled_payment_methods ) ) {
@@ -739,13 +739,13 @@ function callback_for_setting_up_scripts() {
 			'challenge_indicator' => $challenge_indicator,
 			'exemption' => $exemption,
 			'allow_upgrade' => $allow_upgrade,
-			// Capture settings
-			'auto_capture' => $auto_capture ? true : false,
-			'capture_delay_hours' => $capture_delay_hours,
-			// Performance logging
-			'performance_logging' => $performance_logging ? true : false,
-			// Enabled payment methods
-			'enabled_payment_methods' => $enabled_payment_methods,
+		// Capture settings
+		'auto_capture' => $auto_capture ? true : false,
+		'capture_delay_hours' => $capture_delay_hours,
+		// Debug logging (enables detailed console logs)
+		'debug_logging' => $debug_logging ? true : false,
+		// Enabled payment methods
+		'enabled_payment_methods' => $enabled_payment_methods,
 		);
 
 		wp_set_script_translations( 'checkout-com-flow-payment-session-script', 'checkout-com-unified-payments-api' );

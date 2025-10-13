@@ -18,6 +18,7 @@
 #flow-container {
 	min-height: 100px;
 	position: relative;
+	transition: opacity 0.3s ease, box-shadow 0.3s ease;
 }
 
 /* When saved cards exist, style Flow container as a simple bordered block */

@@ -1443,12 +1443,12 @@ class WC_Checkoutcom_Cards_Settings {
 					),
 					'default'     => array(), // Empty by default - shows all available methods including cards
 				),
-				'flow_performance_logging'                   => array(
-					'id'          => 'flow_performance_logging',
-					'title'       => __( 'Performance Logging', 'checkout-com-unified-payments-api' ),
-					'type'        => 'checkbox',
-					'label'       => __( 'Enable performance metrics logging', 'checkout-com-unified-payments-api' ),
-					'description' => __( 'When enabled, logs detailed performance metrics to browser console showing load times for Flow component initialization. Useful for debugging and monitoring payment performance. Disable in production to reduce console output.', 'checkout-com-unified-payments-api' ),
+			'flow_debug_logging'                   => array(
+				'id'          => 'flow_debug_logging',
+				'title'       => __( 'Debug Logging', 'checkout-com-unified-payments-api' ),
+				'type'        => 'checkbox',
+				'label'       => __( 'Enable detailed console logging for debugging', 'checkout-com-unified-payments-api' ),
+				'description' => __( 'When enabled, logs detailed debugging information to browser console including initialization, form submissions, and card saving. Shows performance metrics, 3DS flows, and payment processing steps. <strong>Disable in production</strong> to reduce console output. Critical errors, warnings, webhooks, and 3DS authentication will always be visible.', 'checkout-com-unified-payments-api' ),
 					'desc_tip'    => true,
 					'default'     => 'yes',
 				),

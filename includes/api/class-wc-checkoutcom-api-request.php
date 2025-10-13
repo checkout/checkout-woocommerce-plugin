@@ -1266,13 +1266,16 @@ class WC_Checkoutcom_Api_Request {
 			return [];
 		}
 
-		$items    = WC()->cart->get_cart();
-		$products = [];
+	$items    = WC()->cart->get_cart();
+	$products = [];
 
-		$total_amount = WC()->cart->total;
-		$amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $total_amount, get_woocommerce_currency() );
+	$total_amount = WC()->cart->total;
+	$amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $total_amount, get_woocommerce_currency() );
 
-		foreach ( $items as $item => $values ) {
+	// Initialize virtual product flag
+	$contains_virtual_product = false;
+
+	foreach ( $items as $item => $values ) {
 
 			$_product         = wc_get_product( $values['data']->get_id() );
 			$wc_product       = wc_get_product( $values['product_id'] );
@@ -1290,19 +1293,24 @@ class WC_Checkoutcom_Api_Request {
 				$reset_tax = reset( $tax )['rate'];
 				$tax_rate  = round( $reset_tax );
 
-			} else {
-				$tax_rate               = 0;
-				$total_tax_amount_cents = 0;
-			}
+		} else {
+			$tax_rate               = 0;
+			$total_tax_amount_cents = 0;
+		}
 
-			if( $flow ) {
+		// Check if product is virtual
+		if ( $_product->is_virtual() ) {
+			$contains_virtual_product = true;
+		}
+
+		if( $flow ) {
 				$quantity   = $values['quantity'];
 				$line_subtotal = $values['line_subtotal'];
 				$line_total    = $values['line_total'];
 
 				// Discount Price
 				$unit_discount       = ( $line_subtotal - $line_total ) / $quantity;
-				$discount_total_cents = WC_Checkoutcom_Utility::value_to_decimal( $unit_discount * $quantity, $currency );
+				$discount_total_cents = WC_Checkoutcom_Utility::value_to_decimal( $unit_discount * $quantity, get_woocommerce_currency() );
 
 				// Flow-specific logic for cart items
 				$products[] = [
@@ -1404,12 +1412,13 @@ class WC_Checkoutcom_Api_Request {
 				'region'          => WC()->customer->get_billing_city(),
 				'phone'           => WC()->customer->get_billing_phone(),
 				'country'         => WC()->customer->get_billing_country(),
-			],
-			'order_amount'      => $amount_cents,
-			'order_tax_amount'  => $total_tax_amount_cents,
-			'order_lines'       => $products,
-		];
-	}
+		],
+		'order_amount'      => $amount_cents,
+		'order_tax_amount'  => $total_tax_amount_cents,
+		'order_lines'       => $products,
+		'contains_virtual_product' => $contains_virtual_product,
+	];
+}
 
 	/**
 	 * Get order information for Flow integration.
