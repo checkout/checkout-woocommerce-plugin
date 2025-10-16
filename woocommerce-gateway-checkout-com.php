@@ -133,6 +133,15 @@ function init_checkout_com_gateway_class() {
 	include_once 'includes/class-wc-gateway-checkout-com-alternative-payments.php';
 	include_once 'flow-integration/class-wc-gateway-checkout-com-flow.php';
 
+	// WooCommerce Blocks integration
+	include_once 'includes/blocks/class-wc-checkoutcom-blocks-integration.php';
+	include_once 'includes/blocks/class-wc-checkoutcom-blocks-admin-notice.php';
+	include_once 'includes/blocks/payment-methods/class-wc-checkoutcom-cards-blocks.php';
+	include_once 'includes/blocks/payment-methods/class-wc-checkoutcom-paypal-blocks.php';
+	include_once 'includes/blocks/payment-methods/class-wc-checkoutcom-googlepay-blocks.php';
+	include_once 'includes/blocks/payment-methods/class-wc-checkoutcom-applepay-blocks.php';
+	include_once 'includes/blocks/payment-methods/class-wc-checkoutcom-flow-blocks.php';
+
 	// Enhanced logging classes
 	include_once 'includes/logging/class-wc-checkoutcom-enhanced-logger.php';
 	include_once 'includes/logging/class-wc-checkoutcom-log-manager.php';
