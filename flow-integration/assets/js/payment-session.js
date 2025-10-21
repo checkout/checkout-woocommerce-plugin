@@ -564,6 +564,7 @@ var ckoFlow = {
 		// Debug: Log Flow component configuration
 		ckoLogger.debug('Flow Component Configuration:', {
 			publicKey: cko_flow_vars.PKey ? 'SET' : 'NOT SET',
+			publicKeyPreview: cko_flow_vars.PKey ? cko_flow_vars.PKey.substring(0, 10) + '...' : 'NOT SET',
 			environment: cko_flow_vars.env,
 			locale: window.locale,
 			paymentSessionId: paymentSession.id,
@@ -572,6 +573,19 @@ var ckoFlow = {
 			componentOptions: window.componentOptions ? 'SET' : 'NOT SET',
 			translations: window.translations ? 'SET' : 'NOT SET'
 		});
+		
+		// Additional validation
+		if (!cko_flow_vars.PKey) {
+			ckoLogger.error('CRITICAL: Public key is missing!');
+			showError('Payment gateway configuration error. Please contact support.');
+			return;
+		}
+		
+		if (!paymentSession.id) {
+			ckoLogger.error('CRITICAL: Payment session ID is missing!');
+			showError('Payment session error. Please try again.');
+			return;
+		}
 		
 		// Define callback functions BEFORE passing them to CheckoutWebComponents
 		const onReady = () => {
@@ -847,6 +861,40 @@ var ckoFlow = {
 							component.type
 						}"`
 					);
+					
+				// Additional debugging for Flow component validation issues
+				if (component.type === 'flow' && !component.isValid()) {
+					console.log('[FLOW DEBUG] Flow component validation failed - checking component state:', {
+						componentType: component.type,
+						isValid: component.isValid(),
+						componentState: component.state || 'no state available',
+						componentErrors: component.errors || 'no errors available',
+						componentValue: component.value || 'no value available',
+						componentData: component.data || 'no data available',
+						componentMethods: Object.getOwnPropertyNames(component),
+						componentPrototype: Object.getOwnPropertyNames(Object.getPrototypeOf(component)),
+						componentMounted: component.mount ? 'mount method exists' : 'no mount method',
+						componentAvailable: component.isAvailable ? 'isAvailable method exists' : 'no isAvailable method'
+					});
+					
+				// Check if component is properly mounted
+				if (component.mount) {
+					console.log('[FLOW DEBUG] Component mount method exists, checking if mounted...');
+					
+					// Check if component is mounted to DOM
+					const flowContainer = document.getElementById('flow-container');
+					if (flowContainer) {
+						console.log('[FLOW DEBUG] Flow container found:', {
+							containerExists: true,
+							containerChildren: flowContainer.children.length,
+							containerInnerHTML: flowContainer.innerHTML.length > 0 ? 'has content' : 'empty',
+							containerVisible: flowContainer.offsetWidth > 0 && flowContainer.offsetHeight > 0
+						});
+					} else {
+						console.log('[FLOW DEBUG] Flow container NOT found - this is the problem!');
+					}
+				}
+				}
 				};
 
 					/*
@@ -891,13 +939,16 @@ var ckoFlow = {
 						placeOrderBtn.classList.remove("flow-loading");
 					}
 
-						if (
-							error.message ===
-							"[Submit]: Component is invalid [component_invalid]"
-						) {
-							error.message =
-								"Please complete your payment before placing the order.";
-						}
+					// Handle specific error types
+					if (error.message && error.message.includes("[Request]: Network request failed [payment_request_failed]")) {
+						ckoLogger.error("Payment request failed - checking configuration:");
+						ckoLogger.error("Public Key:", cko_flow_vars.PKey ? 'SET' : 'NOT SET');
+						ckoLogger.error("Environment:", cko_flow_vars.env);
+						ckoLogger.error("Payment Session ID:", paymentSession.id);
+						error.message = "Payment request failed. Please check your payment gateway configuration or try again.";
+					} else if (error.message === "[Submit]: Component is invalid [component_invalid]") {
+						error.message = "Please complete your payment before placing the order.";
+					}
 
 						showError(
 							error.message ||
@@ -938,9 +989,51 @@ var ckoFlow = {
 			onError
 		});
 
-				const flowComponent = checkout.create(window.componentName, {
-					showPayButton: false,
-				});
+				// Ensure component name is defined
+				const componentName = window.componentName || 'flow';
+				ckoLogger.debug('Creating Flow component with name:', componentName);
+				
+				let flowComponent;
+				try {
+					console.log('[FLOW DEBUG] About to create Flow component with:', {
+						componentName: componentName,
+						checkoutObject: typeof checkout,
+						checkoutCreate: typeof checkout.create,
+						componentOptions: { showPayButton: false }
+					});
+					
+					ckoLogger.debug('About to create Flow component with:', {
+						componentName: componentName,
+						checkoutObject: typeof checkout,
+						checkoutCreate: typeof checkout.create,
+						componentOptions: { showPayButton: false }
+					});
+					
+					flowComponent = checkout.create(componentName, {
+						showPayButton: false,
+					});
+					
+					console.log('[FLOW DEBUG] Flow component created successfully:', {
+						componentName: componentName,
+						componentType: flowComponent.type,
+						componentAvailable: flowComponent.isAvailable ? 'method exists' : 'method missing',
+						componentMethods: Object.getOwnPropertyNames(flowComponent),
+						componentPrototype: Object.getOwnPropertyNames(Object.getPrototypeOf(flowComponent))
+					});
+					
+					ckoLogger.debug('Flow component created successfully:', {
+						componentName: componentName,
+						componentType: flowComponent.type,
+						componentAvailable: flowComponent.isAvailable ? 'method exists' : 'method missing',
+						componentMethods: Object.getOwnPropertyNames(flowComponent),
+						componentPrototype: Object.getOwnPropertyNames(Object.getPrototypeOf(flowComponent))
+					});
+				} catch (error) {
+					console.log('[FLOW ERROR] Error creating Flow component:', error);
+					ckoLogger.error('Error creating Flow component:', error);
+					showError('Failed to initialize payment component. Please try again.');
+					return;
+				}
 
 				// Performance: Track component creation
 				const componentInitEnd = performance.now();

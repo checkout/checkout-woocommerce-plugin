@@ -39,6 +39,22 @@ require 'class-wc-checkoutcom-apm-method.php';
 class WC_Checkoutcom_Api_Request {
 
 	/**
+	 * Helper function to safely get SDK builder with null check
+	 *
+	 * @param Checkout_SDK $checkout SDK instance
+	 * @param string $operation Operation name for logging
+	 * @return mixed|null Builder instance or null if SDK not initialized
+	 */
+	private static function get_safe_builder( $checkout, $operation = 'operation' ) {
+		$builder = $checkout->get_builder();
+		if ( ! $builder ) {
+			WC_Checkoutcom_Utility::logger( "Checkout.com SDK not initialized - cannot perform $operation" );
+			return null;
+		}
+		return $builder;
+	}
+
+	/**
 	 * Create payment and return response.
 	 *
 	 * @param WC_Order $order Order object.
@@ -79,8 +95,13 @@ class WC_Checkoutcom_Api_Request {
 				$cko_idempotency_key .= '-' . gmdate( 'Y-m-d h:i:s' );
 			}
 
-			// Call to create charge.
-			$response = $checkout->get_builder()->getPaymentsClient()->requestPayment( $request_param, $cko_idempotency_key );
+		// Call to create charge.
+		$builder = $checkout->get_builder();
+		if ( ! $builder ) {
+			WC_Checkoutcom_Utility::logger( 'Checkout.com SDK not initialized - cannot request payment' );
+			return array( 'error' => 'Payment gateway not properly configured. Please contact support.' );
+		}
+		$response = $builder->getPaymentsClient()->requestPayment( $request_param, $cko_idempotency_key );
 
 			// Check if payment successful.
 			if ( WC_Checkoutcom_Utility::is_successful( $response ) ) {
@@ -642,8 +663,13 @@ class WC_Checkoutcom_Api_Request {
 
 		try {
 
-			// Get payment response.
-			$response = $checkout->get_builder()->getPaymentsClient()->getPaymentDetails( $session_id );
+		// Get payment response.
+		$builder = $checkout->get_builder();
+		if ( ! $builder ) {
+			WC_Checkoutcom_Utility::logger( 'Checkout.com SDK not initialized - cannot get payment details' );
+			return array( 'error' => 'Payment gateway not properly configured. Please contact support.' );
+		}
+		$response = $builder->getPaymentsClient()->getPaymentDetails( $session_id );
 
 			// Check if payment is successful.
 			if ( WC_Checkoutcom_Utility::is_successful( $response ) ) {
@@ -728,7 +754,12 @@ class WC_Checkoutcom_Api_Request {
 			$google_pay_token_request             = new GooglePayTokenRequest();
 			$google_pay_token_request->token_data = $google_pay;
 
-			$token = $checkout->get_builder()->getTokensClient()->requestWalletToken( $google_pay_token_request );
+			$builder = $checkout->get_builder();
+		if ( ! $builder ) {
+			WC_Checkoutcom_Utility::logger( 'Checkout.com SDK not initialized - cannot request Google Pay token' );
+			return array( 'error' => 'Payment gateway not properly configured. Please contact support.' );
+		}
+		$token = $builder->getTokensClient()->requestWalletToken( $google_pay_token_request );
 
 			return [
 				'token'        => $token['token'],

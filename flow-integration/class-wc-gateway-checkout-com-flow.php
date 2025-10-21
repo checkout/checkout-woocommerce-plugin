@@ -22,7 +22,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	 */
 	public function __construct() {
 
-		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 
 		$this->id                 = 'wc_checkout_com_flow';
 		$this->method_title       = __( 'Checkout.com', 'checkout-com-unified-payments-api' );
@@ -117,7 +117,10 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	public function payment_fields() {
 
 		$save_card = WC_Admin_Settings::get_option( 'ckocom_card_saved' );
-		$flow_saved_card = get_option( 'woocommerce_wc_checkout_com_flow_settings' )['flow_saved_payment'];
+		
+		// Safely get flow saved card setting with fallback
+		$flow_settings = get_option( 'woocommerce_wc_checkout_com_flow_settings', array() );
+		$flow_saved_card = isset( $flow_settings['flow_saved_payment'] ) ? $flow_settings['flow_saved_payment'] : 'saved_cards_first';
 
 		$order_pay_order_id = null;
 		$order_pay_order = null;
@@ -1210,7 +1213,15 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	// Fetch the payment details from Checkout.com to verify and get status
 		try {
 		$checkout = new Checkout_SDK();
-		$payment_details = $checkout->get_builder()->getPaymentsClient()->getPaymentDetails( $flow_payment_id );
+		$builder = $checkout->get_builder();
+		
+		// Check if SDK was properly initialized
+		if ( ! $builder ) {
+			WC_Checkoutcom_Utility::logger( 'Checkout.com SDK not initialized - cannot fetch payment details for: ' . $flow_payment_id );
+			throw new Exception( 'Payment gateway not properly configured. Please contact support.' );
+		}
+		
+		$payment_details = $builder->getPaymentsClient()->getPaymentDetails( $flow_payment_id );
 		
 		// Convert to result format expected by the rest of the code
 			$result = array(
@@ -1349,7 +1360,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			if ( 'pending' === $order_status || 'failed' === $order_status ) {
 				$order->update_meta_data( 'cko_payment_authorized', true );
 			}
-	}
+		}
 	else {
 		$flow_pay_id = isset( $_POST['cko-flow-payment-id'] ) ? sanitize_text_field( $_POST['cko-flow-payment-id'] ) : '';
 

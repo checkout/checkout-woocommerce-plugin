@@ -148,7 +148,7 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 // Component name section.
-window.componentName = cko_flow_customization_vars.flow_component_name;
+window.componentName = cko_flow_customization_vars.flow_component_name || 'flow';
 
 // Locale and Translation section.
 window.locale = cko_flow_customization_vars.flow_component_locale;

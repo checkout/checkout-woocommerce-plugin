@@ -18,11 +18,23 @@
  * @package wc_checkout_com
  */
 
-use Checkout\CheckoutUtils;
-use Checkout\Payments\PaymentType;
+// use Checkout\CheckoutUtils;
+// use Checkout\Payments\PaymentType;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
+}
+
+// Load Composer autoloader for Checkout.com SDK
+$autoloader_path = __DIR__ . '/vendor/autoload.php';
+if ( file_exists( $autoloader_path ) ) {
+	require_once $autoloader_path;
+	// Verify SDK classes are available
+	if ( ! class_exists( 'Checkout\CheckoutSdk' ) ) {
+		error_log( 'Checkout.com SDK classes not loaded after autoloader inclusion. Path: ' . $autoloader_path );
+	}
+} else {
+	error_log( 'Checkout.com SDK autoloader not found at: ' . $autoloader_path );
 }
 add_filter( 'woocommerce_checkout_registration_enabled', '__return_true' );
 
@@ -126,30 +138,27 @@ function init_checkout_com_gateway_class() {
 
 	load_plugin_textdomain( 'checkout-com-unified-payments-api', false, plugin_basename( __DIR__ ) . '/languages' );
 
+	// Core payment gateway classes
 	include_once 'includes/class-wc-gateway-checkout-com-cards.php';
 	include_once 'includes/class-wc-gateway-checkout-com-apple-pay.php';
 	include_once 'includes/class-wc-gateway-checkout-com-google-pay.php';
 	include_once 'includes/class-wc-gateway-checkout-com-paypal.php';
 	include_once 'includes/class-wc-gateway-checkout-com-alternative-payments.php';
+	
+	// Flow integration
 	include_once 'flow-integration/class-wc-gateway-checkout-com-flow.php';
 
-	// WooCommerce Blocks integration
-	include_once 'includes/blocks/class-wc-checkoutcom-blocks-integration.php';
-	include_once 'includes/blocks/class-wc-checkoutcom-blocks-admin-notice.php';
-	include_once 'includes/blocks/payment-methods/class-wc-checkoutcom-cards-blocks.php';
-	include_once 'includes/blocks/payment-methods/class-wc-checkoutcom-paypal-blocks.php';
-	include_once 'includes/blocks/payment-methods/class-wc-checkoutcom-googlepay-blocks.php';
-	include_once 'includes/blocks/payment-methods/class-wc-checkoutcom-applepay-blocks.php';
-	include_once 'includes/blocks/payment-methods/class-wc-checkoutcom-flow-blocks.php';
+	// Enhanced logging classes (commented out temporarily)
+	// include_once 'includes/logging/class-wc-checkoutcom-enhanced-logger.php';
+	// include_once 'includes/logging/class-wc-checkoutcom-log-manager.php';
+	// include_once 'includes/logging/class-wc-checkoutcom-performance-monitor.php';
+	// include_once 'includes/settings/class-wc-checkoutcom-logging-settings.php';
 
-	// Enhanced logging classes
-	include_once 'includes/logging/class-wc-checkoutcom-enhanced-logger.php';
-	include_once 'includes/logging/class-wc-checkoutcom-log-manager.php';
-	include_once 'includes/logging/class-wc-checkoutcom-performance-monitor.php';
-	include_once 'includes/settings/class-wc-checkoutcom-logging-settings.php';
+	// Initialize enhanced logging (commented out temporarily)
+	// WC_Checkoutcom_Logging_Settings::init();
 
-	// Initialize enhanced logging
-	WC_Checkoutcom_Logging_Settings::init();
+	// WooCommerce Blocks integration (safe/conditional)
+	include_once 'includes/blocks/class-wc-checkoutcom-blocks-integration-safe.php';
 
 	// Load payment gateway class.
 	add_filter( 'woocommerce_payment_gateways', 'checkout_com_add_gateway' );
@@ -568,7 +577,12 @@ function callback_for_setting_up_scripts() {
 	// Enqueue FLOW scripts.
 	$core_settings      = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
 	$checkout_mode      = $core_settings['ckocom_checkout_mode'];
-	$flow_customization = get_option( 'woocommerce_wc_checkout_com_flow_settings' );
+	$flow_customization = get_option( 'woocommerce_wc_checkout_com_flow_settings', array() );
+	
+	// Ensure flow_component_name is always set with a default value
+	if ( empty( $flow_customization['flow_component_name'] ) ) {
+		$flow_customization['flow_component_name'] = 'flow';
+	}
 
 	if ( 'flow' === $checkout_mode ) {
 		// Add resource hints for faster DNS resolution and connection to Checkout.com
@@ -616,14 +630,14 @@ function callback_for_setting_up_scripts() {
 			'checkout-com-flow-container-script', 
 			WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/js/flow-container.js', 
 			array( 'jquery' ), 
-			WC_CHECKOUTCOM_PLUGIN_VERSION,
+			WC_CHECKOUTCOM_PLUGIN_VERSION
 		);
 
 	wp_enqueue_script(
 		'checkout-com-flow-payment-session-script', 
 		WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/js/payment-session.js', 
 		array( 'jquery', 'flow-customization-script', 'checkout-com-flow-container-script', 'wp-i18n' ), 
-		WC_CHECKOUTCOM_PLUGIN_VERSION . '-v2025010520',
+		WC_CHECKOUTCOM_PLUGIN_VERSION . '-v2025010520'
 	);
 
 		$url = 'https://api.checkout.com/payment-sessions';
@@ -645,12 +659,12 @@ function callback_for_setting_up_scripts() {
 			$wp_version,
 			$woo_version, 
 			WC_CHECKOUTCOM_PLUGIN_VERSION,
-			CheckoutUtils::PROJECT_VERSION,
+			( class_exists('Checkout\\CheckoutUtils') && defined('Checkout\\CheckoutUtils::PROJECT_VERSION') ) ? \Checkout\CheckoutUtils::PROJECT_VERSION : 'unknown',
 			get_site_url()
 		);
 
-		$regular_payment_type = PaymentType::$regular;
-		$recurring_payment_type = PaymentType::$recurring;
+		$regular_payment_type = class_exists('Checkout\\Payments\\PaymentType') ? \Checkout\Payments\PaymentType::$regular : 'Regular';
+		$recurring_payment_type = class_exists('Checkout\\Payments\\PaymentType') ? \Checkout\Payments\PaymentType::$recurring : 'Recurring';
 
 		$ref_session = is_array( WC()->session->get_session_cookie() ) ? substr( WC()->session->get_session_cookie()[3], 0, 25 ) : '';
 		$ref_session = preg_match( '/^[a-zA-Z0-9]{25}$/', $ref_session ) ? $ref_session : substr( bin2hex( random_bytes(13) ), 0, 25 );

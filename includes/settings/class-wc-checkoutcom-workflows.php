@@ -133,8 +133,15 @@ class WC_Checkoutcom_Workflows {
 		}
 
 		try {
+			$builder = $this->checkout->get_builder();
+			
+			// Check if SDK was properly initialized
+			if ( ! $builder ) {
+				WC_Checkoutcom_Utility::logger( 'Checkout.com SDK not initialized - cannot fetch workflows' );
+				return array();
+			}
 
-			$workflows = $this->checkout->get_builder()->getWorkflowsClient()->getWorkflows();
+			$workflows = $builder->getWorkflowsClient()->getWorkflows();
 
 			if ( ! is_wp_error( $workflows ) && ! empty( $workflows ) ) {
 
@@ -192,6 +199,12 @@ class WC_Checkoutcom_Workflows {
 			$url = WC_Checkoutcom_Webhook::get_instance()->generate_current_webhook_url();
 		}
 
+		// Check if SDK classes are available
+		if ( ! class_exists( 'Checkout\Workflows\Actions\WebhookSignature' ) ) {
+			WC_Checkoutcom_Utility::logger( 'Checkout.com SDK Workflow classes not found - cannot create webhook workflow' );
+			return array();
+		}
+		
 		$signature         = new WebhookSignature();
 		$signature->key    = $this->secret_key;
 		$signature->method = 'HMACSHA256';
@@ -258,7 +271,15 @@ class WC_Checkoutcom_Workflows {
 
 		$workflows = [];
 		try {
-			$workflows = $this->checkout->get_builder()->getWorkflowsClient()->createWorkflow( $workflow_request );
+			$builder = $this->checkout->get_builder();
+			
+			// Check if SDK was properly initialized
+			if ( ! $builder ) {
+				WC_Checkoutcom_Utility::logger( 'Checkout.com SDK not initialized - cannot create workflow' );
+				return array();
+			}
+			
+			$workflows = $builder->getWorkflowsClient()->createWorkflow( $workflow_request );
 
 			if ( ! is_wp_error( $workflows ) && ! empty( $workflows ) ) {
 
