@@ -170,15 +170,22 @@ jQuery( function ( $ ) {
                 onApprove: async function (data) {
                     cko_paypal_vars.debug && console.log(data);
 
-                    jQuery.post(cko_paypal_vars.paypal_order_session_url + "&paypal_order_id=" + data.orderID + "&woocommerce-process-checkout-nonce=" + cko_paypal_vars.woocommerce_process_checkout, function (data) {
-                        if (typeof data.success !== 'undefined' && data.success !== true ) {
-                            var messages = data.data.messages ? data.data.messages : data.data;
+                    jQuery.post(cko_paypal_vars.paypal_order_session_url + "&paypal_order_id=" + data.orderID + "&woocommerce-process-checkout-nonce=" + cko_paypal_vars.woocommerce_process_checkout, function (response) {
+                        if (typeof response.success !== 'undefined' && response.success !== true ) {
+                            var messages = response.data.messages ? response.data.messages : response.data;
 
                             if ( 'string' === typeof messages || Array.isArray( messages ) ) {
                                 showError( messages );
                             }
                         } else {
-                            window.location.href = cko_paypal_vars.redirect;
+                            // Check if we have a redirect URL for express checkout
+                            if (response.data && response.data.redirect_url) {
+                                // Express checkout - redirect directly to success page
+                                window.location.href = response.data.redirect_url;
+                            } else {
+                                // Fallback to checkout page (old behavior)
+                                window.location.href = cko_paypal_vars.redirect;
+                            }
                         }
                     });
                 },

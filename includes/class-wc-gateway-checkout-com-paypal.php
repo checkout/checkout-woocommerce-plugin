@@ -178,7 +178,180 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 		$cko_paypal_order_id = WC_Checkoutcom_Utility::cko_get_session( 'cko_paypal_order_id' );
 		$cko_pc_id           = WC_Checkoutcom_Utility::cko_get_session( 'cko_pc_id' );
 
-		wp_send_json_success();
+		// If we have a payment context, process the express checkout immediately
+		if ( ! empty( $cko_pc_id ) ) {
+			try {
+				// Create the order from cart
+				$order = $this->create_express_order_from_cart();
+				
+				if ( ! $order ) {
+					wp_send_json_error( array( 'messages' => 'Failed to create order for PayPal Express checkout.' ) );
+					return;
+				}
+
+				// Get payment context details
+				$checkout = new Checkout_SDK();
+				$response = $checkout->get_builder()->getPaymentContextsClient()->getPaymentContextDetails( $cko_pc_id );
+				
+				$payment_context_id    = $cko_pc_id;
+				$processing_channel_id = $response['payment_request']['processing_channel_id'];
+
+				// Process the payment immediately
+				$payment_response = $this->request_payment( $order, $payment_context_id, $processing_channel_id );
+
+				// Clear PayPal session
+				WC_Checkoutcom_Utility::cko_set_session( 'cko_paypal_order_id', '' );
+				WC_Checkoutcom_Utility::cko_set_session( 'cko_pc_id', '' );
+
+				// Check if payment was successful
+				if ( isset( $payment_response['status'] ) && in_array( $payment_response['status'], array( 'Authorized', 'Captured' ) ) ) {
+					// Set order status based on payment status
+					if ( $payment_response['status'] === 'Captured' ) {
+						$order->payment_complete( $payment_response['id'] );
+						$order->add_order_note( 'PayPal Express payment captured successfully. Payment ID: ' . $payment_response['id'] );
+					} else {
+						$order->update_status( 'on-hold', 'PayPal Express payment authorized. Payment ID: ' . $payment_response['id'] );
+					}
+
+					// Set order meta
+					$order->update_meta_data( '_cko_payment_id', $payment_response['id'] );
+					$order->update_meta_data( '_cko_payment_status', $payment_response['status'] );
+					$order->save();
+
+					// Clear cart
+					WC()->cart->empty_cart();
+
+					// Return success with redirect URL
+					$redirect_url = $order->get_checkout_order_received_url();
+					wp_send_json_success( array( 'redirect_url' => $redirect_url ) );
+				} else {
+					// Payment failed
+					$order->update_status( 'failed', 'PayPal Express payment failed.' );
+					wp_send_json_error( array( 'messages' => 'Payment failed. Please try again.' ) );
+				}
+
+			} catch ( CheckoutApiException $ex ) {
+				$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
+				$error_message = 'An error occurred while processing PayPal Express payment. ';
+				
+				if ( $gateway_debug ) {
+					$error_message .= $ex->getMessage();
+				}
+
+				WC_Checkoutcom_Utility::logger( $error_message, $ex );
+				wp_send_json_error( array( 'messages' => $error_message ) );
+			}
+		} else {
+			// No payment context, just return success (fallback to old behavior)
+			wp_send_json_success();
+		}
+	}
+
+	/**
+	 * Create order from cart for PayPal Express checkout.
+	 *
+	 * @return WC_Order|false
+	 */
+	private function create_express_order_from_cart() {
+		try {
+			// Create order
+			$order = wc_create_order();
+			
+			if ( ! $order ) {
+				return false;
+			}
+
+			// Add cart items to order
+			foreach ( WC()->cart->get_cart() as $cart_item_key => $cart_item ) {
+				$product = $cart_item['data'];
+				$order->add_product( $product, $cart_item['quantity'] );
+			}
+
+			// Set order addresses from PayPal data if available
+			$this->set_order_addresses_from_paypal( $order );
+
+			// Set shipping method if available
+			$shipping_packages = WC()->shipping->get_packages();
+			if ( ! empty( $shipping_packages ) ) {
+				foreach ( $shipping_packages as $package ) {
+					$chosen_methods = WC()->session->get( 'chosen_shipping_methods' );
+					if ( ! empty( $chosen_methods ) ) {
+						$order->set_shipping_method( $chosen_methods[0] );
+					}
+				}
+			}
+
+			// Calculate totals
+			$order->calculate_totals();
+
+			// Set order status
+			$order->set_status( 'pending' );
+			$order->save();
+
+			// Store order ID in session for potential use
+			WC()->session->set( 'order_awaiting_payment', $order->get_id() );
+
+			return $order;
+
+		} catch ( Exception $e ) {
+			WC_Checkoutcom_Utility::logger( 'Error creating PayPal Express order: ' . $e->getMessage(), $e );
+			return false;
+		}
+	}
+
+	/**
+	 * Set order addresses from PayPal payment context data.
+	 *
+	 * @param WC_Order $order
+	 */
+	private function set_order_addresses_from_paypal( $order ) {
+		$cko_pc_details = WC_Checkoutcom_Utility::cko_get_session( 'cko_pc_details' );
+		
+		if ( empty( $cko_pc_details ) ) {
+			// Try to get payment context details
+			$cko_pc_id = WC_Checkoutcom_Utility::cko_get_session( 'cko_pc_id' );
+			if ( ! empty( $cko_pc_id ) ) {
+				try {
+					$checkout = new Checkout_SDK();
+					$cko_pc_details = $checkout->get_builder()->getPaymentContextsClient()->getPaymentContextDetails( $cko_pc_id );
+					WC_Checkoutcom_Utility::cko_set_session( 'cko_pc_details', $cko_pc_details );
+				} catch ( Exception $e ) {
+					// If we can't get details, use default addresses
+					return;
+				}
+			}
+		}
+
+		if ( isset( $cko_pc_details['payment_request']['shipping']['address'] ) ) {
+			$paypal_shipping_address = $cko_pc_details['payment_request']['shipping']['address'];
+			$shipping_name = $cko_pc_details['payment_request']['shipping']['first_name'] ?? '';
+			$shipping_name_parts = explode( ' ', $shipping_name );
+			$shipping_first_name = $shipping_name_parts[0] ?? '';
+			$shipping_last_name = $shipping_name_parts[1] ?? '';
+
+			// Set shipping address
+			$order->set_shipping_first_name( $shipping_first_name );
+			$order->set_shipping_last_name( $shipping_last_name );
+			$order->set_shipping_address_1( $paypal_shipping_address['address_line1'] ?? '' );
+			$order->set_shipping_address_2( $paypal_shipping_address['address_line2'] ?? '' );
+			$order->set_shipping_city( $paypal_shipping_address['city'] ?? '' );
+			$order->set_shipping_postcode( $paypal_shipping_address['zip'] ?? '' );
+			$order->set_shipping_country( $paypal_shipping_address['country'] ?? '' );
+
+			// Set billing address (same as shipping for PayPal Express)
+			$order->set_billing_first_name( $shipping_first_name );
+			$order->set_billing_last_name( $shipping_last_name );
+			$order->set_billing_address_1( $paypal_shipping_address['address_line1'] ?? '' );
+			$order->set_billing_address_2( $paypal_shipping_address['address_line2'] ?? '' );
+			$order->set_billing_city( $paypal_shipping_address['city'] ?? '' );
+			$order->set_billing_postcode( $paypal_shipping_address['zip'] ?? '' );
+			$order->set_billing_country( $paypal_shipping_address['country'] ?? '' );
+
+			// Set email if available
+			if ( isset( $cko_pc_details['payment_request']['shipping']['email'] ) ) {
+				$order->set_billing_email( $cko_pc_details['payment_request']['shipping']['email'] );
+			}
+		}
 	}
 
 	/**
