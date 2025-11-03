@@ -164,10 +164,87 @@ For issues or questions:
 
 ---
 
+---
+
+## 🆕 PayPal Express Checkout Enhancements (November 3, 2025)
+
+### 4. **PayPal Express Location Settings** ✅
+
+**Problem**: PayPal Express buttons could only appear on product pages, limiting merchant flexibility.
+
+**Solution**: Added granular location controls for PayPal Express buttons:
+
+#### **New Settings Available**:
+
+1. **Enable PayPal Express** (Master Toggle)
+   - **Location**: WooCommerce → Settings → Payments → Checkout.com → PayPal Settings
+   - **Setting**: `paypal_express`
+   - **Default**: `no`
+   - **Description**: Master toggle to activate PayPal Express checkout. When enabled, use the location-specific options below to control where buttons appear.
+
+2. **Express Checkout Button Locations**
+   - **Show on Product Page** (`paypal_express_product_page`) - Default: `yes`
+   - **Show on Shop/Category Pages** (`paypal_express_shop_page`) - Default: `yes`
+   - **Show on Cart Page** (`paypal_express_cart_page`) - Default: `yes`
+
+#### **Key Features**:
+
+- ✅ **Master Toggle Control**: Disabling the master toggle prevents all PayPal Express functionality from loading
+- ✅ **Granular Location Control**: Merchants can enable/disable PayPal Express on product, shop, or cart pages independently
+- ✅ **Robust Edge Case Handling**: Explicit checks for `'yes'` value with proper handling of unset, empty, or false values
+- ✅ **Email & Customer Handling**: 
+  - Logged-in users: Account email is used, orders associated with customer account
+  - Guest users: Email extracted from PayPal response
+- ✅ **Backward Compatibility**: Defaults to enabled if settings don't exist (for new installations)
+
+#### **Files Modified**:
+- `includes/express/paypal/class-paypal-express.php` - Master toggle logic, location-specific display methods
+- `includes/settings/class-wc-checkoutcom-cards-settings.php` - New settings fields
+- `includes/class-wc-gateway-checkout-com-paypal.php` - Email and customer ID handling
+- `assets/js/cko-paypal-express-integration.js` - Product, shop, and cart page button initialization
+- `includes/api/class-wc-checkoutcom-utility.php` - Enhanced availability checking
+
+#### **Technical Implementation**:
+
+**Master Toggle Logic**:
+```php
+// Constructor checks master toggle first - prevents hooks from being added if disabled
+$is_express_enable = isset( $paypal_settings['paypal_express'] ) 
+    && 'yes' === $paypal_settings['paypal_express']
+    && ! empty( $paypal_settings['paypal_express'] );
+if ( ! $is_express_enable ) {
+    return; // No hooks added, no scripts loaded
+}
+```
+
+**Location-Specific Display**:
+```php
+// Each display method checks master toggle AND location setting
+$show_on_product = ! isset( $paypal_settings['paypal_express_product_page'] ) 
+    || $paypal_settings['paypal_express_product_page'] !== 'no';
+if ( ! $is_express_enabled || ! $show_on_product ) {
+    return;
+}
+```
+
+#### **Testing Checklist**:
+- [ ] Master toggle disabled: No PayPal Express buttons appear anywhere
+- [ ] Master toggle enabled, all locations enabled: Buttons appear on product, shop, and cart pages
+- [ ] Master toggle enabled, product page disabled: Buttons only on shop and cart pages
+- [ ] Master toggle enabled, shop page disabled: Buttons only on product and cart pages
+- [ ] Master toggle enabled, cart page disabled: Buttons only on product and shop pages
+- [ ] Logged-in user: Order associated with customer account, account email used
+- [ ] Guest user: Email extracted from PayPal response
+- [ ] Express checkout from product page works
+- [ ] Express checkout from shop page works
+- [ ] Express checkout from cart page works
+
+---
+
 ## 🎉 Credits
 
-**Version**: 2025-10-13-FINAL-E2E  
-**Build Date**: October 13, 2025  
+**Version**: 2025-11-03-EXPRESS-CHECKOUT-ENHANCEMENTS  
+**Build Date**: November 3, 2025  
 **Build Type**: Production E2E Ready  
-**Stability**: Production-ready with comprehensive logging and webhook support
+**Stability**: Production-ready with comprehensive logging, webhook support, and enhanced PayPal Express checkout
 

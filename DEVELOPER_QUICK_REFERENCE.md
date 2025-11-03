@@ -50,7 +50,26 @@ window.translations = {
 };
 ```
 
-### 4. Handle MOTO Orders
+### 4. Configure PayPal Express Settings
+```php
+// Enable PayPal Express (master toggle)
+update_option('woocommerce_wc_checkout_com_paypal_settings', [
+    'paypal_express' => 'yes',  // Enable Express checkout
+    'paypal_express_product_page' => 'yes',  // Show on product pages
+    'paypal_express_shop_page' => 'yes',     // Show on shop/category pages
+    'paypal_express_cart_page' => 'yes'       // Show on cart page
+]);
+
+// Disable Express on specific pages
+update_option('woocommerce_wc_checkout_com_paypal_settings', [
+    'paypal_express' => 'yes',
+    'paypal_express_product_page' => 'no',   // Hide on product pages
+    'paypal_express_shop_page' => 'yes',     // Show on shop pages
+    'paypal_express_cart_page' => 'yes'       // Show on cart page
+]);
+```
+
+### 5. Handle MOTO Orders
 ```php
 // Detect MOTO order
 if ($order->is_created_via('admin')) {
