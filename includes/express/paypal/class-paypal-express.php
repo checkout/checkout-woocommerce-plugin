@@ -26,7 +26,7 @@ class CKO_Paypal_Express {
 		$paypal_enabled    = ! empty( $paypal_settings['enabled'] ) && 'yes' === $paypal_settings['enabled'];
 
 		$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
-		$checkout_mode    = $checkout_setting['ckocom_checkout_mode'];
+		$checkout_mode    = isset( $checkout_setting['ckocom_checkout_mode'] ) ? $checkout_setting['ckocom_checkout_mode'] : 'classic';
 
 		if ( ! $paypal_enabled || ! $is_express_enable ) {
 			if ( $checkout_mode === 'classic' ) {
@@ -40,6 +40,21 @@ class CKO_Paypal_Express {
 		}
 
 		add_action( 'woocommerce_after_add_to_cart_form', [ $this, 'display_payment_request_button_html' ], 1 );
+		
+		// Add PayPal Express buttons to shop/listing pages
+		add_action( 'woocommerce_after_shop_loop_item', [ $this, 'display_shop_payment_request_button_html' ], 15 );
+		
+		// Add PayPal Express button to cart page (classic cart)
+		add_action( 'woocommerce_proceed_to_checkout', [ $this, 'display_cart_payment_request_button_html' ], 5 );
+		
+		// Add PayPal Express button to Blocks cart page
+		add_action( 'woocommerce_blocks_cart_block_render', [ $this, 'display_cart_payment_request_button_html' ], 10 );
+		
+		// Add PayPal Express button after cart table (fallback for Blocks)
+		add_action( 'woocommerce_after_cart_table', [ $this, 'display_cart_payment_request_button_html' ], 5 );
+		
+		// Add PayPal Express button in cart collaterals (another fallback)
+		add_action( 'woocommerce_cart_collaterals', [ $this, 'display_cart_payment_request_button_html' ], 15 );
 
 		add_action( 'wp_enqueue_scripts', [ $this, 'payment_scripts' ] );
 
@@ -138,9 +153,28 @@ class CKO_Paypal_Express {
 	}
 
 	public function payment_scripts() {
+		$paypal_settings = get_option( 'woocommerce_wc_checkout_com_paypal_settings' );
 
-		// Load on Cart, Checkout, pay for order or add payment method pages.
-		if ( ! is_product() || ! WC_Checkoutcom_Utility::is_paypal_express_available() ) {
+		// Load on Product, Cart, Shop, or Checkout pages if PayPal Express is available.
+		if ( ! WC_Checkoutcom_Utility::is_paypal_express_available() ) {
+			return;
+		}
+
+		// Check which pages should load scripts based on settings
+		$show_on_product = ! isset( $paypal_settings['paypal_express_product_page'] ) || $paypal_settings['paypal_express_product_page'] !== 'no';
+		$show_on_shop = ! isset( $paypal_settings['paypal_express_shop_page'] ) || $paypal_settings['paypal_express_shop_page'] !== 'no';
+		$show_on_cart = ! isset( $paypal_settings['paypal_express_cart_page'] ) || $paypal_settings['paypal_express_cart_page'] !== 'no';
+
+		// Only load on relevant pages where Express is enabled
+		$should_load = false;
+		
+		if ( ( is_product() && $show_on_product ) ||
+		     ( is_cart() && $show_on_cart ) ||
+		     ( ( is_shop() || is_product_category() || is_product_tag() || is_product_taxonomy() ) && $show_on_shop ) ) {
+			$should_load = true;
+		}
+
+		if ( ! $should_load ) {
 			return;
 		}
 
@@ -200,8 +234,12 @@ class CKO_Paypal_Express {
 	}
 
 	public function display_payment_request_button_html() {
+		$paypal_settings = get_option( 'woocommerce_wc_checkout_com_paypal_settings' );
+		
+		// Check if PayPal Express is enabled for product pages
+		$show_on_product = ! isset( $paypal_settings['paypal_express_product_page'] ) || $paypal_settings['paypal_express_product_page'] !== 'no';
 
-		if ( ! is_product() || ! WC_Checkoutcom_Utility::is_paypal_express_available() ) {
+		if ( ! is_product() || ! WC_Checkoutcom_Utility::is_paypal_express_available() || ! $show_on_product ) {
 			return;
 		}
 
@@ -214,6 +252,114 @@ class CKO_Paypal_Express {
 			}
 		</style>
 		<div id="cko-paypal-button-wrapper" style="margin-top: 1em;clear:both;display:none;"></div>
+		<?php
+	}
+
+	/**
+	 * Display PayPal Express button on shop/listing pages
+	 */
+	public function display_shop_payment_request_button_html() {
+		global $product;
+
+		$paypal_settings = get_option( 'woocommerce_wc_checkout_com_paypal_settings' );
+		
+		// Check if PayPal Express is enabled for shop pages
+		$show_on_shop = ! isset( $paypal_settings['paypal_express_shop_page'] ) || $paypal_settings['paypal_express_shop_page'] !== 'no';
+
+		// Check if PayPal Express is available
+		$is_available = WC_Checkoutcom_Utility::is_paypal_express_available();
+		
+		// Only show on shop pages and if PayPal Express is available and enabled for shop pages
+		if ( ! ( is_shop() || is_product_category() || is_product_tag() || is_product_taxonomy() ) || ! $is_available || ! $show_on_shop ) {
+			return;
+		}
+
+		// Don't show for variable products on shop pages (too complex)
+		if ( $product && $product->is_type( 'variable' ) ) {
+			return;
+		}
+
+		$product_id = $product ? $product->get_id() : 0;
+		?>
+		<style>
+			.cko-paypal-shop-button {
+				margin-top: 8px;
+				text-align: center;
+			}
+			.cko-paypal-shop-button .cko-disabled {
+				cursor: not-allowed;
+				-webkit-filter: grayscale(100%);
+				filter: grayscale(100%);
+			}
+			.cko-paypal-shop-button #cko-paypal-button-wrapper-<?php echo esc_attr( $product_id ); ?> {
+				display: none;
+			}
+		</style>
+		<div class="cko-paypal-shop-button">
+			<div id="cko-paypal-button-wrapper-<?php echo esc_attr( $product_id ); ?>" data-product-id="<?php echo esc_attr( $product_id ); ?>"></div>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Display PayPal Express button on cart page
+	 */
+	public function display_cart_payment_request_button_html() {
+		static $rendered = false;
+		
+		// Prevent duplicate rendering if multiple hooks fire
+		if ( $rendered ) {
+			return;
+		}
+		
+		$paypal_settings = get_option( 'woocommerce_wc_checkout_com_paypal_settings' );
+		
+		// Check if PayPal Express is enabled for cart page
+		$show_on_cart = ! isset( $paypal_settings['paypal_express_cart_page'] ) || $paypal_settings['paypal_express_cart_page'] !== 'no';
+
+		// Check if PayPal Express is available
+		$is_available = WC_Checkoutcom_Utility::is_paypal_express_available();
+		
+		// Only show on cart page and if PayPal Express is available and enabled for cart page
+		if ( ! is_cart() || ! $is_available || ! $show_on_cart ) {
+			return;
+		}
+
+		// Don't show if cart is empty
+		if ( WC()->cart->is_empty() ) {
+			return;
+		}
+		
+		// Mark as rendered
+		$rendered = true;
+		?>
+		<style>
+			.cko-paypal-cart-button {
+				margin: 15px 0;
+				text-align: center;
+				padding: 15px;
+				background: #f8f9fa;
+				border: 1px solid #e9ecef;
+				border-radius: 5px;
+			}
+			.cko-paypal-cart-button .cko-disabled {
+				cursor: not-allowed;
+				-webkit-filter: grayscale(100%);
+				filter: grayscale(100%);
+			}
+			.cko-paypal-cart-button #cko-paypal-button-wrapper-cart {
+				display: none;
+			}
+			.cko-paypal-cart-button h3 {
+				margin: 0 0 10px 0;
+				font-size: 16px;
+				color: #333;
+			}
+		</style>
+		<div class="cko-paypal-cart-button">
+			<h3><?php _e( 'Express Checkout', 'checkout-com-unified-payments-api' ); ?></h3>
+			<div id="cko-paypal-button-wrapper-cart"></div>
+		</div>
 		<?php
 	}
 
@@ -369,6 +515,34 @@ class CKO_Paypal_Express {
 				case 'billing_country':
 				case 'shipping_country':
 					return $paypal_shipping_address['country'];
+
+				case 'billing_email':
+					// For logged-in users, use their account email
+					if ( is_user_logged_in() ) {
+						$current_user = wp_get_current_user();
+						if ( $current_user && $current_user->user_email ) {
+							return $current_user->user_email;
+						}
+					}
+					// For guest users, get email from PayPal data
+					// Check multiple possible locations
+					if ( isset( $cko_pc_details['payment_request']['source']['account_holder']['email'] ) ) {
+						return $cko_pc_details['payment_request']['source']['account_holder']['email'];
+					}
+					if ( isset( $cko_pc_details['payment_request']['shipping']['email'] ) ) {
+						return $cko_pc_details['payment_request']['shipping']['email'];
+					}
+					if ( isset( $cko_pc_details['payment_request']['billing']['email'] ) ) {
+						return $cko_pc_details['payment_request']['billing']['email'];
+					}
+					if ( isset( $cko_pc_details['payment_request']['payer']['email'] ) ) {
+						return $cko_pc_details['payment_request']['payer']['email'];
+					}
+					if ( isset( $cko_pc_details['payment_request']['customer']['email'] ) ) {
+						return $cko_pc_details['payment_request']['customer']['email'];
+					}
+					// Return original value if not found
+					return $value;
 			}
 		}
 

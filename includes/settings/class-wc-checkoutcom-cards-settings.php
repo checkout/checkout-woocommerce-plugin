@@ -820,6 +820,35 @@ class WC_Checkoutcom_Cards_Settings {
 				'desc_tip'    => false,
 				'default'     => 'no',
 			],
+			'paypal_express_location'    => [
+				'title'       => __( 'Express Checkout Button Locations', 'checkout-com-unified-payments-api' ),
+				'type'        => 'title',
+				'description' => __( 'Control where PayPal Express buttons appear on your store.', 'checkout-com-unified-payments-api' ),
+			],
+			'paypal_express_product_page' => [
+				'title'       => __( 'Show on Product Page', 'checkout-com-unified-payments-api' ),
+				'label'       => __( 'Display PayPal Express button on product detail pages', 'checkout-com-unified-payments-api' ),
+				'type'        => 'checkbox',
+				'description' => __( 'Show PayPal Express button on individual product pages.', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => true,
+				'default'     => 'yes',
+			],
+			'paypal_express_shop_page'    => [
+				'title'       => __( 'Show on Shop/Category Pages', 'checkout-com-unified-payments-api' ),
+				'label'       => __( 'Display PayPal Express button on shop and category listing pages', 'checkout-com-unified-payments-api' ),
+				'type'        => 'checkbox',
+				'description' => __( 'Show PayPal Express button on shop, category, tag, and archive pages.', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => true,
+				'default'     => 'yes',
+			],
+			'paypal_express_cart_page'    => [
+				'title'       => __( 'Show on Cart Page', 'checkout-com-unified-payments-api' ),
+				'label'       => __( 'Display PayPal Express button on cart page', 'checkout-com-unified-payments-api' ),
+				'type'        => 'checkbox',
+				'description' => __( 'Show PayPal Express button on the cart page.', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => true,
+				'default'     => 'yes',
+			],
 		];
 
 		return apply_filters( 'wc_checkout_com_paypal', $settings );
