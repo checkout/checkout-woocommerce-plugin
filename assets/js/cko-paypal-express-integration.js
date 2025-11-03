@@ -1,7 +1,7 @@
 /* global cko_paypal_vars */
 
 jQuery( function ( $ ) {
-
+    
     const formSelector = 'form.cart';
 
     const onFormChange = function ( e ) {
@@ -118,11 +118,145 @@ jQuery( function ( $ ) {
             data: data
         } ).done( function ( response ) {
             cko_paypal_vars.debug && console.log( response );
+        } ).fail( function ( xhr, status, error ) {
+            console.error('[PayPal Express] Add to cart failed:', xhr, status, error);
+            console.error('[PayPal Express] Response text:', xhr.responseText);
+            // Return a default response to prevent the chain from breaking
+            return { result: 'error', message: 'Failed to add product to cart' };
         } )
     }
 
-    const cko_express_create_order_id = async function () {
+    const cko_express_create_order_id_for_product = async function (productId) {
+    // Add product to cart first
+    let addToCartSuccess = await cko_express_add_to_cart_for_product(productId);
+
+    if (!addToCartSuccess || addToCartSuccess.result === 'error') {
+        console.error('[PayPal Express] Add to cart failed for product:', productId, addToCartSuccess);
+        showError('Failed to add product to cart. Please try again.');
+        return null;
+    }
+
+    let data = {
+        express_checkout: true,
+        add_to_cart: addToCartSuccess.result
+    }
+    
+    return fetch( cko_paypal_vars.create_order_url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: jQuery.param( data )
+    }).then(function (res) {
+        if (!res.ok) {
+            throw new Error('Network response was not ok: ' + res.status);
+        }
+        return res.text().then(function(text) {
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                console.error('[PayPal Express] Invalid JSON response:', text);
+                console.error('[PayPal Express] JSON parse error:', e);
+                throw new Error('Invalid JSON response from server: ' + text.substring(0, 200));
+            }
+        });
+    }).then(function (data) {
+        if (typeof data.success !== 'undefined' && data.success === false) {
+            let messages = data.data && data.data.messages ? data.data.messages : data.data;
+            if ( 'string' === typeof messages || Array.isArray( messages ) ) {
+                showError( messages );
+            }
+            return null;
+        } else if (data.order_id) {
+            return data.order_id;
+        } else {
+            console.error('[PayPal Express] Unexpected response format:', data);
+            showError('Unexpected response format from server');
+            return null;
+        }
+    }).catch(function(error) {
+        console.error('[PayPal Express] Error in create_order_id_for_product:', error);
+        showError('Failed to create order: ' + error.message);
+        return null;
+    });
+};
+
+const cko_express_create_order_id_for_cart = async function () {
+    let data = {
+        express_checkout: true,
+        use_existing_cart: true
+    }
+    
+    return fetch( cko_paypal_vars.create_order_url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: jQuery.param( data )
+    }).then(function (res) {
+        if (!res.ok) {
+            throw new Error('Network response was not ok: ' + res.status);
+        }
+        return res.text().then(function(text) {
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                console.error('[PayPal Express] Invalid JSON response:', text);
+                console.error('[PayPal Express] JSON parse error:', e);
+                throw new Error('Invalid JSON response from server: ' + text.substring(0, 200));
+            }
+        });
+    }).then(function (data) {
+        if (typeof data.success !== 'undefined' && data.success === false) {
+            let messages = data.data && data.data.messages ? data.data.messages : data.data;
+            if ( 'string' === typeof messages || Array.isArray( messages ) ) {
+                showError( messages );
+            }
+            return null;
+        } else if (data.order_id) {
+            return data.order_id;
+        } else {
+            console.error('[PayPal Express] Unexpected response format:', data);
+            showError('Unexpected response format from server');
+            return null;
+        }
+    }).catch(function(error) {
+        console.error('[PayPal Express] Error in create_order_id_for_cart:', error);
+        showError('Failed to create order: ' + error.message);
+        return null;
+    });
+};
+
+const cko_express_add_to_cart_for_product = async function (productId) {
+    let data = {
+        product_id: productId,
+        quantity: 1,
+        nonce: cko_paypal_vars.paypal_express_add_to_cart_nonce
+    };
+
+    return await $.ajax( {
+        url: cko_paypal_vars.add_to_cart_url,
+        type: 'POST',
+        async: false,
+        data: data
+    } ).done( function ( response ) {
+        cko_paypal_vars.debug && console.log( 'Add to cart response for product ' + productId + ':', response );
+    } ).fail( function ( xhr, status, error ) {
+        console.error('[PayPal Express] Add to cart failed for product ' + productId + ':', xhr, status, error);
+        console.error('[PayPal Express] Response text:', xhr.responseText);
+        return { result: 'error', message: 'Failed to add product to cart' };
+    } )
+};
+
+const cko_express_create_order_id = async function () {
         let addToCartSuccess = await cko_express_add_to_cart()
+
+        // Check if add to cart was successful
+        if (!addToCartSuccess || addToCartSuccess.result === 'error') {
+            console.error('[PayPal Express] Add to cart failed:', addToCartSuccess);
+            showError('Failed to add product to cart. Please try again.');
+            return null;
+        }
 
         // Prepare add-to-cart for express checkout.
         let data = {
@@ -140,38 +274,179 @@ jQuery( function ( $ ) {
             },
             body: jQuery.param( data )
         }).then(function (res) {
-            return res.json();
+            // Check if response is ok
+            if (!res.ok) {
+                throw new Error('Network response was not ok: ' + res.status);
+            }
+            
+            // Get response text first to handle malformed JSON
+            return res.text().then(function(text) {
+                try {
+                    // Try to parse as JSON
+                    return JSON.parse(text);
+                } catch (e) {
+                    // If JSON parsing fails, log the raw response and throw error
+                    console.error('[PayPal Express] Invalid JSON response:', text);
+                    console.error('[PayPal Express] JSON parse error:', e);
+                    throw new Error('Invalid JSON response from server: ' + text.substring(0, 200));
+                }
+            });
         }).then(function (data) {
-            if (typeof data.success !== 'undefined') {
-                let messages = data.data.messages ? data.data.messages : data.data;
+            if (typeof data.success !== 'undefined' && data.success === false) {
+                let messages = data.data && data.data.messages ? data.data.messages : data.data;
 
                 if ( 'string' === typeof messages || Array.isArray( messages ) ) {
                     showError( messages );
                 }
                 return null;
-            } else {
+            } else if (data.order_id) {
                 return data.order_id;
+            } else {
+                console.error('[PayPal Express] Unexpected response format:', data);
+                showError('Unexpected response format from server');
+                return null;
             }
+        }).catch(function(error) {
+            console.error('[PayPal Express] Error in create_order_id:', error);
+            showError('Failed to create order: ' + error.message);
+            return null;
         });
     };
 
     const paypalButton = {
         init: function () {
-            // Initialize PayPal express button.
-            paypal.Buttons({ ...this.paypalButtonProps() }).render( cko_paypal_vars.paypal_button_selector );
+            // Initialize PayPal express buttons for different contexts
+            this.initProductPageButton();
+            this.initShopPageButtons();
+            this.initCartPageButton();
 
             this.updateButtonVisibility();
 
             jQuery(document).on('change', formSelector, onFormChange );
         },
 
-        paypalButtonProps: function () {
-            let paypalButtonProps = {
-                onApprove: async function (data) {
-                    cko_paypal_vars.debug && console.log(data);
+        initProductPageButton: function() {
+            // Initialize button for single product page
+            if (jQuery('#cko-paypal-button-wrapper').length && typeof paypal !== 'undefined') {
+                try {
+                    paypal.Buttons({ ...this.paypalButtonProps('product') }).render('#cko-paypal-button-wrapper');
+                } catch (error) {
+                    // Silently fail - error already handled by PayPal SDK
+                }
+            }
+        },
 
-                    jQuery.post(cko_paypal_vars.paypal_order_session_url + "&paypal_order_id=" + data.orderID + "&woocommerce-process-checkout-nonce=" + cko_paypal_vars.woocommerce_process_checkout, function (response) {
+        initShopPageButtons: function() {
+            // Initialize buttons for shop/listing pages
+            const wrappers = jQuery('[id^="cko-paypal-button-wrapper-"]');
+            
+            // Wait for PayPal SDK to be available
+            const checkPayPal = setInterval(function() {
+                if (typeof paypal !== 'undefined') {
+                    clearInterval(checkPayPal);
+                    jQuery('[id^="cko-paypal-button-wrapper-"]').each(function() {
+                        const $wrapper = jQuery(this);
+                        const productId = $wrapper.data('product-id');
+                        
+                        if (productId && $wrapper.attr('id') !== 'cko-paypal-button-wrapper') {
+                            try {
+                                paypal.Buttons({ ...paypalButton.paypalButtonProps('shop', productId) }).render('#' + $wrapper.attr('id'));
+                            } catch (error) {
+                                // Silently fail - error already handled by PayPal SDK
+                            }
+                        }
+                    });
+                }
+            }, 100);
+            
+            // Timeout after 10 seconds
+            setTimeout(function() {
+                clearInterval(checkPayPal);
+            }, 10000);
+        },
+
+        initCartPageButton: function() {
+            // Initialize button for cart page
+            // Check if this is a Blocks cart page
+            const isBlocksCart = jQuery('.wc-block-cart').length > 0;
+            
+            // For Blocks cart, inject the button wrapper if it doesn't exist
+            if (isBlocksCart && !jQuery('#cko-paypal-button-wrapper-cart').length) {
+                const paymentOptions = jQuery('.wc-block-cart__payment-options');
+                if (paymentOptions.length) {
+                    paymentOptions.html('<div class="cko-paypal-cart-button"><h3>Express Checkout</h3><div id="cko-paypal-button-wrapper-cart"></div></div>');
+                } else {
+                    // Fallback: inject after proceed to checkout button
+                    const proceedButton = jQuery('.wc-block-cart__submit, .wc-block-components-button--contained');
+                    if (proceedButton.length) {
+                        proceedButton.after('<div class="cko-paypal-cart-button"><h3>Express Checkout</h3><div id="cko-paypal-button-wrapper-cart"></div></div>');
+                    }
+                }
+            }
+            
+            // Wait for PayPal SDK to be available
+            const checkPayPal = setInterval(function() {
+                if (jQuery('#cko-paypal-button-wrapper-cart').length && typeof paypal !== 'undefined') {
+                    clearInterval(checkPayPal);
+                    try {
+                        paypal.Buttons({ ...paypalButton.paypalButtonProps('cart') }).render('#cko-paypal-button-wrapper-cart');
+                    } catch (error) {
+                        // Silently fail - error already handled by PayPal SDK
+                    }
+                }
+            }, 100);
+            
+            // Timeout after 10 seconds
+            setTimeout(function() {
+                clearInterval(checkPayPal);
+            }, 10000);
+        },
+
+        paypalButtonProps: function (context = 'product', productId = null) {
+            let paypalButtonProps = {
+        onApprove: async function (data) {
+            cko_paypal_vars.debug && console.log('PayPal onApprove data:', data);
+
+            // Show loading state
+            jQuery('body').addClass('paypal-processing');
+            
+            // Show loading state in the appropriate container
+            let loadingContainer = '#cko-paypal-button-wrapper';
+            if (context === 'shop' && productId) {
+                loadingContainer = '#cko-paypal-button-wrapper-' + productId;
+            } else if (context === 'cart') {
+                loadingContainer = '#cko-paypal-button-wrapper-cart';
+            }
+            
+            jQuery(loadingContainer).html('<div style="text-align: center; padding: 20px;"><div style="display: inline-block; width: 20px; height: 20px; border: 2px solid #f3f3f3; border-top: 2px solid #0070ba; border-radius: 50%; animation: spin 1s linear infinite;"></div><br><span style="color: #0070ba; font-size: 14px; margin-top: 10px; display: inline-block;">Processing your payment...</span></div>');
+            
+            // Add CSS for spinner animation
+            if (!jQuery('#paypal-spinner-css').length) {
+                jQuery('head').append('<style id="paypal-spinner-css">@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>');
+            }
+
+            // Set a timeout fallback in case the API call takes too long (30 seconds)
+            var timeoutFallback = setTimeout(function() {
+                jQuery('body').removeClass('paypal-processing');
+                jQuery(loadingContainer).html('<div id="cko-paypal-button"></div>');
+                showError('Payment processing is taking longer than expected. Please try again.');
+            }, 30000);
+
+                            jQuery.post(cko_paypal_vars.paypal_order_session_url + "&paypal_order_id=" + data.orderID + "&woocommerce-process-checkout-nonce=" + cko_paypal_vars.woocommerce_process_checkout, function (response) {
+                
+                // Clear the timeout since we got a response
+                clearTimeout(timeoutFallback);
+                
+                cko_paypal_vars.debug && console.log('PayPal API response:', response);
+                cko_paypal_vars.debug && console.log('Response type:', typeof response);
+                cko_paypal_vars.debug && console.log('Response success:', response.success);
+                cko_paypal_vars.debug && console.log('Response data:', response.data);
+                        
                         if (typeof response.success !== 'undefined' && response.success !== true ) {
+                            // Hide loading state on error
+                            jQuery('body').removeClass('paypal-processing');
+                            jQuery('#cko-paypal-button-wrapper').html('<div id="cko-paypal-button"></div>');
+                            
                             var messages = response.data.messages ? response.data.messages : response.data;
 
                             if ( 'string' === typeof messages || Array.isArray( messages ) ) {
@@ -180,41 +455,77 @@ jQuery( function ( $ ) {
                         } else {
                             // Check if we have a redirect URL for express checkout
                             if (response.data && response.data.redirect_url) {
+                                cko_paypal_vars.debug && console.log('Redirecting to success page:', response.data.redirect_url);
                                 // Express checkout - redirect directly to success page
                                 window.location.href = response.data.redirect_url;
                             } else {
+                                cko_paypal_vars.debug && console.log('No redirect URL found, using fallback to checkout page');
+                                cko_paypal_vars.debug && console.log('Available redirect URL:', cko_paypal_vars.redirect);
                                 // Fallback to checkout page (old behavior)
                                 window.location.href = cko_paypal_vars.redirect;
                             }
                         }
+                            }).fail(function(xhr, status, error) {
+                        // Clear the timeout since we got a response (even if failed)
+                        clearTimeout(timeoutFallback);
+                        
+                        // Hide loading state on error
+                        jQuery('body').removeClass('paypal-processing');
+                        jQuery(loadingContainer).html('<div id="cko-paypal-button"></div>');
+                        
+                        cko_paypal_vars.debug && console.log('PayPal API request failed:', xhr, status, error);
+                        cko_paypal_vars.debug && console.log('Response text:', xhr.responseText);
+                        showError('Payment processing failed. Please try again.');
                     });
                 },
                 onCancel: function (data, actions) {
+                    // Hide loading state if user cancels
+                    jQuery('body').removeClass('paypal-processing');
+                    jQuery(loadingContainer).html('<div id="cko-paypal-button"></div>');
+                    
                     cko_paypal_vars.debug && console.log(data);
                     jQuery('.woocommerce').unblock();
                 },
                 onError: function (err) {
+                    // Hide loading state on PayPal error
+                    jQuery('body').removeClass('paypal-processing');
+                    jQuery(loadingContainer).html('<div id="cko-paypal-button"></div>');
+                    
                     cko_paypal_vars.debug && console.log(err);
                     jQuery('.woocommerce').unblock();
                 },
             };
 
-            if ( cko_paypal_vars.is_cart_contains_subscription ) {
-                paypalButtonProps.createBillingAgreement = function( data, actions ) {
+            // Always use createOrder for express checkout (no billing agreements)
+            paypalButtonProps.createOrder = function( data, actions ) {
+                if (context === 'shop' && productId) {
+                    return cko_express_create_order_id_for_product(productId);
+                } else if (context === 'cart') {
+                    return cko_express_create_order_id_for_cart();
+                } else {
                     return cko_express_create_order_id();
-                };
-            } else {
-                paypalButtonProps.createOrder = function( data, actions ) {
-                    return cko_express_create_order_id();
-                };
-            }
+                }
+            };
 
             return paypalButtonProps;
         },
 
         updateButtonVisibility: function () {
+            // Show product page button
             if ( jQuery( cko_paypal_vars.paypal_button_selector ) ) {
                 jQuery( cko_paypal_vars.paypal_button_selector ).show();
+            }
+            
+            // Show shop page buttons
+            jQuery('[id^="cko-paypal-button-wrapper-"]').each(function() {
+                if (jQuery(this).attr('id') !== 'cko-paypal-button-wrapper') {
+                    jQuery(this).show();
+                }
+            });
+            
+            // Show cart page button
+            if ( jQuery('#cko-paypal-button-wrapper-cart') ) {
+                jQuery('#cko-paypal-button-wrapper-cart').show();
             }
         }
     }

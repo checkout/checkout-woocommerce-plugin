@@ -137,7 +137,6 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 		// First empty the cart to prevent wrong calculation.
 		WC()->cart->empty_cart();
 
-		// TODO: Add check for variable type product.
 		if ( ( 'variable' === $product_type || 'variable-subscription' === $product_type ) && isset( $_POST['attributes'] ) ) {
 			$attributes = wc_clean( wp_unslash( $_POST['attributes'] ) );
 
@@ -199,30 +198,22 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 				// Process the payment immediately
 				$payment_response = $this->request_payment( $order, $payment_context_id, $processing_channel_id );
 
+				// Debug: Log the payment response
+				WC_Checkoutcom_Utility::logger( 'PayPal Express: Payment response received: ' . print_r( $payment_response, true ) );
+
 				// Clear PayPal session
 				WC_Checkoutcom_Utility::cko_set_session( 'cko_paypal_order_id', '' );
 				WC_Checkoutcom_Utility::cko_set_session( 'cko_pc_id', '' );
 
 				// Check if payment was successful
-				if ( isset( $payment_response['status'] ) && in_array( $payment_response['status'], array( 'Authorized', 'Captured' ) ) ) {
-					// Set order status based on payment status
-					if ( $payment_response['status'] === 'Captured' ) {
-						$order->payment_complete( $payment_response['id'] );
-						$order->add_order_note( 'PayPal Express payment captured successfully. Payment ID: ' . $payment_response['id'] );
-					} else {
-						$order->update_status( 'on-hold', 'PayPal Express payment authorized. Payment ID: ' . $payment_response['id'] );
-					}
-
-					// Set order meta
-					$order->update_meta_data( '_cko_payment_id', $payment_response['id'] );
-					$order->update_meta_data( '_cko_payment_status', $payment_response['status'] );
-					$order->save();
-
-					// Clear cart
-					WC()->cart->empty_cart();
-
-					// Return success with redirect URL
-					$redirect_url = $order->get_checkout_order_received_url();
+				if ( isset( $payment_response['result'] ) && $payment_response['result'] === 'success' ) {
+					// Payment was successful - use the redirect URL from the response
+					$redirect_url = $payment_response['redirect'];
+					
+					// Debug logging
+					WC_Checkoutcom_Utility::logger( 'PayPal Express: Payment successful, redirecting to: ' . $redirect_url );
+					WC_Checkoutcom_Utility::logger( 'PayPal Express: Order ID: ' . $order->get_id() . ', Order Key: ' . $order->get_order_key() );
+					
 					wp_send_json_success( array( 'redirect_url' => $redirect_url ) );
 				} else {
 					// Payment failed
@@ -254,11 +245,33 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 	 */
 	private function create_express_order_from_cart() {
 		try {
-			// Create order
-			$order = wc_create_order();
+			// Determine customer ID and email
+			$customer_id = 0;
+			$customer_email = '';
+			
+			// Check if user is logged in
+			if ( is_user_logged_in() ) {
+				$current_user = wp_get_current_user();
+				$customer_id = $current_user->ID;
+				$customer_email = $current_user->user_email;
+			} else {
+				// For guest users, get email from PayPal data
+				$paypal_email = $this->get_paypal_email_from_context();
+				if ( ! empty( $paypal_email ) ) {
+					$customer_email = $paypal_email;
+				}
+			}
+
+			// Create order with proper customer ID
+			$order = wc_create_order( array( 'customer_id' => $customer_id ) );
 			
 			if ( ! $order ) {
 				return false;
+			}
+
+			// Set customer email if we have one
+			if ( ! empty( $customer_email ) ) {
+				$order->set_billing_email( $customer_email );
 			}
 
 			// Add cart items to order
@@ -283,6 +296,10 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 
 			// Calculate totals
 			$order->calculate_totals();
+
+			// Set payment method to PayPal Express
+			$order->set_payment_method( 'wc_checkout_com_paypal' );
+			$order->set_payment_method_title( 'PayPal Express' );
 
 			// Set order status
 			$order->set_status( 'pending' );
@@ -347,11 +364,77 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 			$order->set_billing_postcode( $paypal_shipping_address['zip'] ?? '' );
 			$order->set_billing_country( $paypal_shipping_address['country'] ?? '' );
 
-			// Set email if available
-			if ( isset( $cko_pc_details['payment_request']['shipping']['email'] ) ) {
-				$order->set_billing_email( $cko_pc_details['payment_request']['shipping']['email'] );
+			// Set email based on user login status
+			if ( is_user_logged_in() ) {
+				// For logged-in users, use their account email
+				$current_user = wp_get_current_user();
+				if ( $current_user && $current_user->user_email ) {
+					$order->set_billing_email( $current_user->user_email );
+				}
+			} else {
+				// For guest users, get email from PayPal data
+				$paypal_email = $this->get_paypal_email_from_context( $cko_pc_details );
+				if ( ! empty( $paypal_email ) ) {
+					$order->set_billing_email( $paypal_email );
+				}
 			}
 		}
+	}
+
+	/**
+	 * Get PayPal email from payment context details.
+	 * Checks multiple possible locations in the PayPal response.
+	 *
+	 * @param array $cko_pc_details Payment context details (optional, will fetch if not provided).
+	 * @return string Email address or empty string if not found.
+	 */
+	private function get_paypal_email_from_context( $cko_pc_details = null ) {
+		if ( empty( $cko_pc_details ) ) {
+			$cko_pc_details = WC_Checkoutcom_Utility::cko_get_session( 'cko_pc_details' );
+		}
+		
+		if ( empty( $cko_pc_details ) ) {
+			// Try to get payment context details
+			$cko_pc_id = WC_Checkoutcom_Utility::cko_get_session( 'cko_pc_id' );
+			if ( ! empty( $cko_pc_id ) ) {
+				try {
+					$checkout = new Checkout_SDK();
+					$cko_pc_details = $checkout->get_builder()->getPaymentContextsClient()->getPaymentContextDetails( $cko_pc_id );
+					WC_Checkoutcom_Utility::cko_set_session( 'cko_pc_details', $cko_pc_details );
+				} catch ( Exception $e ) {
+					return '';
+				}
+			}
+		}
+
+		if ( empty( $cko_pc_details ) || ! isset( $cko_pc_details['payment_request'] ) ) {
+			return '';
+		}
+
+		// Try to get email from different possible locations in PayPal response
+		// Check source.account_holder.email first (this is where PayPal often puts it)
+		if ( isset( $cko_pc_details['payment_request']['source']['account_holder']['email'] ) ) {
+			return $cko_pc_details['payment_request']['source']['account_holder']['email'];
+		}
+		
+		if ( isset( $cko_pc_details['payment_request']['shipping']['email'] ) ) {
+			return $cko_pc_details['payment_request']['shipping']['email'];
+		}
+		
+		if ( isset( $cko_pc_details['payment_request']['billing']['email'] ) ) {
+			return $cko_pc_details['payment_request']['billing']['email'];
+		}
+		
+		if ( isset( $cko_pc_details['payment_request']['payer']['email'] ) ) {
+			return $cko_pc_details['payment_request']['payer']['email'];
+		}
+
+		// Try additional locations that might contain email
+		if ( isset( $cko_pc_details['payment_request']['customer']['email'] ) ) {
+			return $cko_pc_details['payment_request']['customer']['email'];
+		}
+
+		return '';
 	}
 
 	/**

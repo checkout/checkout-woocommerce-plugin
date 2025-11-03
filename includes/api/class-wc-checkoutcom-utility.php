@@ -522,14 +522,20 @@ class WC_Checkoutcom_Utility {
 		$available_payment_methods = WC()->payment_gateways()->get_available_payment_gateways();
 
 		$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
-		$checkout_mode    = $checkout_setting['ckocom_checkout_mode'];
+		$checkout_mode    = isset( $checkout_setting['ckocom_checkout_mode'] ) ? $checkout_setting['ckocom_checkout_mode'] : 'classic';
 
 		if ( $checkout_mode === 'classic' ) {
 			/**
 			 * If checkout_mode is classic, show express-paypal if enabled and 
 			 * if 'wc_checkout_com_paypal' is an available payment method on checkout.
+			 * 
+			 * Note: On shop/cart pages, gateways might not be "available" yet, so we also
+			 * check if the gateway exists in all gateways (not just available ones).
 			 */
-			if ( isset( $available_payment_methods['wc_checkout_com_paypal'] ) && $is_express_enable ) {
+			$all_gateways = WC()->payment_gateways()->payment_gateways();
+			$paypal_exists = isset( $all_gateways['wc_checkout_com_paypal'] );
+			
+			if ( ( isset( $available_payment_methods['wc_checkout_com_paypal'] ) || $paypal_exists ) && $is_express_enable ) {
 				return true;
 			}
 		}

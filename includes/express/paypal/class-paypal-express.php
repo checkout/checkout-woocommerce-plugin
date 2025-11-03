@@ -20,23 +20,26 @@ class CKO_Paypal_Express {
 	}
 
 	public function __construct() {
-		$paypal_settings = get_option( 'woocommerce_wc_checkout_com_paypal_settings' );
+		$paypal_settings = get_option( 'woocommerce_wc_checkout_com_paypal_settings', array() );
 
-		$is_express_enable = ! empty( $paypal_settings['paypal_express'] ) && 'yes' === $paypal_settings['paypal_express'];
+		// Check if master toggle is enabled - must be explicitly 'yes'
+		// Handle cases: not set, empty string, false, 'no', or anything else = disabled
+		$is_express_enable = isset( $paypal_settings['paypal_express'] ) 
+			&& 'yes' === $paypal_settings['paypal_express']
+			&& ! empty( $paypal_settings['paypal_express'] );
 		$paypal_enabled    = ! empty( $paypal_settings['enabled'] ) && 'yes' === $paypal_settings['enabled'];
 
-		$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$checkout_mode    = isset( $checkout_setting['ckocom_checkout_mode'] ) ? $checkout_setting['ckocom_checkout_mode'] : 'classic';
 
-		if ( ! $paypal_enabled || ! $is_express_enable ) {
-			if ( $checkout_mode === 'classic' ) {
-				return;
-			}
-			else {
-				if ( ! $is_express_enable ) {
-					return;
-				}
-			}
+		// If Express is disabled, don't add any hooks (regardless of mode)
+		if ( ! $is_express_enable ) {
+			return;
+		}
+
+		// For classic mode, also check if PayPal gateway is enabled
+		if ( $checkout_mode === 'classic' && ! $paypal_enabled ) {
+			return;
 		}
 
 		add_action( 'woocommerce_after_add_to_cart_form', [ $this, 'display_payment_request_button_html' ], 1 );
@@ -153,17 +156,50 @@ class CKO_Paypal_Express {
 	}
 
 	public function payment_scripts() {
-		$paypal_settings = get_option( 'woocommerce_wc_checkout_com_paypal_settings' );
+		$paypal_settings = get_option( 'woocommerce_wc_checkout_com_paypal_settings', array() );
+
+		// First check if master toggle is enabled - must be explicitly 'yes'
+		// Handle cases: not set, empty string, false, 'no', or anything else = disabled
+		$is_express_enabled = isset( $paypal_settings['paypal_express'] ) 
+			&& 'yes' === $paypal_settings['paypal_express']
+			&& ! empty( $paypal_settings['paypal_express'] );
+		if ( ! $is_express_enabled ) {
+			return;
+		}
 
 		// Load on Product, Cart, Shop, or Checkout pages if PayPal Express is available.
 		if ( ! WC_Checkoutcom_Utility::is_paypal_express_available() ) {
 			return;
 		}
 
-		// Check which pages should load scripts based on settings
-		$show_on_product = ! isset( $paypal_settings['paypal_express_product_page'] ) || $paypal_settings['paypal_express_product_page'] !== 'no';
-		$show_on_shop = ! isset( $paypal_settings['paypal_express_shop_page'] ) || $paypal_settings['paypal_express_shop_page'] !== 'no';
-		$show_on_cart = ! isset( $paypal_settings['paypal_express_cart_page'] ) || $paypal_settings['paypal_express_cart_page'] !== 'no';
+		// Check which pages should load scripts - must be explicitly 'yes'
+		// Handle cases: not set (default enabled), empty string, false, 'no' = disabled
+		$show_on_product = false;
+		if ( ! isset( $paypal_settings['paypal_express_product_page'] ) ) {
+			$show_on_product = true; // Default to yes if setting doesn't exist (backward compatibility)
+		} elseif ( isset( $paypal_settings['paypal_express_product_page'] ) 
+			&& 'yes' === $paypal_settings['paypal_express_product_page']
+			&& ! empty( $paypal_settings['paypal_express_product_page'] ) ) {
+			$show_on_product = true;
+		}
+		
+		$show_on_shop = false;
+		if ( ! isset( $paypal_settings['paypal_express_shop_page'] ) ) {
+			$show_on_shop = true; // Default to yes if setting doesn't exist (backward compatibility)
+		} elseif ( isset( $paypal_settings['paypal_express_shop_page'] ) 
+			&& 'yes' === $paypal_settings['paypal_express_shop_page']
+			&& ! empty( $paypal_settings['paypal_express_shop_page'] ) ) {
+			$show_on_shop = true;
+		}
+		
+		$show_on_cart = false;
+		if ( ! isset( $paypal_settings['paypal_express_cart_page'] ) ) {
+			$show_on_cart = true; // Default to yes if setting doesn't exist (backward compatibility)
+		} elseif ( isset( $paypal_settings['paypal_express_cart_page'] ) 
+			&& 'yes' === $paypal_settings['paypal_express_cart_page']
+			&& ! empty( $paypal_settings['paypal_express_cart_page'] ) ) {
+			$show_on_cart = true;
+		}
 
 		// Only load on relevant pages where Express is enabled
 		$should_load = false;
@@ -234,12 +270,35 @@ class CKO_Paypal_Express {
 	}
 
 	public function display_payment_request_button_html() {
-		$paypal_settings = get_option( 'woocommerce_wc_checkout_com_paypal_settings' );
+		$paypal_settings = get_option( 'woocommerce_wc_checkout_com_paypal_settings', array() );
 		
-		// Check if PayPal Express is enabled for product pages
-		$show_on_product = ! isset( $paypal_settings['paypal_express_product_page'] ) || $paypal_settings['paypal_express_product_page'] !== 'no';
+		// First check if master toggle is enabled - must be explicitly 'yes'
+		// Handle cases: not set, empty string, false, 'no', or anything else = disabled
+		$is_express_enabled = isset( $paypal_settings['paypal_express'] ) 
+			&& 'yes' === $paypal_settings['paypal_express']
+			&& ! empty( $paypal_settings['paypal_express'] );
+		if ( ! $is_express_enabled ) {
+			return;
+		}
+		
+		// Check if PayPal Express is available (gateway check)
+		if ( ! WC_Checkoutcom_Utility::is_paypal_express_available() ) {
+			return;
+		}
+		
+		// Check if PayPal Express is enabled for product pages - must be explicitly 'yes'
+		// Handle cases: not set (default enabled), empty string, false, 'no' = disabled
+		$show_on_product = false;
+		if ( ! isset( $paypal_settings['paypal_express_product_page'] ) ) {
+			// Default to yes if setting doesn't exist (backward compatibility)
+			$show_on_product = true;
+		} elseif ( isset( $paypal_settings['paypal_express_product_page'] ) 
+			&& 'yes' === $paypal_settings['paypal_express_product_page']
+			&& ! empty( $paypal_settings['paypal_express_product_page'] ) ) {
+			$show_on_product = true;
+		}
 
-		if ( ! is_product() || ! WC_Checkoutcom_Utility::is_paypal_express_available() || ! $show_on_product ) {
+		if ( ! is_product() || ! $show_on_product ) {
 			return;
 		}
 
@@ -261,16 +320,37 @@ class CKO_Paypal_Express {
 	public function display_shop_payment_request_button_html() {
 		global $product;
 
-		$paypal_settings = get_option( 'woocommerce_wc_checkout_com_paypal_settings' );
+		$paypal_settings = get_option( 'woocommerce_wc_checkout_com_paypal_settings', array() );
 		
-		// Check if PayPal Express is enabled for shop pages
-		$show_on_shop = ! isset( $paypal_settings['paypal_express_shop_page'] ) || $paypal_settings['paypal_express_shop_page'] !== 'no';
+		// First check if master toggle is enabled - must be explicitly 'yes'
+		// Handle cases: not set, empty string, false, 'no', or anything else = disabled
+		$is_express_enabled = isset( $paypal_settings['paypal_express'] ) 
+			&& 'yes' === $paypal_settings['paypal_express']
+			&& ! empty( $paypal_settings['paypal_express'] );
+		if ( ! $is_express_enabled ) {
+			return;
+		}
 
-		// Check if PayPal Express is available
+		// Check if PayPal Express is available (gateway check)
 		$is_available = WC_Checkoutcom_Utility::is_paypal_express_available();
+		if ( ! $is_available ) {
+			return;
+		}
 		
-		// Only show on shop pages and if PayPal Express is available and enabled for shop pages
-		if ( ! ( is_shop() || is_product_category() || is_product_tag() || is_product_taxonomy() ) || ! $is_available || ! $show_on_shop ) {
+		// Check if PayPal Express is enabled for shop pages - must be explicitly 'yes'
+		// Handle cases: not set (default enabled), empty string, false, 'no' = disabled
+		$show_on_shop = false;
+		if ( ! isset( $paypal_settings['paypal_express_shop_page'] ) ) {
+			// Default to yes if setting doesn't exist (backward compatibility)
+			$show_on_shop = true;
+		} elseif ( isset( $paypal_settings['paypal_express_shop_page'] ) 
+			&& 'yes' === $paypal_settings['paypal_express_shop_page']
+			&& ! empty( $paypal_settings['paypal_express_shop_page'] ) ) {
+			$show_on_shop = true;
+		}
+		
+		// Only show on shop pages and if PayPal Express is enabled for shop pages
+		if ( ! ( is_shop() || is_product_category() || is_product_tag() || is_product_taxonomy() ) || ! $show_on_shop ) {
 			return;
 		}
 
@@ -312,16 +392,37 @@ class CKO_Paypal_Express {
 			return;
 		}
 		
-		$paypal_settings = get_option( 'woocommerce_wc_checkout_com_paypal_settings' );
+		$paypal_settings = get_option( 'woocommerce_wc_checkout_com_paypal_settings', array() );
 		
-		// Check if PayPal Express is enabled for cart page
-		$show_on_cart = ! isset( $paypal_settings['paypal_express_cart_page'] ) || $paypal_settings['paypal_express_cart_page'] !== 'no';
+		// First check if master toggle is enabled - must be explicitly 'yes'
+		// Handle cases: not set, empty string, false, 'no', or anything else = disabled
+		$is_express_enabled = isset( $paypal_settings['paypal_express'] ) 
+			&& 'yes' === $paypal_settings['paypal_express']
+			&& ! empty( $paypal_settings['paypal_express'] );
+		if ( ! $is_express_enabled ) {
+			return;
+		}
 
-		// Check if PayPal Express is available
+		// Check if PayPal Express is available (gateway check)
 		$is_available = WC_Checkoutcom_Utility::is_paypal_express_available();
+		if ( ! $is_available ) {
+			return;
+		}
 		
-		// Only show on cart page and if PayPal Express is available and enabled for cart page
-		if ( ! is_cart() || ! $is_available || ! $show_on_cart ) {
+		// Check if PayPal Express is enabled for cart page - must be explicitly 'yes'
+		// Handle cases: not set (default enabled), empty string, false, 'no' = disabled
+		$show_on_cart = false;
+		if ( ! isset( $paypal_settings['paypal_express_cart_page'] ) ) {
+			// Default to yes if setting doesn't exist (backward compatibility)
+			$show_on_cart = true;
+		} elseif ( isset( $paypal_settings['paypal_express_cart_page'] ) 
+			&& 'yes' === $paypal_settings['paypal_express_cart_page']
+			&& ! empty( $paypal_settings['paypal_express_cart_page'] ) ) {
+			$show_on_cart = true;
+		}
+		
+		// Only show on cart page and if PayPal Express is enabled for cart page
+		if ( ! is_cart() || ! $show_on_cart ) {
 			return;
 		}
 

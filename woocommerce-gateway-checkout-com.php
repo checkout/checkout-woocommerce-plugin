@@ -158,7 +158,18 @@ function init_checkout_com_gateway_class() {
 	// WC_Checkoutcom_Logging_Settings::init();
 
 	// WooCommerce Blocks integration (safe/conditional)
-	include_once 'includes/blocks/class-wc-checkoutcom-blocks-integration-safe.php';
+	// Check for safe version first, fallback to regular version
+	$blocks_safe_file = __DIR__ . '/includes/blocks/class-wc-checkoutcom-blocks-integration-safe.php';
+	$blocks_file = __DIR__ . '/includes/blocks/class-wc-checkoutcom-blocks-integration.php';
+	
+	if ( file_exists( $blocks_safe_file ) ) {
+		include_once $blocks_safe_file;
+	} elseif ( file_exists( $blocks_file ) ) {
+		include_once $blocks_file;
+	} else {
+		// Log error but don't break the site - Blocks integration is optional
+		error_log( 'Checkout.com Blocks integration file not found. Expected: ' . $blocks_file );
+	}
 
 	// Load payment gateway class.
 	add_filter( 'woocommerce_payment_gateways', 'checkout_com_add_gateway' );
