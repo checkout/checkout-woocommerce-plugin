@@ -23,6 +23,7 @@ use Checkout\Payments\Previous\Source\Apm\RequestPayPalSource;
 use Checkout\Payments\Request\Source\Contexts\PaymentContextsKlarnaSource;
 use Checkout\Payments\Request\Source\RequestIdSource;
 use Checkout\Payments\Request\Source\RequestTokenSource;
+use Checkout\Payments\Request\Source\RequestNetworkTokenSource;
 use Checkout\Payments\ThreeDsRequest;
 use Checkout\Payments\VoidRequest;
 use Checkout\Tokens\ApplePayTokenData;
@@ -735,9 +736,38 @@ class WC_Checkoutcom_Api_Request {
 	 * @return mixed
 	 */
 	public static function generate_google_token() {
+		// Protocol version is safe to sanitize
 		$protocol_version = sanitize_text_field( $_POST['cko-google-protocolVersion'] );
-		$signature        = sanitize_text_field( $_POST['cko-google-signature'] );
-		$signed_message   = stripslashes( $_POST['cko-google-signedMessage'] );
+		
+		// Signature and signedMessage are base64-encoded strings that should NOT be sanitized
+		// as sanitize_text_field can corrupt base64 data.
+		// IMPORTANT: For classic Google Pay, form POST data is automatically processed by WordPress
+		// For express AJAX, the data comes directly and may already be in the correct format
+		// wp_unslash on signedMessage can reduce it from 672 to 658 chars, corrupting it
+		// So we should check if wp_unslash changes the length, and if so, use the original
+		$signature_raw = $_POST['cko-google-signature'];
+		$signed_message_raw = $_POST['cko-google-signedMessage'];
+		
+		// Apply wp_unslash to match classic Google Pay form POST behavior
+		$signature = wp_unslash( $signature_raw );
+		$signed_message_unslashed = wp_unslash( $signed_message_raw );
+		
+		// If wp_unslash reduced the signedMessage length, it's corrupting it
+		// Use the original instead (for express AJAX, it's already in the correct format)
+		if ( strlen( $signed_message_unslashed ) < strlen( $signed_message_raw ) ) {
+			$signed_message = $signed_message_raw;
+			
+			// Check if signedMessage has escaped quotes (from AJAX POST)
+			// If signedMessage has \" instead of ", we need to unescape it
+			if ( strpos( $signed_message, '\\"' ) !== false ) {
+				// Unescape quotes: \" -> "
+				$signed_message = str_replace( '\\"', '"', $signed_message );
+				// Also unescape backslashes: \\ -> \
+				$signed_message = str_replace( '\\\\', '\\', $signed_message );
+			}
+		} else {
+			$signed_message = $signed_message_unslashed;
+		}
 
 		$checkout = new Checkout_SDK();
 
@@ -768,6 +798,7 @@ class WC_Checkoutcom_Api_Request {
 		} catch ( CheckoutApiException $ex ) {
 			$error_message = __( 'An error has occurred while processing your Google pay payment.', 'checkout-com-unified-payments-api' );
 			WC_Checkoutcom_Utility::logger( $error_message, $ex );
+			return array( 'error' => $error_message . ' ' . $ex->getMessage() );
 		}
 	}
 

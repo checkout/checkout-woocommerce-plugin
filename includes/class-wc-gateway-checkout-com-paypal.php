@@ -65,26 +65,35 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 		if ( ! empty( $_GET['cko_paypal_action'] ) ) {
 			switch ( $_GET['cko_paypal_action'] ) {
 
-				case 'create_order':
-					if ( ! empty( $_POST ) ) {
-
-						WC()->checkout->process_checkout();
-
-						if ( wc_notice_count( 'error' ) > 0 ) {
-							WC()->session->set( 'reload_checkout', true );
-							$error_messages_data = wc_get_notices( 'error' );
-							$error_messages      = array();
-							foreach ( $error_messages_data as $key => $value ) {
-								$error_messages[] = $value['notice'];
-							}
-							wc_clear_notices();
-							ob_start();
-							wp_send_json_error( array( 'messages' => $error_messages ) );
-							exit;
-						}
-						exit();
+			case 'create_order':
+				if ( ! empty( $_POST ) ) {
+					// Check if this is an express checkout request
+					// phpcs:ignore WordPress.Security.NonceVerification.Missing
+					$express_checkout = ! empty( $_POST['express_checkout'] ) || ! empty( $_POST['use_existing_cart'] );
+					
+					if ( $express_checkout ) {
+						// Route to express checkout handler
+						$this->cko_express_create_order();
+						break;
 					}
-					break;
+
+					WC()->checkout->process_checkout();
+
+					if ( wc_notice_count( 'error' ) > 0 ) {
+						WC()->session->set( 'reload_checkout', true );
+						$error_messages_data = wc_get_notices( 'error' );
+						$error_messages      = array();
+						foreach ( $error_messages_data as $key => $value ) {
+							$error_messages[] = $value['notice'];
+						}
+						wc_clear_notices();
+						ob_start();
+						wp_send_json_error( array( 'messages' => $error_messages ) );
+						exit;
+					}
+					exit();
+				}
+				break;
 				
 				case 'empty_session':
 					WC_Checkoutcom_Utility::cko_set_session( 'cko_paypal_order_id', '' );
@@ -162,12 +171,42 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 	public function cko_express_create_order() {
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing
-		if ( ! empty( $_POST['express_checkout'] ) && ! empty( $_POST['add_to_cart'] ) && 'success' !== $_POST['add_to_cart'] ) {
-			return null;
+		$express_checkout = ! empty( $_POST['express_checkout'] );
+		$add_to_cart = isset( $_POST['add_to_cart'] ) ? sanitize_text_field( wp_unslash( $_POST['add_to_cart'] ) ) : '';
+		$use_existing_cart = ! empty( $_POST['use_existing_cart'] );
+
+		// For product pages, check if add_to_cart was successful
+		if ( $express_checkout && ! empty( $add_to_cart ) && 'success' !== $add_to_cart ) {
+			wp_send_json_error( [ 'messages' => 'Failed to add product to cart' ] );
+			return;
 		}
 
-		if ( WC()->cart->is_empty() ) {
-			return null;
+		// Ensure cart is loaded - important for Blocks cart pages
+		if ( ! WC()->cart ) {
+			wp_send_json_error( [ 'messages' => 'Cart not initialized' ] );
+			return;
+		}
+
+		// For Blocks cart pages, ensure cart is loaded from session
+		// This is important because Blocks cart might not have synced with server session
+		if ( $use_existing_cart ) {
+			// Force cart to load from session
+			WC()->cart->get_cart_from_session();
+			
+			// Recalculate totals to ensure we have the latest
+			WC()->cart->calculate_totals();
+			
+			// Check if cart is empty after loading from session
+			if ( WC()->cart->is_empty() ) {
+				wp_send_json_error( [ 'messages' => 'Cart is empty' ] );
+				return;
+			}
+		}
+
+		// For product pages, ensure cart is not empty after adding product
+		if ( ! $use_existing_cart && WC()->cart->is_empty() ) {
+			wp_send_json_error( [ 'messages' => 'Cart is empty' ] );
+			return;
 		}
 
 		$this->cko_create_order_request( true );
@@ -502,6 +541,31 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 	 */
 	public function cko_create_order_request( $is_express = false ) {
 
+		// Ensure cart is loaded and totals are calculated
+		// This is important for Blocks cart pages
+		if ( ! WC()->cart ) {
+			wp_send_json_error( array( 'messages' => 'Cart not initialized' ) );
+			return;
+		}
+
+		// For Blocks cart pages, ensure cart is loaded from session
+		// Sometimes the cart needs to be refreshed from the session
+		if ( WC()->cart->is_empty() ) {
+			// Try to load cart from session
+			WC()->cart->get_cart_from_session();
+			WC()->cart->calculate_totals();
+		}
+		
+		// Recalculate totals to ensure we have the latest (important for Blocks cart)
+		WC()->cart->calculate_totals();
+
+		// For Blocks cart pages, ensure cart contents are loaded
+		if ( WC()->cart->is_empty() ) {
+			WC_Checkoutcom_Utility::logger( 'PayPal Express: Cart is empty after session load. Cart contents: ' . print_r( WC()->cart->get_cart(), true ) );
+			wp_send_json_error( array( 'messages' => 'Cart is empty. Please add items to your cart.' ) );
+			return;
+		}
+
 		$paymentContextsRequest           = new Checkout\Payments\Contexts\PaymentContextsRequest();
 		$paymentContextsRequest->source   = new Checkout\Payments\Request\Source\Apm\RequestPayPalSource();
 		$paymentContextsRequest->currency = get_woocommerce_currency();
@@ -513,7 +577,20 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 			$paymentContextsRequest->processing->user_action = Checkout\Payments\UserAction::$CONTINUE;
 		}
 
-		$total_amount = WC()->cart->total;
+		// Get cart total - use 'raw' to get the numeric value directly
+		$total_amount = WC()->cart->get_total( 'raw' );
+		
+		// Fallback to formatted total if raw is 0
+		if ( $total_amount <= 0 ) {
+			$total_amount = WC()->cart->total;
+		}
+
+		// Validate that we have a valid total amount
+		if ( $total_amount <= 0 ) {
+			WC_Checkoutcom_Utility::logger( 'PayPal Express: Invalid cart total. Cart contents: ' . print_r( WC()->cart->get_cart(), true ) );
+			wp_send_json_error( array( 'messages' => 'Cart total is invalid. Please refresh the page and try again.' ) );
+			return;
+		}
 
 		// Logic for order-pay page.
 
@@ -566,11 +643,41 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 		try {
 			$response = $checkout->get_builder()->getPaymentContextsClient()->createPaymentContexts( $paymentContextsRequest );
 
+			// Log the full response for debugging
+			WC_Checkoutcom_Utility::logger( 'PayPal Express: Payment context response. Full response: ' . print_r( $response, true ) );
+
+			if ( ! isset( $response['id'] ) ) {
+				WC_Checkoutcom_Utility::logger( 'PayPal Express: No payment context ID in response. Response: ' . print_r( $response, true ) );
+				wp_send_json_error( [ 'messages' => 'Failed to create PayPal payment context. No ID returned.' ] );
+				return;
+			}
+
 			WC_Checkoutcom_Utility::cko_set_session( 'cko_pc_id', $response['id'] );
 
+			// Return order_id from partner_metadata (PayPal Order ID)
+			// Check multiple possible locations for order_id
+			$order_id = null;
 			if ( isset( $response['partner_metadata']['order_id'] ) ) {
+				$order_id = $response['partner_metadata']['order_id'];
+			} elseif ( isset( $response['partner_metadata'] ) && is_array( $response['partner_metadata'] ) ) {
+				// Try to find order_id anywhere in partner_metadata
+				foreach ( $response['partner_metadata'] as $key => $value ) {
+					if ( 'order_id' === $key || 'orderId' === $key || 'order-id' === $key ) {
+						$order_id = $value;
+						break;
+					}
+				}
+			} elseif ( isset( $response['order_id'] ) ) {
+				$order_id = $response['order_id'];
+			}
 
-				wp_send_json( [ 'order_id' => $response['partner_metadata']['order_id'] ], 200 );
+			if ( $order_id ) {
+				WC_Checkoutcom_Utility::logger( 'PayPal Express: Order ID found: ' . $order_id );
+				wp_send_json( [ 'order_id' => $order_id ], 200 );
+			} else {
+				// If no order_id found, log and return error
+				WC_Checkoutcom_Utility::logger( 'PayPal Express: No order_id found in response. Response structure: ' . print_r( $response, true ) );
+				wp_send_json_error( [ 'messages' => 'Failed to create PayPal order. No order ID returned from payment context.' ] );
 			}
 		} catch ( CheckoutApiException $ex ) {
 			$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
@@ -581,9 +688,27 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 				$error_message .= $ex->getMessage();
 			}
 
+			// Log detailed error information
+			WC_Checkoutcom_Utility::logger( 'PayPal Express: CheckoutApiException caught. Error message: ' . $ex->getMessage() );
+			WC_Checkoutcom_Utility::logger( 'PayPal Express: Exception details: ' . print_r( $ex, true ) );
+			
+			// Get more detailed error information if available
+			if ( method_exists( $ex, 'getErrorDetails' ) ) {
+				$error_details = $ex->getErrorDetails();
+				WC_Checkoutcom_Utility::logger( 'PayPal Express: Error details: ' . print_r( $error_details, true ) );
+				if ( is_array( $error_details ) && isset( $error_details['error_codes'] ) ) {
+					$error_message .= ' Error codes: ' . implode( ', ', $error_details['error_codes'] );
+				}
+			}
+
 			WC_Checkoutcom_Utility::logger( $error_message, $ex );
 
 			wp_send_json_error( [ 'messages' => $error_message ] );
+		} catch ( \Exception $ex ) {
+			// Catch any other exceptions
+			WC_Checkoutcom_Utility::logger( 'PayPal Express: General exception caught. Error: ' . $ex->getMessage() );
+			WC_Checkoutcom_Utility::logger( 'PayPal Express: Exception trace: ' . $ex->getTraceAsString() );
+			wp_send_json_error( [ 'messages' => 'An unexpected error occurred: ' . $ex->getMessage() ] );
 		}
 
 		exit();

@@ -682,9 +682,9 @@ class WC_Checkoutcom_Cards_Settings {
 	 * @return mixed|void
 	 */
 	public static function google_settings() {
-		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 
-		$checkout_mode           = $core_settings['ckocom_checkout_mode'];
+		$checkout_mode           = isset( $core_settings['ckocom_checkout_mode'] ) ? $core_settings['ckocom_checkout_mode'] : 'classic';
 		$should_disable_checkbox = false;
 				
 		if ( 'flow' === $checkout_mode ) {
@@ -752,6 +752,43 @@ class WC_Checkoutcom_Cards_Settings {
 					'google-pay-black' => __( 'Black', 'checkout-com-unified-payments-api' ),
 					'google-pay-white' => __( 'White', 'checkout-com-unified-payments-api' ),
 				],
+			],
+			'google_pay_express'            => [
+				'title'       => __( 'Google Pay Express', 'checkout-com-unified-payments-api' ),
+				'label'       => __( 'Enable Google Pay Express', 'checkout-com-unified-payments-api' ),
+				'type'        => 'checkbox',
+				'description' => __( 'Master toggle to activate Google Pay Express checkout. When enabled, use the options below to control where buttons appear.', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => true,
+				'default'     => 'no',
+			],
+			'google_pay_express_location'    => [
+				'title'       => __( 'Button Locations', 'checkout-com-unified-payments-api' ),
+				'type'        => 'title',
+				'description' => __( 'Control where Google Pay Express buttons appear on your store.', 'checkout-com-unified-payments-api' ),
+			],
+			'google_pay_express_product_page' => [
+				'title'       => __( 'Show on Product Page', 'checkout-com-unified-payments-api' ),
+				'label'       => __( 'Display Google Pay Express button on product detail pages', 'checkout-com-unified-payments-api' ),
+				'type'        => 'checkbox',
+				'description' => __( 'Show Google Pay Express button on individual product pages.', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => true,
+				'default'     => 'yes',
+			],
+			'google_pay_express_shop_page'    => [
+				'title'       => __( 'Show on Shop/Category Pages', 'checkout-com-unified-payments-api' ),
+				'label'       => __( 'Display Google Pay Express button on shop and category listing pages', 'checkout-com-unified-payments-api' ),
+				'type'        => 'checkbox',
+				'description' => __( 'Show Google Pay Express button on shop, category, tag, and archive pages.', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => true,
+				'default'     => 'yes',
+			],
+			'google_pay_express_cart_page'    => [
+				'title'       => __( 'Show on Cart Page', 'checkout-com-unified-payments-api' ),
+				'label'       => __( 'Display Google Pay Express button on cart page', 'checkout-com-unified-payments-api' ),
+				'type'        => 'checkbox',
+				'description' => __( 'Show Google Pay Express button on the cart page.', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => true,
+				'default'     => 'yes',
 			],
 		];
 

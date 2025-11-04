@@ -9,26 +9,29 @@ defined( 'ABSPATH' ) || exit;
 
 // Check if WooCommerce Blocks is available
 if ( class_exists( 'Automattic\WooCommerce\Blocks\Payments\Integrations\AbstractPaymentMethodType' ) ) {
-    use Automattic\WooCommerce\Blocks\Payments\Integrations\AbstractPaymentMethodType;
+    // Use the WooCommerce Blocks class
+    // Note: use statement must be at top level, so we'll use fully qualified class name
 } else {
     // Fallback for when blocks are not available
-    class AbstractPaymentMethodType {
-        protected $name = '';
-        protected $settings = [];
-        
-        public function initialize() {}
-        public function is_active() { return false; }
-        public function get_payment_method_script_handles() { return []; }
-        public function get_payment_method_data() { return []; }
-        public function get_supported_features() { return []; }
-        public function get_setting( $key, $default = '' ) { return $default; }
+    if ( ! class_exists( 'AbstractPaymentMethodType' ) ) {
+        class AbstractPaymentMethodType {
+            protected $name = '';
+            protected $settings = [];
+            
+            public function initialize() {}
+            public function is_active() { return false; }
+            public function get_payment_method_script_handles() { return []; }
+            public function get_payment_method_data() { return []; }
+            public function get_supported_features() { return []; }
+            public function get_setting( $key, $default = '' ) { return $default; }
+        }
     }
 }
 
 /**
  * Class WC_Checkoutcom_Cards_Blocks_Integration
  */
-final class WC_Checkoutcom_Cards_Blocks_Integration extends AbstractPaymentMethodType {
+final class WC_Checkoutcom_Cards_Blocks_Integration extends Automattic\WooCommerce\Blocks\Payments\Integrations\AbstractPaymentMethodType {
 
     /**
      * Payment method name.

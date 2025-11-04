@@ -514,6 +514,22 @@ class WC_Checkoutcom_Utility {
 		return false;
 	}
 
+	/**
+	 * Track if unified express checkout container has been rendered.
+	 *
+	 * @param bool $set Optional. Set the flag to true.
+	 * @return bool True if container has been rendered, false otherwise.
+	 */
+	public static function express_checkout_container_rendered( $set = false ) {
+		static $rendered = false;
+		
+		if ( $set ) {
+			$rendered = true;
+		}
+		
+		return $rendered;
+	}
+
 	public static function is_paypal_express_available() {
 		$paypal_settings = get_option( 'woocommerce_wc_checkout_com_paypal_settings' );
 
@@ -542,6 +558,48 @@ class WC_Checkoutcom_Utility {
 		else {
 			/**
 			 * If checkout_mode is flow, show express-paypal if enabled.
+			 */
+			if ( $is_express_enable ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Check if Google Pay Express is available.
+	 *
+	 * @return bool True if Google Pay Express is available, false otherwise.
+	 */
+	public static function is_google_pay_express_available() {
+		$google_pay_settings = get_option( 'woocommerce_wc_checkout_com_google_pay_settings' );
+
+		$is_express_enable = ! empty( $google_pay_settings['google_pay_express'] ) && 'yes' === $google_pay_settings['google_pay_express'];
+
+		$available_payment_methods = WC()->payment_gateways()->get_available_payment_gateways();
+
+		$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$checkout_mode    = isset( $checkout_setting['ckocom_checkout_mode'] ) ? $checkout_setting['ckocom_checkout_mode'] : 'classic';
+
+		if ( $checkout_mode === 'classic' ) {
+			/**
+			 * If checkout_mode is classic, show express-google-pay if enabled and 
+			 * if 'wc_checkout_com_google_pay' is an available payment method on checkout.
+			 * 
+			 * Note: On shop/cart pages, gateways might not be "available" yet, so we also
+			 * check if the gateway exists in all gateways (not just available ones).
+			 */
+			$all_gateways = WC()->payment_gateways()->payment_gateways();
+			$google_pay_exists = isset( $all_gateways['wc_checkout_com_google_pay'] );
+			
+			if ( ( isset( $available_payment_methods['wc_checkout_com_google_pay'] ) || $google_pay_exists ) && $is_express_enable ) {
+				return true;
+			}
+		}
+		else {
+			/**
+			 * If checkout_mode is flow, show express-google-pay if enabled.
 			 */
 			if ( $is_express_enable ) {
 				return true;

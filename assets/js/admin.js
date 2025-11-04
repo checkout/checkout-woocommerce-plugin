@@ -13,7 +13,9 @@ jQuery( function ( $ ) {
 			if ( applePay.length > 0 ) {
 				applePay.hide();
 			}
-			if ( googlePay.length > 0 ) {
+			// Google Pay is now available in Flow mode - don't hide it
+			// Only hide Google Pay in classic mode, show it in Flow mode
+			if ( googlePay.length > 0 && ! cko_admin_vars.flow_enabled ) {
 				googlePay.hide();
 			}
 
@@ -29,6 +31,10 @@ jQuery( function ( $ ) {
 				classicCheckout.hide();
 				payPal.hide();
 				flowPay.show();
+				// Show Google Pay when Flow mode is enabled
+				if ( googlePay.length > 0 ) {
+					googlePay.show();
+				}
 			}
 		},
 

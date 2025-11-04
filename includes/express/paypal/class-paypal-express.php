@@ -226,7 +226,12 @@ class CKO_Paypal_Express {
 			$paypal_js_arg['client-id'] = 'ATbi1ysGm-jp4RmmAFz1EWH4dFpPd-VdXIWWzR4QZK5LAvDu_5atDY9dsUEJcLS5mTpR8Wb1l_m6Ameq';
 		}
 
-		$paypal_js_arg['merchant-id'] = $paypal_settings['ckocom_paypal_merchant_id'] ?? '';
+		// Always add merchant-id if available (PayPal requires it to match payee in transaction)
+		// PayPal SDK validation error indicates payee mismatch when merchant-id is missing
+		$merchant_id = $paypal_settings['ckocom_paypal_merchant_id'] ?? '';
+		if ( ! empty( $merchant_id ) ) {
+			$paypal_js_arg['merchant-id'] = $merchant_id;
+		}
 
 		$paypal_js_arg['disable-funding'] = 'credit,card,sepa';
 		$paypal_js_arg['commit']          = 'false';
@@ -242,11 +247,23 @@ class CKO_Paypal_Express {
 
 		wp_register_script( 'cko-paypal-script', $paypal_js_url, [ 'jquery' ], null );
 
+		// Get base API URL and validate it
+		$base_api_url = WC()->api_request_url( 'CKO_Paypal_Woocommerce' );
+		
+		// Ensure base API URL is valid
+		if ( empty( $base_api_url ) || ! filter_var( $base_api_url, FILTER_VALIDATE_URL ) ) {
+			WC_Checkoutcom_Utility::logger( 'PayPal Express: Warning - API request URL is empty or invalid. Check if CKO_Paypal_Woocommerce API route is registered.' );
+			$base_api_url = home_url( '/wc-api/CKO_Paypal_Woocommerce/' );
+		}
+		
+		// Ensure base URL ends with a trailing slash for proper query string handling
+		$base_api_url = trailingslashit( $base_api_url );
+
 		$vars = [
-			'add_to_cart_url'                  => add_query_arg( [ 'cko_paypal_action' => 'express_add_to_cart' ], WC()->api_request_url( 'CKO_Paypal_Woocommerce' ) ),
-			'create_order_url'                 => add_query_arg( [ 'cko_paypal_action' => 'express_create_order' ], WC()->api_request_url( 'CKO_Paypal_Woocommerce' ) ),
-			'paypal_order_session_url'         => add_query_arg( [ 'cko_paypal_action' => 'express_paypal_order_session' ], WC()->api_request_url( 'CKO_Paypal_Woocommerce' ) ),
-			'cc_capture'                       => add_query_arg( [ 'cko_paypal_action' => 'cc_capture' ], WC()->api_request_url( 'CKO_Paypal_Woocommerce' ) ),
+			'add_to_cart_url'                  => add_query_arg( [ 'cko_paypal_action' => 'express_add_to_cart' ], $base_api_url ),
+			'create_order_url'                 => add_query_arg( [ 'cko_paypal_action' => 'express_create_order' ], $base_api_url ),
+			'paypal_order_session_url'         => add_query_arg( [ 'cko_paypal_action' => 'express_paypal_order_session' ], $base_api_url ),
+			'cc_capture'                       => add_query_arg( [ 'cko_paypal_action' => 'cc_capture' ], $base_api_url ),
 			'woocommerce_process_checkout'     => wp_create_nonce( 'woocommerce-process_checkout' ),
 			'is_cart_contains_subscription'    => WC_Checkoutcom_Utility::is_cart_contains_subscription(),
 			'paypal_button_selector'           => '#cko-paypal-button-wrapper',
@@ -265,6 +282,9 @@ class CKO_Paypal_Express {
 			[ 'jquery', 'cko-paypal-script' ],
 			WC_CHECKOUTCOM_PLUGIN_VERSION
 		);
+		
+		// Also localize on express integration script to ensure variables are available
+		wp_localize_script( 'cko-paypal-express-integration-script', 'cko_paypal_vars', $vars );
 
 		wp_enqueue_script( 'cko-paypal-express-integration-script' );
 	}
@@ -385,12 +405,7 @@ class CKO_Paypal_Express {
 	 * Display PayPal Express button on cart page
 	 */
 	public function display_cart_payment_request_button_html() {
-		static $rendered = false;
-		
-		// Prevent duplicate rendering if multiple hooks fire
-		if ( $rendered ) {
-			return;
-		}
+		static $container_rendered = false;
 		
 		$paypal_settings = get_option( 'woocommerce_wc_checkout_com_paypal_settings', array() );
 		
@@ -431,37 +446,121 @@ class CKO_Paypal_Express {
 			return;
 		}
 		
-		// Mark as rendered
-		$rendered = true;
-		?>
-		<style>
-			.cko-paypal-cart-button {
-				margin: 15px 0;
-				text-align: center;
-				padding: 15px;
-				background: #f8f9fa;
-				border: 1px solid #e9ecef;
-				border-radius: 5px;
-			}
-			.cko-paypal-cart-button .cko-disabled {
-				cursor: not-allowed;
-				-webkit-filter: grayscale(100%);
-				filter: grayscale(100%);
-			}
-			.cko-paypal-cart-button #cko-paypal-button-wrapper-cart {
-				display: none;
-			}
-			.cko-paypal-cart-button h3 {
-				margin: 0 0 10px 0;
-				font-size: 16px;
-				color: #333;
-			}
-		</style>
-		<div class="cko-paypal-cart-button">
-			<h3><?php _e( 'Express Checkout', 'checkout-com-unified-payments-api' ); ?></h3>
-			<div id="cko-paypal-button-wrapper-cart"></div>
-		</div>
-		<?php
+		// Check if unified express checkout container exists
+		$google_pay_settings = get_option( 'woocommerce_wc_checkout_com_google_pay_settings', array() );
+		$google_express_enabled = isset( $google_pay_settings['google_pay_express'] ) 
+			&& 'yes' === $google_pay_settings['google_pay_express']
+			&& ! empty( $google_pay_settings['google_pay_express'] );
+		$google_available = WC_Checkoutcom_Utility::is_google_pay_express_available();
+		$google_show_on_cart = isset( $google_pay_settings['google_pay_express_cart_page'] ) 
+			&& 'yes' === $google_pay_settings['google_pay_express_cart_page']
+			&& ! empty( $google_pay_settings['google_pay_express_cart_page'] );
+		
+		// Check if unified container has been rendered by Google Pay
+		$unified_container_rendered = WC_Checkoutcom_Utility::express_checkout_container_rendered();
+		
+		$should_render_container = ! $unified_container_rendered && ( $google_express_enabled && $google_available && $google_show_on_cart );
+		
+		// Render unified container only once if both are enabled, or PayPal's own container
+		if ( $should_render_container ) {
+			WC_Checkoutcom_Utility::express_checkout_container_rendered( true );
+			$container_rendered = true;
+			?>
+			<style>
+				.cko-express-checkout-container {
+					margin: 15px 0;
+					text-align: center;
+					padding: 15px;
+					background: #f8f9fa;
+					border: 1px solid #e9ecef;
+					border-radius: 5px;
+				}
+				.cko-express-checkout-container h3 {
+					margin: 0 0 15px 0;
+					font-size: 16px;
+					color: #333;
+				}
+				.cko-express-checkout-buttons {
+					display: flex;
+					flex-direction: column;
+					gap: 10px;
+					align-items: center;
+					justify-content: center;
+				}
+				.cko-express-checkout-buttons > div {
+					width: 100%;
+					max-width: 300px;
+					min-height: 40px;
+				}
+				.cko-express-checkout-buttons #cko-paypal-button-wrapper-cart,
+				.cko-express-checkout-buttons #cko-google-pay-button-wrapper-cart {
+					display: block !important;
+				}
+				.cko-express-checkout-buttons .cko-disabled {
+					cursor: not-allowed;
+					-webkit-filter: grayscale(100%);
+					filter: grayscale(100%);
+				}
+			</style>
+			<div class="cko-express-checkout-container">
+				<h3><?php _e( 'Express Checkout', 'checkout-com-unified-payments-api' ); ?></h3>
+				<div class="cko-express-checkout-buttons">
+					<div id="cko-paypal-button-wrapper-cart"></div>
+					<div id="cko-google-pay-button-wrapper-cart" style="display: block;"></div>
+				</div>
+			</div>
+			<?php
+		} elseif ( ! $container_rendered && ! WC_Checkoutcom_Utility::express_checkout_container_rendered() ) {
+			// Only PayPal is enabled, render PayPal's own container (only if unified container wasn't already rendered)
+			$container_rendered = true;
+			?>
+			<style>
+				.cko-paypal-cart-button {
+					margin: 15px 0;
+					text-align: center;
+					padding: 15px;
+					background: #f8f9fa;
+					border: 1px solid #e9ecef;
+					border-radius: 5px;
+				}
+				.cko-paypal-cart-button .cko-disabled {
+					cursor: not-allowed;
+					-webkit-filter: grayscale(100%);
+					filter: grayscale(100%);
+				}
+				.cko-paypal-cart-button #cko-paypal-button-wrapper-cart {
+					display: none;
+					max-width: 300px;
+					margin: 0 auto;
+					min-height: 40px;
+				}
+				.cko-paypal-cart-button h3 {
+					margin: 0 0 10px 0;
+					font-size: 16px;
+					color: #333;
+				}
+			</style>
+			<div class="cko-paypal-cart-button">
+				<h3><?php _e( 'Express Checkout', 'checkout-com-unified-payments-api' ); ?></h3>
+				<div id="cko-paypal-button-wrapper-cart"></div>
+			</div>
+			<?php
+		} else {
+			// Unified container already rendered by Google Pay, add PayPal button via JavaScript
+			?>
+			<script>
+			(function() {
+				var buttonsContainer = document.querySelector('.cko-express-checkout-buttons');
+				if (buttonsContainer && !document.getElementById('cko-paypal-button-wrapper-cart')) {
+					var paypalWrapper = document.createElement('div');
+					paypalWrapper.id = 'cko-paypal-button-wrapper-cart';
+					paypalWrapper.style.display = 'block';
+					buttonsContainer.insertBefore(paypalWrapper, buttonsContainer.firstChild);
+				}
+			})();
+			</script>
+			<?php
+		}
 	}
 
 	public function disable_other_gateways( array $methods ) {
