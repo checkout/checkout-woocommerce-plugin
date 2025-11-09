@@ -45,14 +45,76 @@ define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '5.0.0_beta' );
 define( 'WC_CHECKOUTCOM_PLUGIN_URL', untrailingslashit( plugins_url( basename( plugin_dir_path( __FILE__ ) ), basename( __FILE__ ) ) ) );
 define( 'WC_CHECKOUTCOM_PLUGIN_PATH', untrailingslashit( plugin_dir_path( __FILE__ ) ) );
 
-add_action( 'plugins_loaded', 'init_checkout_com_gateway_class', 0 );
+/**
+ * This function registers our PHP class as a WooCommerce payment gateway.
+ */
+if ( ! function_exists( 'init_checkout_com_gateway_class' ) ) {
+	add_action( 'plugins_loaded', 'init_checkout_com_gateway_class', 0 );
+	function init_checkout_com_gateway_class() {
+		if ( ! class_exists( 'WC_Payment_Gateway' ) ) {
+			return;
+		}
+
+		load_plugin_textdomain( 'checkout-com-unified-payments-api', false, plugin_basename( __DIR__ ) . '/languages' );
+
+		// Core payment gateway classes
+		include_once 'includes/class-wc-gateway-checkout-com-cards.php';
+		include_once 'includes/class-wc-gateway-checkout-com-apple-pay.php';
+		
+		// Register Apple Pay CSR generation AJAX handler early
+		// Use a wrapper function to ensure it's always available
+		if ( class_exists( 'WC_Gateway_Checkout_Com_Apple_Pay' ) ) {
+		add_action( 'wp_ajax_cko_generate_apple_pay_csr', 'cko_ajax_generate_apple_pay_csr' );
+		add_action( 'wp_ajax_cko_upload_apple_pay_certificate', 'cko_ajax_upload_apple_pay_certificate' );
+		add_action( 'wp_ajax_cko_generate_apple_pay_merchant_certificate', 'cko_ajax_generate_apple_pay_merchant_certificate' );
+		add_action( 'wp_ajax_cko_upload_apple_pay_domain_association', 'cko_ajax_upload_apple_pay_domain_association' );
+		add_action( 'wp_ajax_cko_generate_apple_pay_merchant_identity_csr', 'cko_ajax_generate_apple_pay_merchant_identity_csr' );
+		add_action( 'wp_ajax_cko_upload_apple_pay_merchant_identity_certificate', 'cko_ajax_upload_apple_pay_merchant_identity_certificate' );
+		add_action( 'wp_ajax_cko_test_apple_pay_certificate', 'cko_ajax_test_apple_pay_certificate' );
+	}
+	
+		include_once 'includes/class-wc-gateway-checkout-com-google-pay.php';
+		include_once 'includes/class-wc-gateway-checkout-com-paypal.php';
+		include_once 'includes/class-wc-gateway-checkout-com-alternative-payments.php';
+		
+		// Flow integration
+		include_once 'flow-integration/class-wc-gateway-checkout-com-flow.php';
+
+		// Enhanced logging classes (commented out temporarily)
+		// include_once 'includes/logging/class-wc-checkoutcom-enhanced-logger.php';
+		// include_once 'includes/logging/class-wc-checkoutcom-log-manager.php';
+		// include_once 'includes/logging/class-wc-checkoutcom-performance-monitor.php';
+		// include_once 'includes/settings/class-wc-checkoutcom-logging-settings.php';
+
+		// Initialize enhanced logging (commented out temporarily)
+		// WC_Checkoutcom_Logging_Settings::init();
+
+		// WooCommerce Blocks integration (safe/conditional)
+		// Check for safe version first, fallback to regular version
+		$blocks_safe_file = __DIR__ . '/includes/blocks/class-wc-checkoutcom-blocks-integration-safe.php';
+		$blocks_file = __DIR__ . '/includes/blocks/class-wc-checkoutcom-blocks-integration.php';
+		
+		if ( file_exists( $blocks_safe_file ) ) {
+			include_once $blocks_safe_file;
+		} elseif ( file_exists( $blocks_file ) ) {
+			include_once $blocks_file;
+		} else {
+			// Log error but don't break the site - Blocks integration is optional
+			error_log( 'Checkout.com Blocks integration file not found. Expected: ' . $blocks_file );
+		}
+
+		// Load payment gateway class.
+		add_filter( 'woocommerce_payment_gateways', 'checkout_com_add_gateway' );
+	}
+}
 
 /**
  * Make billing details read-only on order-pay page
  * This ensures customers can't modify billing information that was set when the order was created
  */
-add_action( 'wp_enqueue_scripts', 'cko_make_order_pay_billing_readonly' );
-function cko_make_order_pay_billing_readonly() {
+if ( ! function_exists( 'cko_make_order_pay_billing_readonly' ) ) {
+	add_action( 'wp_enqueue_scripts', 'cko_make_order_pay_billing_readonly' );
+	function cko_make_order_pay_billing_readonly() {
 	// Only on order-pay page
 	if ( ! is_wc_endpoint_url( 'order-pay' ) ) {
 		return;
@@ -111,6 +173,7 @@ function cko_make_order_pay_billing_readonly() {
 			console.log("[CKO DEBUG] Billing fields disabled successfully on order-pay page");
 		});
 	' );
+	}
 }
 
 
@@ -128,51 +191,168 @@ add_action(
 	}
 );
 
+
 /**
- * This function registers our PHP class as a WooCommerce payment gateway.
+ * AJAX handler wrapper for Apple Pay CSR generation.
+ * This ensures the handler is always available, even if the gateway class isn't fully instantiated.
  */
-function init_checkout_com_gateway_class() {
-	if ( ! class_exists( 'WC_Payment_Gateway' ) ) {
+if ( ! function_exists( 'cko_ajax_generate_apple_pay_csr' ) ) {
+	function cko_ajax_generate_apple_pay_csr() {
+	if ( ! class_exists( 'WC_Gateway_Checkout_Com_Apple_Pay' ) ) {
+		wp_send_json_error( [ 
+			'message' => __( 'Apple Pay gateway class not found.', 'checkout-com-unified-payments-api' ),
+		] );
 		return;
 	}
-
-	load_plugin_textdomain( 'checkout-com-unified-payments-api', false, plugin_basename( __DIR__ ) . '/languages' );
-
-	// Core payment gateway classes
-	include_once 'includes/class-wc-gateway-checkout-com-cards.php';
-	include_once 'includes/class-wc-gateway-checkout-com-apple-pay.php';
-	include_once 'includes/class-wc-gateway-checkout-com-google-pay.php';
-	include_once 'includes/class-wc-gateway-checkout-com-paypal.php';
-	include_once 'includes/class-wc-gateway-checkout-com-alternative-payments.php';
 	
-	// Flow integration
-	include_once 'flow-integration/class-wc-gateway-checkout-com-flow.php';
-
-	// Enhanced logging classes (commented out temporarily)
-	// include_once 'includes/logging/class-wc-checkoutcom-enhanced-logger.php';
-	// include_once 'includes/logging/class-wc-checkoutcom-log-manager.php';
-	// include_once 'includes/logging/class-wc-checkoutcom-performance-monitor.php';
-	// include_once 'includes/settings/class-wc-checkoutcom-logging-settings.php';
-
-	// Initialize enhanced logging (commented out temporarily)
-	// WC_Checkoutcom_Logging_Settings::init();
-
-	// WooCommerce Blocks integration (safe/conditional)
-	// Check for safe version first, fallback to regular version
-	$blocks_safe_file = __DIR__ . '/includes/blocks/class-wc-checkoutcom-blocks-integration-safe.php';
-	$blocks_file = __DIR__ . '/includes/blocks/class-wc-checkoutcom-blocks-integration.php';
-	
-	if ( file_exists( $blocks_safe_file ) ) {
-		include_once $blocks_safe_file;
-	} elseif ( file_exists( $blocks_file ) ) {
-		include_once $blocks_file;
+	// Get the gateway instance
+	$gateways = WC()->payment_gateways()->payment_gateways();
+	if ( isset( $gateways['wc_checkout_com_apple_pay'] ) ) {
+		$gateways['wc_checkout_com_apple_pay']->ajax_generate_csr();
 	} else {
-		// Log error but don't break the site - Blocks integration is optional
-		error_log( 'Checkout.com Blocks integration file not found. Expected: ' . $blocks_file );
+		// Fallback: create a temporary instance
+		$gateway = new WC_Gateway_Checkout_Com_Apple_Pay();
+		$gateway->ajax_generate_csr();
 	}
+	}
+}
 
-	// Load payment gateway class.
-	add_filter( 'woocommerce_payment_gateways', 'checkout_com_add_gateway' );
+/**
+ * AJAX handler wrapper for Apple Pay certificate upload.
+ * This ensures the handler is always available, even if the gateway class isn't fully instantiated.
+ */
+if ( ! function_exists( 'cko_ajax_upload_apple_pay_certificate' ) ) {
+	function cko_ajax_upload_apple_pay_certificate() {
+	if ( ! class_exists( 'WC_Gateway_Checkout_Com_Apple_Pay' ) ) {
+		wp_send_json_error( [ 
+			'message' => __( 'Apple Pay gateway class not found.', 'checkout-com-unified-payments-api' ),
+		] );
+		return;
+	}
+	
+	// Get the gateway instance
+	$gateways = WC()->payment_gateways()->payment_gateways();
+	if ( isset( $gateways['wc_checkout_com_apple_pay'] ) ) {
+		$gateways['wc_checkout_com_apple_pay']->ajax_upload_certificate();
+	} else {
+		// Fallback: create a temporary instance
+		$gateway = new WC_Gateway_Checkout_Com_Apple_Pay();
+		$gateway->ajax_upload_certificate();
+	}
+	}
+}
+
+/**
+ * AJAX handler wrapper for Apple Pay merchant certificate generation.
+ * This ensures the handler is always available, even if the gateway class isn't fully instantiated.
+ */
+if ( ! function_exists( 'cko_ajax_generate_apple_pay_merchant_certificate' ) ) {
+	function cko_ajax_generate_apple_pay_merchant_certificate() {
+	if ( ! class_exists( 'WC_Gateway_Checkout_Com_Apple_Pay' ) ) {
+		wp_send_json_error( [ 
+			'message' => __( 'Apple Pay gateway class not found.', 'checkout-com-unified-payments-api' ),
+		] );
+		return;
+	}
+	
+	// Get the gateway instance
+	$gateways = WC()->payment_gateways()->payment_gateways();
+	if ( isset( $gateways['wc_checkout_com_apple_pay'] ) ) {
+		$gateways['wc_checkout_com_apple_pay']->ajax_generate_merchant_certificate();
+	} else {
+		// Fallback: create a temporary instance
+		$gateway = new WC_Gateway_Checkout_Com_Apple_Pay();
+		$gateway->ajax_generate_merchant_certificate();
+	}
+	}
+}
+
+/**
+ * AJAX handler wrapper for Apple Pay domain association upload.
+ */
+if ( ! function_exists( 'cko_ajax_upload_apple_pay_domain_association' ) ) {
+	function cko_ajax_upload_apple_pay_domain_association() {
+	if ( ! class_exists( 'WC_Gateway_Checkout_Com_Apple_Pay' ) ) {
+		wp_send_json_error( [ 
+			'message' => __( 'Apple Pay gateway class not found.', 'checkout-com-unified-payments-api' ),
+		] );
+		return;
+	}
+	
+	$gateways = WC()->payment_gateways()->payment_gateways();
+	if ( isset( $gateways['wc_checkout_com_apple_pay'] ) ) {
+		$gateways['wc_checkout_com_apple_pay']->ajax_upload_domain_association();
+	} else {
+		$gateway = new WC_Gateway_Checkout_Com_Apple_Pay();
+		$gateway->ajax_upload_domain_association();
+	}
+	}
+}
+
+/**
+ * AJAX handler wrapper for Apple Pay merchant identity CSR generation.
+ */
+if ( ! function_exists( 'cko_ajax_generate_apple_pay_merchant_identity_csr' ) ) {
+	function cko_ajax_generate_apple_pay_merchant_identity_csr() {
+	if ( ! class_exists( 'WC_Gateway_Checkout_Com_Apple_Pay' ) ) {
+		wp_send_json_error( [ 
+			'message' => __( 'Apple Pay gateway class not found.', 'checkout-com-unified-payments-api' ),
+		] );
+		return;
+	}
+	
+	$gateways = WC()->payment_gateways()->payment_gateways();
+	if ( isset( $gateways['wc_checkout_com_apple_pay'] ) ) {
+		$gateways['wc_checkout_com_apple_pay']->ajax_generate_merchant_identity_csr();
+	} else {
+		$gateway = new WC_Gateway_Checkout_Com_Apple_Pay();
+		$gateway->ajax_generate_merchant_identity_csr();
+	}
+	}
+}
+
+/**
+ * AJAX handler wrapper for Apple Pay merchant identity certificate upload.
+ */
+if ( ! function_exists( 'cko_ajax_upload_apple_pay_merchant_identity_certificate' ) ) {
+	function cko_ajax_upload_apple_pay_merchant_identity_certificate() {
+	if ( ! class_exists( 'WC_Gateway_Checkout_Com_Apple_Pay' ) ) {
+		wp_send_json_error( [ 
+			'message' => __( 'Apple Pay gateway class not found.', 'checkout-com-unified-payments-api' ),
+		] );
+		return;
+	}
+	
+	$gateways = WC()->payment_gateways()->payment_gateways();
+	if ( isset( $gateways['wc_checkout_com_apple_pay'] ) ) {
+		$gateways['wc_checkout_com_apple_pay']->ajax_upload_merchant_identity_certificate();
+	} else {
+		$gateway = new WC_Gateway_Checkout_Com_Apple_Pay();
+		$gateway->ajax_upload_merchant_identity_certificate();
+	}
+	}
+}
+
+/**
+ * AJAX handler wrapper for Apple Pay certificate testing.
+ */
+if ( ! function_exists( 'cko_ajax_test_apple_pay_certificate' ) ) {
+	function cko_ajax_test_apple_pay_certificate() {
+	if ( ! class_exists( 'WC_Gateway_Checkout_Com_Apple_Pay' ) ) {
+		wp_send_json_error( [ 
+			'message' => __( 'Apple Pay gateway class not found.', 'checkout-com-unified-payments-api' ),
+		] );
+		return;
+	}
+	
+	$gateways = WC()->payment_gateways()->payment_gateways();
+	if ( isset( $gateways['wc_checkout_com_apple_pay'] ) ) {
+		$gateways['wc_checkout_com_apple_pay']->ajax_test_certificate();
+	} else {
+		$gateway = new WC_Gateway_Checkout_Com_Apple_Pay();
+		$gateway->ajax_test_certificate();
+	}
+	}
 }
 
 /**

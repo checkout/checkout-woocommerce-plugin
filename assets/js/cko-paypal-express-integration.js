@@ -367,7 +367,7 @@ const cko_express_create_order_id = async function () {
                 try {
                     paypal.Buttons({ ...this.paypalButtonProps('product') }).render('#cko-paypal-button-wrapper');
                 } catch (error) {
-                    // Silently fail - error already handled by PayPal SDK
+                    console.error('[PayPal Express] Error initializing product page button:', error);
                 }
             }
         },
@@ -407,6 +407,11 @@ const cko_express_create_order_id = async function () {
             const isBlocksCart = jQuery('.wc-block-cart').length > 0;
             const isClassicCart = jQuery('.woocommerce-cart').length > 0 && !isBlocksCart;
             const wrapperExists = jQuery('#cko-paypal-button-wrapper-cart').length > 0;
+            
+            // Clear existing PayPal button if it exists (to prevent duplicates on cart update)
+            if (wrapperExists) {
+                jQuery('#cko-paypal-button-wrapper-cart').empty();
+            }
             
             // For Blocks cart, inject the button wrapper if it doesn't exist
             if (isBlocksCart && !wrapperExists) {
@@ -455,9 +460,11 @@ const cko_express_create_order_id = async function () {
                 if (jQuery('#cko-paypal-button-wrapper-cart').length && typeof paypal !== 'undefined') {
                     clearInterval(checkPayPal);
                     try {
+                        // Clear wrapper before rendering to prevent duplicates
+                        jQuery('#cko-paypal-button-wrapper-cart').empty();
                         paypal.Buttons({ ...paypalButton.paypalButtonProps('cart') }).render('#cko-paypal-button-wrapper-cart');
                     } catch (error) {
-                        // Silently fail - error already handled by PayPal SDK
+                        console.error('[PayPal Express] Error rendering cart button:', error);
                     }
                 }
             }, 100);
@@ -470,6 +477,13 @@ const cko_express_create_order_id = async function () {
 
         paypalButtonProps: function (context = 'product', productId = null) {
             let paypalButtonProps = {
+                style: {
+                    layout: 'vertical',
+                    color: 'gold',  // PayPal's default brand color (also allowed: blue, silver, white, black)
+                    shape: 'rect',
+                    label: 'paypal',
+                    height: 40
+                },
         onApprove: async function (data) {
             cko_paypal_vars.debug && console.log('PayPal onApprove data:', data);
 
@@ -628,4 +642,12 @@ const cko_express_create_order_id = async function () {
     }
 
     paypalButton.init();
+    
+    // Re-initialize PayPal button when cart is updated (for cart page)
+    jQuery(document.body).on('updated_cart_totals', function() {
+        // Re-initialize cart page button after cart update
+        if (jQuery('#cko-paypal-button-wrapper-cart').length || jQuery('.woocommerce-cart').length || jQuery('.wc-block-cart').length) {
+            paypalButton.initCartPageButton();
+        }
+    });
 });

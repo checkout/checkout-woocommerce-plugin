@@ -399,7 +399,7 @@ jQuery( function ( $ ) {
                     const button = paymentsClient.createButton({
                         onClick: this.onGooglePayButtonClick.bind(this, 'product'),
                         buttonColor: cko_google_pay_vars.button_style === 'google-pay-white' ? 'white' : 'black',
-                        buttonType: 'pay'
+                        buttonType: 'plain'
                     });
 
                     wrapper.html('');
@@ -435,7 +435,7 @@ jQuery( function ( $ ) {
                         const button = paymentsClient.createButton({
                             onClick: self.onGooglePayButtonClick.bind(self, 'shop', productId),
                             buttonColor: cko_google_pay_vars.button_style === 'google-pay-white' ? 'white' : 'black',
-                            buttonType: 'pay'
+                            buttonType: 'plain'
                         });
 
                         $wrapper.html('');
@@ -522,7 +522,7 @@ jQuery( function ( $ ) {
                     const button = paymentsClient.createButton({
                         onClick: this.onGooglePayButtonClick.bind(this, 'cart'),
                         buttonColor: cko_google_pay_vars.button_style === 'google-pay-white' ? 'white' : 'black',
-                        buttonType: 'pay'
+                        buttonType: 'plain'
                     });
 
                     wrapper.html('');

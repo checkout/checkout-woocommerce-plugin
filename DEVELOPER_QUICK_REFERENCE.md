@@ -69,7 +69,30 @@ update_option('woocommerce_wc_checkout_com_paypal_settings', [
 ]);
 ```
 
-### 5. Handle MOTO Orders
+### 5. Configure Google Pay Express Settings
+```php
+// Enable Google Pay Express (master toggle)
+update_option('woocommerce_wc_checkout_com_google_pay_settings', [
+    'google_pay_express' => 'yes',  // Enable Express checkout
+    'google_pay_express_product_page' => 'yes',  // Show on product pages
+    'google_pay_express_shop_page' => 'yes',     // Show on shop/category pages
+    'google_pay_express_cart_page' => 'yes'       // Show on cart page
+]);
+
+// Disable Express on specific pages
+update_option('woocommerce_wc_checkout_com_google_pay_settings', [
+    'google_pay_express' => 'yes',
+    'google_pay_express_product_page' => 'no',   // Hide on product pages
+    'google_pay_express_shop_page' => 'yes',     // Show on shop pages
+    'google_pay_express_cart_page' => 'yes'       // Show on cart page
+]);
+
+// Unified Express Checkout Container
+// When both PayPal and Google Pay Express are enabled, they appear together
+// in a single "Express Checkout" section on the cart page
+```
+
+### 6. Handle MOTO Orders
 ```php
 // Detect MOTO order
 if ($order->is_created_via('admin')) {

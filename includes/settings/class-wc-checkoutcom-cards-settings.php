@@ -585,91 +585,302 @@ class WC_Checkoutcom_Cards_Settings {
 		}
 
 		$settings = [
-			'core_setting'             => [
-				'title'       => __( 'Apple Pay settings', 'checkout-com-unified-payments-api' ),
+			// ==================== APPLE PAY SETTINGS ====================
+			'apple_setting'            => [
+				'title'       => __( 'Apple Pay Settings', 'checkout-com-unified-payments-api' ),
 				'type'        => 'title',
 				'description' => '',
 			],
 			'enabled'                  => [
 				'id'          		=> 'enable',
-				'title'       		=> __( 'Enable/Disable', 'checkout-com-unified-payments-api' ),
+				'title'       		=> __( 'Enable Apple Pay', 'checkout-com-unified-payments-api' ),
 				'type'        		=> 'checkbox',
-				'label'       		=> __( 'Enable Checkout.com', 'checkout-com-unified-payments-api' ),
-				'description' 		=> __( 'This enables Checkout.com. cards payment', 'checkout-com-unified-payments-api' ),
-				'desc_tip'    		=> true,
+				'label'       		=> __( 'Enable Apple Pay payment method', 'checkout-com-unified-payments-api' ),
+				'description' 		=> __( 'Enable this option to activate Apple Pay as a payment method on your checkout page. When enabled, customers with compatible Apple devices can use Apple Pay to complete their purchase.', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    		=> false,
 				'default'     		=> 'yes',
 				'custom_attributes' => $should_disable_checkbox ? [ 'disabled' => 'disabled' ] : [],
 			],
 			'title'                    => [
-				'title'       => __( 'Title', 'checkout-com-unified-payments-api' ),
+				'title'       => __( 'Payment Method Title', 'checkout-com-unified-payments-api' ),
 				'type'        => 'text',
-				'label'       => __( 'Card payment title', 'checkout-com-unified-payments-api' ),
-				'description' => __( 'Title that will be displayed on the checkout page', 'checkout-com-unified-payments-api' ),
-				'desc_tip'    => true,
-				'default'     => 'Core settings',
+				'description' => __( 'This is the title that customers will see on the checkout page. Choose a clear, recognizable name for the payment method (e.g., "Apple Pay" or "Pay with Apple Pay").', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => false,
+				'default'     => 'Apple Pay',
 			],
 			'description'              => [
-				'title'       => __( 'Description', 'checkout-com-unified-payments-api' ),
+				'title'       => __( 'Payment Method Description', 'checkout-com-unified-payments-api' ),
 				'type'        => 'text',
-				'description' => __( 'This controls the description which the user sees during checkout.', 'checkout-com-unified-payments-api' ),
-				'default'     => 'Pay with Apple Pay.',
-				'desc_tip'    => true,
+				'description' => __( 'A short description that appears below the payment method title on the checkout page. This helps customers understand what Apple Pay is and how it works.', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => false,
+				'default'     => 'Pay securely with Apple Pay using your iPhone, iPad, or Mac.',
+			],
+
+			// ==================== STEP 1: PAYMENT PROCESSING CERTIFICATE SETUP (for decryption) ====================
+			'apple_pay_certificate_setup' => [
+				'title'       => __( 'Step 1: Payment Processing Certificate Setup (for decryption)', 'checkout-com-unified-payments-api' ),
+				'type'        => 'title',
+				'description' => __( 'Set up your Apple Pay Payment Processing Certificate. This certificate is required for Checkout.com to decrypt Apple Pay payment tokens. Follow the steps below to generate and upload your certificate.', 'checkout-com-unified-payments-api' ),
+			],
+			'apple_pay_csr_generate'         => [
+				'title'       => __( 'Step 1a: Generate Certificate Signing Request (CSR)', 'checkout-com-unified-payments-api' ),
+				'type'        => 'apple_pay_csr_button',
+				/* translators: 1: HTML anchor opening tag, 2: HTML anchor closing tag. */
+				'description' => sprintf( __( 'First, create a Merchant ID in your %1$sApple Developer account%2$s if you haven\'t already. Then generate a Certificate Signing Request (CSR) file that you will upload to Apple Developer. This CSR is valid for 24 hours, so complete the certificate creation process promptly.', 'checkout-com-unified-payments-api' ), '<a target="_blank" href="https://developer.apple.com/account/resources/identifiers/add/merchant">', '</a>' ),
+				'desc_tip'    => false,
+			],
+			'apple_pay_certificate_upload'    => [
+				'title'       => __( 'Step 1b: Upload Signed Certificate', 'checkout-com-unified-payments-api' ),
+				'type'        => 'apple_pay_certificate_upload',
+				'description' => __( 'After generating the CSR above, upload it to Apple Developer and download the signed certificate (apple_pay.cer). Then upload that certificate here to complete the setup.', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => false,
+			],
+
+			// ==================== STEP 2: DOMAIN ASSOCIATION SETUP ====================
+			'apple_pay_domain_association_setup' => [
+				'title'       => __( 'Step 2: Domain Association Setup', 'checkout-com-unified-payments-api' ),
+				'type'        => 'title',
+				'description' => __( 'Register your merchant domain with Apple. This is required to display the Apple Pay button on your website. You must have a valid TLS certificate on your domain.', 'checkout-com-unified-payments-api' ),
+			],
+			'apple_pay_domain_association_upload' => [
+				'title'       => __( 'Upload Domain Association File', 'checkout-com-unified-payments-api' ),
+				'type'        => 'apple_pay_domain_association_upload',
+				/* translators: 1: HTML anchor opening tag, 2: HTML anchor closing tag. */
+				'description' => sprintf( __( 'After adding your domain in Apple Developer, download the domain association file (.txt) and upload it here. The file will be automatically saved to your server. Go to your %1$sApple Developer Merchant IDs%2$s to manage your domains.', 'checkout-com-unified-payments-api' ), '<a target="_blank" href="https://developer.apple.com/account/resources/identifiers/list/merchant">', '</a>' ),
+				'desc_tip'    => false,
+			],
+
+			// ==================== STEP 3: MERCHANT IDENTITY CERTIFICATE SETUP (for session signing) ====================
+			'apple_pay_merchant_identity_certificate_setup' => [
+				'title'       => __( 'Step 3: Merchant Identity Certificate Setup (for session signing)', 'checkout-com-unified-payments-api' ),
+				'type'        => 'title',
+				'description' => __( 'Create and set up your Apple Pay Merchant Identity Certificate. This certificate is used to sign merchant session responses during Apple Pay payment authorization. Generate a CSR and private key locally using OpenSSL, upload the CSR to Apple Developer, download the signed certificate, and convert it to PEM format.', 'checkout-com-unified-payments-api' ),
+			],
+			'apple_pay_merchant_identity_csr_generate' => [
+				'title'       => __( 'Step 3a: Generate Merchant Identity CSR and Key', 'checkout-com-unified-payments-api' ),
+				'type'        => 'apple_pay_merchant_identity_csr_button',
+				'description' => __( 'Generate a Certificate Signing Request (CSR) and private key file using OpenSSL. Click the button below to generate these files on your server. The files will be downloaded automatically: uploadMe.csr and certificate_sandbox.key. Save the private key file securely on your server, then upload the CSR file to Apple Developer.', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => false,
+			],
+			'apple_pay_merchant_identity_certificate_upload' => [
+				'title'       => __( 'Step 3b: Upload and Convert Merchant Identity Certificate', 'checkout-com-unified-payments-api' ),
+				'type'        => 'apple_pay_merchant_identity_certificate_upload',
+				'description' => __( 'After uploading the CSR to Apple Developer and downloading the signed certificate (merchant_id.cer), upload it here. The certificate will be automatically converted from DER (.cer) format to PEM format and saved to your server. Make sure you have the certificate_sandbox.key file saved on your server from Step 3a.', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => false,
+			],
+			'apple_pay_test_certificate' => [
+				'title'       => __( 'Step 4: Test Certificate and Key (Final Verification)', 'checkout-com-unified-payments-api' ),
+				'type'        => 'apple_pay_test_certificate_button',
+				'description' => __( 'Test your Apple Pay certificate and private key by validating them with Apple\'s payment session endpoint. This will verify that your certificate and key are correctly configured and working. Make sure you have configured the Merchant Identifier, Domain Name, Display Name, and certificate/key paths above.', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => false,
+			],
+
+			// ==================== EXPRESS CHECKOUT SETTINGS ====================
+			'apple_pay_express_section' => [
+				'title'       => __( 'Express Checkout Settings', 'checkout-com-unified-payments-api' ),
+				'type'        => 'title',
+				'description' => __( 'Decide how buttons for digital wallets Apple Pay and Google Pay are displayed in your store. Depending on their web browser and their wallet configurations, your customers will see either Apple Pay or Google Pay, but not both.', 'checkout-com-unified-payments-api' ),
+			],
+			'apple_pay_express'            => [
+				'title'       => __( 'Enable Apple Pay / Google Pay', 'checkout-com-unified-payments-api' ),
+				'label'       => __( 'Enable Apple Pay / Google Pay', 'checkout-com-unified-payments-api' ),
+				'type'        => 'checkbox',
+				'description' => __( 'When enabled, customers who have configured Apple Pay or Google Pay enabled devices will be able to pay with their respective choice of Wallet.', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => false,
+				'default'     => 'no',
+			],
+			'apple_pay_express_location'    => [
+				'title'       => __( 'Show express checkouts on', 'checkout-com-unified-payments-api' ),
+				'type'        => 'title',
+				'description' => __( 'Configure the display of Apple Pay and Google Pay buttons on your store.', 'checkout-com-unified-payments-api' ),
+			],
+			'apple_pay_express_product_page' => [
+				'title'       => __( 'Product page', 'checkout-com-unified-payments-api' ),
+				'label'       => __( 'Product page', 'checkout-com-unified-payments-api' ),
+				'type'        => 'checkbox',
+				'description' => __( 'Display the Apple Pay button on individual product pages.', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => false,
+				'default'     => 'yes',
+			],
+			'apple_pay_express_shop_page'    => [
+				'title'       => __( 'Shop & Category Pages', 'checkout-com-unified-payments-api' ),
+				'label'       => __( 'Shop & Category Pages', 'checkout-com-unified-payments-api' ),
+				'type'        => 'checkbox',
+				'description' => __( 'Display the Apple Pay button on shop pages, category pages, tag archives, and other product listing pages.', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => false,
+				'default'     => 'yes',
+			],
+			'apple_pay_express_cart_page'    => [
+				'title'       => __( 'Cart', 'checkout-com-unified-payments-api' ),
+				'label'       => __( 'Cart', 'checkout-com-unified-payments-api' ),
+				'type'        => 'checkbox',
+				'description' => __( 'Display the Apple Pay button on the cart page.', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => false,
+				'default'     => 'yes',
+			],
+			'apple_pay_express_checkout_page' => [
+				'title'       => __( 'Checkout', 'checkout-com-unified-payments-api' ),
+				'label'       => __( 'Checkout', 'checkout-com-unified-payments-api' ),
+				'type'        => 'checkbox',
+				'description' => __( 'Display the Apple Pay button on the checkout page.', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => false,
+				'default'     => 'yes',
+			],
+			'apple_pay_express_appearance' => [
+				'title'       => __( 'Appearance', 'checkout-com-unified-payments-api' ),
+				'type'        => 'title',
+				'description' => __( 'Configure the appearance of Apple Pay and Google Pay buttons. Note: Some appearance settings may be overridden by the express payment section of the Cart & Checkout blocks.', 'checkout-com-unified-payments-api' ),
+			],
+			// Size settings temporarily disabled - buttons use native SDK sizes
+			/*
+			'apple_pay_express_button_size_preset' => [
+				'title'       => __( 'Size', 'checkout-com-unified-payments-api' ),
+				'type'        => 'select',
+				'description' => __( 'Select the button size. Note that larger buttons are more suitable for mobile use.', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => false,
+				'default'     => 'default',
+				'options'     => [
+					'native'  => __( 'Native (Recommended)', 'checkout-com-unified-payments-api' ),
+					'small'   => __( 'Small (40 px)', 'checkout-com-unified-payments-api' ),
+					'default' => __( 'Default (48 px)', 'checkout-com-unified-payments-api' ),
+					'large'   => __( 'Large (56 px)', 'checkout-com-unified-payments-api' ),
+					'custom'  => __( 'Custom Height', 'checkout-com-unified-payments-api' ),
+				],
+			],
+			'apple_pay_express_button_custom_height' => [
+				'title'       => __( 'Custom Button Height', 'checkout-com-unified-payments-api' ),
+				'type'        => 'number',
+				'description' => __( 'Enter a custom height in pixels (minimum 36px, maximum 60px). This setting only applies when "Custom Height" is selected above.', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => false,
+				'default'     => '48',
+				'custom_attributes' => [
+					'min' => '36',
+					'max' => '60',
+					'step' => '1',
+				],
+			],
+			*/
+
+			// ==================== APPLE PAY CONFIGURATION ====================
+			'apple_pay_configuration' => [
+				'title'       => __( 'Apple Pay Configuration', 'checkout-com-unified-payments-api' ),
+				'type'        => 'title',
+				'description' => __( 'Configure your Apple Pay merchant identifier and certificate settings. These are required for Apple Pay to function properly.', 'checkout-com-unified-payments-api' ),
 			],
 			'ckocom_apple_mercahnt_id' => [
 				'title'       => __( 'Merchant Identifier', 'checkout-com-unified-payments-api' ),
 				'type'        => 'text',
 				/* translators: 1: HTML anchor opening tag, 2: HTML anchor closing tag. */
-				'description' => sprintf( __( 'You can find this in your developer portal, or to generate one follow this %1$s guide %2$s', 'checkout-com-unified-payments-api' ), '<a target="_blank" href="' . esc_url( $docs_link ) . '">', '</a>' ),
+				'description' => sprintf( __( 'Your Apple Pay Merchant Identifier is a unique identifier registered with Apple. You can find this in your Apple Developer account under Certificates, Identifiers & Profiles > Identifiers. To create a new Merchant ID, follow this %1$s guide %2$s', 'checkout-com-unified-payments-api' ), '<a target="_blank" href="' . esc_url( $docs_link ) . '">', '</a>' ),
+				'desc_tip'    => false,
 				'default'     => '',
+				'placeholder' => 'merchant.com.yourdomain.production',
 			],
 			'ckocom_apple_certificate' => [
-				'title'       => __( 'Merchant Certificate', 'checkout-com-unified-payments-api' ),
+				'title'       => __( 'Merchant Identity Certificate Path', 'checkout-com-unified-payments-api' ),
 				'type'        => 'text',
-				'description' => __( 'The absolute path to your .pem certificate.', 'checkout-com-unified-payments-api' ),
-				'desc_tip'    => true,
+				'description' => __( 'Enter the absolute server path to your Apple Pay Merchant Identity Certificate file (.pem). This certificate is used to sign merchant session responses during Apple Pay payment authorization. This is the certificate from Step 3 (Merchant Identity Certificate Setup).', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => false,
 				'default'     => '',
+				'placeholder' => '/path/to/your/certificate_sandbox.pem',
 			],
 			'ckocom_apple_key'         => [
-				'title'       => __( 'Merchant Certificate Key', 'checkout-com-unified-payments-api' ),
+				'title'       => __( 'Merchant Identity Certificate Key Path', 'checkout-com-unified-payments-api' ),
 				'type'        => 'text',
-				'description' => __( 'The absolute path to your .key certificate key.', 'checkout-com-unified-payments-api' ),
-				'desc_tip'    => true,
+				'description' => __( 'Enter the absolute server path to your Apple Pay Merchant Identity Certificate private key file (.key). This key is used alongside the certificate to sign merchant session responses. This is the private key from Step 3a (Generate Merchant Identity CSR and Key).', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => false,
 				'default'     => '',
+				'placeholder' => '/path/to/your/certificate_sandbox.key',
+				'custom_attributes' => [
+					'data-field-type' => 'private-key',
+				],
+			],
+			'apple_pay_domain_name' => [
+				'title'       => __( 'Domain Name', 'checkout-com-unified-payments-api' ),
+				'type'        => 'text',
+				'description' => __( 'Enter the domain name where you will display the Apple Pay button (e.g., example.com or sandbox.example.com). This domain must match the domain where your Apple Pay button is displayed.', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => false,
+				'default'     => '',
+				'placeholder' => 'example.com',
+			],
+			'apple_pay_display_name' => [
+				'title'       => __( 'Display Name', 'checkout-com-unified-payments-api' ),
+				'type'        => 'text',
+				'description' => __( 'Enter a display name for your merchant account (e.g., "merchant id for test environment"). This name will be used during Apple Pay payment session validation.', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => false,
+				'default'     => '',
+				'placeholder' => 'merchant id for test environment',
+			],
+
+			// ==================== BUTTON CUSTOMIZATION ====================
+			'apple_pay_button_customization' => [
+				'title'       => __( 'Button Appearance', 'checkout-com-unified-payments-api' ),
+				'type'        => 'title',
+				'description' => __( 'Customize the appearance of Apple Pay buttons on your store. These settings control the style, type, and language of the Apple Pay button.', 'checkout-com-unified-payments-api' ),
 			],
 			'ckocom_apple_type'        => array(
-				'title'   => __( 'Button Type', 'checkout-com-unified-payments-api' ),
+				'title'   => __( 'Call to action', 'checkout-com-unified-payments-api' ),
 				'type'    => 'select',
+				'description' => __( 'Select a button label that fits best with the flow of purchase or payment experience on your store.', 'checkout-com-unified-payments-api' ),
+				'desc_tip' => false,
 				'options' => array(
+					'plain'     => __( 'Only icon', 'checkout-com-unified-payments-api' ),
 					'buy'       => __( 'Buy', 'checkout-com-unified-payments-api' ),
-					'check-out' => __( 'Checkout', 'checkout-com-unified-payments-api' ),
-					'book'      => __( 'Book', 'checkout-com-unified-payments-api' ),
 					'donate'    => __( 'Donate', 'checkout-com-unified-payments-api' ),
-					'plain'     => __( 'Plain', 'checkout-com-unified-payments-api' ),
+					'book'      => __( 'Book', 'checkout-com-unified-payments-api' ),
+					'check-out' => __( 'Checkout', 'checkout-com-unified-payments-api' ),
 				),
+				'default' => 'buy',
 			),
 			'ckocom_apple_theme'       => array(
-				'title'   => __( 'Button Theme', 'checkout-com-unified-payments-api' ),
+				'title'   => __( 'Theme', 'checkout-com-unified-payments-api' ),
 				'type'    => 'select',
+				'description' => __( 'Choose the color theme for the Apple Pay button. Select a theme that contrasts well with your website design for optimal visibility.', 'checkout-com-unified-payments-api' ),
+				'desc_tip' => false,
 				'options' => array(
-					'black'         => __( 'Black', 'checkout-com-unified-payments-api' ),
-					'white'         => __( 'White', 'checkout-com-unified-payments-api' ),
-					'white-outline' => __( 'White with outline', 'checkout-com-unified-payments-api' ),
+					'black'         => __( 'Dark', 'checkout-com-unified-payments-api' ) . ' - ' . __( 'Recommended for white or light-colored backgrounds with high contrast.', 'checkout-com-unified-payments-api' ),
+					'white'         => __( 'Light', 'checkout-com-unified-payments-api' ) . ' - ' . __( 'Recommended for dark or colored backgrounds with high contrast.', 'checkout-com-unified-payments-api' ),
+					'white-outline' => __( 'Outline', 'checkout-com-unified-payments-api' ) . ' - ' . __( 'Recommended for white or light-colored backgrounds with insufficient contrast.', 'checkout-com-unified-payments-api' ),
 				),
+				'default' => 'black',
 			),
 			'ckocom_apple_language'    => [
 				'title'       => __( 'Button Language', 'checkout-com-unified-payments-api' ),
 				'type'        => 'text',
 				/* translators: 1: HTML anchor opening tag, 2: HTML anchor closing tag. */
-				'description' => sprintf( __( 'ISO 639-1 value of the language. See supported languages %1$s here. %2$s', 'checkout-com-unified-payments-api' ), '<a href="https://applepaydemo.apple.com/" target="_blank">', '</a>' ),
+				'description' => sprintf( __( 'Enter the ISO 639-1 language code for the Apple Pay button (e.g., "en" for English, "es" for Spanish). If left empty, the button will use the browser default language. See supported languages %1$s here %2$s', 'checkout-com-unified-payments-api' ), '<a href="https://applepaydemo.apple.com/" target="_blank">', '</a>' ),
+				'desc_tip'    => false,
 				'default'     => '',
+				'placeholder' => 'en',
+			],
+
+			// ==================== MERCHANT CERTIFICATE SETUP ====================
+			'apple_pay_merchant_certificate_setup' => [
+				'title'       => __( 'Merchant Certificate & Private Key Setup', 'checkout-com-unified-payments-api' ),
+				'type'        => 'title',
+				'description' => __( 'Generate a self-signed merchant certificate and private key pair for Apple Pay merchant validation. These certificates are used to sign merchant session responses during Apple Pay payment authorization. After generating, download both files and configure their paths in the "Apple Pay Configuration" section above.', 'checkout-com-unified-payments-api' ),
+			],
+			'apple_pay_merchant_certificate_generate' => [
+				'title'       => __( 'Generate Merchant Certificate and Key', 'checkout-com-unified-payments-api' ),
+				'type'        => 'apple_pay_merchant_certificate_button',
+				'description' => __( 'Click the button below to generate a self-signed merchant certificate (.pem) and private key (.key) file pair. After generation, both files will be automatically downloaded. Save these files securely on your server and configure their paths in the "Merchant Certificate Path" and "Merchant Certificate Key Path" fields above.', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => false,
+			],
+
+			// ==================== ADVANCED SETTINGS ====================
+			'apple_pay_advanced_settings' => [
+				'title'       => __( 'Advanced Settings', 'checkout-com-unified-payments-api' ),
+				'type'        => 'title',
+				'description' => __( 'Additional configuration options for specialized use cases.', 'checkout-com-unified-payments-api' ),
 			],
 			'enable_mada'              => [
 				'id'          => 'enable_mada_apple_pay',
-				'title'       => __( 'Enable MADA', 'checkout-com-unified-payments-api' ),
+				'title'       => __( 'Enable MADA Support', 'checkout-com-unified-payments-api' ),
+				'label'       => __( 'Enable MADA card support for Apple Pay', 'checkout-com-unified-payments-api' ),
 				'type'        => 'checkbox',
-				'desc_tip'    => true,
+				'description' => __( 'Enable this option if your business is located in Saudi Arabia and you want to accept MADA (Saudi Payments Network) cards through Apple Pay. MADA is the national payment network of Saudi Arabia.', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => false,
 				'default'     => 'no',
-				'description' => __( 'Please enable if entity is in Saudi Arabia', 'checkout-com-unified-payments-api' ),
 			],
 		];
 
@@ -790,6 +1001,40 @@ class WC_Checkoutcom_Cards_Settings {
 				'desc_tip'    => true,
 				'default'     => 'yes',
 			],
+			// Size settings temporarily disabled - buttons use native SDK sizes
+			/*
+			'google_pay_express_button_size' => [
+				'title'       => __( 'Button Size Customization', 'checkout-com-unified-payments-api' ),
+				'type'        => 'title',
+				'description' => __( 'Customize the size of Google Pay Express buttons. By default, buttons use their native styles for optimal appearance. You can choose to set a consistent size across all express buttons if needed.', 'checkout-com-unified-payments-api' ),
+			],
+			'google_pay_express_button_size_preset' => [
+				'title'       => __( 'Button Size', 'checkout-com-unified-payments-api' ),
+				'type'        => 'select',
+				'description' => __( 'Choose the button size preset. "Native" uses the default Google Pay button styling (recommended). Other options set a consistent height across all express buttons.', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => false,
+				'default'     => 'native',
+				'options'     => [
+					'native' => __( 'Native (Recommended)', 'checkout-com-unified-payments-api' ),
+					'small'  => __( 'Small (36px)', 'checkout-com-unified-payments-api' ),
+					'medium' => __( 'Medium (40px)', 'checkout-com-unified-payments-api' ),
+					'large'  => __( 'Large (48px)', 'checkout-com-unified-payments-api' ),
+					'custom' => __( 'Custom Height', 'checkout-com-unified-payments-api' ),
+				],
+			],
+			'google_pay_express_button_custom_height' => [
+				'title'       => __( 'Custom Button Height', 'checkout-com-unified-payments-api' ),
+				'type'        => 'number',
+				'description' => __( 'Enter a custom height in pixels (minimum 36px, maximum 60px). This setting only applies when "Custom Height" is selected above.', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => false,
+				'default'     => '40',
+				'custom_attributes' => [
+					'min' => '36',
+					'max' => '60',
+					'step' => '1',
+				],
+			],
+			*/
 		];
 
 		return apply_filters( 'wc_checkout_com_google_pay', $settings );
@@ -886,6 +1131,40 @@ class WC_Checkoutcom_Cards_Settings {
 				'desc_tip'    => true,
 				'default'     => 'yes',
 			],
+			// Size settings temporarily disabled - buttons use native SDK sizes
+			/*
+			'paypal_express_button_size' => [
+				'title'       => __( 'Button Size Customization', 'checkout-com-unified-payments-api' ),
+				'type'        => 'title',
+				'description' => __( 'Customize the size of PayPal Express buttons. By default, buttons use their native styles for optimal appearance. You can choose to set a consistent size across all express buttons if needed.', 'checkout-com-unified-payments-api' ),
+			],
+			'paypal_express_button_size_preset' => [
+				'title'       => __( 'Button Size', 'checkout-com-unified-payments-api' ),
+				'type'        => 'select',
+				'description' => __( 'Choose the button size preset. "Native" uses the default PayPal button styling (recommended). Other options set a consistent height across all express buttons.', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => false,
+				'default'     => 'native',
+				'options'     => [
+					'native' => __( 'Native (Recommended)', 'checkout-com-unified-payments-api' ),
+					'small'  => __( 'Small (36px)', 'checkout-com-unified-payments-api' ),
+					'medium' => __( 'Medium (40px)', 'checkout-com-unified-payments-api' ),
+					'large'  => __( 'Large (48px)', 'checkout-com-unified-payments-api' ),
+					'custom' => __( 'Custom Height', 'checkout-com-unified-payments-api' ),
+				],
+			],
+			'paypal_express_button_custom_height' => [
+				'title'       => __( 'Custom Button Height', 'checkout-com-unified-payments-api' ),
+				'type'        => 'number',
+				'description' => __( 'Enter a custom height in pixels (minimum 36px, maximum 60px). This setting only applies when "Custom Height" is selected above.', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => false,
+				'default'     => '40',
+				'custom_attributes' => [
+					'min' => '36',
+					'max' => '60',
+					'step' => '1',
+				],
+			],
+			*/
 		];
 
 		return apply_filters( 'wc_checkout_com_paypal', $settings );

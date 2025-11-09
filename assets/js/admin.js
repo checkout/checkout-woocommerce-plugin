@@ -350,6 +350,35 @@ jQuery( function ( $ ) {
 
 			// Append button after the input field
 			field.after(toggleBtn);
+		},
+
+		expressButtonSizeSettings: function () {
+			// Handle button size preset changes for all three payment methods
+			const paymentMethods = ['apple_pay', 'google_pay', 'paypal'];
+			
+			paymentMethods.forEach(function(paymentMethod) {
+				const presetField = $('#woocommerce_wc_checkout_com_' + paymentMethod + '_' + paymentMethod + '_express_button_size_preset');
+				const customHeightField = $('#woocommerce_wc_checkout_com_' + paymentMethod + '_' + paymentMethod + '_express_button_custom_height');
+				
+				if (!presetField.length || !customHeightField.length) {
+					return;
+				}
+				
+				// Show/hide custom height field based on preset
+				function toggleCustomHeight() {
+					if (presetField.val() === 'custom') {
+						customHeightField.closest('tr').show();
+					} else {
+						customHeightField.closest('tr').hide();
+					}
+				}
+				
+				// Initial state
+				toggleCustomHeight();
+				
+				// On change
+				presetField.on('change', toggleCustomHeight);
+			});
 		}
 	}
 
@@ -374,4 +403,7 @@ jQuery( function ( $ ) {
 	admin_functions.webhookSettings();
 
 	admin_functions.toggleSecretKeyVisibility();
+
+	// Handle express button size settings
+	admin_functions.expressButtonSizeSettings();
 } );

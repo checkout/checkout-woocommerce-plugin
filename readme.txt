@@ -35,6 +35,12 @@ Users can place orders with an Apple Pay wallet.
 = PayPal Payments =
 Users can place orders with an PayPal wallet.
 
+= PayPal Express Checkout =
+Users can place orders with PayPal Express checkout on product pages, shop pages, and cart pages without going through the full checkout process.
+
+= Google Pay Express Checkout =
+Users can place orders with Google Pay Express checkout on product pages, shop pages, and cart pages without going through the full checkout process. Express checkout options appear in a unified container on the cart page when both PayPal and Google Pay Express are enabled.
+
 = Saved Cards Payments =
 Users can place orders with a payment card saved in their account.
 
@@ -187,6 +193,15 @@ v4.8.0 30th October 2024
 
 v4.7.0 12th July 2024
 - **[tweak]** Upgrade Klarna integration
+
+v5.0.0_beta 4th November 2024
+- **[feat]** Add Google Pay Express Checkout (product, shop, cart pages)
+- **[feat]** Unified Express Checkout container for PayPal and Google Pay
+- **[feat]** Blocks cart support for Express Checkout
+- **[feat]** Classic cart support for Express Checkout
+- **[fix]** Fix duplicate Express Checkout containers on cart page
+- **[fix]** Fix inconsistent button sizes in unified container
+- **[fix]** Fix PHP syntax error in class-wc-checkoutcom-cards-blocks.php
 
 v4.6.0 27th June 2024
 - **[feat]** Upgrade PayPal with Express Checkout

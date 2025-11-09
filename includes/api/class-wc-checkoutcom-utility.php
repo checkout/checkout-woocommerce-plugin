@@ -200,9 +200,16 @@ class WC_Checkoutcom_Utility {
 
 		// Check if file logging is enabled.
 		if ( $file_logging ) {
-			// Log error message with exception.
+			// Log error message with exception/data.
 			$logger->error( $error_message, $context );
-			$logger->error( wc_print_r( $exception, true ), $context );
+			if ( null !== $exception ) {
+				// If exception is an array, print it properly
+				if ( is_array( $exception ) ) {
+					$logger->error( $error_message . ' Data: ' . wc_print_r( $exception, true ), $context );
+				} else {
+					$logger->error( wc_print_r( $exception, true ), $context );
+				}
+			}
 		} else {
 			// Log only error message.
 			$logger->error( $error_message, $context );
@@ -607,5 +614,110 @@ class WC_Checkoutcom_Utility {
 		}
 
 		return false;
+	}
+
+	/**
+	 * Check if Apple Pay Express is available.
+	 *
+	 * @return bool True if Apple Pay Express is available, false otherwise.
+	 */
+	public static function is_apple_pay_express_available() {
+		$apple_pay_settings = get_option( 'woocommerce_wc_checkout_com_apple_pay_settings' );
+
+		$is_express_enable = ! empty( $apple_pay_settings['apple_pay_express'] ) && 'yes' === $apple_pay_settings['apple_pay_express'];
+
+		$available_payment_methods = WC()->payment_gateways()->get_available_payment_gateways();
+
+		$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$checkout_mode    = isset( $checkout_setting['ckocom_checkout_mode'] ) ? $checkout_setting['ckocom_checkout_mode'] : 'classic';
+
+		if ( $checkout_mode === 'classic' ) {
+			/**
+			 * If checkout_mode is classic, show express-apple-pay if enabled and 
+			 * if 'wc_checkout_com_apple_pay' is an available payment method on checkout.
+			 * 
+			 * Note: On shop/cart pages, gateways might not be "available" yet, so we also
+			 * check if the gateway exists in all gateways (not just available ones).
+			 */
+			$all_gateways = WC()->payment_gateways()->payment_gateways();
+			$apple_pay_exists = isset( $all_gateways['wc_checkout_com_apple_pay'] );
+			
+			if ( ( isset( $available_payment_methods['wc_checkout_com_apple_pay'] ) || $apple_pay_exists ) && $is_express_enable ) {
+				return true;
+			}
+		}
+		else {
+			/**
+			 * If checkout_mode is flow, show express-apple-pay if enabled.
+			 */
+			if ( $is_express_enable ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Get express button height from settings.
+	 *
+	 * @param string $payment_method Payment method: 'apple_pay', 'google_pay', or 'paypal'.
+	 * @return array Returns array with 'height' (in pixels or 'native') and 'use_native' (boolean).
+	 */
+	public static function get_express_button_height( $payment_method = 'apple_pay' ) {
+		// Map payment method to settings key
+		$settings_key_map = array(
+			'apple_pay' => 'woocommerce_wc_checkout_com_apple_pay_settings',
+			'google_pay' => 'woocommerce_wc_checkout_com_google_pay_settings',
+			'paypal' => 'woocommerce_wc_checkout_com_paypal_settings',
+		);
+		
+		$settings_key = isset( $settings_key_map[ $payment_method ] ) 
+			? $settings_key_map[ $payment_method ] 
+			: 'woocommerce_wc_checkout_com_apple_pay_settings';
+		
+		$settings = get_option( $settings_key, array() );
+		
+		$size_preset = isset( $settings[ $payment_method . '_express_button_size_preset' ] ) 
+			? $settings[ $payment_method . '_express_button_size_preset' ] 
+			: 'native';
+		
+		// If native, return native
+		if ( 'native' === $size_preset ) {
+			return array(
+				'height' => 'native',
+				'use_native' => true,
+			);
+		}
+		
+		// Map presets to heights (matching Stripe's approach)
+		$preset_heights = array(
+			'small' => 40,   // Small (40px) - matching Stripe
+			'default' => 48, // Default (48px) - matching Stripe
+			'large' => 56,   // Large (56px) - matching Stripe
+		);
+		
+		// If custom, get custom height
+		if ( 'custom' === $size_preset ) {
+			$custom_height = isset( $settings[ $payment_method . '_express_button_custom_height' ] ) 
+				? absint( $settings[ $payment_method . '_express_button_custom_height' ] ) 
+				: 40;
+			
+			// Validate custom height (36-60px)
+			$custom_height = max( 36, min( 60, $custom_height ) );
+			
+			return array(
+				'height' => $custom_height,
+				'use_native' => false,
+			);
+		}
+		
+		// Use preset height
+		$height = isset( $preset_heights[ $size_preset ] ) ? $preset_heights[ $size_preset ] : 40;
+		
+		return array(
+			'height' => $height,
+			'use_native' => false,
+		);
 	}
 }

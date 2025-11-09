@@ -213,7 +213,8 @@ class WC_Checkoutcom_Api_Request {
 			$card_scheme = $arg['preferred_scheme'];
 		}
 
-		$customer_address = WC_Checkoutcom_Api_Request::customer_address( $post_data );
+		// For express checkout, if POST data doesn't have address info, get it from order
+		$customer_address = WC_Checkoutcom_Api_Request::customer_address( $post_data, $order );
 
 		// Prepare payment parameters.
 		if ( 'wc_checkout_com_cards' === $post_data['payment_method'] ) {
@@ -358,11 +359,17 @@ class WC_Checkoutcom_Api_Request {
 
 		$payment->source = $method;
 
-		$email = $post_data['billing_email'];
-		$name  = $post_data['billing_first_name'] . ' ' . $post_data['billing_last_name'];
+		// Get email and name from POST data or order (for express checkout)
+		$email = isset( $post_data['billing_email'] ) ? $post_data['billing_email'] : '';
+		$name  = isset( $post_data['billing_first_name'] ) && isset( $post_data['billing_last_name'] ) 
+			? $post_data['billing_first_name'] . ' ' . $post_data['billing_last_name'] 
+			: '';
 
 		// Pay Order Page.
 		$is_pay_order = ! empty( $get_data['pay_for_order'] ) && (bool) $get_data['pay_for_order'];
+
+		// Check if this is express checkout (POST data doesn't have address info)
+		$is_express_checkout = empty( $customer_address['billing_address_1'] ) && empty( $customer_address['billing_city'] ) && ! empty( $order );
 
 		if ( $is_pay_order ) {
 			if ( ! empty( $get_data['order_id'] ) ) {
@@ -373,6 +380,10 @@ class WC_Checkoutcom_Api_Request {
 
 			$order = wc_get_order( $order_id );
 
+			$email = $order->get_billing_email();
+			$name  = $order->get_billing_first_name() . ' ' . $order->get_billing_last_name();
+		} elseif ( $is_express_checkout && ! empty( $order ) ) {
+			// Express checkout: Get email and name from order when POST data is empty
 			$email = $order->get_billing_email();
 			$name  = $order->get_billing_first_name() . ' ' . $order->get_billing_last_name();
 		}
@@ -562,11 +573,12 @@ class WC_Checkoutcom_Api_Request {
 	/**
 	 * Return customer address.
 	 *
-	 * @param array $data Post data.
+	 * @param array    $data Post data.
+	 * @param WC_Order $order Order object (optional, used for express checkout when POST data is empty).
 	 *
 	 * @return array
 	 */
-	private static function customer_address( $data ) {
+	private static function customer_address( $data, $order = null ) {
 		// Pay Order Page.
 		$is_pay_order = ! empty( $_GET['pay_for_order'] ) ? (bool) $_GET['pay_for_order'] : false;
 
@@ -578,6 +590,9 @@ class WC_Checkoutcom_Api_Request {
 		$billing_state      = empty( $data['billing_state'] ) ? '' : wc_clean( $data['billing_state'] );
 		$billing_postcode   = empty( $data['billing_postcode'] ) ? '' : wc_clean( $data['billing_postcode'] );
 		$billing_country    = empty( $data['billing_country'] ) ? '' : wc_clean( $data['billing_country'] );
+
+		// Check if POST data is empty (express checkout scenario) and we have an order
+		$is_express_checkout = empty( $billing_address_1 ) && empty( $billing_city ) && ! empty( $order );
 
 		if ( isset( $data['ship_to_different_address'] ) ) {
 			$shipping_first_name = empty( $data['shipping_first_name'] ) ? '' : wc_clean( $data['shipping_first_name'] );
@@ -618,6 +633,25 @@ class WC_Checkoutcom_Api_Request {
 			$shipping_postcode   = $order->get_shipping_postcode();
 			$shipping_country    = $order->get_shipping_country();
 
+		} elseif ( $is_express_checkout && ! empty( $order ) ) {
+			// Express checkout: Get billing and shipping details from order when POST data is empty
+			$billing_first_name = $order->get_billing_first_name();
+			$billing_last_name  = $order->get_billing_last_name();
+			$billing_address_1  = $order->get_billing_address_1();
+			$billing_address_2  = $order->get_billing_address_2();
+			$billing_city       = $order->get_billing_city();
+			$billing_state      = $order->get_billing_state();
+			$billing_postcode   = $order->get_billing_postcode();
+			$billing_country    = $order->get_billing_country();
+
+			$shipping_first_name = $order->get_shipping_first_name();
+			$shipping_last_name  = $order->get_shipping_last_name();
+			$shipping_address_1  = $order->get_shipping_address_1();
+			$shipping_address_2  = $order->get_shipping_address_2();
+			$shipping_city       = $order->get_shipping_city();
+			$shipping_state      = $order->get_shipping_state();
+			$shipping_postcode   = $order->get_shipping_postcode();
+			$shipping_country    = $order->get_shipping_country();
 		} else {
 			$shipping_first_name = $billing_first_name;
 			$shipping_last_name  = $billing_last_name;

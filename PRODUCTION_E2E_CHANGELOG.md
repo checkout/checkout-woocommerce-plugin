@@ -241,10 +241,137 @@ if ( ! $is_express_enabled || ! $show_on_product ) {
 
 ---
 
+## 🆕 Google Pay Express Checkout Enhancements (November 4, 2025)
+
+### 5. **Google Pay Express Location Settings** ✅
+
+**Problem**: Google Pay Express checkout was not available, limiting merchant flexibility for express checkout options.
+
+**Solution**: Added complete Google Pay Express integration with granular location controls, mirroring PayPal Express functionality:
+
+#### **New Settings Available**:
+
+1. **Enable Google Pay Express** (Master Toggle)
+   - **Location**: WooCommerce → Settings → Payments → Checkout.com → Google Pay Settings
+   - **Setting**: `google_pay_express`
+   - **Default**: `no`
+   - **Description**: Master toggle to activate Google Pay Express checkout. When enabled, use the location-specific options below to control where buttons appear.
+
+2. **Express Checkout Button Locations**
+   - **Show on Product Page** (`google_pay_express_product_page`) - Default: `yes`
+   - **Show on Shop/Category Pages** (`google_pay_express_shop_page`) - Default: `yes`
+   - **Show on Cart Page** (`google_pay_express_cart_page`) - Default: `yes`
+
+#### **Key Features**:
+
+- ✅ **Master Toggle Control**: Disabling the master toggle prevents all Google Pay Express functionality from loading
+- ✅ **Granular Location Control**: Merchants can enable/disable Google Pay Express on product, shop, or cart pages independently
+- ✅ **Unified Express Checkout Container**: PayPal and Google Pay Express buttons appear together in a single "Express Checkout" section on the cart page
+- ✅ **Consistent Button Sizing**: All Express Checkout buttons have uniform sizing (max-width: 300px, min-height: 40px)
+- ✅ **Blocks Cart Support**: Full support for WooCommerce Blocks cart pages
+- ✅ **Classic Cart Support**: Full support for classic WooCommerce cart pages
+- ✅ **Email & Address Handling**: 
+  - Logged-in users: Account email is used, shipping address from Google Pay
+  - Guest users: Both email and shipping address extracted from Google Pay response
+- ✅ **Backward Compatibility**: Defaults to enabled if settings don't exist (for new installations)
+
+#### **Files Modified**:
+- `includes/express/google-pay/class-google-pay-express.php` - Complete Google Pay Express implementation
+- `includes/class-wc-gateway-checkout-com-google-pay.php` - Express checkout API endpoints and order creation
+- `includes/settings/class-wc-checkoutcom-cards-settings.php` - New Google Pay Express settings fields
+- `includes/settings/admin/class-wc-checkoutcom-admin.php` - Admin navigation updates
+- `assets/js/cko-google-pay-express-integration.js` - Product, shop, and cart page button initialization
+- `includes/api/class-wc-checkoutcom-utility.php` - Enhanced availability checking (`is_google_pay_express_available()`)
+- `includes/blocks/payment-methods/class-wc-checkoutcom-cards-blocks.php` - Fixed PHP syntax error
+
+#### **Technical Implementation**:
+
+**Master Toggle Logic**:
+```php
+// Constructor checks master toggle first - prevents hooks from being added if disabled
+$is_express_enable = isset( $google_pay_settings['google_pay_express'] ) 
+    && 'yes' === $google_pay_settings['google_pay_express']
+    && ! empty( $google_pay_settings['google_pay_express'] );
+if ( ! $is_express_enable ) {
+    return; // No hooks added, no scripts loaded
+}
+```
+
+**Unified Express Checkout Container**:
+```php
+// Cart page shows unified container if both PayPal and Google Pay Express are enabled
+if ( WC_Checkoutcom_Utility::is_paypal_express_available() 
+    && WC_Checkoutcom_Utility::is_google_pay_express_available() ) {
+    // Render unified container with both buttons
+}
+```
+
+#### **Testing Checklist**:
+- [ ] Master toggle disabled: No Google Pay Express buttons appear anywhere
+- [ ] Master toggle enabled, all locations enabled: Buttons appear on product, shop, and cart pages
+- [ ] Master toggle enabled, product page disabled: Buttons only on shop and cart pages
+- [ ] Master toggle enabled, shop page disabled: Buttons only on product and cart pages
+- [ ] Master toggle enabled, cart page disabled: Buttons only on product and shop pages
+- [ ] Unified Express Checkout container appears on cart page when both PayPal and Google Pay Express are enabled
+- [ ] Only ONE "Express Checkout" heading on cart page
+- [ ] Buttons have consistent sizing
+- [ ] No duplicate containers
+- [ ] Logged-in user: Account email used, shipping address from Google Pay
+- [ ] Guest user: Both email and shipping address from Google Pay
+- [ ] Express checkout from product page works
+- [ ] Express checkout from shop page works
+- [ ] Express checkout from cart page works (both Blocks and Classic)
+- [ ] Payment completes successfully
+- [ ] Redirects to success page after payment
+
+---
+
+## 🆕 Unified Express Checkout Container (November 4, 2025)
+
+### 6. **Unified Express Checkout on Cart Page** ✅
+
+**Problem**: When both PayPal and Google Pay Express were enabled, they appeared in separate containers, creating duplicate "Express Checkout" headings and inconsistent button sizes.
+
+**Solution**: Implemented unified Express Checkout container that combines both payment methods in a single section:
+
+#### **Key Features**:
+
+- ✅ **Single Container**: Both PayPal and Google Pay Express buttons appear in one "Express Checkout" section
+- ✅ **Consistent Sizing**: All buttons have uniform styling (max-width: 300px, min-height: 40px)
+- ✅ **Proper Spacing**: Buttons are properly spaced with consistent margins
+- ✅ **No Duplicates**: Prevents duplicate containers from being rendered
+- ✅ **Blocks Support**: Works on WooCommerce Blocks cart pages
+- ✅ **Classic Support**: Works on classic WooCommerce cart pages
+
+#### **Files Modified**:
+- `includes/express/paypal/class-paypal-express.php` - Unified container rendering logic
+- `includes/express/google-pay/class-google-pay-express.php` - Unified container rendering logic
+- `includes/api/class-wc-checkoutcom-utility.php` - Container tracking utility (`express_checkout_container_rendered()`)
+
+#### **Technical Implementation**:
+
+**Container Tracking**:
+```php
+// Track if unified container has been rendered to prevent duplicates
+WC_Checkoutcom_Utility::express_checkout_container_rendered(true);
+```
+
+**Unified Container Rendering**:
+```php
+// Check if other express method is also enabled
+if ( WC_Checkoutcom_Utility::is_paypal_express_available() 
+    && WC_Checkoutcom_Utility::is_google_pay_express_available() ) {
+    // Render unified container with both buttons
+    // Set tracking flag to prevent duplicate rendering
+}
+```
+
+---
+
 ## 🎉 Credits
 
-**Version**: 2025-11-03-EXPRESS-CHECKOUT-ENHANCEMENTS  
-**Build Date**: November 3, 2025  
+**Version**: 2025-11-04-EXPRESS-CHECKOUT-COMPLETE  
+**Build Date**: November 4, 2025  
 **Build Type**: Production E2E Ready  
-**Stability**: Production-ready with comprehensive logging, webhook support, and enhanced PayPal Express checkout
+**Stability**: Production-ready with comprehensive logging, webhook support, PayPal Express checkout, and Google Pay Express checkout
 
