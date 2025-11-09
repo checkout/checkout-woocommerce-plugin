@@ -79,6 +79,15 @@ if ( ! function_exists( 'init_checkout_com_gateway_class' ) ) {
 		
 		// Flow integration
 		include_once 'flow-integration/class-wc-gateway-checkout-com-flow.php';
+		
+		// Unified Express Checkout Element Handler
+		include_once 'includes/express/class-wc-checkoutcom-express-checkout-element.php';
+		
+		// Initialize unified express checkout element
+		if ( class_exists( 'WC_Checkoutcom_Express_Checkout_Element' ) ) {
+			$express_checkout_element = new WC_Checkoutcom_Express_Checkout_Element();
+			$express_checkout_element->init();
+		}
 
 		// Enhanced logging classes (commented out temporarily)
 		// include_once 'includes/logging/class-wc-checkoutcom-enhanced-logger.php';

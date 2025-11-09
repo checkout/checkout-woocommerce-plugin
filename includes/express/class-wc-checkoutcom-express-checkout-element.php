@@ -66,11 +66,24 @@ class WC_Checkoutcom_Express_Checkout_Element {
 	 * @return bool
 	 */
 	private function is_express_checkout_enabled() {
-		$cards_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		$apple_pay_settings = get_option( 'woocommerce_wc_checkout_com_apple_pay_settings', array() );
+		$google_pay_settings = get_option( 'woocommerce_wc_checkout_com_google_pay_settings', array() );
+		$paypal_settings = get_option( 'woocommerce_wc_checkout_com_paypal_settings', array() );
 		
-		// Check if express checkout master toggle is enabled
-		return isset( $cards_settings['apple_pay_express'] ) 
-			&& 'yes' === $cards_settings['apple_pay_express'];
+		// Check if at least one express checkout method is enabled
+		$apple_pay_enabled = isset( $apple_pay_settings['apple_pay_express'] ) 
+			&& 'yes' === $apple_pay_settings['apple_pay_express']
+			&& ! empty( $apple_pay_settings['apple_pay_express'] );
+		
+		$google_pay_enabled = isset( $google_pay_settings['google_pay_express'] ) 
+			&& 'yes' === $google_pay_settings['google_pay_express']
+			&& ! empty( $google_pay_settings['google_pay_express'] );
+		
+		$paypal_enabled = isset( $paypal_settings['paypal_express'] ) 
+			&& 'yes' === $paypal_settings['paypal_express']
+			&& ! empty( $paypal_settings['paypal_express'] );
+		
+		return $apple_pay_enabled || $google_pay_enabled || $paypal_enabled;
 	}
 
 	/**
@@ -80,25 +93,71 @@ class WC_Checkoutcom_Express_Checkout_Element {
 	 * @return bool
 	 */
 	private function should_show_express_checkout_button( $page_type = 'product' ) {
-		$cards_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		$apple_pay_settings = get_option( 'woocommerce_wc_checkout_com_apple_pay_settings', array() );
+		$google_pay_settings = get_option( 'woocommerce_wc_checkout_com_google_pay_settings', array() );
+		$paypal_settings = get_option( 'woocommerce_wc_checkout_com_paypal_settings', array() );
 		
-		// Check page-specific settings
+		// Check if at least one express method is enabled for this page type
 		switch ( $page_type ) {
 			case 'product':
-				return ! isset( $cards_settings['apple_pay_express_product_page'] ) 
-					|| 'yes' === $cards_settings['apple_pay_express_product_page'];
+				$apple_show = ! isset( $apple_pay_settings['apple_pay_express_product_page'] ) 
+					|| ( isset( $apple_pay_settings['apple_pay_express_product_page'] ) 
+						&& 'yes' === $apple_pay_settings['apple_pay_express_product_page']
+						&& ! empty( $apple_pay_settings['apple_pay_express_product_page'] ) );
+				$google_show = ! isset( $google_pay_settings['google_pay_express_product_page'] ) 
+					|| ( isset( $google_pay_settings['google_pay_express_product_page'] ) 
+						&& 'yes' === $google_pay_settings['google_pay_express_product_page']
+						&& ! empty( $google_pay_settings['google_pay_express_product_page'] ) );
+				$paypal_show = ! isset( $paypal_settings['paypal_express_product_page'] ) 
+					|| ( isset( $paypal_settings['paypal_express_product_page'] ) 
+						&& 'yes' === $paypal_settings['paypal_express_product_page']
+						&& ! empty( $paypal_settings['paypal_express_product_page'] ) );
+				return $apple_show || $google_show || $paypal_show;
 			
 			case 'shop':
-				return ! isset( $cards_settings['apple_pay_express_product_page'] ) 
-					|| 'yes' === $cards_settings['apple_pay_express_product_page'];
+				$apple_show = ! isset( $apple_pay_settings['apple_pay_express_shop_page'] ) 
+					|| ( isset( $apple_pay_settings['apple_pay_express_shop_page'] ) 
+						&& 'yes' === $apple_pay_settings['apple_pay_express_shop_page']
+						&& ! empty( $apple_pay_settings['apple_pay_express_shop_page'] ) );
+				$google_show = ! isset( $google_pay_settings['google_pay_express_shop_page'] ) 
+					|| ( isset( $google_pay_settings['google_pay_express_shop_page'] ) 
+						&& 'yes' === $google_pay_settings['google_pay_express_shop_page']
+						&& ! empty( $google_pay_settings['google_pay_express_shop_page'] ) );
+				$paypal_show = ! isset( $paypal_settings['paypal_express_shop_page'] ) 
+					|| ( isset( $paypal_settings['paypal_express_shop_page'] ) 
+						&& 'yes' === $paypal_settings['paypal_express_shop_page']
+						&& ! empty( $paypal_settings['paypal_express_shop_page'] ) );
+				return $apple_show || $google_show || $paypal_show;
 			
 			case 'cart':
-				return ! isset( $cards_settings['apple_pay_express_cart_page'] ) 
-					|| 'yes' === $cards_settings['apple_pay_express_cart_page'];
+				$apple_show = ! isset( $apple_pay_settings['apple_pay_express_cart_page'] ) 
+					|| ( isset( $apple_pay_settings['apple_pay_express_cart_page'] ) 
+						&& 'yes' === $apple_pay_settings['apple_pay_express_cart_page']
+						&& ! empty( $apple_pay_settings['apple_pay_express_cart_page'] ) );
+				$google_show = ! isset( $google_pay_settings['google_pay_express_cart_page'] ) 
+					|| ( isset( $google_pay_settings['google_pay_express_cart_page'] ) 
+						&& 'yes' === $google_pay_settings['google_pay_express_cart_page']
+						&& ! empty( $google_pay_settings['google_pay_express_cart_page'] ) );
+				$paypal_show = ! isset( $paypal_settings['paypal_express_cart_page'] ) 
+					|| ( isset( $paypal_settings['paypal_express_cart_page'] ) 
+						&& 'yes' === $paypal_settings['paypal_express_cart_page']
+						&& ! empty( $paypal_settings['paypal_express_cart_page'] ) );
+				return $apple_show || $google_show || $paypal_show;
 			
 			case 'checkout':
-				return ! isset( $cards_settings['apple_pay_express_checkout_page'] ) 
-					|| 'yes' === $cards_settings['apple_pay_express_checkout_page'];
+				$apple_show = ! isset( $apple_pay_settings['apple_pay_express_checkout_page'] ) 
+					|| ( isset( $apple_pay_settings['apple_pay_express_checkout_page'] ) 
+						&& 'yes' === $apple_pay_settings['apple_pay_express_checkout_page']
+						&& ! empty( $apple_pay_settings['apple_pay_express_checkout_page'] ) );
+				$google_show = ! isset( $google_pay_settings['google_pay_express_checkout_page'] ) 
+					|| ( isset( $google_pay_settings['google_pay_express_checkout_page'] ) 
+						&& 'yes' === $google_pay_settings['google_pay_express_checkout_page']
+						&& ! empty( $google_pay_settings['google_pay_express_checkout_page'] ) );
+				$paypal_show = ! isset( $paypal_settings['paypal_express_checkout_page'] ) 
+					|| ( isset( $paypal_settings['paypal_express_checkout_page'] ) 
+						&& 'yes' === $paypal_settings['paypal_express_checkout_page']
+						&& ! empty( $paypal_settings['paypal_express_checkout_page'] ) );
+				return $apple_show || $google_show || $paypal_show;
 			
 			default:
 				return false;
@@ -108,24 +167,119 @@ class WC_Checkoutcom_Express_Checkout_Element {
 	/**
 	 * Get available express checkout methods.
 	 *
+	 * @param string $page_type Page type: 'product', 'shop', 'cart', 'checkout'
 	 * @return array Array of available express checkout methods
 	 */
-	private function get_available_express_methods() {
+	private function get_available_express_methods( $page_type = 'product' ) {
 		$methods = array();
+		
+		$apple_pay_settings = get_option( 'woocommerce_wc_checkout_com_apple_pay_settings', array() );
+		$google_pay_settings = get_option( 'woocommerce_wc_checkout_com_google_pay_settings', array() );
+		$paypal_settings = get_option( 'woocommerce_wc_checkout_com_paypal_settings', array() );
 
 		// Check Apple Pay
-		if ( WC_Checkoutcom_Utility::is_apple_pay_express_available() ) {
-			$methods['apple_pay'] = true;
+		$apple_pay_enabled = isset( $apple_pay_settings['apple_pay_express'] ) 
+			&& 'yes' === $apple_pay_settings['apple_pay_express']
+			&& ! empty( $apple_pay_settings['apple_pay_express'] );
+		
+		if ( $apple_pay_enabled && WC_Checkoutcom_Utility::is_apple_pay_express_available() ) {
+			// Check page-specific setting
+			$show_on_page = true;
+			if ( 'shop' === $page_type ) {
+				$show_on_page = ! isset( $apple_pay_settings['apple_pay_express_shop_page'] ) 
+					|| ( isset( $apple_pay_settings['apple_pay_express_shop_page'] ) 
+						&& 'yes' === $apple_pay_settings['apple_pay_express_shop_page']
+						&& ! empty( $apple_pay_settings['apple_pay_express_shop_page'] ) );
+			} elseif ( 'product' === $page_type ) {
+				$show_on_page = ! isset( $apple_pay_settings['apple_pay_express_product_page'] ) 
+					|| ( isset( $apple_pay_settings['apple_pay_express_product_page'] ) 
+						&& 'yes' === $apple_pay_settings['apple_pay_express_product_page']
+						&& ! empty( $apple_pay_settings['apple_pay_express_product_page'] ) );
+			} elseif ( 'cart' === $page_type ) {
+				$show_on_page = ! isset( $apple_pay_settings['apple_pay_express_cart_page'] ) 
+					|| ( isset( $apple_pay_settings['apple_pay_express_cart_page'] ) 
+						&& 'yes' === $apple_pay_settings['apple_pay_express_cart_page']
+						&& ! empty( $apple_pay_settings['apple_pay_express_cart_page'] ) );
+			} elseif ( 'checkout' === $page_type ) {
+				$show_on_page = ! isset( $apple_pay_settings['apple_pay_express_checkout_page'] ) 
+					|| ( isset( $apple_pay_settings['apple_pay_express_checkout_page'] ) 
+						&& 'yes' === $apple_pay_settings['apple_pay_express_checkout_page']
+						&& ! empty( $apple_pay_settings['apple_pay_express_checkout_page'] ) );
+			}
+			
+			if ( $show_on_page ) {
+				$methods['apple_pay'] = true;
+			}
 		}
 
 		// Check Google Pay
-		if ( WC_Checkoutcom_Utility::is_google_pay_express_available() ) {
-			$methods['google_pay'] = true;
+		$google_pay_enabled = isset( $google_pay_settings['google_pay_express'] ) 
+			&& 'yes' === $google_pay_settings['google_pay_express']
+			&& ! empty( $google_pay_settings['google_pay_express'] );
+		
+		if ( $google_pay_enabled && WC_Checkoutcom_Utility::is_google_pay_express_available() ) {
+			// Check page-specific setting
+			$show_on_page = true;
+			if ( 'shop' === $page_type ) {
+				$show_on_page = ! isset( $google_pay_settings['google_pay_express_shop_page'] ) 
+					|| ( isset( $google_pay_settings['google_pay_express_shop_page'] ) 
+						&& 'yes' === $google_pay_settings['google_pay_express_shop_page']
+						&& ! empty( $google_pay_settings['google_pay_express_shop_page'] ) );
+			} elseif ( 'product' === $page_type ) {
+				$show_on_page = ! isset( $google_pay_settings['google_pay_express_product_page'] ) 
+					|| ( isset( $google_pay_settings['google_pay_express_product_page'] ) 
+						&& 'yes' === $google_pay_settings['google_pay_express_product_page']
+						&& ! empty( $google_pay_settings['google_pay_express_product_page'] ) );
+			} elseif ( 'cart' === $page_type ) {
+				$show_on_page = ! isset( $google_pay_settings['google_pay_express_cart_page'] ) 
+					|| ( isset( $google_pay_settings['google_pay_express_cart_page'] ) 
+						&& 'yes' === $google_pay_settings['google_pay_express_cart_page']
+						&& ! empty( $google_pay_settings['google_pay_express_cart_page'] ) );
+			} elseif ( 'checkout' === $page_type ) {
+				$show_on_page = ! isset( $google_pay_settings['google_pay_express_checkout_page'] ) 
+					|| ( isset( $google_pay_settings['google_pay_express_checkout_page'] ) 
+						&& 'yes' === $google_pay_settings['google_pay_express_checkout_page']
+						&& ! empty( $google_pay_settings['google_pay_express_checkout_page'] ) );
+			}
+			
+			if ( $show_on_page ) {
+				$methods['google_pay'] = true;
+			}
 		}
 
 		// Check PayPal
-		if ( WC_Checkoutcom_Utility::is_paypal_express_available() ) {
-			$methods['paypal'] = true;
+		$paypal_enabled = isset( $paypal_settings['paypal_express'] ) 
+			&& 'yes' === $paypal_settings['paypal_express']
+			&& ! empty( $paypal_settings['paypal_express'] );
+		
+		if ( $paypal_enabled && WC_Checkoutcom_Utility::is_paypal_express_available() ) {
+			// Check page-specific setting
+			$show_on_page = true;
+			if ( 'shop' === $page_type ) {
+				$show_on_page = ! isset( $paypal_settings['paypal_express_shop_page'] ) 
+					|| ( isset( $paypal_settings['paypal_express_shop_page'] ) 
+						&& 'yes' === $paypal_settings['paypal_express_shop_page']
+						&& ! empty( $paypal_settings['paypal_express_shop_page'] ) );
+			} elseif ( 'product' === $page_type ) {
+				$show_on_page = ! isset( $paypal_settings['paypal_express_product_page'] ) 
+					|| ( isset( $paypal_settings['paypal_express_product_page'] ) 
+						&& 'yes' === $paypal_settings['paypal_express_product_page']
+						&& ! empty( $paypal_settings['paypal_express_product_page'] ) );
+			} elseif ( 'cart' === $page_type ) {
+				$show_on_page = ! isset( $paypal_settings['paypal_express_cart_page'] ) 
+					|| ( isset( $paypal_settings['paypal_express_cart_page'] ) 
+						&& 'yes' === $paypal_settings['paypal_express_cart_page']
+						&& ! empty( $paypal_settings['paypal_express_cart_page'] ) );
+			} elseif ( 'checkout' === $page_type ) {
+				$show_on_page = ! isset( $paypal_settings['paypal_express_checkout_page'] ) 
+					|| ( isset( $paypal_settings['paypal_express_checkout_page'] ) 
+						&& 'yes' === $paypal_settings['paypal_express_checkout_page']
+						&& ! empty( $paypal_settings['paypal_express_checkout_page'] ) );
+			}
+			
+			if ( $show_on_page ) {
+				$methods['paypal'] = true;
+			}
 		}
 
 		return $methods;
@@ -139,55 +293,66 @@ class WC_Checkoutcom_Express_Checkout_Element {
 			return;
 		}
 
-		$methods = $this->get_available_express_methods();
+		$methods = $this->get_available_express_methods( 'product' );
 		if ( empty( $methods ) ) {
 			return;
 		}
 
-		?>
-		<div id="cko-express-checkout-element" style="margin-top: 1em; clear: both;">
-			<?php if ( isset( $methods['apple_pay'] ) ) : ?>
-				<div id="cko-apple-pay-button-wrapper"></div>
-			<?php endif; ?>
-			<?php if ( isset( $methods['google_pay'] ) ) : ?>
-				<div id="cko-google-pay-button-wrapper"></div>
-			<?php endif; ?>
-			<?php if ( isset( $methods['paypal'] ) ) : ?>
-				<div id="cko-paypal-button-wrapper"></div>
-			<?php endif; ?>
-		</div>
-		<?php
+		// Use existing unified container from individual classes (they handle product page)
+		// This method is kept for compatibility but won't render to avoid duplicates
+		return;
 	}
 
 	/**
 	 * Display express checkout button HTML on shop/listing pages.
+	 * Compact horizontal layout for space efficiency.
 	 */
 	public function display_shop_express_checkout_button_html() {
+		global $product;
+		
+		// Don't show for variable products on shop pages (too complex)
+		if ( $product && $product->is_type( 'variable' ) ) {
+			return;
+		}
+		
+		if ( ! ( is_shop() || is_product_category() || is_product_tag() || is_product_taxonomy() ) ) {
+			return;
+		}
+		
 		if ( ! $this->should_show_express_checkout_button( 'shop' ) ) {
 			return;
 		}
 
-		$methods = $this->get_available_express_methods();
+		$methods = $this->get_available_express_methods( 'shop' );
 		if ( empty( $methods ) ) {
 			return;
 		}
 
-		global $product;
 		$product_id = $product ? $product->get_id() : 0;
 		if ( ! $product_id ) {
 			return;
 		}
+		
+		// Use product-specific container key to prevent duplicates
+		static $rendered_products = array();
+		$container_key = 'shop_' . $product_id;
+		
+		if ( isset( $rendered_products[ $container_key ] ) ) {
+			return; // Already rendered for this product
+		}
+		
+		$rendered_products[ $container_key ] = true;
 
 		?>
-		<div class="cko-express-checkout-shop-button" data-product-id="<?php echo esc_attr( $product_id ); ?>">
+		<div class="cko-express-checkout-shop-compact" data-product-id="<?php echo esc_attr( $product_id ); ?>">
 			<?php if ( isset( $methods['apple_pay'] ) ) : ?>
-				<div id="cko-apple-pay-button-wrapper-<?php echo esc_attr( $product_id ); ?>"></div>
+				<div id="cko-apple-pay-button-wrapper-<?php echo esc_attr( $product_id ); ?>" data-product-id="<?php echo esc_attr( $product_id ); ?>" style="display: block;"></div>
 			<?php endif; ?>
 			<?php if ( isset( $methods['google_pay'] ) ) : ?>
-				<div id="cko-google-pay-button-wrapper-<?php echo esc_attr( $product_id ); ?>"></div>
+				<div id="cko-google-pay-button-wrapper-<?php echo esc_attr( $product_id ); ?>" data-product-id="<?php echo esc_attr( $product_id ); ?>" style="display: block;"></div>
 			<?php endif; ?>
 			<?php if ( isset( $methods['paypal'] ) ) : ?>
-				<div id="cko-paypal-button-wrapper-<?php echo esc_attr( $product_id ); ?>"></div>
+				<div id="cko-paypal-button-wrapper-<?php echo esc_attr( $product_id ); ?>" data-product-id="<?php echo esc_attr( $product_id ); ?>" style="display: block;"></div>
 			<?php endif; ?>
 		</div>
 		<?php
@@ -206,24 +371,9 @@ class WC_Checkoutcom_Express_Checkout_Element {
 			return;
 		}
 
-		$methods = $this->get_available_express_methods();
-		if ( empty( $methods ) ) {
-			return;
-		}
-
-		?>
-		<div id="cko-express-checkout-element-cart">
-			<?php if ( isset( $methods['apple_pay'] ) ) : ?>
-				<div id="cko-apple-pay-button-wrapper-cart"></div>
-			<?php endif; ?>
-			<?php if ( isset( $methods['google_pay'] ) ) : ?>
-				<div id="cko-google-pay-button-wrapper-cart"></div>
-			<?php endif; ?>
-			<?php if ( isset( $methods['paypal'] ) ) : ?>
-				<div id="cko-paypal-button-wrapper-cart"></div>
-			<?php endif; ?>
-		</div>
-		<?php
+		// Use existing unified container from individual classes (they handle cart page)
+		// This method is kept for compatibility but won't render to avoid duplicates
+		return;
 	}
 
 	/**
@@ -234,7 +384,7 @@ class WC_Checkoutcom_Express_Checkout_Element {
 			return;
 		}
 
-		$methods = $this->get_available_express_methods();
+		$methods = $this->get_available_express_methods( 'checkout' );
 		if ( empty( $methods ) ) {
 			return;
 		}
@@ -264,13 +414,30 @@ class WC_Checkoutcom_Express_Checkout_Element {
 		}
 
 		// Enqueue minimal CSS - let SDKs handle their own styling
+		// Shop page uses compact horizontal layout
 		wp_add_inline_style( 'woocommerce-general', '
 			#cko-express-checkout-element,
 			#cko-express-checkout-element-cart,
-			#cko-express-checkout-element-checkout,
-			.cko-express-checkout-shop-button {
+			#cko-express-checkout-element-checkout {
 				margin-top: 1em;
 				clear: both;
+			}
+			/* Simple horizontal layout - let SDKs handle their own sizing */
+			.cko-express-checkout-shop-compact {
+				margin: 10px 0;
+				display: flex;
+				flex-direction: row;
+				gap: 8px;
+				align-items: center;
+				justify-content: center;
+				flex-wrap: wrap;
+				width: 100%;
+			}
+			/* Equal width containers - let buttons render naturally */
+			.cko-express-checkout-shop-compact > div {
+				flex: 1 1 auto;
+				min-width: 0;
+				display: block;
 			}
 			.cko-disabled {
 				cursor: not-allowed;

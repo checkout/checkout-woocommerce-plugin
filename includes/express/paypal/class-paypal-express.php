@@ -44,8 +44,9 @@ class CKO_Paypal_Express {
 
 		add_action( 'woocommerce_after_add_to_cart_form', [ $this, 'display_payment_request_button_html' ], 1 );
 		
-		// Add PayPal Express buttons to shop/listing pages
-		add_action( 'woocommerce_after_shop_loop_item', [ $this, 'display_shop_payment_request_button_html' ], 15 );
+		// Shop page rendering is now handled by WC_Checkoutcom_Express_Checkout_Element
+		// Keep this hook commented out to prevent duplicate rendering
+		// add_action( 'woocommerce_after_shop_loop_item', [ $this, 'display_shop_payment_request_button_html' ], 15 );
 		
 		// Add PayPal Express button to cart page (classic cart)
 		add_action( 'woocommerce_proceed_to_checkout', [ $this, 'display_cart_payment_request_button_html' ], 5 );

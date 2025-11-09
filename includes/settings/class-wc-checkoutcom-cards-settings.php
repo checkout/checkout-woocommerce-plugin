@@ -816,22 +816,8 @@ class WC_Checkoutcom_Cards_Settings {
 			'apple_pay_button_customization' => [
 				'title'       => __( 'Button Appearance', 'checkout-com-unified-payments-api' ),
 				'type'        => 'title',
-				'description' => __( 'Customize the appearance of Apple Pay buttons on your store. These settings control the style, type, and language of the Apple Pay button.', 'checkout-com-unified-payments-api' ),
+				'description' => __( 'Customize the appearance of Apple Pay buttons on your store. These settings control the style and language of the Apple Pay button.', 'checkout-com-unified-payments-api' ),
 			],
-			'ckocom_apple_type'        => array(
-				'title'   => __( 'Call to action', 'checkout-com-unified-payments-api' ),
-				'type'    => 'select',
-				'description' => __( 'Select a button label that fits best with the flow of purchase or payment experience on your store.', 'checkout-com-unified-payments-api' ),
-				'desc_tip' => false,
-				'options' => array(
-					'plain'     => __( 'Only icon', 'checkout-com-unified-payments-api' ),
-					'buy'       => __( 'Buy', 'checkout-com-unified-payments-api' ),
-					'donate'    => __( 'Donate', 'checkout-com-unified-payments-api' ),
-					'book'      => __( 'Book', 'checkout-com-unified-payments-api' ),
-					'check-out' => __( 'Checkout', 'checkout-com-unified-payments-api' ),
-				),
-				'default' => 'buy',
-			),
 			'ckocom_apple_theme'       => array(
 				'title'   => __( 'Theme', 'checkout-com-unified-payments-api' ),
 				'type'    => 'select',

@@ -299,27 +299,27 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 				<?php if ( $is_collapsible ) : ?>
 				<div class="cko-collapsible-content" style="display: none;">
 				<?php endif; ?>
-				
-				<?php if ( ! empty( $value['description'] ) ) : ?>
-					<div class="cko-info-box">
-						<p><?php echo wp_kses_post( $value['description'] ); ?></p>
+					
+					<?php if ( ! empty( $value['description'] ) ) : ?>
+						<div class="cko-info-box">
+							<p><?php echo wp_kses_post( $value['description'] ); ?></p>
+						</div>
+					<?php endif; ?>
+
+					<div class="cko-file-upload-area">
+						<input type="file" id="cko-certificate-upload" name="apple_pay_certificate" accept=".cer">
+						<button type="button" id="cko-upload-certificate-button" class="button button-primary cko-action-button">
+							<?php esc_html_e( 'Upload Certificate', 'checkout-com-unified-payments-api' ); ?>
+						</button>
+						<div id="cko-certificate-status" class="cko-status-message" style="display: none;"></div>
 					</div>
-				<?php endif; ?>
 
-				<div class="cko-file-upload-area">
-					<input type="file" id="cko-certificate-upload" name="apple_pay_certificate" accept=".cer">
-					<button type="button" id="cko-upload-certificate-button" class="button button-primary cko-action-button">
-						<?php esc_html_e( 'Upload Certificate', 'checkout-com-unified-payments-api' ); ?>
-					</button>
-					<div id="cko-certificate-status" class="cko-status-message" style="display: none;"></div>
-				</div>
-
-				<div class="cko-info-box">
-					<p>
-						<?php esc_html_e( 'The certificate file will be automatically converted to base64 format and uploaded to Checkout.com. This process is secure and handled automatically.', 'checkout-com-unified-payments-api' ); ?>
-						<a href="https://www.checkout.com/docs/payments/add-payment-methods/apple-pay/api-only#Upload_the_signed_payment_processing_certificate" target="_blank"><?php esc_html_e( 'Learn more about certificate upload', 'checkout-com-unified-payments-api' ); ?></a>
-					</p>
-				</div>
+					<div class="cko-info-box">
+						<p>
+							<?php esc_html_e( 'The certificate file will be automatically converted to base64 format and uploaded to Checkout.com. This process is secure and handled automatically.', 'checkout-com-unified-payments-api' ); ?>
+							<a href="https://www.checkout.com/docs/payments/add-payment-methods/apple-pay/api-only#Upload_the_signed_payment_processing_certificate" target="_blank"><?php esc_html_e( 'Learn more about certificate upload', 'checkout-com-unified-payments-api' ); ?></a>
+						</p>
+					</div>
 				
 				<?php if ( $is_collapsible ) : ?>
 				</div>
@@ -488,8 +488,8 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 									<br>
 									<code>sudo cp /path/to/apple-developer-merchantid-domain-association.txt <?php echo esc_html( $file_path ); ?></code><br>
 									<code>sudo chmod 644 <?php echo esc_html( $file_path ); ?></code>
-								</p>
-							</div>
+						</p>
+					</div>
 						<?php endif; ?>
 					</div>
 				</div>
@@ -605,31 +605,31 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 				<?php if ( $is_collapsible ) : ?>
 				<div class="cko-collapsible-content" style="display: none;">
 				<?php endif; ?>
-				
-				<?php if ( ! empty( $value['description'] ) ) : ?>
-					<div class="cko-info-box">
-						<p><?php echo wp_kses_post( $value['description'] ); ?></p>
+					
+					<?php if ( ! empty( $value['description'] ) ) : ?>
+						<div class="cko-info-box">
+							<p><?php echo wp_kses_post( $value['description'] ); ?></p>
+						</div>
+					<?php endif; ?>
+
+					<div class="cko-file-upload-area">
+						<input type="file" id="cko-merchant-identity-certificate-upload" name="apple_pay_merchant_identity_certificate" accept=".cer">
+						<button type="button" id="cko-upload-merchant-identity-certificate-button" class="button button-primary cko-action-button">
+							<?php esc_html_e( 'Upload and Convert Certificate', 'checkout-com-unified-payments-api' ); ?>
+						</button>
+						<div id="cko-merchant-identity-certificate-status" class="cko-status-message" style="display: none;"></div>
 					</div>
-				<?php endif; ?>
 
-				<div class="cko-file-upload-area">
-					<input type="file" id="cko-merchant-identity-certificate-upload" name="apple_pay_merchant_identity_certificate" accept=".cer">
-					<button type="button" id="cko-upload-merchant-identity-certificate-button" class="button button-primary cko-action-button">
-						<?php esc_html_e( 'Upload and Convert Certificate', 'checkout-com-unified-payments-api' ); ?>
-					</button>
-					<div id="cko-merchant-identity-certificate-status" class="cko-status-message" style="display: none;"></div>
-				</div>
-
-				<div class="cko-info-box">
-					<p>
-						<strong><?php esc_html_e( 'Important:', 'checkout-com-unified-payments-api' ); ?></strong>
-					</p>
-					<ol>
-						<li><?php esc_html_e( 'The certificate will be automatically converted from DER (.cer) format to PEM format and saved to your server as certificate_sandbox.pem', 'checkout-com-unified-payments-api' ); ?></li>
+					<div class="cko-info-box">
+						<p>
+							<strong><?php esc_html_e( 'Important:', 'checkout-com-unified-payments-api' ); ?></strong>
+						</p>
+						<ol>
+							<li><?php esc_html_e( 'The certificate will be automatically converted from DER (.cer) format to PEM format and saved to your server as certificate_sandbox.pem', 'checkout-com-unified-payments-api' ); ?></li>
 						<li><?php esc_html_e( 'Make sure you have saved the certificate_sandbox.key file from Step 3a on your server', 'checkout-com-unified-payments-api' ); ?></li>
 						<li><?php esc_html_e( 'Configure the paths to both files in the "Merchant Identity Certificate Path" and "Merchant Identity Certificate Key Path" fields in the Apple Pay Configuration section above', 'checkout-com-unified-payments-api' ); ?></li>
-					</ol>
-				</div>
+						</ol>
+					</div>
 				
 				<?php if ( $is_collapsible ) : ?>
 				</div>
@@ -777,8 +777,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			// Display the button and remove the default place order.
 			checkoutInitialiseApplePay = function () {
 				jQuery( '#payment' ) . append(
-					'<apple-pay-button id="' + applePayButtonId + '" onclick="onApplePayButtonClicked()" type="' 
-					+ "<?php echo esc_js( $this->get_option( 'ckocom_apple_type' ) ); ?>" + '" buttonstyle="' 
+					'<apple-pay-button id="' + applePayButtonId + '" onclick="onApplePayButtonClicked()" type="plain" buttonstyle="' 
 					+ "<?php echo esc_js( $this->get_option( 'ckocom_apple_theme' ) ); ?>" + '" locale="' 
 					+ "<?php echo esc_js( $this->get_option( 'ckocom_apple_language' ) ); ?>" + '"></apple-pay-button>'
 				);
@@ -2824,11 +2823,11 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 					return;
 				}
 			} else {
-				if ( ! wp_mkdir_p( $well_known_dir ) ) {
-					wp_send_json_error( [ 
-						'message' => __( 'Failed to create .well-known directory. Please check file permissions.', 'checkout-com-unified-payments-api' ),
-					] );
-					return;
+			if ( ! wp_mkdir_p( $well_known_dir ) ) {
+				wp_send_json_error( [ 
+					'message' => __( 'Failed to create .well-known directory. Please check file permissions.', 'checkout-com-unified-payments-api' ),
+				] );
+				return;
 				}
 			}
 		}
@@ -2854,7 +2853,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		
 		// For non-Bitnami installations, ensure .well-known directory is accessible
 		if ( ! $is_bitnami ) {
-			$this->ensure_well_known_accessible();
+		$this->ensure_well_known_accessible();
 		}
 
 		// Also save without .txt extension for backward compatibility (if not Bitnami)

@@ -44,8 +44,9 @@ class CKO_Apple_Pay_Express {
 
 		add_action( 'woocommerce_after_add_to_cart_form', [ $this, 'display_payment_request_button_html' ], 1 );
 		
-		// Add Apple Pay Express buttons to shop/listing pages
-		add_action( 'woocommerce_after_shop_loop_item', [ $this, 'display_shop_payment_request_button_html' ], 15 );
+		// Shop page rendering is now handled by WC_Checkoutcom_Express_Checkout_Element
+		// Keep this hook commented out to prevent duplicate rendering
+		// add_action( 'woocommerce_after_shop_loop_item', [ $this, 'display_shop_payment_request_button_html' ], 15 );
 		
 		// Add Apple Pay Express button to cart page (classic cart)
 		add_action( 'woocommerce_proceed_to_checkout', [ $this, 'display_cart_payment_request_button_html' ], 5 );
@@ -240,7 +241,7 @@ class CKO_Apple_Pay_Express {
 			'environment'                         => $environment ? 'TEST' : 'PRODUCTION',
 			'merchant_id'                         => $apple_pay_settings['ckocom_apple_mercahnt_id'] ?? '',
 			'currency_code'                       => get_woocommerce_currency(),
-			'button_type'                         => $apple_pay_settings['ckocom_apple_type'] ?? 'buy',
+			'button_type'                         => 'plain',
 			'button_theme'                        => $apple_pay_settings['ckocom_apple_theme'] ?? 'black',
 			'button_language'                     => $apple_pay_settings['ckocom_apple_language'] ?? '',
 			'enable_mada'                         => isset( $apple_pay_settings['enable_mada'] ) && 'yes' === $apple_pay_settings['enable_mada'],
