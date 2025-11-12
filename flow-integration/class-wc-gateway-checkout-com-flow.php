@@ -65,6 +65,91 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	}
 
 	/**
+	 * Check if the gateway is available.
+	 * 
+	 * Override parent method to ensure gateway is available when enabled and checkout mode is 'flow'.
+	 * This bypasses WooCommerce's default currency/country restrictions.
+	 *
+	 * @return bool
+	 */
+	public function is_available() {
+		// Log availability check start
+		WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Checking if Flow gateway is available...' );
+		WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Gateway enabled setting: ' . ( isset( $this->enabled ) ? $this->enabled : 'NOT SET' ) );
+		
+		// First check if gateway is enabled
+		if ( 'yes' !== $this->enabled ) {
+			WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Gateway is NOT available - enabled setting is not "yes"' );
+			return false;
+		}
+
+		// Check if checkout mode is set to 'flow'
+		$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		$checkout_mode = isset( $checkout_setting['ckocom_checkout_mode'] ) ? $checkout_setting['ckocom_checkout_mode'] : 'classic';
+		
+		WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Checkout mode: ' . $checkout_mode );
+		
+		if ( 'flow' !== $checkout_mode ) {
+			WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Gateway is NOT available - checkout mode is not "flow" (current: ' . $checkout_mode . ')' );
+			return false;
+		}
+
+		// Check if API credentials are set
+		$secret_key = isset( $checkout_setting['ckocom_secret_key'] ) ? $checkout_setting['ckocom_secret_key'] : '';
+		$public_key = isset( $checkout_setting['ckocom_public_key'] ) ? $checkout_setting['ckocom_public_key'] : '';
+		
+		WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Secret key: ' . ( ! empty( $secret_key ) ? 'SET (' . substr( $secret_key, 0, 10 ) . '...)' : 'NOT SET' ) );
+		WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Public key: ' . ( ! empty( $public_key ) ? 'SET (' . substr( $public_key, 0, 10 ) . '...)' : 'NOT SET' ) );
+		
+		if ( empty( $secret_key ) || empty( $public_key ) ) {
+			// Log warning but don't block availability (credentials might be set later)
+			WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] WARNING: API credentials not set, but gateway is still available' );
+		}
+
+		// Gateway is available if enabled and checkout mode is 'flow'
+		// We bypass currency/country restrictions as Flow supports all currencies/countries
+		WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Gateway IS available - all checks passed' );
+		return true;
+	}
+
+	/**
+	 * Check if the gateway is valid for use.
+	 * 
+	 * Override parent method to bypass currency/country restrictions.
+	 * Flow supports all currencies and countries, so we always return true
+	 * when the gateway is enabled and checkout mode is 'flow'.
+	 *
+	 * @return bool
+	 */
+	public function valid_for_use() {
+		// Log valid_for_use check start
+		WC_Checkoutcom_Utility::logger( '[FLOW VALID FOR USE] Checking if Flow gateway is valid for use...' );
+		WC_Checkoutcom_Utility::logger( '[FLOW VALID FOR USE] Gateway enabled setting: ' . ( isset( $this->enabled ) ? $this->enabled : 'NOT SET' ) );
+		
+		// Check if gateway is enabled
+		if ( 'yes' !== $this->enabled ) {
+			WC_Checkoutcom_Utility::logger( '[FLOW VALID FOR USE] Gateway is NOT valid - enabled setting is not "yes"' );
+			return false;
+		}
+
+		// Check if checkout mode is set to 'flow'
+		$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		$checkout_mode = isset( $checkout_setting['ckocom_checkout_mode'] ) ? $checkout_setting['ckocom_checkout_mode'] : 'classic';
+		
+		WC_Checkoutcom_Utility::logger( '[FLOW VALID FOR USE] Checkout mode: ' . $checkout_mode );
+		
+		if ( 'flow' !== $checkout_mode ) {
+			WC_Checkoutcom_Utility::logger( '[FLOW VALID FOR USE] Gateway is NOT valid - checkout mode is not "flow" (current: ' . $checkout_mode . ')' );
+			return false;
+		}
+
+		// Flow supports all currencies and countries, so always return true
+		// This bypasses WooCommerce's default currency/country restrictions
+		WC_Checkoutcom_Utility::logger( '[FLOW VALID FOR USE] Gateway IS valid for use - all checks passed' );
+		return true;
+	}
+
+	/**
 	 * Add subscription order payment meta field.
 	 *
 	 * @param array           $payment_meta associative array of meta data required for automatic payments.
@@ -1058,11 +1143,14 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		if ( ! is_user_logged_in() ) :
 			?>
 			<script>
-				const targetNode = document.body;
+				// Use var instead of const to prevent redeclaration errors when updated_checkout fires
+				var targetNode = document.body;
 
 				// Hide Saved payment method for non logged in users.
 				// IMPORTANT: Hide the accordion container, not just the list inside
-				const observer = new MutationObserver((mutationsList, observer) => {
+				// Only create observer if it doesn't already exist to prevent duplicates
+				if (typeof window.flowGuestObserver === 'undefined') {
+					window.flowGuestObserver = new MutationObserver((mutationsList, observer) => {
 					// Hide the accordion container (which contains the saved cards)
 					const $accordion = jQuery('.saved-cards-accordion-container');
 					if ($accordion.length) {
@@ -1079,12 +1167,13 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					// Keep observer running to catch late additions
 				});
 
-				const config = {
-					childList: true,
-					subtree: true
-				};
+					const config = {
+						childList: true,
+						subtree: true
+					};
 
-				observer.observe(targetNode, config);
+					window.flowGuestObserver.observe(targetNode, config);
+				}
 
 				// Try to hide it immediately in case it's already present.
 				jQuery('.saved-cards-accordion-container').hide();
@@ -1880,7 +1969,17 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			if ( ! $is_approved ) {
 				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment not approved: ' . print_r( $payment_details, true ) );
 				error_log( '[FLOW 3DS API] Payment not approved' );
-				wp_die( esc_html__( 'Payment was not approved. Please try again.', 'checkout-com-unified-payments-api' ), esc_html__( 'Payment Failed', 'checkout-com-unified-payments-api' ), array( 'response' => 400 ) );
+				
+				// If we have an order, redirect to order-received page (failure)
+				if ( $order ) {
+					$return_url = $this->get_return_url( $order );
+					WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment failed, redirecting to order-received page: ' . $return_url );
+					wp_safe_redirect( $return_url );
+					exit;
+				} else {
+					// No order found, show error
+					wp_die( esc_html__( 'Payment was not approved. Please try again.', 'checkout-com-unified-payments-api' ), esc_html__( 'Payment Failed', 'checkout-com-unified-payments-api' ), array( 'response' => 400 ) );
+				}
 			}
 			
 			// Process the payment by simulating POST data and calling process_payment
@@ -2185,15 +2284,15 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	 */
 	public static function flow_enabled() {
 
-		$flow_settings = get_option( 'woocommerce_wc_checkout_com_flow_settings' );
+		$flow_settings = get_option( 'woocommerce_wc_checkout_com_flow_settings', array() );
 
-		$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
-		$checkout_mode    = $checkout_setting['ckocom_checkout_mode'];
+		$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		$checkout_mode    = isset( $checkout_setting['ckocom_checkout_mode'] ) ? $checkout_setting['ckocom_checkout_mode'] : 'classic';
 	
-		$apm_settings      = get_option( 'woocommerce_wc_checkout_com_alternative_payments_settings' );
-		$gpay_settings     = get_option( 'woocommerce_wc_checkout_com_google_pay_settings' );
-		$applepay_settings = get_option( 'woocommerce_wc_checkout_com_apple_pay_settings' );
-		$paypal_settings   = get_option( 'woocommerce_wc_checkout_com_paypal_settings' );
+		$apm_settings      = get_option( 'woocommerce_wc_checkout_com_alternative_payments_settings', array() );
+		$gpay_settings     = get_option( 'woocommerce_wc_checkout_com_google_pay_settings', array() );
+		$applepay_settings = get_option( 'woocommerce_wc_checkout_com_apple_pay_settings', array() );
+		$paypal_settings   = get_option( 'woocommerce_wc_checkout_com_paypal_settings', array() );
 	
 		if ( 'flow' === $checkout_mode ) {
 			$flow_settings['enabled']     = 'yes';
@@ -2213,6 +2312,17 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		update_option( 'woocommerce_wc_checkout_com_google_pay_settings', $gpay_settings );
 		update_option( 'woocommerce_wc_checkout_com_apple_pay_settings', $applepay_settings );
 		update_option( 'woocommerce_wc_checkout_com_paypal_settings', $paypal_settings );
+		
+		// Log for debugging
+		WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] ========== FLOW ENABLED CHECK ==========' );
+		WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] Checkout mode: ' . $checkout_mode );
+		WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] Flow gateway enabled: ' . ( isset( $flow_settings['enabled'] ) ? $flow_settings['enabled'] : 'not set' ) );
+		WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] Cards gateway enabled: ' . ( isset( $checkout_setting['enabled'] ) ? $checkout_setting['enabled'] : 'not set' ) );
+		WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] APM gateway enabled: ' . ( isset( $apm_settings['enabled'] ) ? $apm_settings['enabled'] : 'not set' ) );
+		WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] Google Pay enabled: ' . ( isset( $gpay_settings['enabled'] ) ? $gpay_settings['enabled'] : 'not set' ) );
+		WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] Apple Pay enabled: ' . ( isset( $applepay_settings['enabled'] ) ? $applepay_settings['enabled'] : 'not set' ) );
+		WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] PayPal enabled: ' . ( isset( $paypal_settings['enabled'] ) ? $paypal_settings['enabled'] : 'not set' ) );
+		WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] ========================================' );
 	}
 
 	/**
