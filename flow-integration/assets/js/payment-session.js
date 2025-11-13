@@ -185,6 +185,11 @@ var ckoFlow = {
 			.join(', ');
 
 		let description = 'Payment from ' + cko_flow_vars.site_url + ' for [ ' +  products + ' ]';
+		
+		// Truncate description to 100 characters (Checkout.com API limit)
+		if (description.length > 100) {
+			description = description.substring(0, 97) + '...';
+		}
 
 		let orderId = cartInfo["order_id"];
 		ckoLogger.debug('Initial orderId from cartInfo:', orderId);
