@@ -6,14 +6,15 @@
  * Author: Checkout.com
  * Author URI: https://www.checkout.com/
  * Version: 5.0.0_beta
- * Requires Plugins: woocommerce
  * Requires at least: 5.0
- * Stable tag: 5.0.0_beta
  * Tested up to: 6.7.0
+ * WC requires at least: 3.0
  * WC tested up to: 8.3.1
  * Requires PHP: 7.3
  * Text Domain: checkout-com-unified-payments-api
  * Domain Path: /languages
+ * License: GPL v2 or later
+ * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  *
  * @package wc_checkout_com
  */
