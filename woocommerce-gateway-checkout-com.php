@@ -16,6 +16,14 @@
  * License: GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  *
+ * IMPORTANT: Plugin Update Compatibility
+ * WordPress identifies plugins by these three identifiers (must match existing installation):
+ * 1. Plugin folder name: checkout-com-unified-payments-api
+ * 2. Main plugin file: woocommerce-gateway-checkout-com.php
+ * 3. Plugin Name header: Checkout.com Payment Gateway
+ * 
+ * These identifiers ensure the plugin updates over existing installations instead of creating duplicates.
+ *
  * @package wc_checkout_com
  */
 
