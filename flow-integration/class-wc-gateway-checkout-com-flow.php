@@ -1555,6 +1555,38 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		WC_Checkoutcom_Utility::logger( '⚠️ This may cause issues with 3DS return order lookup' );
 	}
 	
+	// Save session+cart identifier for duplicate prevention (if cart is still available)
+	if ( WC()->cart && ! WC()->cart->is_empty() && WC()->session ) {
+		// Get WooCommerce session identifier
+		$session_customer_id = WC()->session->get_customer_id();
+		$session_key = WC()->session->get_customer_unique_id();
+		
+		// Generate cart hash from cart items
+		$cart_items = array();
+		foreach ( WC()->cart->get_cart() as $cart_item_key => $cart_item ) {
+			$cart_items[] = array(
+				'product_id' => $cart_item['product_id'],
+				'variation_id' => $cart_item['variation_id'],
+				'quantity' => $cart_item['quantity'],
+			);
+		}
+		$cart_hash = md5( wp_json_encode( $cart_items ) . WC()->cart->get_total( 'edit' ) );
+		
+		// Combine session ID + cart hash = unique identifier
+		$session_cart_identifier = null;
+		if ( $session_customer_id > 0 ) {
+			$session_cart_identifier = 'customer_' . $session_customer_id . '_' . $cart_hash;
+		} elseif ( ! empty( $session_key ) ) {
+			$session_cart_identifier = 'session_' . $session_key . '_' . $cart_hash;
+		}
+		
+		// Save session+cart identifier if we have it
+		if ( ! empty( $session_cart_identifier ) ) {
+			$order->update_meta_data( '_cko_session_cart_id', $session_cart_identifier );
+			WC_Checkoutcom_Utility::logger( '✅ Saved session+cart identifier to order - Order ID: ' . $order_id . ', Identifier: ' . substr( $session_cart_identifier, 0, 50 ) . '...' );
+		}
+	}
+	
 	// CRITICAL: Save order immediately so webhooks can find it (especially for fast APM payments)
 	$order->save();
 	WC_Checkoutcom_Utility::logger( 'Order meta saved immediately for webhook lookup - Order ID: ' . $order_id . ', Payment ID: ' . $flow_pay_id );
@@ -1769,11 +1801,23 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					) );
 					
 					if ( ! empty( $orders ) ) {
-						$order = $orders[0];
-						$order_id = $order->get_id();
-						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order found by payment session ID - Order ID: ' . $order_id );
-					} else {
-						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order not found by payment session ID, trying fallback methods...' );
+						$found_order = $orders[0];
+						$found_order_status = $found_order->get_status();
+						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order found by payment session ID - Order ID: ' . $found_order->get_id() . ', Status: ' . $found_order_status );
+						
+						// Only use this order if it's in pending or failed status (reusable)
+						if ( in_array( $found_order_status, array( 'pending', 'failed' ), true ) ) {
+							$order = $found_order;
+							$order_id = $order->get_id();
+							WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ✅ Using order found by payment session ID (status: ' . $found_order_status . ') - Order ID: ' . $order_id );
+						} else {
+							WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order found by payment session ID has status ' . $found_order_status . ' (not reusable) - will check for duplicate or create new order' );
+						}
+					}
+					
+					// If order not found or not reusable, try fallback methods
+					if ( ! $order ) {
+						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order not found by payment session ID or not reusable, trying fallback methods...' );
 						
 						// Fallback 1: Try to find order by payment ID (in case payment was already processed)
 						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Fallback: Looking for order by payment ID: ' . $payment_id );
@@ -1786,33 +1830,49 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 						) );
 						
 						if ( ! empty( $orders_by_payment ) ) {
-							$order = $orders_by_payment[0];
-							$order_id = $order->get_id();
-							WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order found by payment ID (fallback) - Order ID: ' . $order_id );
-						} else {
-							// Fallback 2: Try to find most recent pending order for this customer
-							WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Fallback: Looking for most recent pending order...' );
+							$found_order_by_payment = $orders_by_payment[0];
+							$found_order_by_payment_status = $found_order_by_payment->get_status();
+							WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order found by payment ID - Order ID: ' . $found_order_by_payment->get_id() . ', Status: ' . $found_order_by_payment_status );
+							
+							// Only use this order if it's in pending or failed status (reusable)
+							if ( in_array( $found_order_by_payment_status, array( 'pending', 'failed' ), true ) ) {
+								$order = $found_order_by_payment;
+								$order_id = $order->get_id();
+								WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ✅ Using order found by payment ID (status: ' . $found_order_by_payment_status . ') - Order ID: ' . $order_id );
+							} else {
+								WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order found by payment ID has status ' . $found_order_by_payment_status . ' (not reusable) - will check for duplicate or create new order' );
+							}
+						}
+						
+						if ( ! $order ) {
+							// Fallback 2: Try to find most recent pending/failed order for this customer
+							WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Fallback: Looking for most recent pending/failed order...' );
 							if ( $payment_details && isset( $payment_details['customer']['email'] ) ) {
 								$customer_email = $payment_details['customer']['email'];
 								if ( ! empty( $customer_email ) ) {
 									$orders_by_email = wc_get_orders( array(
 										'billing_email' => $customer_email,
-										'status'        => array( 'pending', 'on-hold', 'processing' ),
+										'status'        => array( 'pending', 'failed' ),
 										'limit'         => 5,
 										'orderby'       => 'date',
 										'order'         => 'DESC',
 									) );
 									
-									WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Found ' . count( $orders_by_email ) . ' pending orders for email: ' . $customer_email );
+									WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Found ' . count( $orders_by_email ) . ' pending/failed orders for email: ' . $customer_email );
 									
 									// Check if any of these orders match the payment amount
 									$payment_amount = isset( $payment_details['amount'] ) ? $payment_details['amount'] : 0;
 									foreach ( $orders_by_email as $potential_order ) {
+										$potential_order_status = $potential_order->get_status();
+										// Double-check status (should already be filtered, but be safe)
+										if ( ! in_array( $potential_order_status, array( 'pending', 'failed' ), true ) ) {
+											continue;
+										}
 										$order_amount = (int) round( $potential_order->get_total() * 100 ); // Convert to cents
 										if ( $order_amount === $payment_amount ) {
 											$order = $potential_order;
 											$order_id = $order->get_id();
-											WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order found by email and amount match (fallback) - Order ID: ' . $order_id );
+											WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order found by email and amount match (fallback) - Order ID: ' . $order_id . ', Status: ' . $potential_order_status );
 											break;
 										}
 									}
@@ -1822,7 +1882,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 							if ( ! $order ) {
 								// Last resort: Create order from cart and payment details
 								// This happens when 3DS redirect occurs before form submission
-								WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order not found - creating order from cart and payment details' );
+								WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order not found - checking for existing order with same session+cart hash before creating new one' );
 								
 								if ( ! WC()->cart || WC()->cart->is_empty() ) {
 									WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ERROR: Cannot create order - cart is empty' );
@@ -1843,86 +1903,248 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 									}
 								}
 								
-								// Create order
-								WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Creating order - Customer ID: ' . $customer_id . ', Email: ' . $customer_email );
-								$order = wc_create_order( array( 'customer_id' => $customer_id ) );
-								
-								if ( ! $order || is_wp_error( $order ) ) {
-									WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ERROR: Failed to create order' );
-									error_log( '[FLOW 3DS API] ERROR: Failed to create order' );
-									wp_die( esc_html__( 'Failed to create order. Please contact support.', 'checkout-com-unified-payments-api' ), esc_html__( 'Payment Error', 'checkout-com-unified-payments-api' ), array( 'response' => 500 ) );
+								// Generate session+cart hash to check for duplicate orders
+								$session_cart_identifier = null;
+								if ( WC()->session && WC()->cart && ! WC()->cart->is_empty() ) {
+									// Get WooCommerce session identifier
+									$session_customer_id = WC()->session->get_customer_id();
+									$session_key = WC()->session->get_customer_unique_id();
+									
+									// Generate cart hash from cart items
+									$cart_items = array();
+									foreach ( WC()->cart->get_cart() as $cart_item_key => $cart_item ) {
+										$cart_items[] = array(
+											'product_id' => $cart_item['product_id'],
+											'variation_id' => $cart_item['variation_id'],
+											'quantity' => $cart_item['quantity'],
+										);
+									}
+									$cart_hash = md5( wp_json_encode( $cart_items ) . WC()->cart->get_total( 'edit' ) );
+									
+									// Combine session ID + cart hash = unique identifier
+									if ( $session_customer_id > 0 ) {
+										$session_cart_identifier = 'customer_' . $session_customer_id . '_' . $cart_hash;
+									} elseif ( ! empty( $session_key ) ) {
+										$session_cart_identifier = 'session_' . $session_key . '_' . $cart_hash;
+									}
+									
+									WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Generated session+cart identifier: ' . ( $session_cart_identifier ? substr( $session_cart_identifier, 0, 50 ) . '...' : 'NULL' ) );
 								}
 								
-								// Set customer email
-								if ( ! empty( $customer_email ) ) {
-									$order->set_billing_email( $customer_email );
-								}
-								
-								// Set billing address from payment details if available
-								if ( $payment_details && isset( $payment_details['billing_address'] ) ) {
-									$billing = $payment_details['billing_address'];
-									if ( isset( $billing['address_line1'] ) ) $order->set_billing_address_1( $billing['address_line1'] );
-									if ( isset( $billing['address_line2'] ) ) $order->set_billing_address_2( $billing['address_line2'] );
-									if ( isset( $billing['city'] ) ) $order->set_billing_city( $billing['city'] );
-									if ( isset( $billing['state'] ) ) $order->set_billing_state( $billing['state'] );
-									if ( isset( $billing['zip'] ) ) $order->set_billing_postcode( $billing['zip'] );
-									if ( isset( $billing['country'] ) ) $order->set_billing_country( $billing['country'] );
-									if ( isset( $payment_details['customer']['name'] ) ) {
-										$name_parts = explode( ' ', $payment_details['customer']['name'], 2 );
-										$order->set_billing_first_name( $name_parts[0] ?? '' );
-										$order->set_billing_last_name( $name_parts[1] ?? '' );
+								// Check for existing order with same session+cart hash
+								if ( ! empty( $session_cart_identifier ) ) {
+									WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Checking for existing order with session+cart hash: ' . substr( $session_cart_identifier, 0, 50 ) . '...' );
+									
+									$existing_orders = wc_get_orders( array(
+										'meta_query' => array(
+											array(
+												'key'   => '_cko_session_cart_id',
+												'value' => $session_cart_identifier,
+											),
+										),
+										'limit'      => 1,
+										'orderby'    => 'date',
+										'order'      => 'DESC',
+									) );
+									
+									if ( ! empty( $existing_orders ) ) {
+										$existing_order = $existing_orders[0];
+										$existing_order_status = $existing_order->get_status();
+										
+										WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Found existing order with same session+cart hash - Order ID: ' . $existing_order->get_id() . ', Status: ' . $existing_order_status );
+										
+										// Only reuse order if status is pending or failed
+										if ( in_array( $existing_order_status, array( 'pending', 'failed' ), true ) ) {
+											$order = $existing_order;
+											$order_id = $order->get_id();
+											WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ✅ Reusing existing order (status: ' . $existing_order_status . ') - Order ID: ' . $order_id );
+											
+											// Clear existing order items to refresh with current cart
+											foreach ( $order->get_items() as $item_id => $item ) {
+												$order->remove_item( $item_id );
+											}
+											
+											// Clear existing shipping items
+											foreach ( $order->get_items( 'shipping' ) as $item_id => $item ) {
+												$order->remove_item( $item_id );
+											}
+											
+											// Set customer email
+											if ( ! empty( $customer_email ) ) {
+												$order->set_billing_email( $customer_email );
+											}
+											
+											// Set billing address from payment details if available
+											if ( $payment_details && isset( $payment_details['billing_address'] ) ) {
+												$billing = $payment_details['billing_address'];
+												if ( isset( $billing['address_line1'] ) ) $order->set_billing_address_1( $billing['address_line1'] );
+												if ( isset( $billing['address_line2'] ) ) $order->set_billing_address_2( $billing['address_line2'] );
+												if ( isset( $billing['city'] ) ) $order->set_billing_city( $billing['city'] );
+												if ( isset( $billing['state'] ) ) $order->set_billing_state( $billing['state'] );
+												if ( isset( $billing['zip'] ) ) $order->set_billing_postcode( $billing['zip'] );
+												if ( isset( $billing['country'] ) ) $order->set_billing_country( $billing['country'] );
+												if ( isset( $payment_details['customer']['name'] ) ) {
+													$name_parts = explode( ' ', $payment_details['customer']['name'], 2 );
+													$order->set_billing_first_name( $name_parts[0] ?? '' );
+													$order->set_billing_last_name( $name_parts[1] ?? '' );
+												}
+											}
+											
+											// Add current cart items
+											if ( WC()->cart && ! WC()->cart->is_empty() ) {
+												foreach ( WC()->cart->get_cart() as $cart_item_key => $cart_item ) {
+													$product = $cart_item['data'];
+													$order->add_product( $product, $cart_item['quantity'], array(
+														'subtotal' => $cart_item['line_subtotal'],
+														'total'    => $cart_item['line_total'],
+													) );
+												}
+											}
+											
+											// Set shipping method if available
+											$chosen_shipping_methods = WC()->session->get( 'chosen_shipping_methods' );
+											if ( ! empty( $chosen_shipping_methods ) ) {
+												$shipping_packages = WC()->shipping->get_packages();
+												foreach ( $chosen_shipping_methods as $package_key => $method ) {
+													if ( isset( $shipping_packages[ $package_key ] ) ) {
+														$package = $shipping_packages[ $package_key ];
+														if ( isset( $package['rates'][ $method ] ) ) {
+															$shipping_rate = $package['rates'][ $method ];
+															$item = new WC_Order_Item_Shipping();
+															$item->set_props( array(
+																'method_title' => $shipping_rate->get_label(),
+																'method_id'    => $shipping_rate->get_id(),
+																'total'        => wc_format_decimal( $shipping_rate->get_cost() ),
+																'taxes'        => $shipping_rate->get_taxes(),
+															) );
+															$order->add_item( $item );
+														}
+													}
+												}
+											}
+											
+											// Recalculate totals
+											$order->calculate_totals();
+											
+											// Set payment method
+											$order->set_payment_method( $this->id );
+											$order->set_payment_method_title( $this->get_title() );
+											
+											// Update order with payment session ID if available
+											if ( ! empty( $payment_session_id ) ) {
+												$order->update_meta_data( '_cko_payment_session_id', $payment_session_id );
+											}
+											
+											// Update order with payment ID if available
+											if ( ! empty( $payment_id ) ) {
+												$order->update_meta_data( '_cko_payment_id', $payment_id );
+												$order->update_meta_data( '_cko_flow_payment_id', $payment_id );
+											}
+											
+											// Ensure session+cart identifier is saved
+											$order->update_meta_data( '_cko_session_cart_id', $session_cart_identifier );
+											
+											// Reset order status to pending
+											$order->set_status( 'pending' );
+											
+											$order->save();
+											WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Existing order refreshed with current cart items and ready for processing - Order ID: ' . $order_id );
+										} else {
+											WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Existing order status is ' . $existing_order_status . ' (not pending/failed) - will create NEW order' );
+										}
+									} else {
+										WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] No existing order found with same session+cart hash - will create new order' );
 									}
 								}
 								
-								// Add cart items
-								foreach ( WC()->cart->get_cart() as $cart_item_key => $cart_item ) {
-									$product = $cart_item['data'];
-									$order->add_product( $product, $cart_item['quantity'], array(
-										'subtotal' => $cart_item['line_subtotal'],
-										'total'    => $cart_item['line_total'],
-									) );
-								}
+								// Create new order if no reusable order found
+								if ( ! $order ) {
+									WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Creating new order - Customer ID: ' . $customer_id . ', Email: ' . $customer_email );
+									$order = wc_create_order( array( 'customer_id' => $customer_id ) );
 								
-								// Set shipping method if available
-								$chosen_shipping_methods = WC()->session->get( 'chosen_shipping_methods' );
-								if ( ! empty( $chosen_shipping_methods ) ) {
-									$shipping_packages = WC()->shipping->get_packages();
-									foreach ( $chosen_shipping_methods as $package_key => $method ) {
-										if ( isset( $shipping_packages[ $package_key ] ) ) {
-											$package = $shipping_packages[ $package_key ];
-											if ( isset( $package['rates'][ $method ] ) ) {
-												$shipping_rate = $package['rates'][ $method ];
-												$item = new WC_Order_Item_Shipping();
-												$item->set_props( array(
-													'method_title' => $shipping_rate->get_label(),
-													'method_id'    => $shipping_rate->get_id(),
-													'total'        => wc_format_decimal( $shipping_rate->get_cost() ),
-													'taxes'        => $shipping_rate->get_taxes(),
-												) );
-												$order->add_item( $item );
+									if ( ! $order || is_wp_error( $order ) ) {
+										WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ERROR: Failed to create order' );
+										error_log( '[FLOW 3DS API] ERROR: Failed to create order' );
+										wp_die( esc_html__( 'Failed to create order. Please contact support.', 'checkout-com-unified-payments-api' ), esc_html__( 'Payment Error', 'checkout-com-unified-payments-api' ), array( 'response' => 500 ) );
+									}
+									
+									// Set customer email
+									if ( ! empty( $customer_email ) ) {
+										$order->set_billing_email( $customer_email );
+									}
+									
+									// Set billing address from payment details if available
+									if ( $payment_details && isset( $payment_details['billing_address'] ) ) {
+										$billing = $payment_details['billing_address'];
+										if ( isset( $billing['address_line1'] ) ) $order->set_billing_address_1( $billing['address_line1'] );
+										if ( isset( $billing['address_line2'] ) ) $order->set_billing_address_2( $billing['address_line2'] );
+										if ( isset( $billing['city'] ) ) $order->set_billing_city( $billing['city'] );
+										if ( isset( $billing['state'] ) ) $order->set_billing_state( $billing['state'] );
+										if ( isset( $billing['zip'] ) ) $order->set_billing_postcode( $billing['zip'] );
+										if ( isset( $billing['country'] ) ) $order->set_billing_country( $billing['country'] );
+										if ( isset( $payment_details['customer']['name'] ) ) {
+											$name_parts = explode( ' ', $payment_details['customer']['name'], 2 );
+											$order->set_billing_first_name( $name_parts[0] ?? '' );
+											$order->set_billing_last_name( $name_parts[1] ?? '' );
+										}
+									}
+									
+									// Add cart items
+									foreach ( WC()->cart->get_cart() as $cart_item_key => $cart_item ) {
+										$product = $cart_item['data'];
+										$order->add_product( $product, $cart_item['quantity'], array(
+											'subtotal' => $cart_item['line_subtotal'],
+											'total'    => $cart_item['line_total'],
+										) );
+									}
+									
+									// Set shipping method if available
+									$chosen_shipping_methods = WC()->session->get( 'chosen_shipping_methods' );
+									if ( ! empty( $chosen_shipping_methods ) ) {
+										$shipping_packages = WC()->shipping->get_packages();
+										foreach ( $chosen_shipping_methods as $package_key => $method ) {
+											if ( isset( $shipping_packages[ $package_key ] ) ) {
+												$package = $shipping_packages[ $package_key ];
+												if ( isset( $package['rates'][ $method ] ) ) {
+													$shipping_rate = $package['rates'][ $method ];
+													$item = new WC_Order_Item_Shipping();
+													$item->set_props( array(
+														'method_title' => $shipping_rate->get_label(),
+														'method_id'    => $shipping_rate->get_id(),
+														'total'        => wc_format_decimal( $shipping_rate->get_cost() ),
+														'taxes'        => $shipping_rate->get_taxes(),
+													) );
+													$order->add_item( $item );
+												}
 											}
 										}
 									}
+									
+									// Calculate totals
+									$order->calculate_totals();
+									
+									// Set payment method
+									$order->set_payment_method( $this->id );
+									$order->set_payment_method_title( $this->get_title() );
+									
+									// Save payment session ID
+									if ( ! empty( $payment_session_id ) ) {
+										$order->update_meta_data( '_cko_payment_session_id', $payment_session_id );
+									}
+									
+									// Save session+cart identifier for duplicate prevention
+									if ( ! empty( $session_cart_identifier ) ) {
+										$order->update_meta_data( '_cko_session_cart_id', $session_cart_identifier );
+										WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Saved session+cart identifier to order: ' . substr( $session_cart_identifier, 0, 50 ) . '...' );
+									}
+									
+									// Set status to pending
+									$order->set_status( 'pending' );
+									$order->save();
+									
+									$order_id = $order->get_id();
+									WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order created successfully - Order ID: ' . $order_id );
 								}
-								
-								// Calculate totals
-								$order->calculate_totals();
-								
-								// Set payment method
-								$order->set_payment_method( $this->id );
-								$order->set_payment_method_title( $this->get_title() );
-								
-								// Save payment session ID
-								if ( ! empty( $payment_session_id ) ) {
-									$order->update_meta_data( '_cko_payment_session_id', $payment_session_id );
-								}
-								
-								// Set status to pending
-								$order->set_status( 'pending' );
-								$order->save();
-								
-								$order_id = $order->get_id();
-								WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order created successfully - Order ID: ' . $order_id );
 							}
 						}
 					}
@@ -1970,15 +2192,50 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment not approved: ' . print_r( $payment_details, true ) );
 				error_log( '[FLOW 3DS API] Payment not approved' );
 				
-				// If we have an order, redirect to order-received page (failure)
+				// Get error message from payment details if available
+				$error_message = __( 'Payment was not approved. Please try again.', 'checkout-com-unified-payments-api' );
+				if ( isset( $payment_details['response_summary'] ) ) {
+					$error_message = $payment_details['response_summary'];
+				} elseif ( isset( $payment_details['status'] ) ) {
+					$error_message = sprintf( __( 'Payment failed with status: %s', 'checkout-com-unified-payments-api' ), $payment_details['status'] );
+				}
+				
+				// If we have an order, update it and redirect to checkout/order-pay with error
 				if ( $order ) {
-					$return_url = $this->get_return_url( $order );
-					WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment failed, redirecting to order-received page: ' . $return_url );
-					wp_safe_redirect( $return_url );
+					// Update order status to failed
+					$order->update_status( 'failed', __( 'Payment was not approved by Checkout.com', 'checkout-com-unified-payments-api' ) );
+					
+					// Save payment ID to order for reference
+					if ( ! empty( $payment_id ) ) {
+						$order->update_meta_data( '_cko_payment_id', $payment_id );
+						$order->update_meta_data( '_cko_flow_payment_id', $payment_id );
+						$order->save();
+					}
+					
+					// Add error notice
+					WC_Checkoutcom_Utility::wc_add_notice_self( $error_message, 'error' );
+					
+					// Determine redirect URL based on context
+					if ( ! empty( $order_id ) && ! empty( $order_key ) ) {
+						// Order-pay page: redirect back to order-pay page
+						$redirect_url = wc_get_endpoint_url( 'order-pay', $order_id, wc_get_checkout_url() );
+						$redirect_url = add_query_arg( array(
+							'pay_for_order' => 'true',
+							'key' => $order_key,
+							'payment_failed' => '1',
+						), $redirect_url );
+						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment failed, redirecting to order-pay page: ' . $redirect_url );
+					} else {
+						// Regular checkout: redirect to checkout page
+						$redirect_url = add_query_arg( 'payment_failed', '1', wc_get_checkout_url() );
+						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment failed, redirecting to checkout page: ' . $redirect_url );
+					}
+					
+					wp_safe_redirect( $redirect_url );
 					exit;
 				} else {
 					// No order found, show error
-					wp_die( esc_html__( 'Payment was not approved. Please try again.', 'checkout-com-unified-payments-api' ), esc_html__( 'Payment Failed', 'checkout-com-unified-payments-api' ), array( 'response' => 400 ) );
+					wp_die( esc_html( $error_message ), esc_html__( 'Payment Failed', 'checkout-com-unified-payments-api' ), array( 'response' => 400 ) );
 				}
 			}
 			

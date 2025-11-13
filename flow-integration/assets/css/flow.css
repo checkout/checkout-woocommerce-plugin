@@ -337,19 +337,16 @@ body.flow-method-selected.flow-ready #place_order {
 	line-height: 1.3;
 }
 
-/* Saved Cards Accordion Style */
+/* Saved Cards Accordion Style - Matches Flow Style */
 .saved-cards-accordion-container {
 	margin: 20px 0;
 	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-	/* Default: Visible (for saved_cards_first mode) */
 	display: block !important;
-	opacity: 1 !important; /* Force opacity to prevent animation issues */
-	visibility: visible !important; /* Force visibility */
-	min-height: 50px !important; /* Ensure it has height */
-	max-height: none !important; /* No max height restriction */
+	opacity: 1 !important;
+	visibility: visible !important;
+	min-height: 50px !important;
 }
 
-/* EXPLICIT: Ensure visible in saved_cards_first mode */
 body[data-saved-payment-order="saved_cards_first"] .saved-cards-accordion-container {
 	display: block !important;
 	opacity: 1 !important;
@@ -357,12 +354,10 @@ body[data-saved-payment-order="saved_cards_first"] .saved-cards-accordion-contai
 	min-height: 50px !important;
 }
 
-/* Hide saved cards initially only in new_payment_first mode */
 body[data-saved-payment-order="new_payment_first"] .saved-cards-accordion-container {
 	display: none !important;
 }
 
-/* Show saved cards when Flow is ready in new_payment_first mode */
 body[data-saved-payment-order="new_payment_first"].flow-ready .saved-cards-accordion-container {
 	display: block !important;
 	opacity: 1 !important;
@@ -374,7 +369,7 @@ body[data-saved-payment-order="new_payment_first"].flow-ready .saved-cards-accor
 	background: #ffffff;
 	border: 1px solid #186aff;
 	border-radius: 8px;
-	overflow: visible !important; /* Changed from hidden to prevent height collapse */
+	overflow: visible !important;
 	display: block !important;
 	opacity: 1 !important;
 	visibility: visible !important;
@@ -384,14 +379,9 @@ body[data-saved-payment-order="new_payment_first"].flow-ready .saved-cards-accor
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	padding: 16px 20px;
+	padding: 12px 16px;
 	background: #ffffff;
 	cursor: pointer;
-	transition: background-color 0.2s ease;
-}
-
-.saved-cards-accordion-header:hover {
-	background: #f8f9fa;
 }
 
 .saved-cards-accordion-left {
@@ -434,37 +424,23 @@ body[data-saved-payment-order="new_payment_first"].flow-ready .saved-cards-accor
 }
 
 .saved-cards-accordion-panel {
-	padding: 0 20px 16px 20px;
-	/* Removed animation to prevent opacity: 0 issues */
-	display: block !important; /* Ensure panel content is always visible */
-	opacity: 1 !important; /* Force opacity */
-	visibility: visible !important; /* Force visibility */
+	padding: 0 16px 12px 16px;
+	display: block !important;
+	opacity: 1 !important;
+	visibility: visible !important;
 }
 
-@keyframes savedCardsFadeIn {
-	from {
-		opacity: 0;
-		transform: translateY(-10px);
-	}
-	to {
-		opacity: 1;
-		transform: translateY(0);
-	}
-}
-
-/* Style saved payment methods list inside accordion */
 .saved-cards-accordion-panel .woocommerce-SavedPaymentMethods {
 	margin: 0 !important;
 	padding: 0 !important;
 	list-style: none !important;
 	background: transparent !important;
 	border: none !important;
-	display: block !important; /* Ensure saved cards list is always visible */
-	opacity: 1 !important; /* Force opacity */
-	visibility: visible !important; /* Force visibility */
+	display: block !important;
+	opacity: 1 !important;
+	visibility: visible !important;
 }
 
-/* Hide the "Use a new payment method" and "Use a new card" radio buttons */
 .saved-cards-accordion-panel .woocommerce-SavedPaymentMethods-new,
 .saved-cards-accordion-panel .woocommerce-SavedPaymentMethods li.woocommerce-SavedPaymentMethods-new,
 .saved-cards-accordion-panel .woocommerce-SavedPaymentMethods-tokenBase,
@@ -475,18 +451,15 @@ body[data-saved-payment-order="new_payment_first"].flow-ready .saved-cards-accor
 }
 
 .saved-cards-accordion-panel .woocommerce-SavedPaymentMethods li {
-	padding: 12px 16px;
-	margin: 8px 0 !important;
-	background: #f8f9fa;
+	padding: 10px 12px;
+	margin: 6px 0 !important;
+	background: #ffffff;
 	border: 1px solid #e9ebeb;
-	border-radius: 6px;
-	transition: all 0.2s ease;
+	border-radius: 4px;
 }
 
 .saved-cards-accordion-panel .woocommerce-SavedPaymentMethods li:hover {
-	background: #ffffff;
 	border-color: #186aff;
-	box-shadow: 0 2px 4px rgba(24, 106, 255, 0.1);
 }
 
 .saved-cards-accordion-panel .woocommerce-SavedPaymentMethods li input[type="radio"] {
@@ -502,26 +475,29 @@ body[data-saved-payment-order="new_payment_first"].flow-ready .saved-cards-accor
 	color: #27292d;
 	margin: 0;
 	width: 100%;
+	font-weight: 400;
 }
 
-/* Card icon in saved payment method */
 .saved-cards-accordion-panel .woocommerce-SavedPaymentMethods li label::before {
 	content: '';
 	display: inline-block;
 	width: 32px;
 	height: 20px;
 	margin-right: 10px;
-	background: url('data:image/svg+xml,<svg width="32" height="20" xmlns="http://www.w3.org/2000/svg"><rect x="0.5" y="0.5" width="31" height="19" rx="2.5" stroke="%23186aff" fill="none"/><path d="M4 5h24M4 9h8" stroke="%23186aff" stroke-width="1.5" stroke-linecap="round"/></svg>') center/contain no-repeat;
+	background: url('data:image/svg+xml,<svg width="32" height="20" xmlns="http://www.w3.org/2000/svg"><rect x="0.5" y="0.5" width="31" height="19" rx="2.5" stroke="%2368686c" fill="none"/><path d="M4 5h24M4 9h8" stroke="%2368686c" stroke-width="1.5" stroke-linecap="round"/></svg>') center/contain no-repeat;
 }
 
-/* Selected state */
 .saved-cards-accordion-panel .woocommerce-SavedPaymentMethods li input[type="radio"]:checked + label {
-	font-weight: 600;
+	font-weight: 500;
 	color: #186aff;
+}
+
+.saved-cards-accordion-panel .woocommerce-SavedPaymentMethods li input[type="radio"]:checked + label::before {
+	background: url('data:image/svg+xml,<svg width="32" height="20" xmlns="http://www.w3.org/2000/svg"><rect x="0.5" y="0.5" width="31" height="19" rx="2.5" stroke="%23186aff" fill="none"/><path d="M4 5h24M4 9h8" stroke="%23186aff" stroke-width="1.5" stroke-linecap="round"/></svg>') center/contain no-repeat;
 }
 
 .saved-cards-accordion-panel .woocommerce-SavedPaymentMethods li:has(input[type="radio"]:checked) {
 	background: #f0f6ff;
 	border-color: #186aff;
-	border-width: 2px;
+	border-width: 1px;
 }

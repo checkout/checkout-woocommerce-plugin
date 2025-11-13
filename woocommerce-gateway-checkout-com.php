@@ -202,6 +202,186 @@ add_action( 'woocommerce_checkout_process', function() {
 	}
 }, 5 );
 
+// Add duplicate order check for Classic Cards (same logic as Flow)
+// This hook runs when an order is being created during checkout
+add_filter( 'woocommerce_checkout_create_order', function( $order, $data ) {
+	// Only apply to Classic Cards payment method
+	if ( ! isset( $_POST['payment_method'] ) || 'wc_checkout_com_cards' !== $_POST['payment_method'] ) {
+		return $order;
+	}
+	
+	// Check if this is a saved card payment or new card payment
+	$is_saved_card = false;
+	if ( isset( $_POST['wc-wc_checkout_com_cards-payment-token'] ) && 
+		 'new' !== sanitize_text_field( $_POST['wc-wc_checkout_com_cards-payment-token'] ) &&
+		 ! empty( $_POST['wc-wc_checkout_com_cards-payment-token'] ) ) {
+		$is_saved_card = true;
+	}
+	
+	WC_Checkoutcom_Utility::logger( '[CLASSIC CARDS] Duplicate order check - Payment type: ' . ( $is_saved_card ? 'SAVED CARD' : 'NEW CARD' ) );
+	
+	// Only check if cart and session are available
+	if ( ! WC()->cart || WC()->cart->is_empty() || ! WC()->session ) {
+		return $order;
+	}
+	
+	try {
+		// Generate session+cart hash to check for duplicate orders
+		$session_customer_id = WC()->session->get_customer_id();
+		$session_key = WC()->session->get_customer_unique_id();
+		
+		// Generate cart hash from cart items
+		$cart_items = array();
+		foreach ( WC()->cart->get_cart() as $cart_item_key => $cart_item ) {
+			$cart_items[] = array(
+				'product_id' => $cart_item['product_id'],
+				'variation_id' => $cart_item['variation_id'],
+				'quantity' => $cart_item['quantity'],
+			);
+		}
+		$cart_hash = md5( wp_json_encode( $cart_items ) . WC()->cart->get_total( 'edit' ) );
+		
+		// Combine session ID + cart hash = unique identifier
+		$session_cart_identifier = null;
+		if ( $session_customer_id > 0 ) {
+			$session_cart_identifier = 'customer_' . $session_customer_id . '_' . $cart_hash;
+		} elseif ( ! empty( $session_key ) ) {
+			$session_cart_identifier = 'session_' . $session_key . '_' . $cart_hash;
+		}
+		
+		if ( empty( $session_cart_identifier ) ) {
+			return $order;
+		}
+		
+		WC_Checkoutcom_Utility::logger( '[CLASSIC CARDS] Checking for duplicate order with session+cart hash: ' . substr( $session_cart_identifier, 0, 50 ) . '... (Payment type: ' . ( $is_saved_card ? 'SAVED CARD' : 'NEW CARD' ) . ')' );
+		
+		// Check for existing order with same session+cart hash
+		$existing_orders = wc_get_orders( array(
+			'meta_query' => array(
+				array(
+					'key'   => '_cko_session_cart_id',
+					'value' => $session_cart_identifier,
+				),
+			),
+			'limit'      => 1,
+			'orderby'    => 'date',
+			'order'      => 'DESC',
+		) );
+		
+		if ( ! empty( $existing_orders ) ) {
+			$existing_order = $existing_orders[0];
+			$existing_order_status = $existing_order->get_status();
+			
+			WC_Checkoutcom_Utility::logger( '[CLASSIC CARDS] Found existing order with same session+cart hash - Order ID: ' . $existing_order->get_id() . ', Status: ' . $existing_order_status );
+			
+			// Only reuse order if status is pending or failed
+			if ( in_array( $existing_order_status, array( 'pending', 'failed' ), true ) ) {
+				WC_Checkoutcom_Utility::logger( '[CLASSIC CARDS] ✅ Reusing existing order (status: ' . $existing_order_status . ') - Order ID: ' . $existing_order->get_id() );
+				
+				// Delete the newly created order
+				$new_order_id = $order->get_id();
+				wp_delete_post( $new_order_id, true );
+				WC_Checkoutcom_Utility::logger( '[CLASSIC CARDS] Deleted newly created order ID: ' . $new_order_id );
+				
+				// Refresh the existing order to get latest data
+				$existing_order = wc_get_order( $existing_order->get_id() );
+				
+				// Clear existing order items to refresh with current cart
+				foreach ( $existing_order->get_items() as $item_id => $item ) {
+					$existing_order->remove_item( $item_id );
+				}
+				
+				// Clear existing shipping items
+				foreach ( $existing_order->get_items( 'shipping' ) as $item_id => $item ) {
+					$existing_order->remove_item( $item_id );
+				}
+				
+				// Add current cart items
+				foreach ( WC()->cart->get_cart() as $cart_item_key => $cart_item ) {
+					$product = $cart_item['data'];
+					$existing_order->add_product( $product, $cart_item['quantity'], array(
+						'subtotal' => $cart_item['line_subtotal'],
+						'total'    => $cart_item['line_total'],
+					) );
+				}
+				
+				// Set shipping method if available
+				$chosen_shipping_methods = WC()->session->get( 'chosen_shipping_methods' );
+				if ( ! empty( $chosen_shipping_methods ) ) {
+					$shipping_packages = WC()->shipping->get_packages();
+					foreach ( $chosen_shipping_methods as $package_key => $method ) {
+						if ( isset( $shipping_packages[ $package_key ] ) ) {
+							$package = $shipping_packages[ $package_key ];
+							if ( isset( $package['rates'][ $method ] ) ) {
+								$shipping_rate = $package['rates'][ $method ];
+								$item = new WC_Order_Item_Shipping();
+								$item->set_props( array(
+									'method_title' => $shipping_rate->get_label(),
+									'method_id'    => $shipping_rate->get_id(),
+									'total'        => wc_format_decimal( $shipping_rate->get_cost() ),
+									'taxes'        => $shipping_rate->get_taxes(),
+								) );
+								$existing_order->add_item( $item );
+							}
+						}
+					}
+				}
+				
+				// Recalculate totals
+				$existing_order->calculate_totals();
+				
+				// Reset order status to pending
+				$existing_order->set_status( 'pending' );
+				
+				// Ensure session+cart identifier is saved
+				$existing_order->update_meta_data( '_cko_session_cart_id', $session_cart_identifier );
+				
+				$existing_order->save();
+				
+				// Update the order ID in session/checkout data
+				WC()->session->set( 'order_awaiting_payment', $existing_order->get_id() );
+				
+				WC_Checkoutcom_Utility::logger( '[CLASSIC CARDS] Existing order refreshed with current cart items - Order ID: ' . $existing_order->get_id() );
+				
+				// Return the existing order instead of the new one
+				return $existing_order;
+			} else {
+				WC_Checkoutcom_Utility::logger( '[CLASSIC CARDS] Existing order status is ' . $existing_order_status . ' (not pending/failed) - will create NEW order' );
+			}
+		} else {
+			WC_Checkoutcom_Utility::logger( '[CLASSIC CARDS] No existing order found with same session+cart hash - will create new order' );
+		}
+		
+		// Save session+cart identifier to the new order
+		$order->update_meta_data( '_cko_session_cart_id', $session_cart_identifier );
+		WC_Checkoutcom_Utility::logger( '[CLASSIC CARDS] Saved session+cart identifier to new order - Order ID: ' . $order->get_id() );
+		
+	} catch ( Exception $e ) {
+		WC_Checkoutcom_Utility::logger( '[CLASSIC CARDS] ERROR in duplicate order check: ' . $e->getMessage() );
+		WC_Checkoutcom_Utility::logger( '[CLASSIC CARDS] ERROR stack trace: ' . $e->getTraceAsString() );
+		// Don't break checkout if there's an error
+	}
+	
+	return $order;
+}, 10, 2 );
+
+// Additional hook to ensure order ID is updated in session after order creation
+// This handles cases where the order was replaced with an existing one
+add_action( 'woocommerce_new_order', function( $order_id ) {
+	// Only apply to Classic Cards payment method
+	if ( ! isset( $_POST['payment_method'] ) || 'wc_checkout_com_cards' !== $_POST['payment_method'] ) {
+		return;
+	}
+	
+	// Check if there's a different order ID in session (meaning order was replaced)
+	if ( WC()->session ) {
+		$session_order_id = WC()->session->get( 'order_awaiting_payment' );
+		if ( ! empty( $session_order_id ) && $session_order_id != $order_id ) {
+			WC_Checkoutcom_Utility::logger( '[CLASSIC CARDS] Order ID mismatch detected - Session: ' . $session_order_id . ', New Order: ' . $order_id . ' - Order was likely replaced with existing one' );
+		}
+	}
+}, 5 );
+
 /**
  * Constants.
  */
