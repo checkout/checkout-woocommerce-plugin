@@ -5,7 +5,7 @@
  * Description: Extends WooCommerce by Adding the Checkout.com Gateway.
  * Author: Checkout.com
  * Author URI: https://www.checkout.com/
- * Version: 5.0.0_beta
+ * Version: 5.0.0-beta
  * Requires at least: 5.0
  * Tested up to: 6.7.0
  * WC requires at least: 3.0
@@ -374,6 +374,210 @@ add_filter( 'woocommerce_checkout_create_order', function( $order, $data ) {
 	return $order;
 }, 10, 2 );
 
+// Add duplicate order check for Flow payments (same logic as Classic Cards, but with time-based exclusion)
+// This hook runs when an order is being created during checkout
+add_filter( 'woocommerce_checkout_create_order', function( $order, $data ) {
+	// Only apply to Flow payment method
+	if ( ! isset( $_POST['payment_method'] ) || 'wc_checkout_com_flow' !== $_POST['payment_method'] ) {
+		return $order;
+	}
+	
+	WC_Checkoutcom_Utility::logger( '[FLOW] Duplicate order check - Payment method: Flow' );
+	
+	// Only check if cart and session are available
+	if ( ! WC()->cart || WC()->cart->is_empty() || ! WC()->session ) {
+		return $order;
+	}
+	
+	try {
+		// Generate session+cart hash to check for duplicate orders
+		$session_customer_id = WC()->session->get_customer_id();
+		$session_key = WC()->session->get_customer_unique_id();
+		
+		// Generate cart hash from cart items
+		$cart_items = array();
+		foreach ( WC()->cart->get_cart() as $cart_item_key => $cart_item ) {
+			$cart_items[] = array(
+				'product_id' => $cart_item['product_id'],
+				'variation_id' => $cart_item['variation_id'],
+				'quantity' => $cart_item['quantity'],
+			);
+		}
+		$cart_hash = md5( wp_json_encode( $cart_items ) . WC()->cart->get_total( 'edit' ) );
+		
+		// Combine session ID + cart hash = unique identifier
+		$session_cart_identifier = null;
+		if ( $session_customer_id > 0 ) {
+			$session_cart_identifier = 'customer_' . $session_customer_id . '_' . $cart_hash;
+		} elseif ( ! empty( $session_key ) ) {
+			$session_cart_identifier = 'session_' . $session_key . '_' . $cart_hash;
+		}
+		
+		if ( empty( $session_cart_identifier ) ) {
+			return $order;
+		}
+		
+		WC_Checkoutcom_Utility::logger( '[FLOW] Checking for duplicate order with session+cart hash: ' . substr( $session_cart_identifier, 0, 50 ) . '...' );
+		WC_Checkoutcom_Utility::logger( '[FLOW] Session details - Customer ID: ' . ( $session_customer_id > 0 ? $session_customer_id : 'GUEST' ) . ', Session Key: ' . ( ! empty( $session_key ) ? substr( $session_key, 0, 20 ) . '...' : 'EMPTY' ) );
+		
+		// Check for existing order with same session+cart hash
+		// IMPORTANT: Only check orders created within the last 2 days for failed orders (shorter window)
+		// For pending orders, check last 7 days (they might be legitimately pending)
+		$date_after_failed = date( 'Y-m-d H:i:s', strtotime( '-2 days' ) );
+		$date_after_pending = date( 'Y-m-d H:i:s', strtotime( '-7 days' ) );
+		
+		// First, check for pending orders (longer window)
+		$existing_orders = wc_get_orders( array(
+			'meta_query' => array(
+				array(
+					'key'   => '_cko_session_cart_id',
+					'value' => $session_cart_identifier,
+				),
+			),
+			'status'     => array( 'pending' ),
+			'date_query' => array(
+				array(
+					'after' => $date_after_pending,
+					'inclusive' => true,
+				),
+			),
+			'limit'      => 1,
+			'orderby'    => 'date',
+			'order'      => 'DESC',
+		) );
+		
+		// If no pending orders found, check for failed orders (shorter window)
+		if ( empty( $existing_orders ) ) {
+			$existing_orders = wc_get_orders( array(
+				'meta_query' => array(
+					array(
+						'key'   => '_cko_session_cart_id',
+						'value' => $session_cart_identifier,
+					),
+				),
+				'status'     => array( 'failed' ),
+				'date_query' => array(
+					array(
+						'after' => $date_after_failed,
+						'inclusive' => true,
+					),
+				),
+				'limit'      => 1,
+				'orderby'    => 'date',
+				'order'      => 'DESC',
+			) );
+		}
+		
+		if ( ! empty( $existing_orders ) ) {
+			$existing_order = $existing_orders[0];
+			$existing_order_status = $existing_order->get_status();
+			$existing_order_date = $existing_order->get_date_created();
+			$order_age_days = ( time() - $existing_order_date->getTimestamp() ) / DAY_IN_SECONDS;
+			
+			// Check if order already has a payment ID/transaction ID (means it was already processed)
+			$existing_transaction_id = $existing_order->get_transaction_id();
+			$existing_payment_id = $existing_order->get_meta( '_cko_payment_id' );
+			$existing_flow_payment_id = $existing_order->get_meta( '_cko_flow_payment_id' );
+			
+			WC_Checkoutcom_Utility::logger( '[FLOW] Found existing order with same session+cart hash - Order ID: ' . $existing_order->get_id() . ', Status: ' . $existing_order_status . ', Age: ' . round( $order_age_days, 1 ) . ' days' );
+			WC_Checkoutcom_Utility::logger( '[FLOW] Existing order payment details - Transaction ID: ' . ( $existing_transaction_id ? $existing_transaction_id : 'NONE' ) . ', Payment ID: ' . ( $existing_payment_id ? $existing_payment_id : 'NONE' ) . ', Flow Payment ID: ' . ( $existing_flow_payment_id ? $existing_flow_payment_id : 'NONE' ) );
+			
+			// CRITICAL: Don't reuse order if it already has a payment ID/transaction ID
+			// This means the order was already processed (even if it failed), and we shouldn't reuse it
+			if ( ! empty( $existing_transaction_id ) || ! empty( $existing_payment_id ) || ! empty( $existing_flow_payment_id ) ) {
+				WC_Checkoutcom_Utility::logger( '[FLOW] ⚠️ Existing order already has payment ID/transaction ID - NOT reusing. Will create NEW order instead.' );
+				WC_Checkoutcom_Utility::logger( '[FLOW] Reason: Order was already processed (even if failed), reusing would cause payment conflicts' );
+			} elseif ( in_array( $existing_order_status, array( 'pending', 'failed' ), true ) ) {
+				WC_Checkoutcom_Utility::logger( '[FLOW] ✅ Reusing existing order (status: ' . $existing_order_status . ', no payment ID) - Order ID: ' . $existing_order->get_id() );
+				WC_Checkoutcom_Utility::logger( '[FLOW] This order has never been processed, safe to reuse' );
+				
+				// Delete the newly created order
+				$new_order_id = $order->get_id();
+				wp_delete_post( $new_order_id, true );
+				WC_Checkoutcom_Utility::logger( '[FLOW] Deleted newly created order ID: ' . $new_order_id );
+				
+				// Refresh the existing order to get latest data
+				$existing_order = wc_get_order( $existing_order->get_id() );
+				
+				// Clear existing order items to refresh with current cart
+				foreach ( $existing_order->get_items() as $item_id => $item ) {
+					$existing_order->remove_item( $item_id );
+				}
+				
+				// Clear existing shipping items
+				foreach ( $existing_order->get_items( 'shipping' ) as $item_id => $item ) {
+					$existing_order->remove_item( $item_id );
+				}
+				
+				// Add current cart items
+				foreach ( WC()->cart->get_cart() as $cart_item_key => $cart_item ) {
+					$product = $cart_item['data'];
+					$existing_order->add_product( $product, $cart_item['quantity'], array(
+						'subtotal' => $cart_item['line_subtotal'],
+						'total'    => $cart_item['line_total'],
+					) );
+				}
+				
+				// Set shipping method if available
+				$chosen_shipping_methods = WC()->session->get( 'chosen_shipping_methods' );
+				if ( ! empty( $chosen_shipping_methods ) ) {
+					$shipping_packages = WC()->shipping->get_packages();
+					foreach ( $chosen_shipping_methods as $package_key => $method ) {
+						if ( isset( $shipping_packages[ $package_key ] ) ) {
+							$package = $shipping_packages[ $package_key ];
+							if ( isset( $package['rates'][ $method ] ) ) {
+								$shipping_rate = $package['rates'][ $method ];
+								$item = new WC_Order_Item_Shipping();
+								$item->set_props( array(
+									'method_title' => $shipping_rate->get_label(),
+									'method_id'    => $shipping_rate->get_id(),
+									'total'        => wc_format_decimal( $shipping_rate->get_cost() ),
+									'taxes'        => $shipping_rate->get_taxes(),
+								) );
+								$existing_order->add_item( $item );
+							}
+						}
+					}
+				}
+				
+				// Recalculate totals
+				$existing_order->calculate_totals();
+				
+				// Reset order status to pending
+				$existing_order->set_status( 'pending' );
+				
+				// Ensure session+cart identifier is saved
+				$existing_order->update_meta_data( '_cko_session_cart_id', $session_cart_identifier );
+				
+				$existing_order->save();
+				
+				// Update the order ID in session/checkout data
+				WC()->session->set( 'order_awaiting_payment', $existing_order->get_id() );
+				
+				WC_Checkoutcom_Utility::logger( '[FLOW] Existing order refreshed with current cart items - Order ID: ' . $existing_order->get_id() );
+				
+				// Return the existing order instead of the new one
+				return $existing_order;
+			} else {
+				WC_Checkoutcom_Utility::logger( '[FLOW] Existing order status is ' . $existing_order_status . ' (not pending/failed) - will create NEW order' );
+			}
+		} else {
+			WC_Checkoutcom_Utility::logger( '[FLOW] No existing order found with same session+cart hash (pending: last 7 days, failed: last 2 days) - will create new order' );
+		}
+		
+		// Save session+cart identifier to the new order
+		$order->update_meta_data( '_cko_session_cart_id', $session_cart_identifier );
+		WC_Checkoutcom_Utility::logger( '[FLOW] Saved session+cart identifier to new order - Order ID: ' . $order->get_id() );
+		
+	} catch ( Exception $e ) {
+		WC_Checkoutcom_Utility::logger( '[FLOW] ERROR in duplicate order check: ' . $e->getMessage() );
+		WC_Checkoutcom_Utility::logger( '[FLOW] ERROR stack trace: ' . $e->getTraceAsString() );
+		// Don't break checkout if there's an error
+	}
+	
+	return $order;
+}, 10, 2 );
+
 // Additional hook to ensure order ID is updated in session after order creation
 // This handles cases where the order was replaced with an existing one
 add_action( 'woocommerce_new_order', function( $order_id ) {
@@ -394,7 +598,7 @@ add_action( 'woocommerce_new_order', function( $order_id ) {
 /**
  * Constants.
  */
-define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '5.0.0_beta' );
+define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '5.0.0' );
 define( 'WC_CHECKOUTCOM_PLUGIN_URL', untrailingslashit( plugins_url( basename( plugin_dir_path( __FILE__ ) ), basename( __FILE__ ) ) ) );
 define( 'WC_CHECKOUTCOM_PLUGIN_PATH', untrailingslashit( plugin_dir_path( __FILE__ ) ) );
 
@@ -411,6 +615,39 @@ add_action( 'plugins_loaded', 'init_checkout_com_gateway_class', 0 );
 		load_plugin_textdomain( 'checkout-com-unified-payments-api', false, plugin_basename( __DIR__ ) . '/languages' );
 
 		// Core payment gateway classes
+		include_once 'includes/class-wc-checkout-com-webhook.php';
+		include_once 'includes/class-wc-checkout-com-webhook-queue.php';
+		
+		// Admin pages
+		if ( is_admin() ) {
+			include_once 'includes/admin/class-wc-checkoutcom-webhook-queue-admin.php';
+		}
+		
+		// Note: You can also access the webhook queue table directly using:
+		// - view-webhook-queue.php script (command line or browser)
+		// - WordPress Admin: WooCommerce > Webhook Queue
+		// - Direct SQL queries to wp_cko_pending_webhooks table
+		
+		// Create webhook queue table if it doesn't exist
+		if ( class_exists( 'WC_Checkout_Com_Webhook_Queue' ) ) {
+			WC_Checkout_Com_Webhook_Queue::create_table();
+			
+			// Schedule cleanup of old webhooks (daily)
+			if ( ! wp_next_scheduled( 'cko_cleanup_old_webhooks' ) ) {
+				wp_schedule_event( time(), 'daily', 'cko_cleanup_old_webhooks' );
+			}
+		}
+		
+		// Hook for cleanup of old webhooks
+		add_action( 'cko_cleanup_old_webhooks', function() {
+			if ( class_exists( 'WC_Checkout_Com_Webhook_Queue' ) ) {
+				// Cleanup processed webhooks older than 7 days
+				WC_Checkout_Com_Webhook_Queue::cleanup_old_webhooks( 7 );
+				// Cleanup unprocessed webhooks older than 7 days (orphaned)
+				WC_Checkout_Com_Webhook_Queue::cleanup_old_unprocessed_webhooks( 7 );
+			}
+		} );
+		
 		include_once 'includes/class-wc-gateway-checkout-com-cards.php';
 		include_once 'includes/class-wc-gateway-checkout-com-apple-pay.php';
 		
