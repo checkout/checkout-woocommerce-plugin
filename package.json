@@ -1,0 +1,24 @@
+{
+  "name": "checkout-com-woocommerce-plugin-tests",
+  "version": "1.0.0",
+  "description": "Playwright tests for Checkout.com WooCommerce Flow Integration",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "test:ui": "playwright test --ui",
+    "test:report": "playwright show-report",
+    "test:flow": "playwright test tests/flow",
+    "test:3ds": "playwright test tests/3ds",
+    "test:saved-cards": "playwright test tests/saved-cards"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0",
+    "@types/node": "^20.10.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
+
+

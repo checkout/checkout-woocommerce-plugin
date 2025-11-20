@@ -1404,12 +1404,13 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	
 	// Check if payment is already captured (webhook may have arrived first)
 	$already_captured = $order->get_meta( 'cko_payment_captured' );
+	$action_id = isset( $result['action_id'] ) ? $result['action_id'] : '';
 	
 	// Set status and message for the order (was missing!)
 	// Only set to 'on-hold' if payment is not already captured
 	if ( ! $already_captured ) {
 		$status = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
-		$message = sprintf( esc_html__( 'Checkout.com Payment Authorised - using FLOW (3DS return): %s', 'checkout-com-unified-payments-api' ), $flow_payment_type );
+		$message = sprintf( esc_html__( 'Checkout.com Payment Authorised - using FLOW (3DS return): %s - Payment ID: %s', 'checkout-com-unified-payments-api' ), $flow_payment_type, $flow_payment_id );
 		
 		// Check if payment was flagged
 		if ( isset( $result['risk']['flagged'] ) && $result['risk']['flagged'] ) {
@@ -1418,7 +1419,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		}
 	} else {
 		// Payment already captured - just add note, don't change status
-		$message = sprintf( esc_html__( 'Checkout.com Payment Authorised - using FLOW (3DS return): %s', 'checkout-com-unified-payments-api' ), $flow_payment_type );
+		$message = sprintf( esc_html__( 'Checkout.com Payment Authorised - using FLOW (3DS return): %s - Payment ID: %s', 'checkout-com-unified-payments-api' ), $flow_payment_type, $flow_payment_id );
 		// Status should remain as set by capture webhook (Processing)
 		$status = null; // Signal to skip status update
 	}
@@ -1485,9 +1486,11 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					WC()->session->set( 'wc-wc_checkout_com_cards-new-payment-method', 'no' );
 				}
 
+				$payment_id = isset( $result['id'] ) ? $result['id'] : '';
 				$order->add_order_note(
 					sprintf(
-						esc_html__( 'Checkout.com 3d Redirect waiting. URL : %s', 'checkout-com-unified-payments-api' ),
+						esc_html__( 'Checkout.com 3d Redirect waiting - Payment ID: %1$s, URL: %2$s', 'checkout-com-unified-payments-api' ),
+						$payment_id,
 						$result['3d']
 					)
 				);
@@ -1505,27 +1508,29 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 			// Check if payment is already captured (webhook may have arrived first)
 			$already_captured = $order->get_meta( 'cko_payment_captured' );
+			$payment_id = isset( $result['id'] ) ? $result['id'] : '';
+			$action_id = isset( $result['action_id'] ) ? $result['action_id'] : '';
 
 			// Get cko auth status configured in admin.
 			// Only set to 'on-hold' if payment is not already captured
 			if ( ! $already_captured ) {
 				$status = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
 
-				/* translators: %s: Action ID. */
-				$message = sprintf( esc_html__( 'Checkout.com Payment Authorised - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
+				/* translators: %1$s: Payment ID, %2$s: Action ID. */
+				$message = sprintf( esc_html__( 'Checkout.com Payment Authorised - Payment ID: %1$s, Action ID: %2$s', 'checkout-com-unified-payments-api' ), $payment_id, $action_id );
 
 				// Check if payment was flagged.
 				if ( $result['risk']['flagged'] ) {
 					// Get cko auth status configured in admin.
 					$status = WC_Admin_Settings::get_option( 'ckocom_order_flagged', 'flagged' );
 
-					/* translators: %s: Action ID. */
-					$message = sprintf( esc_html__( 'Checkout.com Payment Flagged - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
+					/* translators: %1$s: Payment ID, %2$s: Action ID. */
+					$message = sprintf( esc_html__( 'Checkout.com Payment Flagged - Payment ID: %1$s, Action ID: %2$s', 'checkout-com-unified-payments-api' ), $payment_id, $action_id );
 				}
 			} else {
 				// Payment already captured - just add note, don't change status
-				/* translators: %s: Action ID. */
-				$message = sprintf( esc_html__( 'Checkout.com Payment Authorised - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
+				/* translators: %1$s: Payment ID, %2$s: Action ID. */
+				$message = sprintf( esc_html__( 'Checkout.com Payment Authorised - Payment ID: %1$s, Action ID: %2$s', 'checkout-com-unified-payments-api' ), $payment_id, $action_id );
 				// Status should remain as set by capture webhook (Processing)
 				$status = null; // Signal to skip status update
 			}
@@ -1636,8 +1641,8 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			// Check if payment is already captured (webhook may have arrived first)
 			$already_captured = $order->get_meta( 'cko_payment_captured' );
 
-			// translators: %s: payment type (e.g., card, applepay).
-			$message = sprintf( esc_html__( 'Checkout.com Payment Authorised - using FLOW : %s', 'checkout-com-unified-payments-api' ), $flow_payment_type );
+			// translators: %1$s: payment type (e.g., card, applepay), %2$s: Payment ID.
+			$message = sprintf( esc_html__( 'Checkout.com Payment Authorised - using FLOW : %1$s - Payment ID: %2$s', 'checkout-com-unified-payments-api' ), $flow_payment_type, $flow_pay_id );
 
 			// Get cko auth status configured in admin.
 			// Only set to 'on-hold' if payment is not already captured
@@ -1715,6 +1720,15 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			$order->update_status( $status );
 		}
 
+		// CRITICAL: Only proceed with success flow if order status is NOT failed
+		// If status is failed, don't clear cart or redirect to success page
+		$final_order_status = $order->get_status();
+		if ( 'failed' === $final_order_status ) {
+			WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Payment failed - Order status is failed. NOT clearing cart or redirecting to success page.' );
+			WC_Checkoutcom_Utility::wc_add_notice_self( __( 'Payment failed. Please try again.', 'checkout-com-unified-payments-api' ), 'error' );
+			return; // Return early - don't clear cart or redirect
+		}
+
 		// Reduce stock levels.
 		wc_reduce_stock_levels( $order_id );
 
@@ -1732,7 +1746,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		WC_Checkoutcom_Utility::logger( 'Order status updated to: ' . $status . ', Order ID: ' . $order_id );
 		WC_Checkoutcom_Utility::logger( 'Transaction ID set to: ' . $order->get_transaction_id() );
 
-		// Remove cart.
+		// Remove cart - only clear if payment succeeded (order status is not failed)
 		WC()->cart->empty_cart();
 
 		// Return thank you page.
@@ -2150,8 +2164,23 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 										
 										WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Found existing order with same session+cart hash - Order ID: ' . $existing_order->get_id() . ', Status: ' . $existing_order_status );
 										
-										// Only reuse order if status is pending or failed
-										if ( in_array( $existing_order_status, array( 'pending', 'failed' ), true ) ) {
+										// Check if order has payment ID/transaction ID (already processed, even if failed)
+										$existing_transaction_id = $existing_order->get_transaction_id();
+										$existing_payment_id = $existing_order->get_meta( '_cko_payment_id' );
+										$existing_flow_payment_id = $existing_order->get_meta( '_cko_flow_payment_id' );
+										
+										// CRITICAL: Don't reuse order if it already has a payment ID/transaction ID
+										// This means the order was already processed (even if failed), and we shouldn't reuse it
+										if ( ! empty( $existing_transaction_id ) || ! empty( $existing_payment_id ) || ! empty( $existing_flow_payment_id ) ) {
+											WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ⚠️ Existing order already has payment ID/transaction ID - NOT reusing. Will create NEW order instead.' );
+											WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Reason: Order was already processed (even if failed), reusing would cause payment conflicts' );
+											// Continue to create new order below
+										} elseif ( 'pending' === $existing_order_status ) {
+											// Only reuse pending orders (never reuse failed orders)
+											$order = $existing_order;
+											$order_id = $order->get_id();
+											WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ✅ Reusing existing order (status: ' . $existing_order_status . ', no payment ID) - Order ID: ' . $order_id );
+											WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] This order has never been processed, safe to reuse' );
 											$order = $existing_order;
 											$order_id = $order->get_id();
 											WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ✅ Reusing existing order (status: ' . $existing_order_status . ') - Order ID: ' . $order_id );
@@ -2241,8 +2270,8 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 											// Ensure session+cart identifier is saved
 											$order->update_meta_data( '_cko_session_cart_id', $session_cart_identifier );
 											
-											// Reset order status to pending
-											$order->set_status( 'pending' );
+											// Order status should already be pending (we only reuse pending orders)
+											// Don't reset status - it's already pending
 											
 											$order->save();
 											WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Existing order refreshed with current cart items and ready for processing - Order ID: ' . $order_id );
@@ -2476,10 +2505,26 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			} else {
 				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment processing failed: ' . print_r( $result, true ) );
 				
-				// Check if order was created but processing failed - redirect to order received page anyway
+				// Payment failed - don't redirect to order received page
+				// Instead, redirect back to checkout with error message
 				if ( $order && $order->get_id() ) {
-					$redirect_url = $order->get_checkout_order_received_url();
-					WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order exists (ID: ' . $order->get_id() . '), redirecting to order received page: ' . $redirect_url );
+					// Update order status to failed if not already
+					if ( 'failed' !== $order->get_status() ) {
+						$order->update_status( 'failed', __( 'Payment processing failed', 'checkout-com-unified-payments-api' ) );
+					}
+					
+					// Get error message from result if available
+					$error_message = __( 'Payment processing failed. Please try again.', 'checkout-com-unified-payments-api' );
+					if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {
+						$error_message = $result['error'];
+					}
+					
+					// Add error notice
+					WC_Checkoutcom_Utility::wc_add_notice_self( $error_message, 'error' );
+					
+					// Redirect to checkout page with error
+					$redirect_url = add_query_arg( 'payment_failed', '1', wc_get_checkout_url() );
+					WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment failed, redirecting to checkout page: ' . $redirect_url );
 					if ( ! headers_sent() ) {
 						wp_safe_redirect( $redirect_url );
 						exit;
@@ -3181,10 +3226,10 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				WC_Checkoutcom_Utility::logger( 'Flow webhook: Payment ID mismatch - Order: ' . $payment_id . ', Webhook: ' . $data->data->id . ' - Continuing processing' );
 			}
 		} elseif ( ! $order ) {
-			// No order found - this is a critical error for webhook processing (always log errors)
-			WC_Checkoutcom_Utility::logger( 'Flow webhook: CRITICAL - No order found for webhook processing. Payment ID: ' . ($data->data->id ?? 'NULL') );
-			http_response_code( 404 );
-			wp_die( 'Order not found', 'Webhook Error', array( 'response' => 404 ) );
+			// No order found - log but continue processing to allow queue system to handle it
+			// The queue system will catch webhooks for payment_approved and payment_captured events
+			// Other webhook types will return false and Checkout.com will retry
+			WC_Checkoutcom_Utility::logger( 'Flow webhook: No order found for webhook processing. Payment ID: ' . ($data->data->id ?? 'NULL') . ' - Will attempt to queue or process via webhook handlers' );
 		}
 
 		if ( $webhook_debug_enabled ) {

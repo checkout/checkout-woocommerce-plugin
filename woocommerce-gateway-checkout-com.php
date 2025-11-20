@@ -483,11 +483,11 @@ add_filter( 'woocommerce_checkout_create_order', function( $order, $data ) {
 			WC_Checkoutcom_Utility::logger( '[FLOW] Existing order payment details - Transaction ID: ' . ( $existing_transaction_id ? $existing_transaction_id : 'NONE' ) . ', Payment ID: ' . ( $existing_payment_id ? $existing_payment_id : 'NONE' ) . ', Flow Payment ID: ' . ( $existing_flow_payment_id ? $existing_flow_payment_id : 'NONE' ) );
 			
 			// CRITICAL: Don't reuse order if it already has a payment ID/transaction ID
-			// This means the order was already processed (even if it failed), and we shouldn't reuse it
+			// This means the order was already processed (even if failed), and we shouldn't reuse it
 			if ( ! empty( $existing_transaction_id ) || ! empty( $existing_payment_id ) || ! empty( $existing_flow_payment_id ) ) {
 				WC_Checkoutcom_Utility::logger( '[FLOW] ⚠️ Existing order already has payment ID/transaction ID - NOT reusing. Will create NEW order instead.' );
 				WC_Checkoutcom_Utility::logger( '[FLOW] Reason: Order was already processed (even if failed), reusing would cause payment conflicts' );
-			} elseif ( in_array( $existing_order_status, array( 'pending', 'failed' ), true ) ) {
+			} elseif ( 'pending' === $existing_order_status ) {
 				WC_Checkoutcom_Utility::logger( '[FLOW] ✅ Reusing existing order (status: ' . $existing_order_status . ', no payment ID) - Order ID: ' . $existing_order->get_id() );
 				WC_Checkoutcom_Utility::logger( '[FLOW] This order has never been processed, safe to reuse' );
 				

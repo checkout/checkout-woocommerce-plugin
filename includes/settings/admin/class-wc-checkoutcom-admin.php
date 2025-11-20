@@ -81,6 +81,9 @@ class WC_Checkoutcom_Admin {
 				<li><a href="<?php echo esc_url( admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards&screen=webhook' ) ); ?>"
 						class="<?php echo 'webhook' === $screen ? 'current cko-webhook' : null; ?>">
 						<?php esc_html_e( 'Webhook', 'checkout-com-unified-payments-api' ); ?></a> | </li>
+				<li><a href="<?php echo esc_url( admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards&screen=webhook_queue' ) ); ?>"
+						class="<?php echo 'webhook_queue' === $screen ? 'current cko-webhook-queue' : null; ?>">
+						<?php esc_html_e( 'Webhook Queue', 'checkout-com-unified-payments-api' ); ?></a> | </li>
 				<?php if ( 'flow' === $checkout_mode ) : ?>
 					<li><a href="<?php echo esc_url( admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_flow' ) ); ?>"
 						class="<?php echo 'wc_checkout_com_flow_settings' === $screen ? 'current' : null; ?>">

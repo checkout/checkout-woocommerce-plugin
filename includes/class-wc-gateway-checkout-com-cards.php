@@ -237,6 +237,13 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 				echo '<table class="form-table">';
 				WC_Admin_Settings::output_fields( WC_Checkoutcom_Cards_Settings::webhook_settings() );
 				echo '</table>';
+			} elseif ( 'webhook_queue' === $screen ) {
+				// Render webhook queue page
+				if ( class_exists( 'WC_Checkoutcom_Webhook_Queue_Admin' ) ) {
+					WC_Checkoutcom_Webhook_Queue_Admin::render_admin_page();
+				} else {
+					echo '<div class="notice notice-error"><p>' . esc_html__( 'Webhook Queue Admin class not found.', 'checkout-com-unified-payments-api' ) . '</p></div>';
+				}
 			} else {
 
 				echo '<table class="form-table">';

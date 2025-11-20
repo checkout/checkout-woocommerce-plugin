@@ -45,6 +45,31 @@ var ckoLogger = {
 };
 
 /*
+ * CRITICAL: Early 3DS Detection - MUST run before any other code
+ * This prevents Flow from initializing during 3DS returns
+ */
+(function() {
+	// Check URL parameters immediately (before any other code runs)
+	const urlParams = new URLSearchParams(window.location.search);
+	const paymentId = urlParams.get("cko-payment-id");
+	const sessionId = urlParams.get("cko-session-id");
+	const paymentSessionId = urlParams.get("cko-payment-session-id");
+	
+	if (paymentId || sessionId || paymentSessionId) {
+		// Set flag IMMEDIATELY - this prevents ALL Flow initialization
+		window.ckoFlow3DSReturn = true;
+		
+		// Log using console.log (always available, even before ckoLogger is defined)
+		console.log('[FLOW 3DS] ⚠️⚠️⚠️ EARLY DETECTION: 3DS return detected, preventing ALL Flow initialization', {
+			paymentId: paymentId,
+			sessionId: sessionId,
+			paymentSessionId: paymentSessionId,
+			timestamp: new Date().toISOString()
+		});
+	}
+})();
+
+/*
  * The main object managing the Checkout.com flow payment integration.
  */
 var ckoFlow = {
@@ -59,6 +84,12 @@ var ckoFlow = {
 	 * Initializes the payment flow by loading the component.
 	 */
 	init: () => {
+		// Don't initialize if 3DS return is in progress
+		if (window.ckoFlow3DSReturn) {
+			ckoLogger.threeDS('Skipping ckoFlow.init() - 3DS return in progress');
+			return;
+		}
+		
 		// Mark when Flow initialization starts
 		ckoFlow.performanceMetrics.flowInitStartTime = performance.now();
 		ckoLogger.performance('Flow initialization started');
@@ -70,6 +101,12 @@ var ckoFlow = {
 	 * creating a payment session, and mounting the Checkout component.
 	 */
 	loadFlow: async () => {
+		// CRITICAL: Check for 3DS return FIRST - before any other checks
+		if (window.ckoFlow3DSReturn) {
+			ckoLogger.threeDS('loadFlow: 3DS return in progress, aborting Flow initialization');
+			return; // Exit immediately
+		}
+		
 		// Check if cko_flow_vars is available
 		if (typeof cko_flow_vars === 'undefined') {
 			ckoLogger.error('cko_flow_vars is not defined. Flow cannot be initialized.');
@@ -84,42 +121,59 @@ var ckoFlow = {
 		const sessionId = urlParams.get("cko-session-id");
 		const status = urlParams.get("status");
 		
-	if ((paymentId || sessionId) && status === 'succeeded') {
-		ckoLogger.threeDS('3DS redirect completed - Processing payment', {
+	// Detect 3DS redirect: if we have payment ID or session ID in URL, it's a 3DS return
+	// Don't require status parameter (some environments don't include it)
+	const is3DSReturn = (paymentId || sessionId);
+	
+	if (is3DSReturn) {
+		ckoLogger.threeDS('3DS redirect detected - Server-side processing should handle this', {
 			paymentId: paymentId,
 			sessionId: sessionId,
-			status: status
+			status: status || 'detected_via_ids'
 		});
 		
-		// Set the payment ID in the hidden input
-		const paymentIdInput = document.getElementById('cko-flow-payment-id');
-		if (paymentIdInput && paymentId) {
-			paymentIdInput.value = paymentId;
-			ckoLogger.debug('Set payment ID in hidden input:', paymentId);
-		}
+		// Prevent Flow initialization and updated_checkout events during 3DS return
+		window.ckoFlow3DSReturn = true;
 		
-		// Set payment type to card (most common)
-		const paymentTypeInput = document.getElementById('cko-flow-payment-type');
-		if (paymentTypeInput) {
-			paymentTypeInput.value = 'card';
-			ckoLogger.debug('Set payment type to: card');
-		}
-		
-		// Submit the checkout form to complete the order
+		// Server-side should handle this, but if page loads, JavaScript can help as fallback
+		// Wait longer for slow environments - server-side processing might take time
 		setTimeout(() => {
-			const checkoutForm = document.querySelector('form.checkout');
-			const orderPayForm = document.querySelector('form#order_review');
-			
-			if (checkoutForm) {
-				ckoLogger.threeDS('Submitting checkout form to complete order');
-				jQuery(checkoutForm).submit();
-			} else if (orderPayForm) {
-				ckoLogger.threeDS('Submitting order-pay form to complete order');
-				jQuery(orderPayForm).submit();
+			// If we're still on checkout page after delay, server-side didn't redirect
+			// Fallback: submit form via JavaScript
+			if (window.location.pathname.includes('/checkout/') && !window.location.pathname.includes('/order-received/')) {
+				ckoLogger.threeDS('Server-side redirect did not occur, using JavaScript fallback');
+				
+				// Set the payment ID in the hidden input
+				const paymentIdInput = document.getElementById('cko-flow-payment-id');
+				if (paymentIdInput && paymentId) {
+					paymentIdInput.value = paymentId;
+					ckoLogger.debug('Set payment ID in hidden input:', paymentId);
+				}
+				
+				// Set payment type to card (most common)
+				const paymentTypeInput = document.getElementById('cko-flow-payment-type');
+				if (paymentTypeInput) {
+					paymentTypeInput.value = 'card';
+					ckoLogger.debug('Set payment type to: card');
+				}
+				
+				// Submit the checkout form to complete the order
+				const checkoutForm = document.querySelector('form.checkout');
+				const orderPayForm = document.querySelector('form#order_review');
+				
+				if (checkoutForm) {
+					ckoLogger.threeDS('Submitting checkout form to complete order (fallback)');
+					jQuery(checkoutForm).off('submit').submit();
+				} else if (orderPayForm) {
+					ckoLogger.threeDS('Submitting order-pay form to complete order (fallback)');
+					jQuery(orderPayForm).off('submit').submit();
+				} else {
+					ckoLogger.error('No checkout or order-pay form found after 3DS redirect');
+				}
 			} else {
-				ckoLogger.error('No checkout or order-pay form found after 3DS redirect');
+				ckoLogger.threeDS('Server-side redirect successful, no JavaScript action needed');
 			}
-		}, 500); // Small delay to ensure DOM is ready
+		}, 5000); // Wait 5 seconds for server-side redirect (increased for slow environments)
 		
 		return; // Don't initialize Flow component
 	}
@@ -1241,7 +1295,39 @@ window.flowUserInteracted = false;
 
 let ckoFlowInitialized = false;
 
+// Note: Early 3DS detection is now at the top of the file (right after ckoLogger definition)
+// This ensures it runs before any other code that might initialize Flow
+
 document.addEventListener("DOMContentLoaded", function () {
+	// CRITICAL: Check for 3DS return FIRST - before any other checks
+	// Check flag first (set by early detection)
+	if (window.ckoFlow3DSReturn) {
+		console.log('[FLOW 3DS] ⚠️ DOMContentLoaded: Blocked by 3DS return flag');
+		if (typeof ckoLogger !== 'undefined') {
+			ckoLogger.threeDS('DOMContentLoaded: 3DS return in progress, skipping all Flow initialization');
+		}
+		return;
+	}
+	
+	// Also check URL parameters directly as fallback (in case early detection didn't run)
+	const urlParams = new URLSearchParams(window.location.search);
+	const paymentId = urlParams.get("cko-payment-id");
+	const sessionId = urlParams.get("cko-session-id");
+	const paymentSessionId = urlParams.get("cko-payment-session-id");
+	
+	if (paymentId || sessionId || paymentSessionId) {
+		console.log('[FLOW 3DS] ⚠️ DOMContentLoaded: Blocked by 3DS return URL parameters', {
+			paymentId: paymentId,
+			sessionId: sessionId,
+			paymentSessionId: paymentSessionId
+		});
+		window.ckoFlow3DSReturn = true;
+		if (typeof ckoLogger !== 'undefined') {
+			ckoLogger.threeDS('DOMContentLoaded: 3DS return detected in URL, skipping all Flow initialization');
+		}
+		return;
+	}
+	
 	// Track page load time for performance metrics
 	ckoFlow.performanceMetrics.pageLoadTime = performance.now();
 	if (ckoFlow.performanceMetrics.enableLogging) {
@@ -1288,6 +1374,31 @@ document.addEventListener("DOMContentLoaded", function () {
  * 3. Container exists
  */
 function initializeFlowIfNeeded() {
+	// CRITICAL: Don't initialize if we're handling a 3DS return
+	// Check flag first (set by early detection)
+	if (window.ckoFlow3DSReturn) {
+		console.log('[FLOW 3DS] ⚠️ initializeFlowIfNeeded: Blocked by 3DS return flag');
+		if (typeof ckoLogger !== 'undefined') {
+			ckoLogger.threeDS('Skipping Flow initialization - 3DS return in progress');
+		}
+		return;
+	}
+	
+	// Also check URL parameters as fallback
+	const urlParams = new URLSearchParams(window.location.search);
+	const paymentId = urlParams.get("cko-payment-id");
+	const sessionId = urlParams.get("cko-session-id");
+	const paymentSessionId = urlParams.get("cko-payment-session-id");
+	
+	if (paymentId || sessionId || paymentSessionId) {
+		console.log('[FLOW 3DS] ⚠️ initializeFlowIfNeeded: Blocked by 3DS return URL parameters');
+		window.ckoFlow3DSReturn = true;
+		if (typeof ckoLogger !== 'undefined') {
+			ckoLogger.threeDS('Skipping Flow initialization - 3DS return detected in URL');
+		}
+		return;
+	}
+	
 	// ALWAYS VISIBLE - Critical for diagnosing Flow disappearing issue
 	console.log('🔍 DIAGNOSTIC: initializeFlowIfNeeded() called');
 	const flowPayment = document.getElementById("payment_method_wc_checkout_com_flow");
@@ -1378,6 +1489,25 @@ function handleFlowPaymentSelection() {
  * This handler checks if Flow was destroyed AFTER DOM update and re-initializes only if needed
  */
 jQuery(document).on("updated_checkout", function () {
+	// CRITICAL: Skip if we're handling a 3DS return (don't re-initialize Flow)
+	// Check both the flag and URL parameters
+	if (window.ckoFlow3DSReturn) {
+		ckoLogger.threeDS('Skipping updated_checkout handler - 3DS return flag is set');
+		return;
+	}
+	
+	// Also check URL parameters as fallback
+	const urlParams = new URLSearchParams(window.location.search);
+	const paymentId = urlParams.get("cko-payment-id");
+	const sessionId = urlParams.get("cko-session-id");
+	const paymentSessionId = urlParams.get("cko-payment-session-id");
+	
+	if (paymentId || sessionId || paymentSessionId) {
+		ckoLogger.threeDS('Skipping updated_checkout handler - 3DS return detected in URL');
+		window.ckoFlow3DSReturn = true;
+		return;
+	}
+	
 	// ALWAYS VISIBLE - Critical for diagnosing Flow disappearing issue
 	console.log('[FLOW DEBUG] updated_checkout event fired');
 	console.log('🔍 DIAGNOSTIC: Flow state BEFORE updated_checkout:', {
@@ -1391,6 +1521,24 @@ jQuery(document).on("updated_checkout", function () {
 	// CRITICAL: Wait for DOM to be updated by WooCommerce before checking
 	// WooCommerce replaces the HTML asynchronously, so we need to check after it completes
 	setTimeout(function() {
+		// CRITICAL: Check for 3DS return again in setTimeout callback
+		if (window.ckoFlow3DSReturn) {
+			ckoLogger.threeDS('Skipping updated_checkout setTimeout callback - 3DS return in progress');
+			return;
+		}
+		
+		// Also check URL parameters as fallback
+		const urlParamsCheck = new URLSearchParams(window.location.search);
+		const paymentIdCheck = urlParamsCheck.get("cko-payment-id");
+		const sessionIdCheck = urlParamsCheck.get("cko-session-id");
+		const paymentSessionIdCheck = urlParamsCheck.get("cko-payment-session-id");
+		
+		if (paymentIdCheck || sessionIdCheck || paymentSessionIdCheck) {
+			ckoLogger.threeDS('Skipping updated_checkout setTimeout callback - 3DS return detected in URL');
+			window.ckoFlow3DSReturn = true;
+			return;
+		}
+		
 		const flowPayment = document.getElementById("payment_method_wc_checkout_com_flow");
 		const flowComponentRoot = document.querySelector('[data-testid="checkout-web-component-root"]');
 		const flowContainer = document.getElementById("flow-container");
@@ -1538,6 +1686,25 @@ document.addEventListener("change", function (event) {
  * Handles initial Flow setup when page loads
  */
 document.addEventListener("DOMContentLoaded", function () {
+	// CRITICAL: Check for 3DS return FIRST - before any other checks
+	// This must be the very first thing we check
+	if (window.ckoFlow3DSReturn) {
+		ckoLogger.threeDS('DOMContentLoaded: 3DS return in progress, skipping ALL Flow initialization');
+		return; // Exit immediately - don't do anything else
+	}
+	
+	// Also check URL parameters as a fallback (in case early detection didn't run)
+	const urlParams = new URLSearchParams(window.location.search);
+	const paymentId = urlParams.get("cko-payment-id");
+	const sessionId = urlParams.get("cko-session-id");
+	const paymentSessionId = urlParams.get("cko-payment-session-id");
+	
+	if (paymentId || sessionId || paymentSessionId) {
+		ckoLogger.threeDS('DOMContentLoaded: 3DS return detected in URL, skipping Flow initialization');
+		window.ckoFlow3DSReturn = true;
+		return; // Don't initialize Flow during 3DS return
+	}
+	
 	// Check if Flow payment method is selected on page load
 	const flowPayment = document.getElementById("payment_method_wc_checkout_com_flow");
 	
