@@ -287,13 +287,42 @@ add_filter( 'woocommerce_checkout_create_order', function( $order, $data ) {
 			if ( in_array( $existing_order_status, array( 'pending', 'failed' ), true ) ) {
 				WC_Checkoutcom_Utility::logger( '[CLASSIC CARDS] ✅ Reusing existing order (status: ' . $existing_order_status . ') - Order ID: ' . $existing_order->get_id() );
 				
-				// Delete the newly created order
+				// Delete the newly created order (but keep $order object temporarily for address copying)
 				$new_order_id = $order->get_id();
-				wp_delete_post( $new_order_id, true );
-				WC_Checkoutcom_Utility::logger( '[CLASSIC CARDS] Deleted newly created order ID: ' . $new_order_id );
 				
 				// Refresh the existing order to get latest data
 				$existing_order = wc_get_order( $existing_order->get_id() );
+				
+				// CRITICAL: Copy billing and shipping addresses from new order to existing order
+				// The new order has the correct addresses from checkout form, but we're reusing the existing order
+				$existing_order->set_billing_first_name( $order->get_billing_first_name() );
+				$existing_order->set_billing_last_name( $order->get_billing_last_name() );
+				$existing_order->set_billing_company( $order->get_billing_company() );
+				$existing_order->set_billing_address_1( $order->get_billing_address_1() );
+				$existing_order->set_billing_address_2( $order->get_billing_address_2() );
+				$existing_order->set_billing_city( $order->get_billing_city() );
+				$existing_order->set_billing_state( $order->get_billing_state() );
+				$existing_order->set_billing_postcode( $order->get_billing_postcode() );
+				$existing_order->set_billing_country( $order->get_billing_country() );
+				$existing_order->set_billing_phone( $order->get_billing_phone() );
+				$existing_order->set_billing_email( $order->get_billing_email() );
+				
+				$existing_order->set_shipping_first_name( $order->get_shipping_first_name() );
+				$existing_order->set_shipping_last_name( $order->get_shipping_last_name() );
+				$existing_order->set_shipping_company( $order->get_shipping_company() );
+				$existing_order->set_shipping_address_1( $order->get_shipping_address_1() );
+				$existing_order->set_shipping_address_2( $order->get_shipping_address_2() );
+				$existing_order->set_shipping_city( $order->get_shipping_city() );
+				$existing_order->set_shipping_state( $order->get_shipping_state() );
+				$existing_order->set_shipping_postcode( $order->get_shipping_postcode() );
+				$existing_order->set_shipping_country( $order->get_shipping_country() );
+				$existing_order->set_shipping_phone( $order->get_shipping_phone() );
+				
+				WC_Checkoutcom_Utility::logger( '[CLASSIC CARDS] Copied billing and shipping addresses from new order to existing order - Order ID: ' . $existing_order->get_id() );
+				
+				// Now delete the newly created order
+				wp_delete_post( $new_order_id, true );
+				WC_Checkoutcom_Utility::logger( '[CLASSIC CARDS] Deleted newly created order ID: ' . $new_order_id );
 				
 				// Clear existing order items to refresh with current cart
 				foreach ( $existing_order->get_items() as $item_id => $item ) {
@@ -491,13 +520,42 @@ add_filter( 'woocommerce_checkout_create_order', function( $order, $data ) {
 				WC_Checkoutcom_Utility::logger( '[FLOW] ✅ Reusing existing order (status: ' . $existing_order_status . ', no payment ID) - Order ID: ' . $existing_order->get_id() );
 				WC_Checkoutcom_Utility::logger( '[FLOW] This order has never been processed, safe to reuse' );
 				
-				// Delete the newly created order
+				// Delete the newly created order (but keep $order object temporarily for address copying)
 				$new_order_id = $order->get_id();
-				wp_delete_post( $new_order_id, true );
-				WC_Checkoutcom_Utility::logger( '[FLOW] Deleted newly created order ID: ' . $new_order_id );
 				
 				// Refresh the existing order to get latest data
 				$existing_order = wc_get_order( $existing_order->get_id() );
+				
+				// CRITICAL: Copy billing and shipping addresses from new order to existing order
+				// The new order has the correct addresses from checkout form, but we're reusing the existing order
+				$existing_order->set_billing_first_name( $order->get_billing_first_name() );
+				$existing_order->set_billing_last_name( $order->get_billing_last_name() );
+				$existing_order->set_billing_company( $order->get_billing_company() );
+				$existing_order->set_billing_address_1( $order->get_billing_address_1() );
+				$existing_order->set_billing_address_2( $order->get_billing_address_2() );
+				$existing_order->set_billing_city( $order->get_billing_city() );
+				$existing_order->set_billing_state( $order->get_billing_state() );
+				$existing_order->set_billing_postcode( $order->get_billing_postcode() );
+				$existing_order->set_billing_country( $order->get_billing_country() );
+				$existing_order->set_billing_phone( $order->get_billing_phone() );
+				$existing_order->set_billing_email( $order->get_billing_email() );
+				
+				$existing_order->set_shipping_first_name( $order->get_shipping_first_name() );
+				$existing_order->set_shipping_last_name( $order->get_shipping_last_name() );
+				$existing_order->set_shipping_company( $order->get_shipping_company() );
+				$existing_order->set_shipping_address_1( $order->get_shipping_address_1() );
+				$existing_order->set_shipping_address_2( $order->get_shipping_address_2() );
+				$existing_order->set_shipping_city( $order->get_shipping_city() );
+				$existing_order->set_shipping_state( $order->get_shipping_state() );
+				$existing_order->set_shipping_postcode( $order->get_shipping_postcode() );
+				$existing_order->set_shipping_country( $order->get_shipping_country() );
+				$existing_order->set_shipping_phone( $order->get_shipping_phone() );
+				
+				WC_Checkoutcom_Utility::logger( '[FLOW] Copied billing and shipping addresses from new order to existing order - Order ID: ' . $existing_order->get_id() );
+				
+				// Now delete the newly created order
+				wp_delete_post( $new_order_id, true );
+				WC_Checkoutcom_Utility::logger( '[FLOW] Deleted newly created order ID: ' . $new_order_id );
 				
 				// Clear existing order items to refresh with current cart
 				foreach ( $existing_order->get_items() as $item_id => $item ) {

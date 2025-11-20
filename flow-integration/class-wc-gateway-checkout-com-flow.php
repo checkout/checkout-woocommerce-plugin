@@ -1321,6 +1321,123 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		
 		WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Order found - ID: ' . $order->get_id() . ', Status: ' . $order->get_status() . ', Payment Method: ' . $order->get_payment_method() );
 		
+		// CRITICAL: Ensure billing and shipping addresses are set from checkout form POST data
+		// WooCommerce should set these during order creation, but we ensure they're set here as well
+		// This is especially important if addresses weren't set during order creation
+		// Priority: 1) POST data, 2) WC()->customer, 3) Keep existing order data
+		
+		// Check if POST data has address fields (indicates form submission)
+		$has_post_addresses = ! empty( $_POST['billing_first_name'] ) || ! empty( $_POST['billing_address_1'] );
+		
+		if ( $has_post_addresses ) {
+			// Set billing address from POST data
+			if ( isset( $_POST['billing_first_name'] ) ) {
+				$order->set_billing_first_name( sanitize_text_field( $_POST['billing_first_name'] ) );
+			}
+			if ( isset( $_POST['billing_last_name'] ) ) {
+				$order->set_billing_last_name( sanitize_text_field( $_POST['billing_last_name'] ) );
+			}
+			if ( isset( $_POST['billing_company'] ) ) {
+				$order->set_billing_company( sanitize_text_field( $_POST['billing_company'] ) );
+			}
+			if ( isset( $_POST['billing_address_1'] ) ) {
+				$order->set_billing_address_1( sanitize_text_field( $_POST['billing_address_1'] ) );
+			}
+			if ( isset( $_POST['billing_address_2'] ) ) {
+				$order->set_billing_address_2( sanitize_text_field( $_POST['billing_address_2'] ) );
+			}
+			if ( isset( $_POST['billing_city'] ) ) {
+				$order->set_billing_city( sanitize_text_field( $_POST['billing_city'] ) );
+			}
+			if ( isset( $_POST['billing_state'] ) ) {
+				$order->set_billing_state( sanitize_text_field( $_POST['billing_state'] ) );
+			}
+			if ( isset( $_POST['billing_postcode'] ) ) {
+				$order->set_billing_postcode( sanitize_text_field( $_POST['billing_postcode'] ) );
+			}
+			if ( isset( $_POST['billing_country'] ) ) {
+				$order->set_billing_country( sanitize_text_field( $_POST['billing_country'] ) );
+			}
+			if ( isset( $_POST['billing_phone'] ) ) {
+				$order->set_billing_phone( sanitize_text_field( $_POST['billing_phone'] ) );
+			}
+			if ( isset( $_POST['billing_email'] ) ) {
+				$order->set_billing_email( sanitize_email( $_POST['billing_email'] ) );
+			}
+			
+			// Set shipping address - check if ship_to_different_address is set
+			$ship_to_different_address = isset( $_POST['ship_to_different_address'] ) ? (bool) $_POST['ship_to_different_address'] : false;
+			
+			if ( $ship_to_different_address ) {
+				// Different shipping address from POST
+				if ( isset( $_POST['shipping_first_name'] ) ) {
+					$order->set_shipping_first_name( sanitize_text_field( $_POST['shipping_first_name'] ) );
+				}
+				if ( isset( $_POST['shipping_last_name'] ) ) {
+					$order->set_shipping_last_name( sanitize_text_field( $_POST['shipping_last_name'] ) );
+				}
+				if ( isset( $_POST['shipping_company'] ) ) {
+					$order->set_shipping_company( sanitize_text_field( $_POST['shipping_company'] ) );
+				}
+				if ( isset( $_POST['shipping_address_1'] ) ) {
+					$order->set_shipping_address_1( sanitize_text_field( $_POST['shipping_address_1'] ) );
+				}
+				if ( isset( $_POST['shipping_address_2'] ) ) {
+					$order->set_shipping_address_2( sanitize_text_field( $_POST['shipping_address_2'] ) );
+				}
+				if ( isset( $_POST['shipping_city'] ) ) {
+					$order->set_shipping_city( sanitize_text_field( $_POST['shipping_city'] ) );
+				}
+				if ( isset( $_POST['shipping_state'] ) ) {
+					$order->set_shipping_state( sanitize_text_field( $_POST['shipping_state'] ) );
+				}
+				if ( isset( $_POST['shipping_postcode'] ) ) {
+					$order->set_shipping_postcode( sanitize_text_field( $_POST['shipping_postcode'] ) );
+				}
+				if ( isset( $_POST['shipping_country'] ) ) {
+					$order->set_shipping_country( sanitize_text_field( $_POST['shipping_country'] ) );
+				}
+			} else {
+				// Shipping address same as billing
+				$order->set_shipping_first_name( $order->get_billing_first_name() );
+				$order->set_shipping_last_name( $order->get_billing_last_name() );
+				$order->set_shipping_company( $order->get_billing_company() );
+				$order->set_shipping_address_1( $order->get_billing_address_1() );
+				$order->set_shipping_address_2( $order->get_billing_address_2() );
+				$order->set_shipping_city( $order->get_billing_city() );
+				$order->set_shipping_state( $order->get_billing_state() );
+				$order->set_shipping_postcode( $order->get_billing_postcode() );
+				$order->set_shipping_country( $order->get_billing_country() );
+			}
+		} elseif ( WC()->customer ) {
+			// Fallback: Get addresses from WC()->customer if POST data not available
+			$order->set_billing_first_name( WC()->customer->get_billing_first_name() );
+			$order->set_billing_last_name( WC()->customer->get_billing_last_name() );
+			$order->set_billing_company( WC()->customer->get_billing_company() );
+			$order->set_billing_address_1( WC()->customer->get_billing_address_1() );
+			$order->set_billing_address_2( WC()->customer->get_billing_address_2() );
+			$order->set_billing_city( WC()->customer->get_billing_city() );
+			$order->set_billing_state( WC()->customer->get_billing_state() );
+			$order->set_billing_postcode( WC()->customer->get_billing_postcode() );
+			$order->set_billing_country( WC()->customer->get_billing_country() );
+			$order->set_billing_phone( WC()->customer->get_billing_phone() );
+			$order->set_billing_email( WC()->customer->get_billing_email() );
+			
+			$order->set_shipping_first_name( WC()->customer->get_shipping_first_name() );
+			$order->set_shipping_last_name( WC()->customer->get_shipping_last_name() );
+			$order->set_shipping_company( WC()->customer->get_shipping_company() );
+			$order->set_shipping_address_1( WC()->customer->get_shipping_address_1() );
+			$order->set_shipping_address_2( WC()->customer->get_shipping_address_2() );
+			$order->set_shipping_city( WC()->customer->get_shipping_city() );
+			$order->set_shipping_state( WC()->customer->get_shipping_state() );
+			$order->set_shipping_postcode( WC()->customer->get_shipping_postcode() );
+			$order->set_shipping_country( WC()->customer->get_shipping_country() );
+		}
+		
+		// Save addresses immediately to ensure they persist
+		$order->save();
+		WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Set and saved billing and shipping addresses from POST data - Order ID: ' . $order_id );
+		
 		// DUPLICATE PREVENTION: Check if this order has already been processed
 		$existing_transaction_id = $order->get_transaction_id();
 		$flow_payment_id = isset( $_POST['cko-flow-payment-id'] ) ? $_POST['cko-flow-payment-id'] : '';
