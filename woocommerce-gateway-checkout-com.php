@@ -5,7 +5,7 @@
  * Description: Extends WooCommerce by Adding the Checkout.com Gateway.
  * Author: Checkout.com
  * Author URI: https://www.checkout.com/
- * Version: 5.0.0-beta
+ * Version: 5.0.1-beta
  * Requires at least: 5.0
  * Tested up to: 6.7.0
  * WC requires at least: 3.0
@@ -656,7 +656,7 @@ add_action( 'woocommerce_new_order', function( $order_id ) {
 /**
  * Constants.
  */
-define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '5.0.0' );
+define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '5.0.1-beta' );
 define( 'WC_CHECKOUTCOM_PLUGIN_URL', untrailingslashit( plugins_url( basename( plugin_dir_path( __FILE__ ) ), basename( __FILE__ ) ) ) );
 define( 'WC_CHECKOUTCOM_PLUGIN_PATH', untrailingslashit( plugin_dir_path( __FILE__ ) ) );
 
@@ -1499,6 +1499,11 @@ function callback_for_setting_up_scripts() {
 			<link rel="dns-prefetch" href="//checkout-web-components.checkout.com">
 			<link rel="preconnect" href="https://checkout-web-components.checkout.com" crossorigin>
 			<link rel="preconnect" href="https://<?php echo esc_attr( $api_domain ); ?>" crossorigin>
+			<!-- CDN resource hints for risk.js and other SDK resources -->
+			<link rel="dns-prefetch" href="//cdn.checkout.com">
+			<link rel="preconnect" href="https://cdn.checkout.com" crossorigin>
+			<link rel="dns-prefetch" href="//devices.checkout.com">
+			<link rel="preconnect" href="https://devices.checkout.com" crossorigin>
 			<?php
 		}, 1 );
 		
@@ -1647,14 +1652,22 @@ function callback_for_setting_up_scripts() {
 		$attempt_no_three_d = $attempt_no_three_d ? true : false;
 		$allow_upgrade = $allow_upgrade ? true : false;
 
+		// Map 'live' to 'production' for SDK compatibility
+		// SDK might expect 'production' instead of 'live' to properly construct URLs
+		$sdk_env = $core_settings['ckocom_environment'];
+		if ( 'live' === $sdk_env ) {
+			$sdk_env = 'production'; // SDK might need 'production' to construct URLs correctly
+		}
+		
 		$flow_vars = array(
 			'checkoutSlug' => get_post_field( 'post_name', get_option( 'woocommerce_checkout_page_id' ) ),
 			'orderPaySlug' => WC()->query->query_vars['order-pay'],
-			'apiURL'       => $url,
-			'SKey'         => $core_settings['ckocom_sk'],
+			// Removed apiURL and SKey - payment session creation now handled securely via AJAX backend
 			'PKey'         => $core_settings['ckocom_pk'],
-			'env'          => $core_settings['ckocom_environment'],
+			'env'          => $sdk_env, // Use mapped environment value
 			'ajax_url'     => admin_url( 'admin-ajax.php' ),
+			// Security nonce for payment session creation
+			'payment_session_nonce' => wp_create_nonce( 'cko_flow_payment_session' ),
 			'woo_version'  => $woo_version,
 			'ref_session'  => $ref_session,
 			'site_url'	   => get_home_url(),
@@ -2030,6 +2043,35 @@ function cko_set_query_vars( $wp ) {
 
 add_action( 'wp_ajax_cko_validate_checkout', 'cko_validate_checkout' );
 add_action( 'wp_ajax_nopriv_cko_validate_checkout', 'cko_validate_checkout' );
+
+// Register Flow payment session AJAX handler early (before gateway class instantiation)
+add_action( 'wp_ajax_cko_flow_create_payment_session', 'cko_ajax_flow_create_payment_session' );
+add_action( 'wp_ajax_nopriv_cko_flow_create_payment_session', 'cko_ajax_flow_create_payment_session' );
+
+/**
+ * AJAX handler wrapper for Flow payment session creation.
+ * This ensures the handler is always available, even if the gateway class isn't fully instantiated.
+ */
+if ( ! function_exists( 'cko_ajax_flow_create_payment_session' ) ) {
+	function cko_ajax_flow_create_payment_session() {
+		if ( ! class_exists( 'WC_Gateway_Checkout_Com_Flow' ) ) {
+			wp_send_json_error( array(
+				'message' => __( 'Flow gateway class not found.', 'checkout-com-unified-payments-api' ),
+			) );
+			return;
+		}
+
+		// Get the gateway instance
+		$gateways = WC()->payment_gateways()->payment_gateways();
+		if ( isset( $gateways['wc_checkout_com_flow'] ) ) {
+			$gateways['wc_checkout_com_flow']->ajax_create_payment_session();
+		} else {
+			// Fallback: create a temporary instance
+			$gateway = new WC_Gateway_Checkout_Com_Flow();
+			$gateway->ajax_create_payment_session();
+		}
+	}
+}
 
 /**
  * Validates the WooCommerce checkout form via AJAX.

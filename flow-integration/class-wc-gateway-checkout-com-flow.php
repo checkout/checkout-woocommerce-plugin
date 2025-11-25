@@ -67,6 +67,10 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 		// Meta field on subscription edit.
 		add_filter( 'woocommerce_subscription_payment_meta', [ $this, 'add_payment_meta_field' ], 10, 2 );
+
+		// Secure AJAX handler for creating payment sessions (prevents secret key exposure to frontend)
+		add_action( 'wp_ajax_cko_flow_create_payment_session', [ $this, 'ajax_create_payment_session' ] );
+		add_action( 'wp_ajax_nopriv_cko_flow_create_payment_session', [ $this, 'ajax_create_payment_session' ] );
 	}
 
 	/**
@@ -3569,5 +3573,105 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		WC_Checkoutcom_Utility::logger("WEBHOOK DEBUG: Sent HTTP status: $status_code with message: $message");
 		WC_Checkoutcom_Utility::logger("=== WEBHOOK DEBUG: Flow webhook handler completed ===");
 		exit; // Prevent WP from sending 200.
+	}
+
+	/**
+	 * Secure AJAX handler for creating payment sessions.
+	 * This prevents the secret key from being exposed to the frontend.
+	 *
+	 * @return void
+	 */
+	public function ajax_create_payment_session() {
+		// Verify nonce for security
+		if ( ! isset( $_POST['nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ) ), 'cko_flow_payment_session' ) ) {
+			wp_send_json_error( array(
+				'message' => __( 'Security check failed. Please refresh the page and try again.', 'checkout-com-unified-payments-api' ),
+			) );
+			return;
+		}
+
+		// Get core settings
+		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+
+		// Verify secret key is configured
+		$secret_key = isset( $core_settings['ckocom_sk'] ) ? $core_settings['ckocom_sk'] : '';
+		if ( empty( $secret_key ) ) {
+			WC_Checkoutcom_Utility::logger( 'Error: Secret key not configured for payment session creation' );
+			wp_send_json_error( array(
+				'message' => __( 'Payment gateway not properly configured. Please contact support.', 'checkout-com-unified-payments-api' ),
+			) );
+			return;
+		}
+
+		// Get payment session request data from POST
+		if ( ! isset( $_POST['payment_session_request'] ) ) {
+			wp_send_json_error( array(
+				'message' => __( 'Invalid request data.', 'checkout-com-unified-payments-api' ),
+			) );
+			return;
+		}
+
+		// Decode and sanitize the payment session request
+		$payment_session_request = json_decode( wp_unslash( $_POST['payment_session_request'] ), true );
+		
+		if ( json_last_error() !== JSON_ERROR_NONE || ! is_array( $payment_session_request ) ) {
+			WC_Checkoutcom_Utility::logger( 'Error: Invalid JSON in payment session request: ' . json_last_error_msg() );
+			wp_send_json_error( array(
+				'message' => __( 'Invalid request format.', 'checkout-com-unified-payments-api' ),
+			) );
+			return;
+		}
+
+		// Determine API URL based on environment
+		$api_url = 'https://api.checkout.com/payment-sessions';
+		if ( isset( $core_settings['ckocom_environment'] ) && 'sandbox' === $core_settings['ckocom_environment'] ) {
+			$api_url = 'https://api.sandbox.checkout.com/payment-sessions';
+		}
+
+		// Prepare the API request
+		$request_args = array(
+			'method'  => 'POST',
+			'timeout' => 30,
+			'headers' => array(
+				'Authorization' => 'Bearer ' . $secret_key,
+				'Content-Type'  => 'application/json',
+			),
+			'body'    => wp_json_encode( $payment_session_request ),
+		);
+
+		// Make the API request
+		$response = wp_remote_request( $api_url, $request_args );
+
+		// Check for request errors
+		if ( is_wp_error( $response ) ) {
+			WC_Checkoutcom_Utility::logger( 'Error creating payment session: ' . $response->get_error_message() );
+			wp_send_json_error( array(
+				'message' => __( 'Failed to create payment session. Please try again.', 'checkout-com-unified-payments-api' ),
+				'error'   => $response->get_error_message(),
+			) );
+			return;
+		}
+
+		// Get response body
+		$response_code = wp_remote_retrieve_response_code( $response );
+		$response_body = wp_remote_retrieve_body( $response );
+		$payment_session = json_decode( $response_body, true );
+
+		// Check for API errors
+		if ( $response_code >= 400 || ( isset( $payment_session['error_type'] ) || isset( $payment_session['error_codes'] ) ) ) {
+			WC_Checkoutcom_Utility::logger( 'Payment Session API Error: ' . $response_body );
+			wp_send_json_error( array(
+				'message'     => isset( $payment_session['error_codes'] ) && is_array( $payment_session['error_codes'] ) 
+					? __( 'Payment session error: ', 'checkout-com-unified-payments-api' ) . implode( ', ', $payment_session['error_codes'] )
+					: __( 'Error creating payment session. Please try again.', 'checkout-com-unified-payments-api' ),
+				'error_type'  => isset( $payment_session['error_type'] ) ? $payment_session['error_type'] : null,
+				'error_codes' => isset( $payment_session['error_codes'] ) ? $payment_session['error_codes'] : null,
+				'request_id'  => isset( $payment_session['request_id'] ) ? $payment_session['request_id'] : null,
+			) );
+			return;
+		}
+
+		// Success - return payment session
+		wp_send_json_success( $payment_session );
 	}
 }

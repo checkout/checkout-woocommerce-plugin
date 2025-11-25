@@ -516,16 +516,50 @@ var ckoFlow = {
 			
 			ckoLogger.debug('Complete Payment Session Request:', paymentSessionRequest);
 
-			let response = await fetch(cko_flow_vars.apiURL, {
+			// SECURITY: Use secure backend AJAX endpoint instead of exposing secret key to frontend
+			const formData = new FormData();
+			formData.append('action', 'cko_flow_create_payment_session');
+			formData.append('nonce', cko_flow_vars.payment_session_nonce);
+			formData.append('payment_session_request', JSON.stringify(paymentSessionRequest));
+
+			let response = await fetch(cko_flow_vars.ajax_url, {
 				method: "POST",
-				headers: {
-					Authorization: `Bearer ${cko_flow_vars.SKey}`,
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify(paymentSessionRequest),
+				body: formData,
 			});
 
-			let paymentSession = await response.json();
+			let responseData = await response.json();
+			
+			// Declare paymentSession variable
+			let paymentSession;
+			
+			// Check if AJAX response indicates success
+			if (!responseData.success) {
+				// Handle error response - format as API error response
+				paymentSession = {
+					error_type: responseData.data?.error_type || 'ajax_error',
+					error_codes: responseData.data?.error_codes || [responseData.data?.message || 'Unknown error'],
+					request_id: responseData.data?.request_id || null
+				};
+				
+				// Create a mock response object with ok: false to trigger error handling below
+				response = {
+					ok: false,
+					status: response.status || 500
+				};
+			} else {
+				// Success - extract payment session from response
+				paymentSession = responseData.data;
+				// Ensure response.ok is true for success case
+				response = {
+					ok: true,
+					status: 200
+				};
+			}
+
+			// Validate payment session response
+			if (!paymentSession.payment_session_token) {
+				ckoLogger.warn('Payment session token not found in response');
+			}
 
 			// Check for API errors (422, 400, etc.)
 			if (!response.ok || paymentSession.error_type || paymentSession.error_codes) {
@@ -708,6 +742,7 @@ var ckoFlow = {
 					// Step 4: Mark Flow as ready - triggers CSS animations and visibility rules
 					document.body.classList.add("flow-ready");
 					ckoLogger.debug('onReady - ✓ Flow marked as ready - Checkout is now fully interactive');
+					
 					
 					// Step 5: Restore saved card selection if in saved_cards_first mode
 					if (displayOrder === 'saved_cards_first') {
@@ -1028,6 +1063,44 @@ var ckoFlow = {
 		window.testOnPaymentCompleted = onPaymentCompleted;
 		ckoLogger.debug('onPaymentCompleted callback is now globally accessible as window.testOnPaymentCompleted');
 		
+		// WORKAROUND: Add URL fields to paymentSession object based on environment
+		// This helps SDK construct correct URLs even if token is missing URL fields
+		// SDK might check these fields before/after decoding the token
+		const baseUrl = cko_flow_vars.env === 'sandbox' 
+			? 'https://api.sandbox.checkout.com'
+			: 'https://api.checkout.com';
+		const cdnUrl = cko_flow_vars.env === 'sandbox'
+			? 'https://cdn.sandbox.checkout.com'
+			: 'https://cdn.checkout.com';
+		const devicesUrl = cko_flow_vars.env === 'sandbox'
+			? 'https://devices.api.sandbox.checkout.com'
+			: 'https://devices.api.checkout.com';
+		
+		// Add URL fields to paymentSession object (SDK might use these)
+		// Note: SDK decodes token internally, but might fall back to these if token URLs are missing
+		if (!paymentSession._urls) {
+			paymentSession._urls = {
+				api_url: baseUrl,
+				cdn_url: cdnUrl,
+				devices_url: devicesUrl,
+				base_url: baseUrl
+			};
+			ckoLogger.debug('Added URL fields to paymentSession:', paymentSession._urls);
+		}
+		
+		// NOTE: We cannot pre-load risk.js manually because:
+		// 1. The SDK constructs the risk.js URL internally from the payment session token
+		// 2. The SDK decodes the token and extracts URLs (cdn_url, etc.)
+		// 3. If token is missing URL fields, SDK constructs incorrect URLs
+		// 4. We cannot modify the token without decoding it (which we're avoiding)
+		// 5. The SDK must load risk.js itself - we can't intercept or pre-load it
+		// 
+		// SOLUTION: The payment session token MUST include URL fields (cdn_url, api_url, etc.)
+		// This is an API issue that needs to be fixed by Checkout.com
+		// 
+		// We've added URL fields to paymentSession._urls as a fallback, but the SDK
+		// primarily uses URLs from the decoded token, so this may not help.
+		
 		const checkout = await CheckoutWebComponents({
 			publicKey: cko_flow_vars.PKey,
 			environment: cko_flow_vars.env,
@@ -1043,6 +1116,14 @@ var ckoFlow = {
 			handleClick,
 			onError
 		});
+
+		// Log SDK initialization (debug mode only)
+		ckoLogger.debug('SDK initialized:', {
+			hasCreate: typeof checkout.create === 'function',
+			paymentSessionId: paymentSession.id,
+			environment: cko_flow_vars.env
+		});
+
 
 				// Ensure component name is defined
 				const componentName = window.componentName || 'flow';
@@ -1103,6 +1184,13 @@ var ckoFlow = {
 				 * Check if the component is available. Mount component only if available.
 				 */
 				flowComponent.isAvailable().then((available) => {
+					// Log component availability (debug mode only)
+					ckoLogger.debug('Component availability:', {
+						available: available,
+						componentType: flowComponent.type,
+						environment: cko_flow_vars.env
+					});
+					
 					if (available) {
 						// Performance: Track component mount
 						const mountStart = performance.now();
@@ -1399,13 +1487,11 @@ function initializeFlowIfNeeded() {
 		return;
 	}
 	
-	// ALWAYS VISIBLE - Critical for diagnosing Flow disappearing issue
-	console.log('🔍 DIAGNOSTIC: initializeFlowIfNeeded() called');
 	const flowPayment = document.getElementById("payment_method_wc_checkout_com_flow");
 	const flowContainer = document.getElementById("flow-container");
 	const flowComponentRoot = document.querySelector('[data-testid="checkout-web-component-root"]');
 	
-	console.log('🔍 DIAGNOSTIC: initializeFlowIfNeeded() state check:', {
+	ckoLogger.debug('initializeFlowIfNeeded() state check:', {
 		flowPaymentExists: !!flowPayment,
 		flowPaymentChecked: flowPayment?.checked || false,
 		flowContainerExists: !!flowContainer,
@@ -1436,19 +1522,17 @@ function initializeFlowIfNeeded() {
 	}
 	
 	// Initialize Flow
-	// ALWAYS VISIBLE - Critical for diagnosing Flow disappearing issue
-	console.log('🔍 DIAGNOSTIC: Initializing Flow - payment selected, container exists, not initialized');
+	ckoLogger.debug('Initializing Flow - payment selected, container exists, not initialized');
 	document.body.classList.add("flow-method-selected");
 	flowContainer.style.display = "block";
 	
 	// Only initialize if not already initialized
 	if (!ckoFlowInitialized || !ckoFlow.flowComponent) {
-		console.log('🔍 DIAGNOSTIC: Calling ckoFlow.init()...');
+		ckoLogger.debug('Calling ckoFlow.init()...');
 		ckoFlow.init();
 		ckoFlowInitialized = true;
-		console.log('🔍 DIAGNOSTIC: ckoFlow.init() completed, ckoFlowInitialized set to true');
 	} else {
-		console.log('🔍 DIAGNOSTIC: Skipping ckoFlow.init() - already initialized');
+		ckoLogger.debug('Skipping ckoFlow.init() - already initialized');
 	}
 }
 
@@ -1460,28 +1544,6 @@ function handleFlowPaymentSelection() {
 	initializeFlowIfNeeded();
 }
 
-/**
- * DIAGNOSTIC: Track what triggers update_checkout
- * This helps identify why updated_checkout fires after Flow loads
- */
-(function() {
-	let updateCheckoutCallStack = null;
-	
-	// Intercept update_checkout trigger to capture stack trace
-	const originalTrigger = jQuery.fn.trigger;
-	jQuery.fn.trigger = function(type, data) {
-		if (type === 'update_checkout' || (typeof type === 'string' && type.includes('update_checkout'))) {
-			try {
-				throw new Error('update_checkout trigger stack');
-			} catch (e) {
-				updateCheckoutCallStack = e.stack;
-				// ALWAYS VISIBLE - Critical for diagnosing Flow disappearing issue
-				console.log('🔍 DIAGNOSTIC: update_checkout triggered - Stack trace:', e.stack);
-			}
-		}
-		return originalTrigger.apply(this, arguments);
-	};
-})();
 
 /**
  * SIMPLIFIED: Protect Flow from updated_checkout destruction
@@ -1508,9 +1570,8 @@ jQuery(document).on("updated_checkout", function () {
 		return;
 	}
 	
-	// ALWAYS VISIBLE - Critical for diagnosing Flow disappearing issue
-	console.log('[FLOW DEBUG] updated_checkout event fired');
-	console.log('🔍 DIAGNOSTIC: Flow state BEFORE updated_checkout:', {
+	ckoLogger.debug('updated_checkout event fired');
+	ckoLogger.debug('Flow state BEFORE updated_checkout:', {
 		flowInitialized: ckoFlowInitialized,
 		flowComponentExists: !!ckoFlow.flowComponent,
 		flowComponentRootExists: !!document.querySelector('[data-testid="checkout-web-component-root"]'),
@@ -1543,8 +1604,7 @@ jQuery(document).on("updated_checkout", function () {
 		const flowComponentRoot = document.querySelector('[data-testid="checkout-web-component-root"]');
 		const flowContainer = document.getElementById("flow-container");
 		
-		// ALWAYS VISIBLE - Critical for diagnosing Flow disappearing issue
-		console.log('🔍 DIAGNOSTIC: Flow state AFTER updated_checkout (100ms delay):', {
+		ckoLogger.debug('Flow state AFTER updated_checkout (100ms delay):', {
 			flowPaymentExists: !!flowPayment,
 			flowPaymentChecked: flowPayment?.checked || false,
 			flowComponentRootExists: !!flowComponentRoot,
@@ -1559,43 +1619,38 @@ jQuery(document).on("updated_checkout", function () {
 		// 3. Flow container exists (DOM was updated)
 		if (flowPayment && flowPayment.checked && flowContainer) {
 			if (!flowComponentRoot) {
-				// ALWAYS VISIBLE - Critical for diagnosing Flow disappearing issue
-				console.log('🔍 DIAGNOSTIC: Flow component was destroyed by updated_checkout, re-initializing...');
+				ckoLogger.debug('Flow component was destroyed by updated_checkout, re-initializing...');
 				// Reset flag so Flow can be re-initialized
 				ckoFlowInitialized = false;
 				ckoFlow.flowComponent = null;
 				// Re-initialize
-				console.log('🔍 DIAGNOSTIC: Calling initializeFlowIfNeeded()...');
 				initializeFlowIfNeeded();
-				console.log('🔍 DIAGNOSTIC: initializeFlowIfNeeded() completed');
 			} else {
 				ckoLogger.debug('Flow component still mounted after updated_checkout, no action needed');
 			}
 		} else if (flowPayment && flowPayment.checked && !flowContainer) {
-			// ALWAYS VISIBLE - Critical for diagnosing Flow disappearing issue
-			console.log('🔍 DIAGNOSTIC: Flow payment selected but container not found yet, waiting...');
+			ckoLogger.debug('Flow payment selected but container not found yet, waiting...');
 			// Container might not be ready yet, check again after a short delay
 			setTimeout(function() {
 				const flowContainerRetry = document.getElementById("flow-container");
 				const flowComponentRootRetry = document.querySelector('[data-testid="checkout-web-component-root"]');
-				console.log('🔍 DIAGNOSTIC: Retry check (300ms total):', {
+				ckoLogger.debug('Retry check (300ms total):', {
 					flowContainerExists: !!flowContainerRetry,
 					flowComponentRootExists: !!flowComponentRootRetry
 				});
 				if (flowContainerRetry && !flowComponentRootRetry) {
-					console.log('🔍 DIAGNOSTIC: Flow container found on retry, re-initializing...');
+					ckoLogger.debug('Flow container found on retry, re-initializing...');
 					ckoFlowInitialized = false;
 					ckoFlow.flowComponent = null;
 					initializeFlowIfNeeded();
 				} else if (flowContainerRetry && flowComponentRootRetry) {
-					console.log('🔍 DIAGNOSTIC: Flow component found on retry, no re-initialization needed');
+					ckoLogger.debug('Flow component found on retry, no re-initialization needed');
 				} else {
-					console.log('🔍 DIAGNOSTIC: Flow container still not found on retry');
+					ckoLogger.debug('Flow container still not found on retry');
 				}
 			}, 200);
 		} else {
-			// ALWAYS VISIBLE - Critical for diagnosing Flow disappearing issue
-			console.log('🔍 DIAGNOSTIC: Conditions not met for re-initialization:', {
+			ckoLogger.debug('Conditions not met for re-initialization:', {
 				flowPaymentExists: !!flowPayment,
 				flowPaymentChecked: flowPayment?.checked || false,
 				flowContainerExists: !!flowContainer
