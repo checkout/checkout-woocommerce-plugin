@@ -27,7 +27,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		$this->id                 = 'wc_checkout_com_flow';
 		$this->method_title       = __( 'Checkout.com', 'checkout-com-unified-payments-api' );
 		$this->method_description = __( 'The Checkout.com extension allows shop owners to process online payments through the <a href="https://www.checkout.com">Checkout.com Payment Gateway.</a>', 'checkout-com-unified-payments-api' );
-		$this->title              = !empty( $core_settings['title'] ) ? __( $core_settings['title'], 'checkout-com-unified-payments-api' ) : __( 'Checkout.com', 'checkout-com-unified-payments-api' );
+		$this->title              = !empty( $core_settings['title'] ) ? trim( __( $core_settings['title'], 'checkout-com-unified-payments-api' ) ) : __( 'Checkout.com', 'checkout-com-unified-payments-api' );
 		$this->has_fields         = true;
 		$this->supports           = array(
 			'products',
@@ -82,6 +82,10 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// AJAX handler for storing save card preference in WooCommerce session
 		add_action( 'wp_ajax_cko_flow_store_save_card_preference', [ $this, 'ajax_store_save_card_preference' ] );
 		add_action( 'wp_ajax_nopriv_cko_flow_store_save_card_preference', [ $this, 'ajax_store_save_card_preference' ] );
+		
+		// AJAX handler for saving payment session ID to order immediately after payment session creation
+		add_action( 'wp_ajax_cko_flow_save_payment_session_id', [ $this, 'ajax_save_payment_session_id' ] );
+		add_action( 'wp_ajax_nopriv_cko_flow_save_payment_session_id', [ $this, 'ajax_save_payment_session_id' ] );
 	}
 
 	/**
@@ -93,13 +97,18 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	 * @return bool
 	 */
 	public function is_available() {
-		// Log availability check start
-		WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Checking if Flow gateway is available...' );
-		WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Gateway enabled setting: ' . ( isset( $this->enabled ) ? $this->enabled : 'NOT SET' ) );
+		// Log availability check start (only in debug mode to reduce log spam)
+		$is_debug = defined( 'WP_DEBUG' ) && WP_DEBUG;
+		if ( $is_debug ) {
+			WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Checking if Flow gateway is available...' );
+			WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Gateway enabled setting: ' . ( isset( $this->enabled ) ? $this->enabled : 'NOT SET' ) );
+		}
 		
 		// First check if gateway is enabled
 		if ( 'yes' !== $this->enabled ) {
-			WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Gateway is NOT available - enabled setting is not "yes"' );
+			if ( $is_debug ) {
+				WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Gateway is NOT available - enabled setting is not "yes"' );
+			}
 			return false;
 		}
 
@@ -107,10 +116,14 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$checkout_mode = isset( $checkout_setting['ckocom_checkout_mode'] ) ? $checkout_setting['ckocom_checkout_mode'] : 'classic';
 		
-		WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Checkout mode: ' . $checkout_mode );
+		if ( $is_debug ) {
+			WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Checkout mode: ' . $checkout_mode );
+		}
 		
 		if ( 'flow' !== $checkout_mode ) {
-			WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Gateway is NOT available - checkout mode is not "flow" (current: ' . $checkout_mode . ')' );
+			if ( $is_debug ) {
+				WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Gateway is NOT available - checkout mode is not "flow" (current: ' . $checkout_mode . ')' );
+			}
 			return false;
 		}
 
@@ -118,17 +131,23 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		$secret_key = isset( $checkout_setting['ckocom_secret_key'] ) ? $checkout_setting['ckocom_secret_key'] : '';
 		$public_key = isset( $checkout_setting['ckocom_public_key'] ) ? $checkout_setting['ckocom_public_key'] : '';
 		
-		WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Secret key: ' . ( ! empty( $secret_key ) ? 'SET (' . substr( $secret_key, 0, 10 ) . '...)' : 'NOT SET' ) );
-		WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Public key: ' . ( ! empty( $public_key ) ? 'SET (' . substr( $public_key, 0, 10 ) . '...)' : 'NOT SET' ) );
+		if ( $is_debug ) {
+			WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Secret key: ' . ( ! empty( $secret_key ) ? 'SET (' . substr( $secret_key, 0, 10 ) . '...)' : 'NOT SET' ) );
+			WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Public key: ' . ( ! empty( $public_key ) ? 'SET (' . substr( $public_key, 0, 10 ) . '...)' : 'NOT SET' ) );
+		}
 		
 		if ( empty( $secret_key ) || empty( $public_key ) ) {
 			// Log warning but don't block availability (credentials might be set later)
-			WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] WARNING: API credentials not set, but gateway is still available' );
+			if ( $is_debug ) {
+				WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] WARNING: API credentials not set, but gateway is still available' );
+			}
 		}
 
 		// Gateway is available if enabled and checkout mode is 'flow'
 		// We bypass currency/country restrictions as Flow supports all currencies/countries
-		WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Gateway IS available - all checks passed' );
+		if ( $is_debug ) {
+			WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Gateway IS available - all checks passed' );
+		}
 		return true;
 	}
 
@@ -476,11 +495,16 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 								root.style.setProperty('--cko-payment-label-text-color', textColor || 'inherit');
 								root.style.setProperty('--cko-payment-label-subtitle-color', subtitleColor || 'inherit');
 								
+								// Text alignment
+								const textAlign = settings.flow_payment_label_text_align || 'left';
+								root.style.setProperty('--cko-payment-label-text-align', textAlign);
+								
 								console.log('[FLOW PHP] Payment label customization applied:', {
 									background: bg,
 									border: `${borderWidth} ${borderColor || 'transparent'}`,
 									iconPosition: iconPosition,
-									textColor: textColor || 'inherit'
+									textColor: textColor || 'inherit',
+									textAlign: textAlign
 								});
 							}
 							
@@ -888,11 +912,16 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 							root.style.setProperty('--cko-payment-label-text-color', textColor || 'inherit');
 							root.style.setProperty('--cko-payment-label-subtitle-color', subtitleColor || 'inherit');
 							
+							// Text alignment
+							const textAlign = settings.flow_payment_label_text_align || 'left';
+							root.style.setProperty('--cko-payment-label-text-align', textAlign);
+							
 							console.log('[FLOW PHP] Payment label customization applied (section 2):', {
 								background: bg,
 								border: `${borderWidth} ${borderColor || 'transparent'}`,
 								iconPosition: iconPosition,
-								textColor: textColor || 'inherit'
+								textColor: textColor || 'inherit',
+								textAlign: textAlign
 							});
 						}
 						
@@ -1443,9 +1472,9 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				
 				if ( $builder ) {
 					$payment_details = $builder->getPaymentsClient()->getPaymentDetails( $flow_payment_id_from_post );
-					WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Payment details fetched successfully (early fetch)' );
-				} else {
-					WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] WARNING: SDK builder not initialized during early fetch - will retry later if needed' );
+					if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+						WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] [SHIPPING DEBUG] Payment details fetched successfully (early fetch)' );
+					}
 				}
 			} catch ( Exception $e ) {
 				WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] WARNING: Failed to fetch payment details early: ' . $e->getMessage() . ' - will retry later if needed' );
@@ -1515,122 +1544,26 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		
 		WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Order found - ID: ' . $order->get_id() . ', Status: ' . $order->get_status() . ', Payment Method: ' . $order->get_payment_method() );
 		
-		// CRITICAL: Ensure billing and shipping addresses are set from checkout form POST data
-		// WooCommerce should set these during order creation, but we ensure they're set here as well
-		// This is especially important if addresses weren't set during order creation
-		// Priority: 1) POST data, 2) WC()->customer, 3) Keep existing order data
+		// DEBUG: Log current address state BEFORE setting addresses
+		WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] [ADDRESS DEBUG] BEFORE setting addresses - Billing: ' . $order->get_billing_address_1() . ', ' . $order->get_billing_city() . ', ' . $order->get_billing_country() . ' | Shipping: ' . $order->get_shipping_address_1() . ', ' . $order->get_shipping_city() . ', ' . $order->get_shipping_country() );
 		
-		// Check if POST data has address fields (indicates form submission)
-		$has_post_addresses = ! empty( $_POST['billing_first_name'] ) || ! empty( $_POST['billing_address_1'] );
+		// CRITICAL: Set addresses consistently for both successful and failed payments
+		// This ensures addresses are always visible regardless of payment outcome
+		// Priority: 1) payment_details (if available), 2) POST data, 3) WC()->customer, 4) Preserve existing
+		// Note: payment_details will be available after payment is fetched, so we'll call this again after fetching payment_details
+		$this->set_order_addresses_consistently( $order );
 		
-		if ( $has_post_addresses ) {
-			// Set billing address from POST data
-			if ( isset( $_POST['billing_first_name'] ) ) {
-				$order->set_billing_first_name( sanitize_text_field( $_POST['billing_first_name'] ) );
-			}
-			if ( isset( $_POST['billing_last_name'] ) ) {
-				$order->set_billing_last_name( sanitize_text_field( $_POST['billing_last_name'] ) );
-			}
-			if ( isset( $_POST['billing_company'] ) ) {
-				$order->set_billing_company( sanitize_text_field( $_POST['billing_company'] ) );
-			}
-			if ( isset( $_POST['billing_address_1'] ) ) {
-				$order->set_billing_address_1( sanitize_text_field( $_POST['billing_address_1'] ) );
-			}
-			if ( isset( $_POST['billing_address_2'] ) ) {
-				$order->set_billing_address_2( sanitize_text_field( $_POST['billing_address_2'] ) );
-			}
-			if ( isset( $_POST['billing_city'] ) ) {
-				$order->set_billing_city( sanitize_text_field( $_POST['billing_city'] ) );
-			}
-			if ( isset( $_POST['billing_state'] ) ) {
-				$order->set_billing_state( sanitize_text_field( $_POST['billing_state'] ) );
-			}
-			if ( isset( $_POST['billing_postcode'] ) ) {
-				$order->set_billing_postcode( sanitize_text_field( $_POST['billing_postcode'] ) );
-			}
-			if ( isset( $_POST['billing_country'] ) ) {
-				$order->set_billing_country( sanitize_text_field( $_POST['billing_country'] ) );
-			}
-			if ( isset( $_POST['billing_phone'] ) ) {
-				$order->set_billing_phone( sanitize_text_field( $_POST['billing_phone'] ) );
-			}
-			if ( isset( $_POST['billing_email'] ) ) {
-				$order->set_billing_email( sanitize_email( $_POST['billing_email'] ) );
-			}
-			
-			// Set shipping address - check if ship_to_different_address is set
-			$ship_to_different_address = isset( $_POST['ship_to_different_address'] ) ? (bool) $_POST['ship_to_different_address'] : false;
-			
-			if ( $ship_to_different_address ) {
-				// Different shipping address from POST
-				if ( isset( $_POST['shipping_first_name'] ) ) {
-					$order->set_shipping_first_name( sanitize_text_field( $_POST['shipping_first_name'] ) );
-				}
-				if ( isset( $_POST['shipping_last_name'] ) ) {
-					$order->set_shipping_last_name( sanitize_text_field( $_POST['shipping_last_name'] ) );
-				}
-				if ( isset( $_POST['shipping_company'] ) ) {
-					$order->set_shipping_company( sanitize_text_field( $_POST['shipping_company'] ) );
-				}
-				if ( isset( $_POST['shipping_address_1'] ) ) {
-					$order->set_shipping_address_1( sanitize_text_field( $_POST['shipping_address_1'] ) );
-				}
-				if ( isset( $_POST['shipping_address_2'] ) ) {
-					$order->set_shipping_address_2( sanitize_text_field( $_POST['shipping_address_2'] ) );
-				}
-				if ( isset( $_POST['shipping_city'] ) ) {
-					$order->set_shipping_city( sanitize_text_field( $_POST['shipping_city'] ) );
-				}
-				if ( isset( $_POST['shipping_state'] ) ) {
-					$order->set_shipping_state( sanitize_text_field( $_POST['shipping_state'] ) );
-				}
-				if ( isset( $_POST['shipping_postcode'] ) ) {
-					$order->set_shipping_postcode( sanitize_text_field( $_POST['shipping_postcode'] ) );
-				}
-				if ( isset( $_POST['shipping_country'] ) ) {
-					$order->set_shipping_country( sanitize_text_field( $_POST['shipping_country'] ) );
-				}
-			} else {
-				// Shipping address same as billing
-				$order->set_shipping_first_name( $order->get_billing_first_name() );
-				$order->set_shipping_last_name( $order->get_billing_last_name() );
-				$order->set_shipping_company( $order->get_billing_company() );
-				$order->set_shipping_address_1( $order->get_billing_address_1() );
-				$order->set_shipping_address_2( $order->get_billing_address_2() );
-				$order->set_shipping_city( $order->get_billing_city() );
-				$order->set_shipping_state( $order->get_billing_state() );
-				$order->set_shipping_postcode( $order->get_billing_postcode() );
-				$order->set_shipping_country( $order->get_billing_country() );
-			}
-		} elseif ( WC()->customer ) {
-			// Fallback: Get addresses from WC()->customer if POST data not available
-			$order->set_billing_first_name( WC()->customer->get_billing_first_name() );
-			$order->set_billing_last_name( WC()->customer->get_billing_last_name() );
-			$order->set_billing_company( WC()->customer->get_billing_company() );
-			$order->set_billing_address_1( WC()->customer->get_billing_address_1() );
-			$order->set_billing_address_2( WC()->customer->get_billing_address_2() );
-			$order->set_billing_city( WC()->customer->get_billing_city() );
-			$order->set_billing_state( WC()->customer->get_billing_state() );
-			$order->set_billing_postcode( WC()->customer->get_billing_postcode() );
-			$order->set_billing_country( WC()->customer->get_billing_country() );
-			$order->set_billing_phone( WC()->customer->get_billing_phone() );
-			$order->set_billing_email( WC()->customer->get_billing_email() );
-			
-			$order->set_shipping_first_name( WC()->customer->get_shipping_first_name() );
-			$order->set_shipping_last_name( WC()->customer->get_shipping_last_name() );
-			$order->set_shipping_company( WC()->customer->get_shipping_company() );
-			$order->set_shipping_address_1( WC()->customer->get_shipping_address_1() );
-			$order->set_shipping_address_2( WC()->customer->get_shipping_address_2() );
-			$order->set_shipping_city( WC()->customer->get_shipping_city() );
-			$order->set_shipping_state( WC()->customer->get_shipping_state() );
-			$order->set_shipping_postcode( WC()->customer->get_shipping_postcode() );
-			$order->set_shipping_country( WC()->customer->get_shipping_country() );
+		// CRITICAL: Add shipping from payment_details if available (from early fetch)
+		if ( ! empty( $payment_details ) ) {
+			$this->add_shipping_from_payment_details( $order, $payment_details );
 		}
 		
 		// Save addresses immediately to ensure they persist
 		$order->save();
-		WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Set and saved billing and shipping addresses from POST data - Order ID: ' . $order_id );
+		
+		// DEBUG: Log address state AFTER setting and saving
+		WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] [ADDRESS DEBUG] AFTER setting addresses - Billing: ' . $order->get_billing_address_1() . ', ' . $order->get_billing_city() . ', ' . $order->get_billing_country() . ' | Shipping: ' . $order->get_shipping_address_1() . ', ' . $order->get_shipping_city() . ', ' . $order->get_shipping_country() );
+		WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Set and saved billing and shipping addresses - Order ID: ' . $order_id );
 		
 		// DUPLICATE PREVENTION: Check if this order has already been processed
 		$existing_transaction_id = $order->get_transaction_id();
@@ -1856,13 +1789,33 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// CRITICAL: Check if payment is approved before processing
 		$is_approved = isset( $payment_details['approved'] ) ? $payment_details['approved'] : false;
 		if ( ! $is_approved ) {
-			WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Payment not approved (3DS return) - Order ID: ' . $order_id . ', Payment ID: ' . $flow_payment_id );
-			WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Payment details: ' . print_r( $payment_details, true ) );
+			// PERFORMANCE: Only log verbose details in debug mode
+			$is_debug = defined( 'WP_DEBUG' ) && WP_DEBUG;
+			
+			if ( $is_debug ) {
+				WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Payment not approved (3DS return) - Order ID: ' . $order_id . ', Payment ID: ' . $flow_payment_id );
+				WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Payment details: ' . print_r( $payment_details, true ) );
+			}
+			
+			// CRITICAL: Set addresses consistently for failed payments (same logic as successful payments)
+			// This ensures addresses are always visible regardless of payment outcome
+			// Priority: 1) payment_details (if available), 2) POST data, 3) WC()->customer, 4) Preserve existing
+			if ( $is_debug ) {
+				WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] [ADDRESS DEBUG] Payment failed - Setting addresses consistently' );
+				WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] [ADDRESS DEBUG] Payment details available: ' . ( $payment_details ? 'YES' : 'NO' ) . ', billing_address in payment_details: ' . ( isset( $payment_details['billing_address'] ) ? 'YES' : 'NO' ) );
+			}
+			$this->set_order_addresses_consistently( $order, $payment_details );
 			
 			// Set transaction ID and payment ID in order meta for tracking
 			$order->set_transaction_id( $result['action_id'] );
 			$order->update_meta_data( '_cko_payment_id', $flow_payment_id );
 			$order->update_meta_data( '_cko_flow_payment_id', $flow_payment_id );
+			
+			// Save addresses BEFORE marking as failed
+			$order->save();
+			if ( $is_debug ) {
+				WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] [ADDRESS DEBUG] Addresses saved BEFORE marking as failed - Billing: ' . $order->get_billing_address_1() . ', ' . $order->get_billing_city() . ', ' . $order->get_billing_country() . ' | Shipping: ' . $order->get_shipping_address_1() . ', ' . $order->get_shipping_city() . ', ' . $order->get_shipping_country() );
+			}
 			
 			// Get error message from payment details if available
 			$error_message = __( 'Payment was not approved. Please try again.', 'checkout-com-unified-payments-api' );
@@ -1875,13 +1828,29 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			// Update order status to failed
 			$order->update_status( 'failed', __( 'Payment was not approved by Checkout.com', 'checkout-com-unified-payments-api' ) );
 			$order->add_order_note( sprintf( __( 'Payment declined - Payment ID: %s, Reason: %s', 'checkout-com-unified-payments-api' ), $flow_payment_id, $error_message ) );
+			
+			// Save order again after marking as failed
 			$order->save();
+			if ( $is_debug ) {
+				WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] [ADDRESS DEBUG] Addresses saved AFTER marking as failed - Billing: ' . $order->get_billing_address_1() . ', ' . $order->get_billing_city() . ', ' . $order->get_billing_country() . ' | Shipping: ' . $order->get_shipping_address_1() . ', ' . $order->get_shipping_city() . ', ' . $order->get_shipping_country() );
+			}
 			
 			// Add error notice
 			WC_Checkoutcom_Utility::wc_add_notice_self( $error_message, 'error' );
 			
 			// Return error - don't proceed with success flow
 			return;
+		}
+		
+		// CRITICAL: Update addresses from payment_details for successful payments (if available)
+		// This ensures we have the most accurate addresses from Checkout.com API
+		// Priority: 1) payment_details (most accurate), 2) POST data, 3) WC()->customer, 4) Preserve existing
+		if ( isset( $payment_details ) ) {
+			$this->set_order_addresses_consistently( $order, $payment_details );
+			// CRITICAL: Add shipping from payment_details items if not already present
+			$this->add_shipping_from_payment_details( $order, $payment_details );
+			$order->save(); // Save addresses before proceeding
+		} else {
 		}
 		
 		// Set transaction ID and payment ID in order meta
@@ -1985,11 +1954,19 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {
 				WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Saved card payment failed - Order ID: ' . $order_id . ', Error: ' . $result['error'] );
 				
+				// DEBUG: Log addresses before marking as failed
+				if ( $order && $order->get_id() ) {
+					WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] [ADDRESS DEBUG] Saved card payment failed - Billing: ' . $order->get_billing_address_1() . ', ' . $order->get_billing_city() . ', ' . $order->get_billing_country() . ' | Shipping: ' . $order->get_shipping_address_1() . ', ' . $order->get_shipping_city() . ', ' . $order->get_shipping_country() );
+				}
+				
 				// CRITICAL: Mark order as failed to track payment failure
 				if ( $order && $order->get_id() ) {
 					$order->update_status( 'failed', __( 'Payment failed - Saved card payment error', 'checkout-com-unified-payments-api' ) );
 					$order->add_order_note( sprintf( __( 'Payment failed - Error: %s', 'checkout-com-unified-payments-api' ), $result['error'] ) );
 					$order->save();
+					
+					// DEBUG: Log addresses AFTER marking as failed
+					WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] [ADDRESS DEBUG] After saved card payment failed save - Billing: ' . $order->get_billing_address_1() . ', ' . $order->get_billing_city() . ', ' . $order->get_billing_country() . ' | Shipping: ' . $order->get_shipping_address_1() . ', ' . $order->get_shipping_city() . ', ' . $order->get_shipping_country() );
 					WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Order marked as failed - Order ID: ' . $order_id );
 				}
 				
@@ -2096,20 +2073,27 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	$payment_session_id = isset( $_POST['cko-flow-payment-session-id'] ) ? sanitize_text_field( $_POST['cko-flow-payment-session-id'] ) : '';
 	WC_Checkoutcom_Utility::logger( 'Payment session ID from POST: ' . ( ! empty( $payment_session_id ) ? $payment_session_id : 'EMPTY' ) );
 	
+	$payment_details_for_shipping = null;
 	if ( empty( $payment_session_id ) && ! empty( $flow_pay_id ) ) {
 		// Try to get payment session ID from payment metadata
-		WC_Checkoutcom_Utility::logger( 'Payment session ID not in POST, fetching from payment details...' );
 		try {
 			$checkout = new Checkout_SDK();
 			$builder = $checkout->get_builder();
 			if ( $builder ) {
-				$payment_details = $builder->getPaymentsClient()->getPaymentDetails( $flow_pay_id );
-				$payment_session_id = isset( $payment_details['metadata']['cko_payment_session_id'] ) ? $payment_details['metadata']['cko_payment_session_id'] : '';
-				WC_Checkoutcom_Utility::logger( 'Payment session ID from payment metadata: ' . ( ! empty( $payment_session_id ) ? $payment_session_id : 'EMPTY' ) );
+				$payment_details_for_shipping = $builder->getPaymentsClient()->getPaymentDetails( $flow_pay_id );
+				$payment_session_id = isset( $payment_details_for_shipping['metadata']['cko_payment_session_id'] ) ? $payment_details_for_shipping['metadata']['cko_payment_session_id'] : '';
 			}
 		} catch ( Exception $e ) {
-			WC_Checkoutcom_Utility::logger( 'Could not fetch payment session ID from payment details: ' . $e->getMessage() );
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				WC_Checkoutcom_Utility::logger( '[FLOW] [SHIPPING DEBUG] Could not fetch payment details: ' . $e->getMessage() );
+			}
 		}
+	}
+	
+	// CRITICAL: Add shipping from payment_details if available and order doesn't have shipping yet
+	if ( $payment_details_for_shipping ) {
+		$this->add_shipping_from_payment_details( $order, $payment_details_for_shipping );
+		$order->save(); // Save after adding shipping
 	}
 	
 	// Always save payment session ID if we have it (even if empty, log it)
@@ -2394,247 +2378,249 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	public function handle_3ds_return() {
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended
 		
-		WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ========== ENTRY POINT ==========' );
-		WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Request URI: ' . ( isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : 'N/A' ) );
-		WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] GET params: ' . print_r( $_GET, true ) );
-		WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] POST params: ' . print_r( $_POST, true ) );
+		// PERFORMANCE: Only log verbose details in debug mode
+		$is_debug = defined( 'WP_DEBUG' ) && WP_DEBUG;
+		if ( $is_debug ) {
+			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ========== ENTRY POINT ==========' );
+			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Request URI: ' . ( isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : 'N/A' ) );
+		}
 		
 		$payment_id = isset( $_GET['cko-payment-id'] ) ? sanitize_text_field( $_GET['cko-payment-id'] ) : '';
 		$payment_session_id_from_url = isset( $_GET['cko-payment-session-id'] ) ? sanitize_text_field( $_GET['cko-payment-session-id'] ) : '';
 		$order_id   = isset( $_GET['order_id'] ) ? absint( $_GET['order_id'] ) : 0;
 		$order_key  = isset( $_GET['key'] ) ? sanitize_text_field( $_GET['key'] ) : '';
 		
-		WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Extracted values - Payment ID: ' . $payment_id . ', Payment Session ID (from URL): ' . $payment_session_id_from_url . ', Order ID: ' . $order_id . ', Order Key: ' . ( ! empty( $order_key ) ? 'SET' : 'EMPTY' ) );
+		if ( $is_debug ) {
+			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment ID: ' . $payment_id . ', Order ID: ' . $order_id );
+		}
 		
 		if ( empty( $payment_id ) ) {
-			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ERROR: Missing payment ID' );
 			error_log( '[FLOW 3DS API] ERROR: Missing payment ID in GET params' );
 			wp_die( esc_html__( 'Missing payment ID', 'checkout-com-unified-payments-api' ), esc_html__( 'Payment Error', 'checkout-com-unified-payments-api' ), array( 'response' => 400 ) );
 		}
 		
-		// Fetch payment details early (before order lookup) so we can use them as fallback if order lookup fails
-		$payment_details = null;
-		try {
-			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Fetching payment details early (before order lookup) - Payment ID: ' . $payment_id );
-			$checkout = new Checkout_SDK();
-			$builder = $checkout->get_builder();
-			
-			if ( $builder ) {
-				$payment_details = $builder->getPaymentsClient()->getPaymentDetails( $payment_id );
-				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment details fetched successfully (early fetch)' );
-			} else {
-				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] WARNING: SDK builder not initialized during early fetch - will retry later' );
-			}
-		} catch ( Exception $e ) {
-			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] WARNING: Failed to fetch payment details early: ' . $e->getMessage() . ' - will retry later' );
-			// Don't fail here - we'll retry later if needed
-		}
+		// PERFORMANCE OPTIMIZATION: Initialize SDK and payment details cache (used in both fast and slow paths)
+		static $sdk_builder_cache = null;
+		static $payment_details_cache = array();
 		
+		// PERFORMANCE OPTIMIZATION: Early exit - Check order_id FIRST before expensive operations
+		// If order_id and order_key are provided (order-pay page), use them directly (fast path)
 		$order = null;
+		$payment_details = null;
 		
-		// If order_id and order_key are provided (order-pay page), use them
 		if ( ! empty( $order_id ) && ! empty( $order_key ) ) {
-			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order ID and key provided - loading order: ' . $order_id );
+			if ( $is_debug ) {
+				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order ID and key provided - loading order: ' . $order_id );
+			}
 			$order = wc_get_order( $order_id );
 			
 			if ( ! $order ) {
-				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ERROR: Order not found - Order ID: ' . $order_id );
-				error_log( '[FLOW 3DS API] ERROR: Order not found' );
+				error_log( '[FLOW 3DS API] ERROR: Order not found - Order ID: ' . $order_id );
 				wp_die( esc_html__( 'Order not found', 'checkout-com-unified-payments-api' ), esc_html__( 'Payment Error', 'checkout-com-unified-payments-api' ), array( 'response' => 400 ) );
 			}
 			
 			$order_key_from_order = $order->get_order_key();
-			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order found - Order Key from order: ' . $order_key_from_order . ', Order Key from URL: ' . $order_key );
-			
 			if ( $order_key_from_order !== $order_key ) {
-				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ERROR: Order key mismatch' );
 				error_log( '[FLOW 3DS API] ERROR: Order key mismatch' );
 				wp_die( esc_html__( 'Invalid order key', 'checkout-com-unified-payments-api' ), esc_html__( 'Payment Error', 'checkout-com-unified-payments-api' ), array( 'response' => 400 ) );
 			}
+			
+			// PERFORMANCE: Fast path - order found, skip to payment processing
+			// Payment details will be fetched later if needed (after duplicate check)
 		} else {
-			// For regular checkout, look up order by payment session ID
-			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order ID/key not provided - will look up order by payment session ID' );
+			// PERFORMANCE OPTIMIZATION: For regular checkout, look up order by payment session ID
+			// Initialize SDK once (if not already initialized)
+			if ( null === $sdk_builder_cache ) {
+				$checkout = new Checkout_SDK();
+				$sdk_builder_cache = $checkout->get_builder();
+			}
+			$builder = $sdk_builder_cache;
+			
+			if ( ! $builder ) {
+				error_log( '[FLOW 3DS API] ERROR: SDK builder not initialized' );
+				wp_die( esc_html__( 'Payment processing error', 'checkout-com-unified-payments-api' ), esc_html__( 'Payment Error', 'checkout-com-unified-payments-api' ), array( 'response' => 500 ) );
+			}
+			
+			// PERFORMANCE: Fetch payment details once and cache
+			if ( ! isset( $payment_details_cache[ $payment_id ] ) ) {
+				try {
+					if ( $is_debug ) {
+						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Fetching payment details - Payment ID: ' . $payment_id );
+					}
+					$payment_details_cache[ $payment_id ] = $builder->getPaymentsClient()->getPaymentDetails( $payment_id );
+				} catch ( Exception $e ) {
+					if ( $is_debug ) {
+						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] WARNING: Failed to fetch payment details: ' . $e->getMessage() );
+					}
+					error_log( '[FLOW 3DS API] ERROR: Failed to fetch payment details: ' . $e->getMessage() );
+					wp_die( esc_html__( 'Payment processing error', 'checkout-com-unified-payments-api' ), esc_html__( 'Payment Error', 'checkout-com-unified-payments-api' ), array( 'response' => 500 ) );
+				}
+			}
+			$payment_details = $payment_details_cache[ $payment_id ];
 			
 			try {
 				// Get payment session ID from URL first (faster), then from payment metadata if needed
 				$payment_session_id = $payment_session_id_from_url;
-				$payment_details = null;
 				
-				if ( empty( $payment_session_id ) ) {
-					// Fallback: fetch payment details to get the payment session ID
-					WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment session ID not in URL, fetching from payment details...' );
-					$checkout = new Checkout_SDK();
-					$builder = $checkout->get_builder();
-					
-					if ( ! $builder ) {
-						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ERROR: SDK builder not initialized for order lookup' );
-						error_log( '[FLOW 3DS API] ERROR: SDK builder not initialized' );
-						wp_die( esc_html__( 'Payment processing error', 'checkout-com-unified-payments-api' ), esc_html__( 'Payment Error', 'checkout-com-unified-payments-api' ), array( 'response' => 500 ) );
-					}
-					
-					WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Fetching payment details to get payment session ID...' );
-					$payment_details = $builder->getPaymentsClient()->getPaymentDetails( $payment_id );
-					
-					// Get payment session ID from metadata
+				if ( empty( $payment_session_id ) && ! empty( $payment_details ) ) {
+					// Get payment session ID from cached payment details
 					$payment_session_id = isset( $payment_details['metadata']['cko_payment_session_id'] ) ? $payment_details['metadata']['cko_payment_session_id'] : '';
-					
-					WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment session ID from payment metadata: ' . $payment_session_id );
-				} else {
-					WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Using payment session ID from URL: ' . $payment_session_id );
-					// Still fetch payment details for fallback lookup methods
-					$checkout = new Checkout_SDK();
-					$builder = $checkout->get_builder();
-					if ( $builder ) {
-						$payment_details = $builder->getPaymentsClient()->getPaymentDetails( $payment_id );
+					if ( $is_debug && ! empty( $payment_session_id ) ) {
+						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment session ID from payment metadata: ' . $payment_session_id );
 					}
 				}
 				
 				if ( empty( $payment_session_id ) ) {
-					WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ERROR: Payment session ID not found in URL or payment metadata' );
-					error_log( '[FLOW 3DS API] ERROR: Payment session ID not found' );
+					if ( $is_debug ) {
+						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment session ID not found in URL or payment metadata' );
+					}
 					// Don't die yet - try fallback methods
 				} else {
 					
-					// Look up order by payment session ID
-					// In slow environments, order might not be created yet, so retry with delays
-					// In fast environments, order is usually found on first try (no delay)
-					WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Looking up order by payment session ID: ' . $payment_session_id );
-					$orders = null;
-					$max_retries = 2; // Reduced to 2 retries (still handles slow envs, faster for normal envs)
-					$retry_delay = 0.5; // Reduced to 0.5 seconds (faster retries)
-					
-					for ( $retry = 0; $retry < $max_retries; $retry++ ) {
-						// First attempt: no delay (fast environments find order immediately)
-						// Subsequent attempts: short delay (for slow environments)
-						if ( $retry > 0 ) {
-							WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Retry ' . $retry . ' - Waiting ' . $retry_delay . ' seconds before retrying order lookup...' );
-							usleep( $retry_delay * 1000000 ); // Use usleep for microsecond precision
-						}
-						
-						$orders = wc_get_orders( array(
-							'meta_key'   => '_cko_payment_session_id',
-							'meta_value' => $payment_session_id,
-							'limit'      => 1,
-							'orderby'    => 'date',
-							'order'      => 'DESC',
-						) );
-						
-						if ( ! empty( $orders ) ) {
-							break; // Order found, exit retry loop immediately (no delay in fast environments)
-						}
+					// PERFORMANCE OPTIMIZATION Phase 2: Combined query - Look up by payment_session_id OR payment_id in single query
+					// This reduces database queries from 2 to 1
+					if ( $is_debug ) {
+						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Looking up order by payment session ID or payment ID...' );
 					}
 					
+					// Build meta_query with OR conditions for both payment_session_id and payment_id
+					$meta_query = array(
+						'relation' => 'OR',
+					);
+					
+					if ( ! empty( $payment_session_id ) ) {
+						$meta_query[] = array(
+							'key'   => '_cko_payment_session_id',
+							'value' => $payment_session_id,
+						);
+					}
+					
+					// Always include payment_id lookup (fallback)
+					$meta_query[] = array(
+						'key'   => '_cko_payment_id',
+						'value' => $payment_id,
+					);
+					
+					$orders = wc_get_orders( array(
+						'meta_query' => $meta_query,
+						'limit'      => 5, // Get up to 5 to check statuses
+						'orderby'    => 'date',
+						'order'      => 'DESC',
+					) );
+					
+					// Process results - prioritize payment_session_id matches, then payment_id matches
 					if ( ! empty( $orders ) ) {
-						$found_order = $orders[0];
-						$found_order_status = $found_order->get_status();
-						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order found by payment session ID - Order ID: ' . $found_order->get_id() . ', Status: ' . $found_order_status . ' (after ' . ($retry + 1) . ' attempt(s))' );
+						$found_order = null;
+						$found_by_payment_session = false;
 						
-						// Only use this order if it's in pending or failed status (reusable)
-						if ( in_array( $found_order_status, array( 'pending', 'failed' ), true ) ) {
+						foreach ( $orders as $potential_order ) {
+							$order_payment_session_id = $potential_order->get_meta( '_cko_payment_session_id' );
+							$order_payment_id = $potential_order->get_meta( '_cko_payment_id' );
+							$order_status = $potential_order->get_status();
+							
+							// Prioritize payment_session_id match
+							if ( ! empty( $payment_session_id ) && $order_payment_session_id === $payment_session_id ) {
+								if ( in_array( $order_status, array( 'pending', 'failed' ), true ) ) {
+									$found_order = $potential_order;
+									$found_by_payment_session = true;
+									if ( $is_debug ) {
+										WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order found by payment session ID - Order ID: ' . $found_order->get_id() . ', Status: ' . $order_status );
+									}
+									break; // Found best match, exit loop
+								}
+							}
+						}
+						
+						// If no payment_session_id match found, check payment_id matches
+						if ( ! $found_order ) {
+							foreach ( $orders as $potential_order ) {
+								$order_payment_id = $potential_order->get_meta( '_cko_payment_id' );
+								$order_status = $potential_order->get_status();
+								$existing_transaction_id = $potential_order->get_transaction_id();
+								
+								if ( $order_payment_id === $payment_id ) {
+									// Check if order already has a transaction ID (means it was already fully processed)
+									if ( ! empty( $existing_transaction_id ) ) {
+										if ( $is_debug ) {
+											WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ⚠️ Order found by payment ID already has transaction ID: ' . $existing_transaction_id . ' - NOT reusing (already processed)' );
+										}
+										continue; // Skip this order, check next
+									} elseif ( in_array( $order_status, array( 'pending', 'failed' ), true ) ) {
+										// Only use this order if it's in pending or failed status AND has no transaction ID (reusable)
+										$found_order = $potential_order;
+										if ( $is_debug ) {
+											WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order found by payment ID - Order ID: ' . $found_order->get_id() . ', Status: ' . $order_status );
+										}
+										break; // Found reusable order, exit loop
+									}
+								}
+							}
+						}
+						
+						if ( $found_order ) {
 							$order = $found_order;
 							$order_id = $order->get_id();
-							WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ✅ Using order found by payment session ID (status: ' . $found_order_status . ') - Order ID: ' . $order_id );
-						} else {
-							WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order found by payment session ID has status ' . $found_order_status . ' (not reusable) - will check for duplicate or create new order' );
+							if ( $is_debug ) {
+								WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ✅ Using order found by ' . ( $found_by_payment_session ? 'payment session ID' : 'payment ID' ) . ' (status: ' . $found_order->get_status() . ') - Order ID: ' . $order_id );
+							}
 						}
-					} else {
-						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order not found by payment session ID after ' . $max_retries . ' attempts (slow environment?)' );
 					}
 					
 					// If order not found or not reusable, try fallback methods
 					if ( ! $order ) {
-						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order not found by payment session ID or not reusable, trying fallback methods...' );
-						
-						// Fallback 1: Try to find order by payment ID (in case payment was already processed)
-						// Also retry for slow environments (but optimized for fast environments)
-						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Fallback: Looking for order by payment ID: ' . $payment_id );
-						$orders_by_payment = null;
-						
-						for ( $retry_payment = 0; $retry_payment < $max_retries; $retry_payment++ ) {
-							// First attempt: no delay (fast environments find order immediately)
-							if ( $retry_payment > 0 ) {
-								WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Fallback retry ' . $retry_payment . ' - Waiting ' . $retry_delay . ' seconds...' );
-								usleep( $retry_delay * 1000000 ); // Use usleep for microsecond precision
-							}
-							
-							$orders_by_payment = wc_get_orders( array(
-								'meta_key'   => '_cko_payment_id',
-								'meta_value' => $payment_id,
-								'limit'      => 1,
-								'orderby'    => 'date',
-								'order'      => 'DESC',
-							) );
-							
-							if ( ! empty( $orders_by_payment ) ) {
-								break; // Order found, exit immediately (no delay in fast environments)
-							}
-						}
-						
-						if ( ! empty( $orders_by_payment ) ) {
-							$found_order_by_payment = $orders_by_payment[0];
-							$found_order_by_payment_status = $found_order_by_payment->get_status();
-							WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order found by payment ID - Order ID: ' . $found_order_by_payment->get_id() . ', Status: ' . $found_order_by_payment_status . ' (after ' . ($retry_payment + 1) . ' attempt(s))' );
-							
-							// CRITICAL: Check if order already has a transaction ID (means it was already fully processed)
-							$existing_transaction_id = $found_order_by_payment->get_transaction_id();
-							if ( ! empty( $existing_transaction_id ) ) {
-								WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ⚠️ Order found by payment ID already has transaction ID: ' . $existing_transaction_id . ' - NOT reusing (already processed)' );
-							} elseif ( in_array( $found_order_by_payment_status, array( 'pending', 'failed' ), true ) ) {
-								// Only use this order if it's in pending or failed status AND has no transaction ID (reusable)
-								$order = $found_order_by_payment;
-								$order_id = $order->get_id();
-								WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ✅ Using order found by payment ID (status: ' . $found_order_by_payment_status . ', no transaction ID) - Order ID: ' . $order_id );
-							} else {
-								WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order found by payment ID has status ' . $found_order_by_payment_status . ' (not reusable) - will check for duplicate or create new order' );
-							}
-						}
-						
-						if ( ! $order ) {
 							// Fallback 2: Try to find most recent pending/failed order for this customer
 							// IMPORTANT: Apply same duplicate prevention logic as pre-order creation check
-							WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Fallback: Looking for most recent pending/failed order...' );
+							if ( $is_debug ) {
+								WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Fallback: Looking for most recent pending/failed order...' );
+							}
 							if ( $payment_details && isset( $payment_details['customer']['email'] ) ) {
 								$customer_email = $payment_details['customer']['email'];
 								if ( ! empty( $customer_email ) ) {
+									// PERFORMANCE OPTIMIZATION Phase 2: Single query for both pending and failed orders
 									// Use date_query to only check recent orders (same time windows as pre-order creation check)
-									$date_after_failed = date( 'Y-m-d H:i:s', strtotime( '-2 days' ) );
 									$date_after_pending = date( 'Y-m-d H:i:s', strtotime( '-7 days' ) );
 									
-									// First, check for pending orders (longer window)
+									// Single query for both pending and failed orders (more efficient than two separate queries)
 									$orders_by_email = wc_get_orders( array(
 										'billing_email' => $customer_email,
-										'status'        => array( 'pending' ),
+										'status'        => array( 'pending', 'failed' ),
 										'date_query'    => array(
 											array(
-												'after' => $date_after_pending,
+												'after' => $date_after_pending, // Use longer window (7 days) for both
 												'inclusive' => true,
 											),
 										),
-										'limit'         => 5,
+										'limit'         => 10, // Increased limit to handle both statuses
 										'orderby'       => 'date',
 										'order'         => 'DESC',
 									) );
 									
-									// If no pending orders found, check for failed orders (shorter window)
-									if ( empty( $orders_by_email ) ) {
-										$orders_by_email = wc_get_orders( array(
-											'billing_email' => $customer_email,
-											'status'        => array( 'failed' ),
-											'date_query'    => array(
-												array(
-													'after' => $date_after_failed,
-													'inclusive' => true,
-												),
-											),
-											'limit'         => 5,
-											'orderby'       => 'date',
-											'order'         => 'DESC',
-										) );
+									// Filter failed orders to 2-day window in PHP (more efficient than second query)
+									if ( ! empty( $orders_by_email ) ) {
+										$date_after_failed = strtotime( '-2 days' );
+										$filtered_orders = array();
+										
+										foreach ( $orders_by_email as $email_order ) {
+											$order_status = $email_order->get_status();
+											$order_date = $email_order->get_date_created();
+											
+											// Include pending orders (7-day window) or failed orders (2-day window)
+											if ( 'pending' === $order_status || 
+											     ( 'failed' === $order_status && $order_date->getTimestamp() >= $date_after_failed ) ) {
+												$filtered_orders[] = $email_order;
+											}
+										}
+										
+										$orders_by_email = $filtered_orders;
 									}
 									
-									WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Found ' . count( $orders_by_email ) . ' pending/failed orders for email: ' . $customer_email . ' (within time windows: pending=7 days, failed=2 days)' );
+									if ( $is_debug ) {
+										WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Found ' . count( $orders_by_email ) . ' pending/failed orders for email: ' . $customer_email );
+									}
 									
-									// Check if any of these orders match the payment amount AND are reusable
+									// CRITICAL: Only reuse orders if payment_session_id matches (or is missing)
+									// If payment_session_id in URL doesn't match existing order, create new order
+									// This ensures every payment session (request to Checkout.com) has corresponding order
 									$payment_amount = isset( $payment_details['amount'] ) ? $payment_details['amount'] : 0;
 									foreach ( $orders_by_email as $potential_order ) {
 										$potential_order_status = $potential_order->get_status();
@@ -2648,9 +2634,21 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 										$existing_transaction_id = $potential_order->get_transaction_id();
 										$existing_payment_id = $potential_order->get_meta( '_cko_payment_id' );
 										$existing_flow_payment_id = $potential_order->get_meta( '_cko_flow_payment_id' );
+										$existing_payment_session_id = $potential_order->get_meta( '_cko_payment_session_id' );
+										
+										// CRITICAL: Don't reuse if order has different payment_session_id
+										// Each payment session should have its own order
+										if ( ! empty( $payment_session_id ) && ! empty( $existing_payment_session_id ) && $existing_payment_session_id !== $payment_session_id ) {
+											if ( $is_debug ) {
+												WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ⚠️ Order ' . $potential_order->get_id() . ' has different payment_session_id (' . $existing_payment_session_id . ' vs ' . $payment_session_id . ') - NOT reusing. Each payment session needs its own order.' );
+											}
+											continue; // Skip this order, check next one
+										}
 										
 										if ( ! empty( $existing_transaction_id ) || ! empty( $existing_payment_id ) || ! empty( $existing_flow_payment_id ) ) {
-											WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ⚠️ Order ' . $potential_order->get_id() . ' already has payment ID/transaction ID - NOT reusing (Transaction ID: ' . ( $existing_transaction_id ? $existing_transaction_id : 'NONE' ) . ', Payment ID: ' . ( $existing_payment_id ? $existing_payment_id : 'NONE' ) . ', Flow Payment ID: ' . ( $existing_flow_payment_id ? $existing_flow_payment_id : 'NONE' ) . ')' );
+											if ( $is_debug ) {
+												WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ⚠️ Order ' . $potential_order->get_id() . ' already has payment ID/transaction ID - NOT reusing' );
+											}
 											continue; // Skip this order, check next one
 										}
 										
@@ -2658,15 +2656,11 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 										if ( $order_amount === $payment_amount ) {
 											$order = $potential_order;
 											$order_id = $order->get_id();
-											$order_date = $order->get_date_created();
-											$order_age_days = ( time() - $order_date->getTimestamp() ) / DAY_IN_SECONDS;
-											WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ✅ Order found by email and amount match (fallback) - Order ID: ' . $order_id . ', Status: ' . $potential_order_status . ', Age: ' . round( $order_age_days, 1 ) . ' days, No payment ID (reusable)' );
+											if ( $is_debug ) {
+												WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ✅ Order found by email and amount match (fallback) - Order ID: ' . $order_id . ', Status: ' . $potential_order_status );
+											}
 											break;
 										}
-									}
-									
-									if ( empty( $order ) ) {
-										WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] No reusable order found by email/amount match (all orders either have payment IDs or are outside time windows)' );
 									}
 								}
 							}
@@ -2674,28 +2668,28 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 							if ( ! $order ) {
 								// Last resort: Create order from cart and payment details
 								// This happens when 3DS redirect occurs before form submission
-								WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order not found - checking for existing order with same session+cart hash before creating new one' );
+								if ( $is_debug ) {
+									WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order not found - checking for existing order with same session+cart hash before creating new one' );
+								}
 								
 								if ( ! WC()->cart || WC()->cart->is_empty() ) {
-									WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Cart is empty - attempting to create minimal order from payment details' );
-									
 									// If we have payment details, create minimal order
 									if ( ! empty( $payment_details ) && ! empty( $payment_id ) ) {
 										$order = $this->create_minimal_order_from_payment_details( $payment_id, $payment_details );
 										
 										if ( ! is_wp_error( $order ) && $order ) {
-											WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Minimal order created from payment details - Order ID: ' . $order->get_id() );
+											if ( $is_debug ) {
+												WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Minimal order created from payment details - Order ID: ' . $order->get_id() );
+											}
 											$order_id = $order->get_id();
 											// Continue with normal flow - order now exists
 										} else {
-											WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ERROR: Failed to create minimal order - ' . ( is_wp_error( $order ) ? $order->get_error_message() : 'Unknown error' ) );
 											error_log( '[FLOW 3DS API] ERROR: Cannot create order - cart is empty and minimal order creation failed' );
 											wp_die( esc_html__( 'Order not found and cart is empty. Please contact support.', 'checkout-com-unified-payments-api' ), esc_html__( 'Payment Error', 'checkout-com-unified-payments-api' ), array( 'response' => 400 ) );
 										}
 									} else {
-										WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ERROR: Cannot create order - cart is empty and payment details not available' );
 										error_log( '[FLOW 3DS API] ERROR: Cart is empty, cannot create order' );
-										wp_die( esc_html__( 'Order not found and cart is empty. Please contact support.', 'checkout-com-unified-payments-api' ), esc_html__( 'Payment Error', 'checkout-com-unified-payments-api' ), array( 'response' => 400 ) );
+										wp_die( esc_html__( 'Order not found and cart is empty. Please contact support.', 'checkout-com-unified-payments-api' ), esc_html__( 'Payment Error', 'Payment Error', 'checkout-com-unified-payments-api' ), array( 'response' => 400 ) );
 									}
 								}
 								
@@ -2737,12 +2731,14 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 										$session_cart_identifier = 'session_' . $session_key . '_' . $cart_hash;
 									}
 									
-									WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Generated session+cart identifier: ' . ( $session_cart_identifier ? substr( $session_cart_identifier, 0, 50 ) . '...' : 'NULL' ) );
 								}
 								
-								// Check for existing order with same session+cart hash
-								if ( ! empty( $session_cart_identifier ) ) {
-									WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Checking for existing order with session+cart hash: ' . substr( $session_cart_identifier, 0, 50 ) . '...' );
+								// CRITICAL: Only check session+cart hash if payment_session_id is NOT in URL
+								// If payment_session_id exists in URL, we MUST find/create order for that specific payment session
+								// This ensures every payment session (request to Checkout.com) has corresponding order
+								if ( ! empty( $session_cart_identifier ) && empty( $payment_session_id ) ) {
+									// Only check session+cart hash if no payment_session_id in URL
+									// This handles edge cases where payment session ID is missing
 									
 									$existing_orders = wc_get_orders( array(
 										'meta_query' => array(
@@ -2760,8 +2756,6 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 										$existing_order = $existing_orders[0];
 										$existing_order_status = $existing_order->get_status();
 										
-										WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Found existing order with same session+cart hash - Order ID: ' . $existing_order->get_id() . ', Status: ' . $existing_order_status );
-										
 										// Check if order has payment ID/transaction ID (already processed, even if failed)
 										$existing_transaction_id = $existing_order->get_transaction_id();
 										$existing_payment_id = $existing_order->get_meta( '_cko_payment_id' );
@@ -2770,146 +2764,166 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 										// CRITICAL: Don't reuse order if it already has a payment ID/transaction ID
 										// This means the order was already processed (even if failed), and we shouldn't reuse it
 										if ( ! empty( $existing_transaction_id ) || ! empty( $existing_payment_id ) || ! empty( $existing_flow_payment_id ) ) {
-											WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ⚠️ Existing order already has payment ID/transaction ID - NOT reusing. Will create NEW order instead.' );
-											WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Reason: Order was already processed (even if failed), reusing would cause payment conflicts' );
+											if ( $is_debug ) {
+												WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ⚠️ Existing order already has payment ID/transaction ID - NOT reusing. Will create NEW order instead.' );
+											}
 											// Continue to create new order below
 										} elseif ( 'pending' === $existing_order_status ) {
 											// Only reuse pending orders (never reuse failed orders)
-											$order = $existing_order;
-											$order_id = $order->get_id();
-											WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ✅ Reusing existing order (status: ' . $existing_order_status . ', no payment ID) - Order ID: ' . $order_id );
-											WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] This order has never been processed, safe to reuse' );
-											$order = $existing_order;
-											$order_id = $order->get_id();
-											WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ✅ Reusing existing order (status: ' . $existing_order_status . ') - Order ID: ' . $order_id );
-											
-											// Clear existing order items to refresh with current cart
-											foreach ( $order->get_items() as $item_id => $item ) {
-												$order->remove_item( $item_id );
-											}
-											
-											// Clear existing shipping items
-											foreach ( $order->get_items( 'shipping' ) as $item_id => $item ) {
-												$order->remove_item( $item_id );
-											}
-											
-											// Set customer email
-											if ( ! empty( $customer_email ) ) {
-												$order->set_billing_email( $customer_email );
-											}
-											
-											// Set billing address from payment details if available
-											if ( $payment_details && isset( $payment_details['billing_address'] ) ) {
-												$billing = $payment_details['billing_address'];
-												if ( isset( $billing['address_line1'] ) ) $order->set_billing_address_1( $billing['address_line1'] );
-												if ( isset( $billing['address_line2'] ) ) $order->set_billing_address_2( $billing['address_line2'] );
-												if ( isset( $billing['city'] ) ) $order->set_billing_city( $billing['city'] );
-												if ( isset( $billing['state'] ) ) $order->set_billing_state( $billing['state'] );
-												if ( isset( $billing['zip'] ) ) $order->set_billing_postcode( $billing['zip'] );
-												if ( isset( $billing['country'] ) ) $order->set_billing_country( $billing['country'] );
-												if ( isset( $payment_details['customer']['name'] ) ) {
-													$name_parts = explode( ' ', $payment_details['customer']['name'], 2 );
-													$order->set_billing_first_name( $name_parts[0] ?? '' );
-													$order->set_billing_last_name( $name_parts[1] ?? '' );
+											// CRITICAL: Verify payment_session_id match if both exist
+											// Each payment session should have its own order
+											$existing_payment_session_id = $existing_order->get_meta( '_cko_payment_session_id' );
+											if ( ! empty( $payment_session_id ) && ! empty( $existing_payment_session_id ) && $existing_payment_session_id !== $payment_session_id ) {
+												if ( $is_debug ) {
+													WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ⚠️ Existing order has different payment_session_id (' . $existing_payment_session_id . ' vs ' . $payment_session_id . ') - NOT reusing. Each payment session needs its own order.' );
 												}
-											}
-											
-											// Add current cart items
-											if ( WC()->cart && ! WC()->cart->is_empty() ) {
-												foreach ( WC()->cart->get_cart() as $cart_item_key => $cart_item ) {
-													$product = $cart_item['data'];
-													$order->add_product( $product, $cart_item['quantity'], array(
-														'subtotal' => $cart_item['line_subtotal'],
-														'total'    => $cart_item['line_total'],
-													) );
+												// Continue to create new order below
+											} else {
+												$order = $existing_order;
+												$order_id = $order->get_id();
+												if ( $is_debug ) {
+													WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ✅ Reusing existing order (status: ' . $existing_order_status . ', no payment ID, payment_session_id matches or missing) - Order ID: ' . $order_id );
 												}
-											}
-											
-											// Set shipping method if available
-											$chosen_shipping_methods = WC()->session->get( 'chosen_shipping_methods' );
-											if ( ! empty( $chosen_shipping_methods ) ) {
-												$shipping_packages = WC()->shipping->get_packages();
-												foreach ( $chosen_shipping_methods as $package_key => $method ) {
-													if ( isset( $shipping_packages[ $package_key ] ) ) {
-														$package = $shipping_packages[ $package_key ];
-														if ( isset( $package['rates'][ $method ] ) ) {
-															$shipping_rate = $package['rates'][ $method ];
-															$item = new WC_Order_Item_Shipping();
-															$item->set_props( array(
-																'method_title' => $shipping_rate->get_label(),
-																'method_id'    => $shipping_rate->get_id(),
-																'total'        => wc_format_decimal( $shipping_rate->get_cost() ),
-																'taxes'        => $shipping_rate->get_taxes(),
-															) );
-															$order->add_item( $item );
+												
+												// Clear existing order items to refresh with current cart
+												foreach ( $order->get_items() as $item_id => $item ) {
+													$order->remove_item( $item_id );
+												}
+												
+												// Clear existing shipping items
+												foreach ( $order->get_items( 'shipping' ) as $item_id => $item ) {
+													$order->remove_item( $item_id );
+												}
+												
+												// Set customer email
+												if ( ! empty( $customer_email ) ) {
+													$order->set_billing_email( $customer_email );
+												}
+												
+												// Set billing address from payment details if available
+												if ( $payment_details && isset( $payment_details['billing_address'] ) ) {
+													$billing = $payment_details['billing_address'];
+													if ( isset( $billing['address_line1'] ) ) $order->set_billing_address_1( $billing['address_line1'] );
+													if ( isset( $billing['address_line2'] ) ) $order->set_billing_address_2( $billing['address_line2'] );
+													if ( isset( $billing['city'] ) ) $order->set_billing_city( $billing['city'] );
+													if ( isset( $billing['state'] ) ) $order->set_billing_state( $billing['state'] );
+													if ( isset( $billing['zip'] ) ) $order->set_billing_postcode( $billing['zip'] );
+													if ( isset( $billing['country'] ) ) $order->set_billing_country( $billing['country'] );
+													if ( isset( $payment_details['customer']['name'] ) ) {
+														$name_parts = explode( ' ', $payment_details['customer']['name'], 2 );
+														$order->set_billing_first_name( $name_parts[0] ?? '' );
+														$order->set_billing_last_name( $name_parts[1] ?? '' );
+													}
+												}
+												
+												// Add current cart items
+												if ( WC()->cart && ! WC()->cart->is_empty() ) {
+													foreach ( WC()->cart->get_cart() as $cart_item_key => $cart_item ) {
+														$product = $cart_item['data'];
+														$order->add_product( $product, $cart_item['quantity'], array(
+															'subtotal' => $cart_item['line_subtotal'],
+															'total'    => $cart_item['line_total'],
+														) );
+													}
+												}
+												
+												// Set shipping method if available
+												$chosen_shipping_methods = WC()->session->get( 'chosen_shipping_methods' );
+												$shipping_added_from_session_reuse = false;
+												if ( ! empty( $chosen_shipping_methods ) ) {
+													$shipping_packages = WC()->shipping->get_packages();
+													foreach ( $chosen_shipping_methods as $package_key => $method ) {
+														if ( isset( $shipping_packages[ $package_key ] ) ) {
+															$package = $shipping_packages[ $package_key ];
+															if ( isset( $package['rates'][ $method ] ) ) {
+																$shipping_rate = $package['rates'][ $method ];
+																$item = new WC_Order_Item_Shipping();
+																$item->set_props( array(
+																	'method_title' => $shipping_rate->get_label(),
+																	'method_id'    => $shipping_rate->get_id(),
+																	'total'        => wc_format_decimal( $shipping_rate->get_cost() ),
+																	'taxes'        => $shipping_rate->get_taxes(),
+																) );
+																$order->add_item( $item );
+																$shipping_added_from_session_reuse = true;
+															}
 														}
 													}
 												}
+												
+												// CRITICAL FIX: If shipping wasn't added from session (common after 3DS redirect),
+												// add it from payment_details which contains the actual payment items including shipping
+												if ( ! $shipping_added_from_session_reuse && ! empty( $payment_details ) ) {
+													$this->add_shipping_from_payment_details( $order, $payment_details );
+												}
+												
+												// Recalculate totals
+												$order->calculate_totals();
+												
+												// Set payment method
+												$order->set_payment_method( $this->id );
+												$order->set_payment_method_title( $this->get_title() );
+												
+												// Update order with payment session ID if available
+												if ( ! empty( $payment_session_id ) ) {
+													$order->update_meta_data( '_cko_payment_session_id', $payment_session_id );
+												}
+												
+												// Update order with payment ID if available
+												if ( ! empty( $payment_id ) ) {
+													$order->update_meta_data( '_cko_payment_id', $payment_id );
+													$order->update_meta_data( '_cko_flow_payment_id', $payment_id );
+												}
+												
+												// Ensure session+cart identifier is saved
+												$order->update_meta_data( '_cko_session_cart_id', $session_cart_identifier );
+												
+												// Order status should already be pending (we only reuse pending orders)
+												// Don't reset status - it's already pending
+												
+												$order->save();
+												
+												// PERFORMANCE: Defer webhook processing - check if already processed first
+												if ( class_exists( 'WC_Checkout_Com_Webhook_Queue' ) ) {
+													$already_processed = $order->get_meta( 'cko_payment_authorized' ) || $order->get_meta( 'cko_payment_captured' );
+													if ( ! $already_processed ) {
+														WC_Checkout_Com_Webhook_Queue::process_pending_webhooks_for_order( $order );
+													}
+												}
 											}
-											
-											// Recalculate totals
-											$order->calculate_totals();
-											
-											// Set payment method
-											$order->set_payment_method( $this->id );
-											$order->set_payment_method_title( $this->get_title() );
-											
-											// Update order with payment session ID if available
-											if ( ! empty( $payment_session_id ) ) {
-												$order->update_meta_data( '_cko_payment_session_id', $payment_session_id );
-											}
-											
-											// Update order with payment ID if available
-											if ( ! empty( $payment_id ) ) {
-												$order->update_meta_data( '_cko_payment_id', $payment_id );
-												$order->update_meta_data( '_cko_flow_payment_id', $payment_id );
-											}
-											
-											// Ensure session+cart identifier is saved
-											$order->update_meta_data( '_cko_session_cart_id', $session_cart_identifier );
-											
-											// Order status should already be pending (we only reuse pending orders)
-											// Don't reset status - it's already pending
-											
-											$order->save();
-											WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Existing order refreshed with current cart items and ready for processing - Order ID: ' . $order_id );
-											
-											// Process any pending webhooks for this order
-											if ( class_exists( 'WC_Checkout_Com_Webhook_Queue' ) ) {
-												WC_Checkout_Com_Webhook_Queue::process_pending_webhooks_for_order( $order );
-											}
-										} else {
-											WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Existing order status is ' . $existing_order_status . ' (not pending/failed) - will create NEW order' );
 										}
-									} else {
-										WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] No existing order found with same session+cart hash - will create new order' );
 									}
+								} elseif ( ! empty( $payment_session_id ) && $is_debug ) {
+									// Payment session ID exists in URL - skip session+cart hash check
+									// We MUST find/create order for this specific payment session
+									WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment session ID in URL (' . $payment_session_id . ') - skipping session+cart hash check. Will find/create order for this payment session.' );
 								}
 								
 								// Create new order if no reusable order found
 								if ( ! $order ) {
-									WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Creating new order - Customer ID: ' . $customer_id . ', Email: ' . $customer_email );
+									if ( $is_debug ) {
+										WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Creating new order - Customer ID: ' . $customer_id . ', Email: ' . $customer_email );
+									}
+									
 									$order = wc_create_order( array( 'customer_id' => $customer_id ) );
 								
 									if ( ! $order || is_wp_error( $order ) ) {
-										WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ERROR: Failed to create order - attempting minimal order creation' );
-										
 										// Try to create minimal order from payment details
 										if ( ! empty( $payment_details ) && ! empty( $payment_id ) ) {
 											$order = $this->create_minimal_order_from_payment_details( $payment_id, $payment_details );
 											
 											if ( ! is_wp_error( $order ) && $order ) {
-												WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Minimal order created successfully - Order ID: ' . $order->get_id() );
+												if ( $is_debug ) {
+													WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Minimal order created successfully - Order ID: ' . $order->get_id() );
+												}
 												$order_id = $order->get_id();
 												// Continue with normal flow - order now exists
 											} else {
-												WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ERROR: Failed to create minimal order' );
 												error_log( '[FLOW 3DS API] ERROR: Failed to create order' );
 												wp_die( esc_html__( 'Failed to create order. Please contact support.', 'checkout-com-unified-payments-api' ), esc_html__( 'Payment Error', 'checkout-com-unified-payments-api' ), array( 'response' => 500 ) );
 											}
 										} else {
-											WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ERROR: Failed to create order and payment details not available' );
-											error_log( '[FLOW 3DS API] ERROR: Failed to create order' );
+											error_log( '[FLOW 3DS API] ERROR: Failed to create order and payment details not available' );
 											wp_die( esc_html__( 'Failed to create order. Please contact support.', 'checkout-com-unified-payments-api' ), esc_html__( 'Payment Error', 'checkout-com-unified-payments-api' ), array( 'response' => 500 ) );
 										}
 									}
@@ -2946,6 +2960,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 									
 									// Set shipping method if available
 									$chosen_shipping_methods = WC()->session->get( 'chosen_shipping_methods' );
+									$shipping_added_from_session = false;
 									if ( ! empty( $chosen_shipping_methods ) ) {
 										$shipping_packages = WC()->shipping->get_packages();
 										foreach ( $chosen_shipping_methods as $package_key => $method ) {
@@ -2961,9 +2976,16 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 														'taxes'        => $shipping_rate->get_taxes(),
 													) );
 													$order->add_item( $item );
+													$shipping_added_from_session = true;
 												}
 											}
 										}
+									}
+									
+									// CRITICAL FIX: If shipping wasn't added from session (common after 3DS redirect),
+									// add it from payment_details which contains the actual payment items including shipping
+									if ( ! $shipping_added_from_session && ! empty( $payment_details ) ) {
+										$this->add_shipping_from_payment_details( $order, $payment_details );
 									}
 									
 									// Calculate totals
@@ -2988,7 +3010,6 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 									$save_card_from_get = isset( $_GET['cko-save-card'] ) ? sanitize_text_field( $_GET['cko-save-card'] ) : '';
 									if ( 'yes' === $save_card_from_get ) {
 										$order->update_meta_data( '_cko_save_card_preference', 'yes' );
-										WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Stored save card preference from GET parameter in newly created order: YES' );
 									}
 									
 									// Set status to pending
@@ -2996,36 +3017,32 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 									$order->save();
 									
 									$order_id = $order->get_id();
-									WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order created successfully - Order ID: ' . $order_id );
 									
-									// Process any pending webhooks for this order
+									// PERFORMANCE: Defer webhook processing - check if already processed first
 									if ( class_exists( 'WC_Checkout_Com_Webhook_Queue' ) ) {
-										WC_Checkout_Com_Webhook_Queue::process_pending_webhooks_for_order( $order );
+										$already_processed = $order->get_meta( 'cko_payment_authorized' ) || $order->get_meta( 'cko_payment_captured' );
+										if ( ! $already_processed ) {
+											WC_Checkout_Com_Webhook_Queue::process_pending_webhooks_for_order( $order );
+										}
 									}
 								}
 							}
 						}
 					}
-				}
-			} catch ( Exception $e ) {
-				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Exception during order lookup: ' . $e->getMessage() );
+				} catch ( Exception $e ) {
 				error_log( '[FLOW 3DS API] EXCEPTION during order lookup: ' . $e->getMessage() );
 				
 				// Try to create minimal order from payment details as fallback
 				if ( ! empty( $payment_details ) && ! empty( $payment_id ) ) {
 					try {
-						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Attempting to create minimal order from payment details after exception...' );
 						$order = $this->create_minimal_order_from_payment_details( $payment_id, $payment_details );
 						
 						if ( ! is_wp_error( $order ) && $order ) {
-							WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Minimal order created successfully after exception - Order ID: ' . $order->get_id() );
 							// Continue with normal flow - order now exists
 						} else {
-							WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Failed to create minimal order after exception: ' . ( is_wp_error( $order ) ? $order->get_error_message() : 'Unknown error' ) );
 							wp_die( esc_html__( 'An error occurred while processing your payment. Please try again.', 'checkout-com-unified-payments-api' ), esc_html__( 'Payment Error', 'checkout-com-unified-payments-api' ), array( 'response' => 500 ) );
 						}
 					} catch ( Exception $fallback_exception ) {
-						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Exception during minimal order creation: ' . $fallback_exception->getMessage() );
 						wp_die( esc_html__( 'An error occurred while processing your payment. Please try again.', 'checkout-com-unified-payments-api' ), esc_html__( 'Payment Error', 'checkout-com-unified-payments-api' ), array( 'response' => 500 ) );
 					}
 				} else {
@@ -3034,41 +3051,48 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			}
 		}
 		
-		// Check if payment is already processed
+		// PERFORMANCE: Check if payment is already processed BEFORE fetching payment details
 		$existing_payment = $order->get_meta( '_cko_payment_id' );
-		WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Checking existing payment - Existing: ' . $existing_payment . ', New: ' . $payment_id );
 		
 		if ( $existing_payment === $payment_id ) {
-			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment already processed, redirecting to order-received' );
 			$return_url = $this->get_return_url( $order );
-			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Redirect URL: ' . $return_url );
 			wp_safe_redirect( $return_url );
 			exit;
 		}
 		
-		// Fetch payment details from Checkout.com
-		WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Fetching payment details from Checkout.com - Payment ID: ' . $payment_id );
-		try {
-			$checkout = new Checkout_SDK();
-			$builder = $checkout->get_builder();
+		// PERFORMANCE: Use cached payment details if available, otherwise fetch
+		// For fast path (order_id provided), payment details may not be cached yet
+		if ( empty( $payment_details ) ) {
+			// Initialize SDK if not already cached
+			if ( null === $sdk_builder_cache ) {
+				$checkout = new Checkout_SDK();
+				$sdk_builder_cache = $checkout->get_builder();
+			}
+			$builder = $sdk_builder_cache;
 			
 			if ( ! $builder ) {
-				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ERROR: SDK builder not initialized' );
 				error_log( '[FLOW 3DS API] ERROR: SDK builder not initialized' );
 				throw new Exception( 'Checkout.com SDK not initialized' );
 			}
 			
-			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] SDK initialized, fetching payment details...' );
-			$payment_details = $builder->getPaymentsClient()->getPaymentDetails( $payment_id );
-			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment details received: ' . print_r( $payment_details, true ) );
-			
-			// Check if payment is approved
+			// Fetch and cache payment details
+			if ( ! isset( $payment_details_cache[ $payment_id ] ) ) {
+				try {
+					$payment_details_cache[ $payment_id ] = $builder->getPaymentsClient()->getPaymentDetails( $payment_id );
+				} catch ( Exception $e ) {
+					error_log( '[FLOW 3DS API] ERROR: Failed to fetch payment details: ' . $e->getMessage() );
+					throw $e;
+				}
+			}
+			$payment_details = $payment_details_cache[ $payment_id ];
+		}
+		
+		// Check if payment is approved
+		try {
 			$is_approved = isset( $payment_details['approved'] ) ? $payment_details['approved'] : false;
-			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment approved status: ' . ( $is_approved ? 'YES' : 'NO' ) );
 			
 			if ( ! $is_approved ) {
-				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment not approved: ' . print_r( $payment_details, true ) );
-				error_log( '[FLOW 3DS API] Payment not approved' );
+				error_log( '[FLOW 3DS API] Payment not approved - Payment ID: ' . $payment_id );
 				
 				// Get error message from payment details if available
 				$error_message = __( 'Payment was not approved. Please try again.', 'checkout-com-unified-payments-api' );
@@ -3080,6 +3104,21 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				
 				// If we have an order, update it and redirect to checkout/order-pay with error
 				if ( $order ) {
+					// CRITICAL: Set addresses consistently for failed payments (same logic as successful payments)
+					// This ensures addresses are always visible regardless of payment outcome
+					// Priority: 1) payment_details (if available), 2) POST data, 3) WC()->customer, 4) Preserve existing
+					if ( $is_debug ) {
+						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] [ADDRESS DEBUG] Payment failed - Setting addresses consistently' );
+						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] [ADDRESS DEBUG] Payment details available: ' . ( $payment_details ? 'YES' : 'NO' ) . ', billing_address in payment_details: ' . ( isset( $payment_details['billing_address'] ) ? 'YES' : 'NO' ) );
+					}
+					$this->set_order_addresses_consistently( $order, $payment_details );
+					
+					// Save addresses BEFORE marking as failed
+					$order->save();
+					if ( $is_debug ) {
+						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] [ADDRESS DEBUG] Addresses saved BEFORE marking as failed - Billing: ' . $order->get_billing_address_1() . ', ' . $order->get_billing_city() . ', ' . $order->get_billing_country() . ' | Shipping: ' . $order->get_shipping_address_1() . ', ' . $order->get_shipping_city() . ', ' . $order->get_shipping_country() );
+					}
+					
 					// Update order status to failed
 					$order->update_status( 'failed', __( 'Payment was not approved by Checkout.com', 'checkout-com-unified-payments-api' ) );
 					
@@ -3087,7 +3126,12 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					if ( ! empty( $payment_id ) ) {
 						$order->update_meta_data( '_cko_payment_id', $payment_id );
 						$order->update_meta_data( '_cko_flow_payment_id', $payment_id );
-						$order->save();
+					}
+					
+					// Save order again after marking as failed
+					$order->save();
+					if ( $is_debug ) {
+						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] [ADDRESS DEBUG] Addresses saved AFTER marking as failed - Billing: ' . $order->get_billing_address_1() . ', ' . $order->get_billing_city() . ', ' . $order->get_billing_country() . ' | Shipping: ' . $order->get_shipping_address_1() . ', ' . $order->get_shipping_city() . ', ' . $order->get_shipping_country() );
 					}
 					
 					// Add error notice
@@ -3102,19 +3146,15 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 							'key' => $order_key,
 							'payment_failed' => '1',
 						), $redirect_url );
-						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment failed, redirecting to order-pay page: ' . $redirect_url );
 					} else {
 						// Regular checkout: redirect to checkout page
 						$redirect_url = add_query_arg( 'payment_failed', '1', wc_get_checkout_url() );
-						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment failed, redirecting to checkout page: ' . $redirect_url );
 					}
 					
 					wp_safe_redirect( $redirect_url );
 					exit;
 				} else {
 					// No order found - try to create minimal order
-					WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] No order found for failed payment - attempting to create minimal order' );
-					
 					if ( ! empty( $payment_details ) && ! empty( $payment_id ) ) {
 						$order = $this->create_minimal_order_from_payment_details( $payment_id, $payment_details );
 						
@@ -3128,7 +3168,6 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 							
 							// Redirect to checkout page
 							$redirect_url = add_query_arg( 'payment_failed', '1', wc_get_checkout_url() );
-							WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment failed, minimal order created, redirecting to checkout page: ' . $redirect_url );
 							wp_safe_redirect( $redirect_url );
 							exit;
 						}
@@ -3139,39 +3178,63 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				}
 			}
 		} catch ( Exception $e ) {
-			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Exception: ' . $e->getMessage() );
-			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Exception trace: ' . $e->getTraceAsString() );
 			error_log( '[FLOW 3DS API] EXCEPTION: ' . $e->getMessage() );
+			if ( $is_debug ) {
+				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Exception trace: ' . $e->getTraceAsString() );
+			}
 			
+			// PERFORMANCE OPTIMIZATION Phase 2: Only reload order if not already cached
 			// Try to find order and redirect to checkout with error
-			if ( ! empty( $order_id ) ) {
+			if ( ! empty( $order_id ) && ( ! $order || $order->get_id() !== $order_id ) ) {
 				$order = wc_get_order( $order_id );
-				if ( $order ) {
-					$order->update_status( 'failed', __( 'Payment processing failed due to an error.', 'checkout-com-unified-payments-api' ) );
-					WC_Checkoutcom_Utility::wc_add_notice_self( __( 'An error occurred while processing your payment. Please try again.', 'checkout-com-unified-payments-api' ), 'error' );
-					wp_safe_redirect( wc_get_checkout_url() );
-					exit;
-				}
+			}
+			if ( $order ) {
+				$order->update_status( 'failed', __( 'Payment processing failed due to an error.', 'checkout-com-unified-payments-api' ) );
+				WC_Checkoutcom_Utility::wc_add_notice_self( __( 'An error occurred while processing your payment. Please try again.', 'checkout-com-unified-payments-api' ), 'error' );
+				wp_safe_redirect( wc_get_checkout_url() );
+				exit;
 			}
 			wp_die( esc_html__( 'An error occurred while processing your payment. Please try again.', 'checkout-com-unified-payments-api' ), esc_html__( 'Payment Error', 'checkout-com-unified-payments-api' ), array( 'response' => 500 ) );
 		}
 		
 		// CRITICAL SECURITY CHECK: Validate payment amount matches order amount
 		// This prevents cart manipulation attacks where user modifies cart during 3DS authentication
-		if ( ! empty( $payment_details ) && isset( $payment_details['amount'] ) && $order ) {
+		// PERFORMANCE OPTIMIZATION: Check order status first (fastest check) - skip validation if already processed
+		// Postage is added BEFORE payment session call, so payment amount already includes postage
+		$order_status = $order->get_status();
+		$payment_already_processed = in_array( $order_status, array( 'processing', 'completed', 'on-hold' ), true );
+		
+		// If status check is ambiguous (pending/failed), check payment IDs (only if needed)
+		if ( ! $payment_already_processed ) {
+			$existing_transaction_id = $order->get_transaction_id();
+			$existing_payment_id = $order->get_meta( '_cko_payment_id' );
+			$existing_flow_payment_id = $order->get_meta( '_cko_flow_payment_id' );
+			// Payment is already processed if it has any of these identifiers
+			$payment_already_processed = ! empty( $existing_transaction_id ) || ! empty( $existing_payment_id ) || ! empty( $existing_flow_payment_id );
+		}
+		
+		if ( $is_debug ) {
+			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] [SECURITY] Payment already processed check - status: ' . $order_status . ', result: ' . ( $payment_already_processed ? 'YES (skip validation)' : 'NO (run validation)' ) );
+		}
+		
+		if ( ! $payment_already_processed && ! empty( $payment_details ) && isset( $payment_details['amount'] ) && $order ) {
 			$payment_amount_cents = (int) $payment_details['amount'];
 			$order_total_cents = (int) round( $order->get_total() * 100 ); // Convert to cents
 			$currency = isset( $payment_details['currency'] ) ? $payment_details['currency'] : '';
 			$order_currency = $order->get_currency();
 			
-			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] [SECURITY] Payment amount validation - Payment Amount: ' . $payment_amount_cents . ' cents (' . $currency . '), Order Total: ' . $order_total_cents . ' cents (' . $order_currency . ')' );
+			if ( $is_debug ) {
+				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] [SECURITY] Validating payment amount - Payment: ' . $payment_amount_cents . ' cents, Order: ' . $order_total_cents . ' cents' );
+			}
 			
 			// Check currency match first
 			if ( ! empty( $currency ) && ! empty( $order_currency ) && strtoupper( $currency ) !== strtoupper( $order_currency ) ) {
-				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] [SECURITY] ERROR: Currency mismatch - Payment: ' . $currency . ', Order: ' . $order_currency );
 				error_log( '[FLOW 3DS API] [SECURITY] ERROR: Payment currency (' . $currency . ') does not match order currency (' . $order_currency . ')' );
 				
+				// Mark order as failed due to security check - webhooks should NOT process this
+				$order->update_meta_data( '_cko_security_check_failed', 'currency_mismatch' );
 				$order->update_status( 'failed', __( 'Payment security check failed: Currency mismatch. Cart may have been modified during payment.', 'checkout-com-unified-payments-api' ) );
+				$order->save();
 				WC_Checkoutcom_Utility::wc_add_notice_self( __( 'Security check failed: Payment currency does not match order. Please try again.', 'checkout-com-unified-payments-api' ), 'error' );
 				wp_safe_redirect( wc_get_checkout_url() );
 				exit;
@@ -3179,18 +3242,24 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			
 			// Check amount match (allow 1 cent difference for rounding)
 			if ( abs( $payment_amount_cents - $order_total_cents ) > 1 ) {
-				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] [SECURITY] ERROR: Amount mismatch - Payment: ' . $payment_amount_cents . ' cents, Order: ' . $order_total_cents . ' cents, Difference: ' . abs( $payment_amount_cents - $order_total_cents ) . ' cents' );
 				error_log( '[FLOW 3DS API] [SECURITY] ERROR: Payment amount (' . $payment_amount_cents . ' cents) does not match order total (' . $order_total_cents . ' cents). Possible cart manipulation attack.' );
 				
+				// Mark order as failed due to security check - webhooks should NOT process this
+				$order->update_meta_data( '_cko_security_check_failed', 'amount_mismatch' );
 				$order->update_status( 'failed', sprintf( __( 'Payment security check failed: Amount mismatch. Payment amount (%s) does not match order total (%s). Cart may have been modified during payment.', 'checkout-com-unified-payments-api' ), wc_price( $payment_amount_cents / 100, array( 'currency' => $order_currency ) ), wc_price( $order_total_cents / 100, array( 'currency' => $order_currency ) ) ) );
+				$order->save();
 				WC_Checkoutcom_Utility::wc_add_notice_self( __( 'Security check failed: Payment amount does not match order total. Your cart may have been modified during payment. Please try again.', 'checkout-com-unified-payments-api' ), 'error' );
 				wp_safe_redirect( wc_get_checkout_url() );
 				exit;
 			}
 			
-			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] [SECURITY] ✅ Payment amount validation passed - Amounts match' );
-		} else {
-			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] [SECURITY] WARNING: Cannot validate payment amount - Payment details: ' . ( ! empty( $payment_details ) ? 'AVAILABLE' : 'MISSING' ) . ', Order: ' . ( $order ? 'AVAILABLE' : 'MISSING' ) );
+			if ( $is_debug ) {
+				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] [SECURITY] Payment amount validation passed' );
+			}
+		} elseif ( $payment_already_processed ) {
+			if ( $is_debug ) {
+				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] [SECURITY] Skipping amount validation - payment already processed (status: ' . $order_status . '). Shipping is now added during order creation, so totals should match.' );
+			}
 		}
 		
 		// Process the payment by simulating POST data and calling process_payment
@@ -3201,19 +3270,24 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		$_POST['cko-flow-payment-id'] = $payment_id;
 		$_POST['cko-flow-payment-type'] = $payment_type;
 		
-		WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Calling process_payment for order: ' . $order_id );
+		if ( $is_debug ) {
+			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Calling process_payment for order: ' . $order_id );
+		}
 		
 		// Process the payment
 		$result = $this->process_payment( $order_id );
-		WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] process_payment result: ' . print_r( $result, true ) );
 		
+		// PERFORMANCE OPTIMIZATION Phase 2: Cache order object - avoid redundant loading
 		// Run card saving logic here in handle_3ds_return() AFTER process_payment()
 		// This ensures card saving runs even if duplicate prevention triggered in process_payment()
-		if ( ! empty( $order_id ) ) {
+		// Only reload order if we don't already have it (process_payment may have returned it)
+		if ( ! empty( $order_id ) && ( ! $order || $order->get_id() !== $order_id ) ) {
 			$order = wc_get_order( $order_id );
 		}
 		
-		WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] [CARD SAVING] Checking conditions - Result: ' . ( isset( $result['result'] ) ? $result['result'] : 'NOT SET' ) . ', Order ID: ' . $order_id . ', Order exists: ' . ( $order ? 'YES' : 'NO' ) . ', Payment type: ' . ( isset( $payment_type ) ? $payment_type : 'NOT SET' ) );
+		if ( $is_debug ) {
+			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] [CARD SAVING] Checking conditions - Result: ' . ( isset( $result['result'] ) ? $result['result'] : 'NOT SET' ) . ', Order ID: ' . $order_id );
+		}
 		
 		if ( isset( $result['result'] ) && 'success' === $result['result'] && $order ) {
 			
@@ -3338,6 +3412,160 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	}
 
 	/**
+	 * Set addresses on order with consistent priority for both successful and failed payments.
+	 * Priority: 1) payment_details, 2) POST data, 3) WC()->customer, 4) Preserve existing order addresses
+	 *
+	 * @param WC_Order $order Order object
+	 * @param array    $payment_details Payment details from Checkout.com API (optional)
+	 * @return void
+	 */
+	private function set_order_addresses_consistently( $order, $payment_details = null ) {
+		$is_debug = defined( 'WP_DEBUG' ) && WP_DEBUG;
+		
+		// Priority 1: Set from payment_details if available (most accurate source from Checkout.com)
+		if ( $payment_details && isset( $payment_details['billing_address'] ) ) {
+			if ( $is_debug ) {
+				WC_Checkoutcom_Utility::logger( '[SET ADDRESSES] Setting addresses from payment_details (Priority 1)' );
+			}
+			$billing = $payment_details['billing_address'];
+			if ( isset( $billing['address_line1'] ) ) $order->set_billing_address_1( $billing['address_line1'] );
+			if ( isset( $billing['address_line2'] ) ) $order->set_billing_address_2( $billing['address_line2'] );
+			if ( isset( $billing['city'] ) ) $order->set_billing_city( $billing['city'] );
+			if ( isset( $billing['state'] ) ) $order->set_billing_state( $billing['state'] );
+			if ( isset( $billing['zip'] ) ) $order->set_billing_postcode( $billing['zip'] );
+			if ( isset( $billing['country'] ) ) $order->set_billing_country( $billing['country'] );
+			if ( isset( $payment_details['customer']['name'] ) ) {
+				$name_parts = explode( ' ', $payment_details['customer']['name'], 2 );
+				$order->set_billing_first_name( $name_parts[0] ?? '' );
+				$order->set_billing_last_name( $name_parts[1] ?? '' );
+			}
+			if ( isset( $payment_details['customer']['email'] ) ) {
+				$order->set_billing_email( $payment_details['customer']['email'] );
+			}
+			
+			// Set shipping address from payment_details or copy from billing
+			if ( isset( $payment_details['shipping_address'] ) ) {
+				$shipping = $payment_details['shipping_address'];
+				if ( isset( $shipping['address_line1'] ) ) $order->set_shipping_address_1( $shipping['address_line1'] );
+				if ( isset( $shipping['address_line2'] ) ) $order->set_shipping_address_2( $shipping['address_line2'] );
+				if ( isset( $shipping['city'] ) ) $order->set_shipping_city( $shipping['city'] );
+				if ( isset( $shipping['state'] ) ) $order->set_shipping_state( $shipping['state'] );
+				if ( isset( $shipping['zip'] ) ) $order->set_shipping_postcode( $shipping['zip'] );
+				if ( isset( $shipping['country'] ) ) $order->set_shipping_country( $shipping['country'] );
+			} else {
+				// Shipping same as billing
+				$order->set_shipping_first_name( $order->get_billing_first_name() );
+				$order->set_shipping_last_name( $order->get_billing_last_name() );
+				$order->set_shipping_address_1( $order->get_billing_address_1() );
+				$order->set_shipping_address_2( $order->get_billing_address_2() );
+				$order->set_shipping_city( $order->get_billing_city() );
+				$order->set_shipping_state( $order->get_billing_state() );
+				$order->set_shipping_postcode( $order->get_billing_postcode() );
+				$order->set_shipping_country( $order->get_billing_country() );
+			}
+			return; // Addresses set from payment_details, done
+		}
+		
+		// Priority 2: Set from POST data if available (from form submission)
+		$has_post_addresses = ! empty( $_POST['billing_first_name'] ) || ! empty( $_POST['billing_address_1'] );
+		if ( $has_post_addresses ) {
+			if ( $is_debug ) {
+				WC_Checkoutcom_Utility::logger( '[SET ADDRESSES] Setting addresses from POST data (Priority 2)' );
+			}
+			if ( isset( $_POST['billing_first_name'] ) ) $order->set_billing_first_name( sanitize_text_field( $_POST['billing_first_name'] ) );
+			if ( isset( $_POST['billing_last_name'] ) ) $order->set_billing_last_name( sanitize_text_field( $_POST['billing_last_name'] ) );
+			if ( isset( $_POST['billing_company'] ) ) $order->set_billing_company( sanitize_text_field( $_POST['billing_company'] ) );
+			if ( isset( $_POST['billing_address_1'] ) ) $order->set_billing_address_1( sanitize_text_field( $_POST['billing_address_1'] ) );
+			if ( isset( $_POST['billing_address_2'] ) ) $order->set_billing_address_2( sanitize_text_field( $_POST['billing_address_2'] ) );
+			if ( isset( $_POST['billing_city'] ) ) $order->set_billing_city( sanitize_text_field( $_POST['billing_city'] ) );
+			if ( isset( $_POST['billing_state'] ) ) $order->set_billing_state( sanitize_text_field( $_POST['billing_state'] ) );
+			if ( isset( $_POST['billing_postcode'] ) ) $order->set_billing_postcode( sanitize_text_field( $_POST['billing_postcode'] ) );
+			if ( isset( $_POST['billing_country'] ) ) $order->set_billing_country( sanitize_text_field( $_POST['billing_country'] ) );
+			if ( isset( $_POST['billing_phone'] ) ) $order->set_billing_phone( sanitize_text_field( $_POST['billing_phone'] ) );
+			if ( isset( $_POST['billing_email'] ) ) $order->set_billing_email( sanitize_email( $_POST['billing_email'] ) );
+			
+			// Set shipping address
+			$ship_to_different_address = isset( $_POST['ship_to_different_address'] ) ? (bool) $_POST['ship_to_different_address'] : false;
+			if ( $ship_to_different_address ) {
+				if ( isset( $_POST['shipping_first_name'] ) ) $order->set_shipping_first_name( sanitize_text_field( $_POST['shipping_first_name'] ) );
+				if ( isset( $_POST['shipping_last_name'] ) ) $order->set_shipping_last_name( sanitize_text_field( $_POST['shipping_last_name'] ) );
+				if ( isset( $_POST['shipping_company'] ) ) $order->set_shipping_company( sanitize_text_field( $_POST['shipping_company'] ) );
+				if ( isset( $_POST['shipping_address_1'] ) ) $order->set_shipping_address_1( sanitize_text_field( $_POST['shipping_address_1'] ) );
+				if ( isset( $_POST['shipping_address_2'] ) ) $order->set_shipping_address_2( sanitize_text_field( $_POST['shipping_address_2'] ) );
+				if ( isset( $_POST['shipping_city'] ) ) $order->set_shipping_city( sanitize_text_field( $_POST['shipping_city'] ) );
+				if ( isset( $_POST['shipping_state'] ) ) $order->set_shipping_state( sanitize_text_field( $_POST['shipping_state'] ) );
+				if ( isset( $_POST['shipping_postcode'] ) ) $order->set_shipping_postcode( sanitize_text_field( $_POST['shipping_postcode'] ) );
+				if ( isset( $_POST['shipping_country'] ) ) $order->set_shipping_country( sanitize_text_field( $_POST['shipping_country'] ) );
+			} else {
+				// Shipping same as billing
+				$order->set_shipping_first_name( $order->get_billing_first_name() );
+				$order->set_shipping_last_name( $order->get_billing_last_name() );
+				$order->set_shipping_company( $order->get_billing_company() );
+				$order->set_shipping_address_1( $order->get_billing_address_1() );
+				$order->set_shipping_address_2( $order->get_billing_address_2() );
+				$order->set_shipping_city( $order->get_billing_city() );
+				$order->set_shipping_state( $order->get_billing_state() );
+				$order->set_shipping_postcode( $order->get_billing_postcode() );
+				$order->set_shipping_country( $order->get_billing_country() );
+			}
+			return; // Addresses set from POST data, done
+		}
+		
+		// Priority 3: Set from WC()->customer if available (from WooCommerce customer session)
+		if ( WC()->customer ) {
+			$billing_address_1 = $order->get_billing_address_1();
+			$billing_city = $order->get_billing_city();
+			$billing_country = $order->get_billing_country();
+			$order_addresses_empty = empty( $billing_address_1 ) || empty( $billing_city ) || empty( $billing_country );
+			
+			if ( $order_addresses_empty ) {
+				if ( $is_debug ) {
+					WC_Checkoutcom_Utility::logger( '[SET ADDRESSES] Setting addresses from WC()->customer (Priority 3)' );
+				}
+				$order->set_billing_first_name( WC()->customer->get_billing_first_name() );
+				$order->set_billing_last_name( WC()->customer->get_billing_last_name() );
+				$order->set_billing_company( WC()->customer->get_billing_company() );
+				$order->set_billing_address_1( WC()->customer->get_billing_address_1() );
+				$order->set_billing_address_2( WC()->customer->get_billing_address_2() );
+				$order->set_billing_city( WC()->customer->get_billing_city() );
+				$order->set_billing_state( WC()->customer->get_billing_state() );
+				$order->set_billing_postcode( WC()->customer->get_billing_postcode() );
+				$order->set_billing_country( WC()->customer->get_billing_country() );
+				$order->set_billing_phone( WC()->customer->get_billing_phone() );
+				$order->set_billing_email( WC()->customer->get_billing_email() );
+				
+				$order->set_shipping_first_name( WC()->customer->get_shipping_first_name() );
+				$order->set_shipping_last_name( WC()->customer->get_shipping_last_name() );
+				$order->set_shipping_company( WC()->customer->get_shipping_company() );
+				$order->set_shipping_address_1( WC()->customer->get_shipping_address_1() );
+				$order->set_shipping_address_2( WC()->customer->get_shipping_address_2() );
+				$order->set_shipping_city( WC()->customer->get_shipping_city() );
+				$order->set_shipping_state( WC()->customer->get_shipping_state() );
+				$order->set_shipping_postcode( WC()->customer->get_shipping_postcode() );
+				$order->set_shipping_country( WC()->customer->get_shipping_country() );
+				
+				// If shipping address is still empty, copy from billing
+				if ( empty( $order->get_shipping_address_1() ) ) {
+					$order->set_shipping_first_name( $order->get_billing_first_name() );
+					$order->set_shipping_last_name( $order->get_billing_last_name() );
+					$order->set_shipping_address_1( $order->get_billing_address_1() );
+					$order->set_shipping_address_2( $order->get_billing_address_2() );
+					$order->set_shipping_city( $order->get_billing_city() );
+					$order->set_shipping_state( $order->get_billing_state() );
+					$order->set_shipping_postcode( $order->get_billing_postcode() );
+					$order->set_shipping_country( $order->get_billing_country() );
+				}
+				return; // Addresses set from WC()->customer, done
+			}
+		}
+		
+		// Priority 4: Preserve existing order addresses (already set, don't overwrite)
+		if ( $is_debug ) {
+			WC_Checkoutcom_Utility::logger( '[SET ADDRESSES] Preserving existing order addresses (Priority 4)' );
+		}
+	}
+	
+	/**
 	 * Create a minimal order from payment details when normal order creation fails.
 	 * This ensures every payment attempt has an order record.
 	 *
@@ -3345,6 +3573,94 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	 * @param array  $payment_details Payment details from Checkout.com API
 	 * @return WC_Order|WP_Error Order object or error
 	 */
+	/**
+	 * Add shipping items to order from payment_details items array.
+	 * Extracts shipping items (type: 'shipping_fee') from payment_details and adds them to the order.
+	 *
+	 * @param WC_Order $order          The WooCommerce order object.
+	 * @param array    $payment_details Payment details from Checkout.com API.
+	 * @return void
+	 */
+	private function add_shipping_from_payment_details( $order, $payment_details ) {
+		if ( ! $order ) {
+			return;
+		}
+		
+		if ( ! isset( $payment_details['items'] ) || ! is_array( $payment_details['items'] ) ) {
+			return;
+		}
+		
+		// Check if order already has shipping items
+		$existing_shipping_items = $order->get_items( 'shipping' );
+		if ( ! empty( $existing_shipping_items ) ) {
+			return;
+		}
+		
+		$shipping_added = false;
+		$shipping_items_found = 0;
+		
+		// Extract shipping items from payment_details
+		// NOTE: For Flow payments, shipping items may not have 'type' field set (see class-wc-checkoutcom-api-request.php line 1506-1515)
+		// So we need to detect shipping by multiple methods: type field, reference pattern, or name pattern
+		foreach ( $payment_details['items'] as $index => $item_data ) {
+			$item_type = isset( $item_data['type'] ) ? $item_data['type'] : '';
+			$item_name = isset( $item_data['name'] ) ? $item_data['name'] : 'Unknown';
+			$item_reference = isset( $item_data['reference'] ) ? $item_data['reference'] : '';
+			$item_quantity = isset( $item_data['quantity'] ) ? intval( $item_data['quantity'] ) : 1;
+			
+			// Check if this is a shipping item using multiple detection methods
+			$is_shipping = false;
+			
+			// Method 1: Check type field (for non-Flow payments)
+			if ( 'shipping_fee' === $item_type ) {
+				$is_shipping = true;
+			}
+			// Method 2: Check reference field (common shipping method IDs)
+			elseif ( ! empty( $item_reference ) && in_array( $item_reference, array( 'flat_rate', 'free_shipping', 'local_pickup', 'shipping' ), true ) ) {
+				$is_shipping = true;
+			}
+			// Method 3: Check name patterns (common shipping names)
+			elseif ( ! empty( $item_name ) && (
+				stripos( $item_name, 'shipping' ) !== false ||
+				stripos( $item_name, 'flat rate' ) !== false ||
+				stripos( $item_name, 'delivery' ) !== false ||
+				stripos( $item_name, 'postage' ) !== false
+			) ) {
+				// Additional check: shipping items typically have quantity = 1 and are not products
+				if ( $item_quantity === 1 ) {
+					$is_shipping = true;
+				}
+			}
+			
+			if ( $is_shipping ) {
+				$shipping_items_found++;
+				$shipping_name = ! empty( $item_name ) ? $item_name : __( 'Shipping', 'checkout-com-unified-payments-api' );
+				$shipping_total = isset( $item_data['total_amount'] ) ? ( $item_data['total_amount'] / 100 ) : 0; // Convert from cents
+				$shipping_reference = ! empty( $item_reference ) ? $item_reference : 'flat_rate';
+				
+				if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+					WC_Checkoutcom_Utility::logger( '[FLOW] [SHIPPING DEBUG] Found shipping item - Name: ' . $shipping_name . ', Amount: ' . $shipping_total );
+				}
+				
+				// Create shipping item
+				$shipping_item = new WC_Order_Item_Shipping();
+				$shipping_item->set_props( array(
+					'method_title' => $shipping_name,
+					'method_id'    => $shipping_reference,
+					'total'        => wc_format_decimal( $shipping_total ),
+					'taxes'        => array(), // Tax is typically included in total_amount
+				) );
+				$order->add_item( $shipping_item );
+				$shipping_added = true;
+			}
+		}
+		
+		// Recalculate totals after adding shipping
+		if ( $shipping_added ) {
+			$order->calculate_totals();
+		}
+	}
+
 	private function create_minimal_order_from_payment_details( $payment_id, $payment_details ) {
 		WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Creating minimal order from payment details - Payment ID: ' . $payment_id );
 		
@@ -3419,13 +3735,107 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				}
 			}
 			
-			// Add a line item with the payment amount
-			// This is a minimal order, so we add a single line item
-			$item = new WC_Order_Item_Fee();
-			$item->set_name( __( 'Payment Amount', 'checkout-com-unified-payments-api' ) );
-			$item->set_amount( $amount );
-			$item->set_total( $amount );
-			$order->add_item( $item );
+			// Set shipping address from payment details if available, otherwise copy from billing
+			if ( isset( $payment_details['shipping_address'] ) ) {
+				$shipping = $payment_details['shipping_address'];
+				if ( isset( $shipping['address_line1'] ) ) {
+					$order->set_shipping_address_1( $shipping['address_line1'] );
+				}
+				if ( isset( $shipping['address_line2'] ) ) {
+					$order->set_shipping_address_2( $shipping['address_line2'] );
+				}
+				if ( isset( $shipping['city'] ) ) {
+					$order->set_shipping_city( $shipping['city'] );
+				}
+				if ( isset( $shipping['state'] ) ) {
+					$order->set_shipping_state( $shipping['state'] );
+				}
+				if ( isset( $shipping['zip'] ) ) {
+					$order->set_shipping_postcode( $shipping['zip'] );
+				}
+				if ( isset( $shipping['country'] ) ) {
+					$order->set_shipping_country( $shipping['country'] );
+				}
+			} else {
+				// Shipping same as billing
+				$order->set_shipping_first_name( $order->get_billing_first_name() );
+				$order->set_shipping_last_name( $order->get_billing_last_name() );
+				$order->set_shipping_address_1( $order->get_billing_address_1() );
+				$order->set_shipping_address_2( $order->get_billing_address_2() );
+				$order->set_shipping_city( $order->get_billing_city() );
+				$order->set_shipping_state( $order->get_billing_state() );
+				$order->set_shipping_postcode( $order->get_billing_postcode() );
+				$order->set_shipping_country( $order->get_billing_country() );
+			}
+			
+			// Add products and shipping from payment_details items if available
+			if ( isset( $payment_details['items'] ) && is_array( $payment_details['items'] ) ) {
+				foreach ( $payment_details['items'] as $idx => $item_data ) {
+					$item_type = isset( $item_data['type'] ) ? $item_data['type'] : '';
+					$item_name = isset( $item_data['name'] ) ? $item_data['name'] : 'Unknown';
+					$item_reference = isset( $item_data['reference'] ) ? $item_data['reference'] : '';
+					$item_quantity = isset( $item_data['quantity'] ) ? intval( $item_data['quantity'] ) : 1;
+					
+					// Check if this is a shipping item using multiple detection methods
+					// NOTE: For Flow payments, shipping items may not have 'type' field set
+					$is_shipping = false;
+					
+					// Method 1: Check type field (for non-Flow payments)
+					if ( 'shipping_fee' === $item_type ) {
+						$is_shipping = true;
+					}
+					// Method 2: Check reference field (common shipping method IDs)
+					elseif ( ! empty( $item_reference ) && in_array( $item_reference, array( 'flat_rate', 'free_shipping', 'local_pickup', 'shipping' ), true ) ) {
+						$is_shipping = true;
+					}
+					// Method 3: Check name patterns (common shipping names)
+					elseif ( ! empty( $item_name ) && (
+						stripos( $item_name, 'shipping' ) !== false ||
+						stripos( $item_name, 'flat rate' ) !== false ||
+						stripos( $item_name, 'delivery' ) !== false ||
+						stripos( $item_name, 'postage' ) !== false
+					) ) {
+						// Additional check: shipping items typically have quantity = 1 and are not products
+						if ( $item_quantity === 1 ) {
+							$is_shipping = true;
+						}
+					}
+					
+					if ( $is_shipping ) {
+						// Add shipping item
+						$shipping_item = new WC_Order_Item_Shipping();
+						$shipping_name = ! empty( $item_name ) ? $item_name : __( 'Shipping', 'checkout-com-unified-payments-api' );
+						$shipping_total = isset( $item_data['total_amount'] ) ? ( $item_data['total_amount'] / 100 ) : 0; // Convert from cents
+						
+						$shipping_item->set_props( array(
+							'method_title' => $shipping_name,
+							'method_id'    => ! empty( $item_reference ) ? $item_reference : 'flat_rate',
+							'total'        => wc_format_decimal( $shipping_total ),
+							'taxes'        => array(), // Tax is typically included in total_amount
+						) );
+						$order->add_item( $shipping_item );
+					} else {
+						// Add product item
+						$product_name = isset( $item_data['name'] ) ? $item_data['name'] : __( 'Product', 'checkout-com-unified-payments-api' );
+						$product_total = isset( $item_data['total_amount'] ) ? ( $item_data['total_amount'] / 100 ) : 0; // Convert from cents
+						$product_quantity = isset( $item_data['quantity'] ) ? $item_data['quantity'] : 1;
+						
+						$product_item = new WC_Order_Item_Fee();
+						$product_item->set_name( $product_name );
+						$product_item->set_amount( $product_total / $product_quantity );
+						$product_item->set_total( $product_total );
+						$order->add_item( $product_item );
+					}
+				}
+			} else {
+				// Fallback: Add a line item with the payment amount
+				// This is a minimal order, so we add a single line item
+				$item = new WC_Order_Item_Fee();
+				$item->set_name( __( 'Payment Amount', 'checkout-com-unified-payments-api' ) );
+				$item->set_amount( $amount );
+				$item->set_total( $amount );
+				$order->add_item( $item );
+			}
 			
 			// Set currency
 			$order->set_currency( $currency );
@@ -3511,8 +3921,9 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	 * @return void
 	 */
 	public function element_form_save_card( $save_card ) {
-		// Only render the save card checkbox div if save card feature is enabled
-		if ( ! $save_card ) {
+		// Only render the save card checkbox div if save card feature is enabled AND user is logged in
+		// Guest users cannot save cards, so don't show the checkbox
+		if ( ! $save_card || ! is_user_logged_in() ) {
 			return;
 		}
 		?>
@@ -3754,16 +4165,19 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		update_option( 'woocommerce_wc_checkout_com_apple_pay_settings', $applepay_settings );
 		update_option( 'woocommerce_wc_checkout_com_paypal_settings', $paypal_settings );
 		
-		// Log for debugging
-		WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] ========== FLOW ENABLED CHECK ==========' );
-		WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] Checkout mode: ' . $checkout_mode );
-		WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] Flow gateway enabled: ' . ( isset( $flow_settings['enabled'] ) ? $flow_settings['enabled'] : 'not set' ) );
-		WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] Cards gateway enabled: ' . ( isset( $checkout_setting['enabled'] ) ? $checkout_setting['enabled'] : 'not set' ) );
-		WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] APM gateway enabled: ' . ( isset( $apm_settings['enabled'] ) ? $apm_settings['enabled'] : 'not set' ) );
-		WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] Google Pay enabled: ' . ( isset( $gpay_settings['enabled'] ) ? $gpay_settings['enabled'] : 'not set' ) );
-		WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] Apple Pay enabled: ' . ( isset( $applepay_settings['enabled'] ) ? $applepay_settings['enabled'] : 'not set' ) );
-		WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] PayPal enabled: ' . ( isset( $paypal_settings['enabled'] ) ? $paypal_settings['enabled'] : 'not set' ) );
-		WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] ========================================' );
+		// Log for debugging (only in debug mode to reduce log spam)
+		$is_debug = defined( 'WP_DEBUG' ) && WP_DEBUG;
+		if ( $is_debug ) {
+			WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] ========== FLOW ENABLED CHECK ==========' );
+			WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] Checkout mode: ' . $checkout_mode );
+			WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] Flow gateway enabled: ' . ( isset( $flow_settings['enabled'] ) ? $flow_settings['enabled'] : 'not set' ) );
+			WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] Cards gateway enabled: ' . ( isset( $checkout_setting['enabled'] ) ? $checkout_setting['enabled'] : 'not set' ) );
+			WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] APM gateway enabled: ' . ( isset( $apm_settings['enabled'] ) ? $apm_settings['enabled'] : 'not set' ) );
+			WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] Google Pay enabled: ' . ( isset( $gpay_settings['enabled'] ) ? $gpay_settings['enabled'] : 'not set' ) );
+			WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] Apple Pay enabled: ' . ( isset( $applepay_settings['enabled'] ) ? $applepay_settings['enabled'] : 'not set' ) );
+			WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] PayPal enabled: ' . ( isset( $paypal_settings['enabled'] ) ? $paypal_settings['enabled'] : 'not set' ) );
+			WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] ========================================' );
+		}
 	}
 
 	/**
@@ -4462,6 +4876,68 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 		// Success - return payment session
 		wp_send_json_success( $payment_session );
+	}
+	
+	/**
+	 * AJAX handler to save payment session ID to order immediately after payment session creation.
+	 * This ensures order is linked to payment session even if user cancels after 3DS.
+	 * 
+	 * @return void
+	 */
+	public function ajax_save_payment_session_id() {
+		// Verify nonce for security
+		if ( ! isset( $_POST['nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ) ), 'cko_flow_payment_session' ) ) {
+			wp_send_json_error( array(
+				'message' => __( 'Security check failed. Please refresh the page and try again.', 'checkout-com-unified-payments-api' ),
+			) );
+			return;
+		}
+		
+		// Get order ID and payment session ID from POST
+		$order_id = isset( $_POST['order_id'] ) ? absint( $_POST['order_id'] ) : 0;
+		$payment_session_id = isset( $_POST['payment_session_id'] ) ? sanitize_text_field( wp_unslash( $_POST['payment_session_id'] ) ) : '';
+		
+		// Validate required parameters
+		if ( empty( $order_id ) || empty( $payment_session_id ) ) {
+			wp_send_json_error( array(
+				'message' => __( 'Missing required parameters.', 'checkout-com-unified-payments-api' ),
+			) );
+			return;
+		}
+		
+		// Get order object
+		$order = wc_get_order( $order_id );
+		
+		if ( ! $order ) {
+			wp_send_json_error( array(
+				'message' => __( 'Order not found.', 'checkout-com-unified-payments-api' ),
+			) );
+			return;
+		}
+		
+		// Check if payment session ID already saved (avoid duplicate saves)
+		$existing_payment_session_id = $order->get_meta( '_cko_payment_session_id' );
+		
+		if ( ! empty( $existing_payment_session_id ) && $existing_payment_session_id === $payment_session_id ) {
+			// Already saved, return success
+			wp_send_json_success( array(
+				'message' => __( 'Payment session ID already saved.', 'checkout-com-unified-payments-api' ),
+				'order_id' => $order_id,
+			) );
+			return;
+		}
+		
+		// Save payment session ID to order
+		$order->update_meta_data( '_cko_payment_session_id', $payment_session_id );
+		$order->save();
+		
+		WC_Checkoutcom_Utility::logger( '[SAVE PAYMENT SESSION ID] Payment session ID saved to order immediately - Order ID: ' . $order_id . ', Payment Session ID: ' . $payment_session_id );
+		
+		// Return success
+		wp_send_json_success( array(
+			'message' => __( 'Payment session ID saved successfully.', 'checkout-com-unified-payments-api' ),
+			'order_id' => $order_id,
+		) );
 	}
 	
 	/**

@@ -1,0 +1,420 @@
+Test Case ID,Category,Sub-Category,User Type,Payment Method,3DS Required,Save Card Option,Test Scenario,Steps,Expected Results,Verification Points,Test Card Number,Status,Notes
+TC-1.1,Basic Payment Flow,Logged In - New Card,Logged In,New Card,Yes,Checked,"Logged in user pays with new card, 3DS authentication required, saves card","1. Log in to WordPress/WooCommerce account
+2. Add product to cart
+3. Go to checkout page
+4. Select ""Checkout.com"" payment method
+5. Enter new card details in Flow component:
+   - Card: 4242 4242 4242 4242
+   - Expiry: Any future date (e.g., 12/25)
+   - CVV: 100
+   - Name: Any name
+6. CHECK ""Save card for future purchases"" checkbox
+7. Click ""Place Order""
+8. Complete 3DS authentication (if prompted)
+9. Verify redirect to order received page","✅ Payment processes successfully
+✅ Order created with status ""Processing"" or ""On Hold""
+✅ Card is saved to user's account
+✅ Saved card appears in payment methods for future orders
+✅ Order shows correct payment method and transaction ID","- Check WooCommerce → Orders → View order details
+- Check My Account → Payment Methods (should show saved card)
+- Check order notes for payment details
+- Verify _cko_payment_id and transaction_id are set",4242 4242 4242 4242,Pending,
+TC-1.2,Basic Payment Flow,Logged In - New Card,Logged In,New Card,Yes,Unchecked,"Logged in user pays with new card, 3DS authentication required, does NOT save card","1. Log in to WordPress/WooCommerce account
+2. Add product to cart
+3. Go to checkout page
+4. Select ""Checkout.com"" payment method
+5. Enter new card details in Flow component:
+   - Card: 4242 4242 4242 4242
+   - Expiry: Any future date
+   - CVV: 100
+6. DO NOT check ""Save card for future purchases"" checkbox
+7. Click ""Place Order""
+8. Complete 3DS authentication (if prompted)
+9. Verify redirect to order received page","✅ Payment processes successfully
+✅ Order created with status ""Processing"" or ""On Hold""
+✅ Card is NOT saved to user's account
+✅ No saved card appears in payment methods
+✅ Order shows correct payment method and transaction ID","- Check WooCommerce → Orders → View order details
+- Check My Account → Payment Methods (should NOT show card)
+- Check order notes for payment details",4242 4242 4242 4242,Pending,
+TC-1.3,Basic Payment Flow,Logged In - New Card,Logged In,New Card,No,Checked,"Logged in user pays with new card, no 3DS authentication, saves card","1. Log in to WordPress/WooCommerce account
+2. Add product to cart
+3. Go to checkout page
+4. Select ""Checkout.com"" payment method
+5. Enter new card details in Flow component:
+   - Card: 4242 4242 4242 4242 (or use a card that doesn't trigger 3DS)
+   - Expiry: Any future date
+   - CVV: 100
+6. CHECK ""Save card for future purchases"" checkbox
+7. Click ""Place Order""
+8. Verify redirect to order received page (no 3DS prompt)","✅ Payment processes successfully without 3DS
+✅ Order created with status ""Processing"" or ""On Hold""
+✅ Card is saved to user's account
+✅ Saved card appears in payment methods
+✅ Order shows correct payment method and transaction ID","- Check WooCommerce → Orders → View order details
+- Check My Account → Payment Methods (should show saved card)
+- Verify no 3DS prompt appeared",4242 4242 4242 4242,Pending,
+TC-1.4,Basic Payment Flow,Logged In - New Card,Logged In,New Card,No,Unchecked,"Logged in user pays with new card, no 3DS authentication, does NOT save card","1. Log in to WordPress/WooCommerce account
+2. Add product to cart
+3. Go to checkout page
+4. Select ""Checkout.com"" payment method
+5. Enter new card details in Flow component:
+   - Card: 4242 4242 4242 4242
+   - Expiry: Any future date
+   - CVV: 100
+6. DO NOT check ""Save card for future purchases"" checkbox
+7. Click ""Place Order""
+8. Verify redirect to order received page (no 3DS prompt)","✅ Payment processes successfully without 3DS
+✅ Order created with status ""Processing"" or ""On Hold""
+✅ Card is NOT saved to user's account
+✅ No saved card appears in payment methods
+✅ Order shows correct payment method and transaction ID","- Check WooCommerce → Orders → View order details
+- Check My Account → Payment Methods (should NOT show card)
+- Verify no 3DS prompt appeared",4242 4242 4242 4242,Pending,
+TC-2.1,Basic Payment Flow,Logged In - Saved Card,Logged In,Saved Card,Yes,N/A,"Logged in user pays with previously saved card, 3DS authentication required","Prerequisites: User must have at least one saved card from previous test cases
+
+1. Log in to WordPress/WooCommerce account
+2. Add product to cart
+3. Go to checkout page
+4. Select ""Checkout.com"" payment method
+5. SELECT a saved card from the saved cards accordion
+6. Verify ""Save card for future purchases"" checkbox is visible (but may be disabled/grayed out)
+7. Click ""Place Order""
+8. Complete 3DS authentication (if prompted)
+9. Verify redirect to order received page","✅ Payment processes successfully using saved card
+✅ Order created with status ""Processing"" or ""On Hold""
+✅ Saved card remains in user's account
+✅ Order shows correct payment method (saved card) and transaction ID
+✅ Order notes indicate saved card was used","- Check WooCommerce → Orders → View order details
+- Verify saved card was used
+- Check order notes for payment details
+- Verify saved card still exists in My Account",N/A (Use saved card),Pending,
+TC-2.2,Basic Payment Flow,Logged In - Saved Card,Logged In,Saved Card,No,N/A,"Logged in user pays with previously saved card, no 3DS authentication","Prerequisites: User must have at least one saved card from previous test cases
+
+1. Log in to WordPress/WooCommerce account
+2. Add product to cart
+3. Go to checkout page
+4. Select ""Checkout.com"" payment method
+5. SELECT a saved card from the saved cards accordion
+6. Click ""Place Order""
+7. Verify redirect to order received page (no 3DS prompt)","✅ Payment processes successfully using saved card without 3DS
+✅ Order created with status ""Processing"" or ""On Hold""
+✅ Saved card remains in user's account
+✅ Order shows correct payment method (saved card) and transaction ID","- Check WooCommerce → Orders → View order details
+- Verify saved card was used
+- Verify no 3DS prompt appeared
+- Verify saved card still exists in My Account",N/A (Use saved card),Pending,
+TC-3.1,Basic Payment Flow,Guest - New Card,Guest,New Card,Yes,Hidden,"Guest user pays with new card, 3DS authentication required","1. LOG OUT from WordPress/WooCommerce (ensure you're a guest)
+2. Add product to cart
+3. Go to checkout page
+4. Fill in billing details:
+   - Email: test@example.com
+   - Name, Address, etc.
+5. Select ""Checkout.com"" payment method
+6. Enter new card details in Flow component:
+   - Card: 4242 4242 4242 4242
+   - Expiry: Any future date
+   - CVV: 100
+7. Verify ""Save card for future purchases"" checkbox is NOT visible (guest users cannot save cards)
+8. Click ""Place Order""
+9. Complete 3DS authentication (if prompted)
+10. Verify redirect to order received page","✅ Payment processes successfully
+✅ Order created with status ""Processing"" or ""On Hold""
+✅ ""Save card"" option is NOT visible (correct behavior for guests)
+✅ Order shows correct payment method and transaction ID
+✅ Order is created as guest order","- Check WooCommerce → Orders → View order details
+- Verify ""Save card"" checkbox is NOT visible
+- Verify order is created as guest order
+- Check order notes for payment details",4242 4242 4242 4242,Pending,
+TC-3.2,Basic Payment Flow,Guest - New Card,Guest,New Card,No,Hidden,"Guest user pays with new card, no 3DS authentication","1. LOG OUT from WordPress/WooCommerce (ensure you're a guest)
+2. Add product to cart
+3. Go to checkout page
+4. Fill in billing details
+5. Select ""Checkout.com"" payment method
+6. Enter new card details in Flow component:
+   - Card: 4242 4242 4242 4242
+   - Expiry: Any future date
+   - CVV: 100
+7. Verify ""Save card for future purchases"" checkbox is NOT visible
+8. Click ""Place Order""
+9. Verify redirect to order received page (no 3DS prompt)","✅ Payment processes successfully without 3DS
+✅ Order created with status ""Processing"" or ""On Hold""
+✅ ""Save card"" option is NOT visible
+✅ Order shows correct payment method and transaction ID
+✅ Order is created as guest order","- Check WooCommerce → Orders → View order details
+- Verify ""Save card"" checkbox is NOT visible
+- Verify no 3DS prompt appeared
+- Verify order is created as guest order",4242 4242 4242 4242,Pending,
+TC-4.1,Duplicate Prevention,Transaction ID Duplicate,Logged In,New Card,Yes,Checked,"User Submits Same Order Twice (Browser Back Button)","1. Add product to cart
+2. Go to checkout
+3. Complete payment successfully (order gets transaction_id)
+4. Click browser back button
+5. Click ""Place Order"" again","✅ Duplicate prevention triggers (transaction_id exists)
+✅ Payment NOT processed again
+✅ Returns success redirect (no error)
+✅ Card saving still runs if applicable
+✅ Order status remains unchanged
+✅ No duplicate charges","Check logs for: DUPLICATE PREVENTION: Order X already has transaction ID
+Verify order has only ONE transaction_id
+Verify order has only ONE payment_id
+Check WordPress debug log for duplicate prevention messages",4242 4242 4242 4242,Pending,Browser back button scenario
+TC-4.2,Duplicate Prevention,Transaction ID Duplicate,Logged In,New Card,Yes,Checked,"User Refreshes Page After Payment Success","1. Complete payment successfully
+2. Browser shows success page
+3. User refreshes page (F5 or Ctrl+R)
+4. Form resubmits","✅ Duplicate prevention triggers
+✅ Payment NOT processed again
+✅ User redirected to order-received page
+✅ No duplicate charges","Check logs for duplicate prevention
+Verify only one payment processed
+Check order has single transaction_id",4242 4242 4242 4242,Pending,
+TC-4.3,Duplicate Prevention,Payment ID Duplicate,Logged In,New Card,Yes,Checked,"Webhook Arrives Before 3DS Return","1. User initiates payment
+2. Redirected to 3DS authentication
+3. Webhook arrives and processes payment (sets _cko_payment_id)
+4. User completes 3DS and returns
+5. handle_3ds_return() calls process_payment()","✅ Duplicate prevention triggers (_cko_payment_id matches)
+✅ Payment NOT processed again
+✅ Returns success redirect
+✅ Card saving still runs (if checkbox was checked)
+✅ Order status already updated by webhook","Check logs for: DUPLICATE PREVENTION: Order X already processed with payment ID
+Verify order has correct status (set by webhook)
+Verify card is saved if applicable
+Check order notes show both webhook and 3DS return processing",4242 4242 4242 4242,Pending,Most common scenario
+TC-4.4,Duplicate Prevention,Payment ID Duplicate,Logged In,New Card,Yes,Checked,"Multiple 3DS Return Attempts","1. Complete 3DS authentication
+2. Return to checkout
+3. Payment processed _cko_payment_id set
+4. User clicks browser back
+5. Returns to checkout again
+6. Form resubmits with same payment_id","✅ Duplicate prevention triggers
+✅ Payment NOT processed again
+✅ Returns success redirect
+✅ Card saving still runs if applicable","Check logs for duplicate prevention
+Verify payment not processed twice
+Check order has single payment_id",4242 4242 4242 4242,Pending,
+TC-4.5,Duplicate Prevention,Order Reuse Prevention,Logged In,New Card,Yes,Checked,"Order Already Processed (Has Transaction ID)","1. Order created with status ""pending""
+2. Payment processed transaction_id set
+3. Order status changed to ""processing""
+4. User returns from 3DS
+5. handle_3ds_return() looks for order by payment_session_id
+6. Finds order but it has transaction_id","✅ Order NOT reused
+✅ New order created OR existing order found without transaction_id
+✅ Log shows: Order already has transaction ID - NOT reusing","Check logs for order reuse prevention messages
+Verify no duplicate orders created
+Verify payment amount validation still runs",4242 4242 4242 4242,Pending,
+TC-4.6,Duplicate Prevention,Order Reuse Prevention,Logged In,New Card,Yes,Checked,"Reusable Order (Pending No Payment IDs)","1. Order created with status ""pending""
+2. No payment_id no transaction_id no flow_payment_id
+3. User returns from 3DS
+4. System finds this order","✅ Order IS reused (safe to reuse)
+✅ Order refreshed with current cart items
+✅ Payment processed normally
+✅ Log shows: Reusing existing order (status: pending no payment ID)","Verify order items updated correctly
+Verify order totals recalculated
+Verify payment processed successfully",4242 4242 4242 4242,Pending,
+TC-5.1,Error Handling,Payment Decline,Logged In,New Card,Yes,Checked,"Payment is declined during 3DS authentication","1. Log in to WordPress/WooCommerce account
+2. Add product to cart
+3. Go to checkout page
+4. Select ""Checkout.com"" payment method
+5. Enter card details that will be declined:
+   - Card: 4000 0000 0000 0002 (declined card)
+   - Expiry: Any future date
+   - CVV: 100
+6. CHECK ""Save card for future purchases"" checkbox
+7. Click ""Place Order""
+8. Complete 3DS authentication (if prompted)
+9. Payment should be declined","✅ Order is created with status ""Failed""
+✅ Error message displayed to user: ""Your payment was declined...""
+✅ Order notes contain decline reason
+✅ Card is NOT saved (payment failed)
+✅ User can retry payment","- Check WooCommerce → Orders → View failed order
+- Verify error message is user-friendly
+- Check order notes for decline reason
+- Verify card was NOT saved",4000 0000 0000 0002,Pending,
+TC-5.2,Error Handling,Payment Decline,Logged In,New Card,No,Checked,"Payment is declined without 3DS authentication","1. Log in to WordPress/WooCommerce account
+2. Add product to cart
+3. Go to checkout page
+4. Select ""Checkout.com"" payment method
+5. Enter card details that will be declined:
+   - Card: 4000 0000 0000 0002 (declined card)
+   - Expiry: Any future date
+   - CVV: 100
+6. Click ""Place Order""
+7. Payment should be declined immediately","✅ Order is created with status ""Failed""
+✅ Error message displayed to user
+✅ Order notes contain decline reason
+✅ User can retry payment","- Check WooCommerce → Orders → View failed order
+- Verify error message is displayed
+- Check order notes for decline reason",4000 0000 0000 0002,Pending,
+TC-5.3,Error Handling,Security Check Failed,Logged In,New Card,Yes,Checked,"Cart Modified During 3DS (Amount Mismatch)","1. User initiates payment with Cart A ($10)
+2. Redirected to 3DS
+3. User opens another tab modifies cart to Cart B ($50)
+4. User completes 3DS
+5. Returns with Cart B but payment was for Cart A","✅ Payment amount validation runs
+✅ Amount mismatch detected
+✅ Payment REJECTED
+✅ Order status set to ""failed""
+✅ User redirected to checkout with error
+✅ Log shows: [SECURITY] ERROR: Amount mismatch","Check logs for amount validation
+Verify payment rejected
+Verify order status is ""failed""
+Verify error message shown to user
+Verify webhook will NOT update failed order status",4242 4242 4242 4242,Pending,Security test - prevents cart manipulation
+TC-5.4,Error Handling,Security Check Failed,Logged In,New Card,Yes,Checked,"Currency Mismatch","1. Order created in GBP
+2. Payment processed in USD
+3. Amount validation runs","✅ Currency mismatch detected
+✅ Payment REJECTED
+✅ Order status set to ""failed""
+✅ Error message shown
+✅ Webhook will NOT update failed order status","Check logs for currency mismatch
+Verify payment rejected
+Verify order status is ""failed""
+Verify webhook protection",4242 4242 4242 4242,Pending,
+TC-6.1,Edge Cases,Multiple Saved Cards,Logged In,Mixed,Yes/No,N/A,"Switch Between Cards","Prerequisites: User must have at least 2 saved cards
+
+1. Log in to WordPress/WooCommerce account
+2. Add product to cart
+3. Go to checkout page
+4. Select ""Checkout.com"" payment method
+5. Select first saved card
+6. Click ""Use a new payment method"" (if available)
+7. Enter new card details
+8. CHECK ""Save card for future purchases""
+9. Click ""Place Order""
+10. Complete payment","✅ User can switch between saved cards
+✅ New card can be added and saved
+✅ All saved cards remain available
+✅ Payment processes with selected card","- Verify multiple saved cards are displayed
+- Verify switching between cards works
+- Verify new card can be added
+- Verify all cards remain available",4242 4242 4242 4242,Pending,
+TC-6.2,Edge Cases,Order-Pay Page,Logged In/Guest,Mixed,Yes/No,N/A,"MOTO Orders (Admin Created)","Prerequisites: Admin must create an order for a customer
+
+1. As admin, create an order for a customer
+2. Send order-pay link to customer
+3. Customer clicks order-pay link
+4. Select ""Checkout.com"" payment method
+5. Enter card details or select saved card
+6. Complete payment","✅ Payment processes successfully
+✅ Order status updates correctly
+✅ For guest customers: ""Save card"" option is hidden
+✅ For logged-in customers: ""Save card"" option is visible
+✅ Order notes reflect payment method used","- Create order as admin
+- Test with guest customer
+- Test with logged-in customer
+- Verify ""Save card"" visibility is correct",4242 4242 4242 4242,Pending,
+TC-6.3,Edge Cases,Cart Empty After 3DS,Logged In,New Card,Yes,Checked,"Cart Empty After 3DS Redirect","1. Log in to WordPress/WooCommerce account
+2. Add product to cart
+3. Go to checkout page
+4. Select ""Checkout.com"" payment method
+5. Enter card details
+6. Click ""Place Order""
+7. Complete 3DS authentication
+8. BEFORE redirect completes: Clear cart (simulate edge case)
+9. Return from 3DS","✅ Order is still created (minimal order from payment details)
+✅ Payment processes successfully
+✅ Order contains correct items from payment details
+✅ User is redirected to order received page","- Simulate cart clearing scenario
+- Verify order is created from payment details
+- Verify order contains correct items
+- Check order notes for minimal order flag",4242 4242 4242 4242,Pending,
+TC-6.4,Edge Cases,Shipping Charges,Logged In,New Card,Yes,Checked,"Shipping Charges Added Correctly","1. Add product to cart
+2. Select shipping method with charges
+3. Go to checkout
+4. Complete payment with shipping
+5. Verify order total includes shipping","✅ Shipping charges added to order
+✅ Order total matches payment amount
+✅ Security check passes (amount match)
+✅ Shipping item appears in order items","- Check order items for shipping
+- Verify order total includes shipping
+- Verify payment amount matches order total
+- Check logs for shipping detection",4242 4242 4242 4242,Pending,
+TC-7.1,Webhook Integration,Webhook Before 3DS Return,Logged In,New Card,Yes,Checked,"Webhook Processes Payment Before 3DS Return","1. User initiates payment
+2. Redirected to 3DS
+3. Webhook arrives immediately
+4. Webhook processes payment (sets transaction_id payment_id)
+5. User completes 3DS and returns
+6. process_payment() called","✅ Duplicate prevention triggers (transaction_id exists)
+✅ Payment NOT processed again
+✅ Card saving still runs if applicable
+✅ Order status already correct (from webhook)
+✅ Webhook note added to order","Check webhook processing logs
+Verify order status set by webhook
+Verify duplicate prevention works
+Check order notes for webhook processing",4242 4242 4242 4242,Pending,Most common webhook scenario
+TC-7.2,Webhook Integration,3DS Return Before Webhook,Logged In,New Card,Yes,Checked,"3DS Return Processes Payment Before Webhook","1. User completes 3DS
+2. Returns to checkout
+3. Payment processed (sets transaction_id payment_id)
+4. Webhook arrives later
+5. Webhook processes payment","✅ Webhook sees transaction_id/payment_id
+✅ Webhook adds note but doesn't change status
+✅ No duplicate processing
+✅ Order status correct","Check webhook handler duplicate prevention
+Verify webhook doesn't downgrade order status
+Check order notes for webhook note",4242 4242 4242 4242,Pending,
+TC-7.3,Webhook Integration,Webhook Queue Processing,Logged In,New Card,Yes,Checked,"Webhook Arrives Before Order Exists","1. Webhook arrives before order exists
+2. Webhook queued
+3. Order created
+4. Webhook processed from queue
+5. User returns from 3DS","✅ Webhook processes payment when order available
+✅ User returns duplicate prevention triggers
+✅ No duplicate processing
+✅ Card saving still runs","Check webhook queue processing
+Verify webhook processes when order available
+Verify duplicate prevention works",4242 4242 4242 4242,Pending,
+TC-7.4,Webhook Integration,Failed Order Protection,Logged In,New Card,Yes,Checked,"Webhook Tries to Update Failed Order","1. Order fails security check (amount mismatch)
+2. Order status set to ""failed""
+3. Webhook arrives for this order
+4. Webhook tries to process payment","✅ Webhook checks order status
+✅ Order status is ""failed""
+✅ Webhook skips processing
+✅ Order remains ""failed""
+✅ Webhook adds note but doesn't change status","Check webhook logs for failed order check
+Verify order status remains ""failed""
+Verify webhook doesn't change status
+Check order notes for webhook note",4242 4242 4242 4242,Pending,Webhook protection for failed orders
+TC-8.1,Performance,3DS Return Performance,Logged In,New Card,Yes,Checked,"Fast 3DS Return Processing","1. Complete payment with 3DS
+2. Return from 3DS
+3. Measure processing time","✅ 3DS return processes in < 300ms (worst case)
+✅ Best case: < 100ms
+✅ Average: < 200ms
+✅ Payment details cached
+✅ SDK initialized once","Check server logs for processing time
+Verify payment details cached
+Verify SDK cached
+Check database query count",4242 4242 4242 4242,Pending,Performance optimization test
+TC-8.2,Performance,Order Lookup Optimization,Logged In,New Card,Yes,Checked,"Combined Order Lookup Queries","1. Complete payment
+2. Return from 3DS
+3. System looks up order","✅ Order lookup uses combined query (payment_session_id OR payment_id)
+✅ Single query instead of multiple
+✅ Faster order lookup
+✅ Query reduction: 2 queries → 1 query","Check database query logs
+Verify combined query used
+Verify query count reduced",4242 4242 4242 4242,Pending,Database optimization test
+TC-9.1,UI/UX,Save Card Checkbox Visibility,Logged In,New Card,Yes,Checked,"Checkbox Shows for Card Payment Type","1. Select Checkout.com payment method
+2. Flow component loads
+3. Select card payment type
+4. Verify checkbox visibility","✅ Save card checkbox visible when card type selected
+✅ Checkbox shows correctly (not hidden)
+✅ Checkbox can be checked/unchecked
+✅ Checkbox label displays correctly","Check browser console for visibility logs
+Verify checkbox element visible
+Verify checkbox functional
+Check CSS for display rules",4242 4242 4242 4242,Pending,UI fix verification
+TC-9.2,UI/UX,Save Card Checkbox Visibility,Guest,New Card,Yes,Hidden,"Checkbox Hidden for Guest Users","1. Log out (ensure guest)
+2. Select Checkout.com payment method
+3. Flow component loads
+4. Select card payment type
+5. Verify checkbox visibility","✅ Save card checkbox NOT visible for guests
+✅ Checkbox element not rendered or hidden
+✅ No save card option shown","Check browser console
+Verify checkbox not visible
+Verify guest user detection works",4242 4242 4242 4242,Pending,Guest user UI test
+TC-9.3,UI/UX,Flow Component Loading,Logged In,New Card,Yes,Checked,"Flow Component Initializes Correctly","1. Go to checkout page
+2. Select Checkout.com payment method
+3. Verify Flow component loads","✅ Flow component mounts correctly
+✅ Payment form displays
+✅ Saved cards show if available
+✅ Place Order button enables after Flow ready
+✅ No JavaScript errors","Check browser console for errors
+Verify Flow component mounted
+Verify UI elements visible
+Check for loading overlays",4242 4242 4242 4242,Pending,Component initialization test
+
