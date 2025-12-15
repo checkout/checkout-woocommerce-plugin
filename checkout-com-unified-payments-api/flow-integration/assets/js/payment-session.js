@@ -317,13 +317,31 @@ var ckoFlow = {
 			orderId = pathMatch ? pathMatch[1] : null;
 			ckoLogger.debug('MOTO order detected - Order ID from URL path:', orderId);
 		}
-		
 		ckoLogger.debug('Final orderId:', orderId);
 
 		let payment_type = cko_flow_vars.regular_payment_type;
-
 		let metadata = {
 			udf5: cko_flow_vars.udf5,
+		}
+
+		// Check for subscription product FIRST (before orderId check)
+		let containsSubscriptionProduct = cartInfo["contains_subscription_product"];
+		let cartInfoPaymentType = cartInfo["payment_type"];
+		let isSubscription = false;
+		
+		// PRIORITY 1: Check cartInfo["payment_type"] if already set to Recurring by backend
+		if ( cartInfoPaymentType === cko_flow_vars.recurring_payment_type ) {
+			payment_type = cko_flow_vars.recurring_payment_type;
+			isSubscription = true;
+			ckoLogger.debug('Subscription detected via cartInfo["payment_type"] = Recurring');
+		}
+		// PRIORITY 2: Check containsSubscriptionProduct flag
+		else if ( containsSubscriptionProduct ) {
+			isSubscription = orders.some(order => order.is_subscription === true);
+			if ( isSubscription ) {
+				payment_type = cko_flow_vars.recurring_payment_type;
+				ckoLogger.debug('Subscription detected via containsSubscriptionProduct flag');
+			}
 		}
 
 		if ( orderId ) {
@@ -332,18 +350,25 @@ var ckoFlow = {
 				order_id: orderId,
 			}
 
-			payment_type = cartInfo["payment_type"];
-		}
+			ckoLogger.debug('🔍 OrderId exists - Checking cartInfo payment_type:', {
+				orderId: orderId,
+				cartInfo_payment_type: cartInfo["payment_type"],
+				isSubscription: isSubscription,
+				current_payment_type: payment_type
+			});
 
-		// Check for subscription product.
-		let containsSubscriptionProduct = cartInfo["contains_subscription_product"];
-
-		if ( containsSubscriptionProduct ) {
-			const isSubscription = orders.some(order => order.is_subscription === true);
-			if ( isSubscription ) {
-				payment_type = cko_flow_vars.recurring_payment_type;
+			// Only use cartInfo payment_type if it's not already set to recurring by subscription check
+			if ( !isSubscription ) {
+				payment_type = cartInfo["payment_type"];
+				ckoLogger.debug('✅ Using cartInfo payment_type:', payment_type);
+			} else {
+				ckoLogger.debug('⏭️ Skipping cartInfo payment_type (subscription takes priority). Current payment_type:', payment_type);
 			}
+		} else {
+			ckoLogger.debug('🔍 No orderId - payment_type remains:', payment_type);
 		}
+
+		ckoLogger.debug('🔍 Payment Type - Final value before paymentSessionRequest:', payment_type);
 
 		// Remove is_subscription from all orders.
 		orders.forEach(order => {
@@ -474,6 +499,15 @@ var ckoFlow = {
 				allow_upgrade: cko_flow_vars.allow_upgrade === true || cko_flow_vars.allow_upgrade === "true" || cko_flow_vars.allow_upgrade === "yes",
 			});
 
+			// CRITICAL: Log payment_type right before creating paymentSessionRequest
+			ckoLogger.debug('🔍 Payment Type Check - Right before paymentSessionRequest creation:', {
+				payment_type: payment_type,
+				regular_payment_type: cko_flow_vars.regular_payment_type,
+				recurring_payment_type: cko_flow_vars.recurring_payment_type,
+				isRecurring: payment_type === cko_flow_vars.recurring_payment_type,
+				isRegular: payment_type === cko_flow_vars.regular_payment_type
+			});
+
 			// Debug: Log complete payment session request
 			const paymentSessionRequest = {
 				amount: amount,
@@ -544,11 +578,25 @@ var ckoFlow = {
 				ckoLogger.debug('MOTO order detected - setting payment_type to MOTO');
 				ckoLogger.debug('MOTO conditions: Admin order + Order-pay page + Guest customer');
 			} else {
-				ckoLogger.debug('Not a MOTO order - using regular payment type:', payment_type);
+				ckoLogger.debug('Not a MOTO order - current payment_type:', payment_type);
 			}
+			
+			// CRITICAL: Log payment_type right before final assignment to paymentSessionRequest
+			ckoLogger.debug('🔍 Final Payment Type Assignment:', {
+				payment_type: payment_type,
+				regular_payment_type: cko_flow_vars.regular_payment_type,
+				recurring_payment_type: cko_flow_vars.recurring_payment_type,
+				isRecurring: payment_type === cko_flow_vars.recurring_payment_type,
+				isRegular: payment_type === cko_flow_vars.regular_payment_type,
+				isMOTO: payment_type === 'MOTO',
+				'Will be assigned to paymentSessionRequest.payment_type': payment_type
+			});
 			
 			// Update payment type in the request
 			paymentSessionRequest.payment_type = payment_type;
+			
+			// Verify the assignment
+			ckoLogger.debug('✅ Verified paymentSessionRequest.payment_type after assignment:', paymentSessionRequest.payment_type);
 			
 			// SIMPLIFIED: All flows go directly to PHP endpoint which processes payment and redirects to success/failure page
 			// This provides a smooth transition: 3DS → PHP Endpoint → Success/Failure Page (no checkout page in between)
@@ -1013,23 +1061,20 @@ var ckoFlow = {
 					ckoLogger.debug('onReady - ✓ Flow marked as ready - Checkout is now fully interactive');
 					
 					
-					// Step 5: Restore saved card selection if in saved_cards_first mode
-					if (displayOrder === 'saved_cards_first') {
-						ckoLogger.debug('onReady - saved_cards_first mode: checking for default saved card');
-						
-						// Find default card (has checked="checked" attribute or is marked as default)
-						const defaultCardRadio = jQuery('.saved-cards-accordion-panel input[name="wc-wc_checkout_com_flow-payment-token"][checked="checked"]:not(#wc-wc_checkout_com_flow-payment-token-new)').first();
-						
-						if (defaultCardRadio.length) {
-							// Re-select the default card (in case Flow init deselected it)
-							defaultCardRadio.prop('checked', true);
-							window.flowSavedCardSelected = true;
-							window.flowUserInteracted = false;
-							ckoLogger.debug('onReady - ✓ Default saved card re-selected after Flow load');
-							ckoLogger.debug('onReady - Selected card ID:', defaultCardRadio.attr('id'));
-						} else {
-							ckoLogger.debug('onReady - No default saved card found');
+					// Step 5: Ensure no saved card is selected by default - user must explicitly select
+					// Remove any default selections to prevent issues with auto-detection
+					const anyDefaultCard = jQuery('input[name="wc-wc_checkout_com_flow-payment-token"][checked="checked"]:not(#wc-wc_checkout_com_flow-payment-token-new)');
+					if (anyDefaultCard.length > 0) {
+						ckoLogger.debug('onReady - Removing default saved card selection - user must explicitly select');
+						anyDefaultCard.prop('checked', false).removeAttr('checked');
+						// Ensure "new" card option is selected by default
+						const newCardRadio = jQuery('#wc-wc_checkout_com_flow-payment-token-new');
+						if (newCardRadio.length) {
+							newCardRadio.prop('checked', true);
+							ckoLogger.debug('onReady - ✓ "New card" option selected by default');
 						}
+						window.flowSavedCardSelected = false;
+						window.flowUserInteracted = false;
 					}
 					
 					// Note: Save card checkbox visibility is controlled by the onChange event
@@ -1437,9 +1482,7 @@ var ckoFlow = {
 			onError: typeof onError
 		});
 		
-		// Debug: Make onPaymentCompleted globally accessible for testing
-		window.testOnPaymentCompleted = onPaymentCompleted;
-		ckoLogger.debug('onPaymentCompleted callback is now globally accessible as window.testOnPaymentCompleted');
+		// Note: onPaymentCompleted is internal - not exposed globally for security
 		
 		// WORKAROUND: Add URL fields to paymentSession object based on environment
 		// This helps SDK construct correct URLs even if token is missing URL fields
@@ -3319,6 +3362,158 @@ document.addEventListener("DOMContentLoaded", function () {
 		}
 	}
 	
+	/**
+	 * Create order before payment processing via AJAX.
+	 * This ensures order exists before webhook arrives, preventing race conditions.
+	 * 
+	 * @returns {Promise<number|null>} Order ID if successful, null if failed
+	 */
+	async function createOrderBeforePayment() {
+		// Check if order already exists (for order-pay page) - check BEFORE form lookup
+		const orderIdField = jQuery('input[name="order_id"]');
+		if (orderIdField.length && orderIdField.val()) {
+			const existingOrderId = orderIdField.val();
+			ckoLogger.debug('[CREATE ORDER] Order already exists (order-pay page) - Order ID: ' + existingOrderId);
+			return parseInt(existingOrderId);
+		}
+		
+		// Try to find form - checkout form or order-pay form
+		let form = jQuery("form.checkout");
+		if (!form.length) {
+			// Try order-pay form (form#order_review)
+			form = jQuery("form#order_review");
+			if (form.length) {
+				ckoLogger.debug('[CREATE ORDER] Found order-pay form (form#order_review)');
+			}
+		}
+		
+		if (!form.length) {
+			ckoLogger.debug('[CREATE ORDER] No checkout form or order-pay form found - skipping order creation');
+			// For order-pay pages, order already exists, so return order ID from URL
+			if (window.location.pathname.includes('/order-pay/')) {
+				const pathMatch = window.location.pathname.match(/\/order-pay\/(\d+)\//);
+				if (pathMatch && pathMatch[1]) {
+					const orderId = parseInt(pathMatch[1]);
+					ckoLogger.debug('[CREATE ORDER] Order-pay page detected - using order ID from URL: ' + orderId);
+					return orderId;
+				}
+			}
+			return null;
+		}
+		
+		ckoLogger.debug('[CREATE ORDER] Creating order before payment processing...');
+		
+		// Get form data
+		const formData = form.serialize();
+		const formDataObj = Object.fromEntries(new URLSearchParams(formData));
+		
+		// Get nonce from form or page
+		let nonceValue = '';
+		const nonceField = jQuery('input[name="woocommerce-process-checkout-nonce"]');
+		if (nonceField.length > 0) {
+			nonceValue = nonceField.val();
+		}
+		
+		// Fallback: Try to get nonce from form data
+		if (!nonceValue && formDataObj['woocommerce-process-checkout-nonce']) {
+			nonceValue = formDataObj['woocommerce-process-checkout-nonce'];
+		}
+		
+		// Fallback: Try to get from meta tag or other sources
+		if (!nonceValue) {
+			const metaNonce = jQuery('meta[name="woocommerce-process-checkout-nonce"]');
+			if (metaNonce.length > 0) {
+				nonceValue = metaNonce.attr('content');
+			}
+		}
+		
+		// For order-pay pages, order already exists, so we don't need to create it
+		// Just return the order ID from URL if nonce is missing
+		if (!nonceValue) {
+			if (window.location.pathname.includes('/order-pay/')) {
+				const pathMatch = window.location.pathname.match(/\/order-pay\/(\d+)\//);
+				if (pathMatch && pathMatch[1]) {
+					const orderId = parseInt(pathMatch[1]);
+					ckoLogger.debug('[CREATE ORDER] Order-pay page - nonce missing but order exists, using order ID from URL: ' + orderId);
+					return orderId;
+				}
+			}
+			ckoLogger.error('[CREATE ORDER] ERROR: Nonce not found in form or page');
+			ckoLogger.error('[CREATE ORDER] Form data keys:', Object.keys(formDataObj));
+			return null;
+		}
+		
+		ckoLogger.debug('[CREATE ORDER] Nonce found:', nonceValue.substring(0, 10) + '...');
+		
+		// Ensure nonce is included in form data
+		formDataObj['woocommerce-process-checkout-nonce'] = nonceValue;
+		
+		// Get payment session ID if available
+		const paymentSessionIdField = jQuery('input[name="cko-flow-payment-session-id"]');
+		const paymentSessionId = paymentSessionIdField.length > 0 ? paymentSessionIdField.val() : '';
+		
+		// Get save card preference
+		const saveCardField = jQuery('input[name="cko-flow-save-card-persist"]');
+		const saveCardValue = saveCardField.length > 0 ? saveCardField.val() : '';
+		
+		try {
+			// Build data object ensuring nonce is included
+			const ajaxData = {
+				action: "cko_flow_create_order",
+				'cko-flow-payment-session-id': paymentSessionId,
+				'cko-flow-save-card-persist': saveCardValue
+			};
+			
+			// Add all form data (including nonce)
+			Object.assign(ajaxData, formDataObj);
+			
+			// Ensure nonce is explicitly included
+			if (nonceValue && !ajaxData['woocommerce-process-checkout-nonce']) {
+				ajaxData['woocommerce-process-checkout-nonce'] = nonceValue;
+				ckoLogger.debug('[CREATE ORDER] Explicitly added nonce to AJAX data');
+			}
+			
+			ckoLogger.debug('[CREATE ORDER] AJAX data keys:', Object.keys(ajaxData));
+			ckoLogger.debug('[CREATE ORDER] Nonce in data:', !!ajaxData['woocommerce-process-checkout-nonce']);
+			
+			const response = await jQuery.ajax({
+				url: cko_flow_vars.ajax_url,
+				type: "POST",
+				data: ajaxData
+			}).fail(function(xhr, status, error) {
+				ckoLogger.error('[CREATE ORDER] ❌ AJAX Request Failed');
+				ckoLogger.error('[CREATE ORDER] Status:', status);
+				ckoLogger.error('[CREATE ORDER] Error:', error);
+				ckoLogger.error('[CREATE ORDER] Response Text:', xhr.responseText);
+				ckoLogger.error('[CREATE ORDER] Status Code:', xhr.status);
+				ckoLogger.error('[CREATE ORDER] Request Data:', ajaxData);
+			});
+			
+			if (response && response.success && response.data && response.data.order_id) {
+				const orderId = response.data.order_id;
+				ckoLogger.debug('[CREATE ORDER] ✅ Order created successfully - Order ID: ' + orderId);
+				
+				// Store order ID in form for process_payment()
+				if (!orderIdField.length) {
+					form.append('<input type="hidden" name="order_id" value="' + orderId + '">');
+				} else {
+					orderIdField.val(orderId);
+				}
+				
+				// Store in session for fallback
+				sessionStorage.setItem('cko_flow_order_id', orderId);
+				
+				return parseInt(orderId);
+			} else {
+				ckoLogger.error('[CREATE ORDER] ❌ Failed to create order:', response);
+				return null;
+			}
+		} catch (error) {
+			ckoLogger.error('[CREATE ORDER] ❌ AJAX Error:', error);
+			return null;
+		}
+	}
+	
 	document.addEventListener("click", function (event) {
 		const flowPayment = document.getElementById(
 			"payment_method_wc_checkout_com_flow"
@@ -3328,23 +3523,79 @@ document.addEventListener("DOMContentLoaded", function () {
 		if (event.target && event.target.id === "place_order") {
 			// Track that Place Order was clicked (for order creation on payment decline)
 			window.ckoPlaceOrderClicked = true;
-			ckoLogger.error("Place Order button clicked - tracking for order creation on payment decline");
+			ckoLogger.debug("Place Order button clicked - tracking for order creation on payment decline");
 
 			// If the Flow payment method is selected, proceed with validation and order placement.
 			if (flowPayment && flowPayment.checked) {
 				event.preventDefault();
 				
-				// CRITICAL: Ensure payment session ID is added to form before submission
-				// This is a fallback in case form wasn't available when payment session was created
-				if (window.ckoAddPaymentSessionIdField) {
-					const added = window.ckoAddPaymentSessionIdField();
-					if (added) {
-						ckoLogger.debug('[SAVE PAYMENT SESSION ID] Hidden field added on Place Order click (fallback)');
+				// Check if saved card is selected BEFORE creating order
+				// For saved card payments, WooCommerce will create order on form submission
+				// So we should NOT create order via AJAX to prevent duplicates
+				// Check if saved card is selected (only by property - no defaults anymore)
+				const selectedSavedCard = jQuery('input[name="wc-wc_checkout_com_flow-payment-token"]:checked:not(#wc-wc_checkout_com_flow-payment-token-new)');
+				const savedCardSelected = selectedSavedCard.length > 0;
+				const savedCardEnabled = document.querySelector('[data-testid="checkout-web-component-root"]')?.classList.contains('saved-card-is-enabled') || false;
+				
+				if (savedCardSelected || savedCardEnabled) {
+					ckoLogger.debug('[CREATE ORDER] Saved card selected - bypassing Flow component (direct API call via WooCommerce)');
+					// For saved cards, let WooCommerce handle order creation and payment via direct API call
+					// Flow component is NOT used for saved cards - payment is processed server-side via API
+					const form = jQuery("form.checkout");
+					
+					// Handle payment for order-pay page.
+					if (form.length === 0) {
+						const orderPaySlug = cko_flow_vars.orderPaySlug;
+						const orderPayForm = jQuery('form#order_review');
+						
+						if (window.location.pathname.includes('/' + orderPaySlug + '/')) {
+							// CRITICAL: Ensure payment session ID is in form before submission
+							if (window.ckoAddPaymentSessionIdField) {
+								window.ckoAddPaymentSessionIdField();
+							}
+							// Submit directly - no Flow component needed for saved cards
+							ckoLogger.debug('[SAVED CARD] Submitting order-pay form directly (bypassing Flow component)');
+							orderPayForm.submit();
+						}
+					} else {
+						// For saved cards, submit form directly to WooCommerce
+						// WooCommerce will call process_payment() which makes direct API call
+						// No Flow component validation needed
+						ckoLogger.debug('[SAVED CARD] Submitting checkout form directly (bypassing Flow component)');
+						
+						// CRITICAL: Ensure payment session ID is in form before submission
+						if (window.ckoAddPaymentSessionIdField) {
+							window.ckoAddPaymentSessionIdField();
+						}
+						// Submit directly - no validateCheckout needed for saved cards
+						form.submit();
 					}
+					return; // Exit early - don't create order via AJAX, don't use Flow component
 				}
 				
-				// Persist save card checkbox before form submission
-				persistSaveCardCheckbox();
+				// CRITICAL: Create order BEFORE payment processing (only for new card payments)
+				// This ensures order exists before webhook arrives
+				(async function() {
+					const orderId = await createOrderBeforePayment();
+					if (!orderId) {
+						ckoLogger.error('[CREATE ORDER] Failed to create order - cannot proceed with payment');
+						showError('Failed to create order. Please try again.');
+						return;
+					}
+					
+					ckoLogger.debug('[CREATE ORDER] Order created - proceeding with payment processing. Order ID: ' + orderId);
+				
+					// CRITICAL: Ensure payment session ID is added to form before submission
+					// This is a fallback in case form wasn't available when payment session was created
+					if (window.ckoAddPaymentSessionIdField) {
+						const added = window.ckoAddPaymentSessionIdField();
+						if (added) {
+							ckoLogger.debug('[SAVE PAYMENT SESSION ID] Hidden field added on Place Order click (fallback)');
+						}
+					}
+					
+					// Persist save card checkbox before form submission
+					persistSaveCardCheckbox();
 
 				const form = jQuery("form.checkout");
 
@@ -3362,7 +3613,7 @@ document.addEventListener("DOMContentLoaded", function () {
 						if (ckoFlow.flowComponent) {
 							// console.log('[CURRENT VERSION] Flow component exists');
 							
-							// Check if a saved card is actually selected (not just if saved cards are enabled)
+							// Check if a saved card is actually selected (only by property - no defaults anymore)
 							const selectedSavedCard = jQuery('input[name="wc-wc_checkout_com_flow-payment-token"]:checked:not(#wc-wc_checkout_com_flow-payment-token-new)');
 							const savedCardSelected = selectedSavedCard.length > 0;
 							const savedCardEnabled = document.querySelector('[data-testid="checkout-web-component-root"]').classList.contains('saved-card-is-enabled');
@@ -3377,11 +3628,12 @@ document.addEventListener("DOMContentLoaded", function () {
 							}
 							
 							if( savedCardSelected || savedCardEnabled ) {
-								// console.log('[CURRENT VERSION] Saved card selected/enabled - submitting order-pay form directly');
+								ckoLogger.debug('[SAVED CARD] Saved card selected - submitting order-pay form directly (bypassing Flow component)');
 								// CRITICAL: Ensure payment session ID is in form before submission
 								if (window.ckoAddPaymentSessionIdField) {
 									window.ckoAddPaymentSessionIdField();
 								}
+								// Submit directly - Flow component NOT used for saved cards
 								orderPayForm.submit();
 							} else {
 								// console.log('[CURRENT VERSION] No saved card - calling flow component submit');
@@ -3396,7 +3648,12 @@ document.addEventListener("DOMContentLoaded", function () {
 									const isValid = ckoFlow.flowComponent.isValid();
 									if (isValid) {
 										ckoLogger.debug('Flow component is valid, submitting...');
-										ckoFlow.flowComponent.submit();
+										try {
+											ckoFlow.flowComponent.submit();
+										} catch (error) {
+											ckoLogger.error('Flow component submit failed:', error);
+											showError('Payment processing failed. Please try again.');
+										}
 									} else {
 										ckoLogger.error('Flow component is invalid, cannot submit');
 										showError('Payment form is not valid. Please check your payment details and try again.');
@@ -3404,7 +3661,17 @@ document.addEventListener("DOMContentLoaded", function () {
 								} else {
 									// Fallback: submit without validation check
 									ckoLogger.debug('Flow component validity check not available, submitting directly...');
-									ckoFlow.flowComponent.submit();
+									try {
+										if (ckoFlow.flowComponent && typeof ckoFlow.flowComponent.submit === 'function') {
+											ckoFlow.flowComponent.submit();
+										} else {
+											ckoLogger.error('Flow component submit method not available');
+											showError('Payment component not ready. Please refresh the page and try again.');
+										}
+									} catch (error) {
+										ckoLogger.error('Flow component submit failed (fallback):', error);
+										showError('Payment processing failed. Please try again.');
+									}
 								}
 							}
 						} else {
@@ -3432,7 +3699,7 @@ document.addEventListener("DOMContentLoaded", function () {
 						if (ckoFlow.flowComponent) {
 							// console.log('[CURRENT VERSION] Flow component exists for checkout');
 							
-							// Check if a saved card is actually selected (not just if saved cards are enabled)
+							// Check if a saved card is actually selected (only by property - no defaults anymore)
 							const selectedSavedCard = jQuery('input[name="wc-wc_checkout_com_flow-payment-token"]:checked:not(#wc-wc_checkout_com_flow-payment-token-new)');
 							const savedCardSelected = selectedSavedCard.length > 0;
 							const savedCardEnabled = document.querySelector('[data-testid="checkout-web-component-root"]').classList.contains('saved-card-is-enabled');
@@ -3441,11 +3708,13 @@ document.addEventListener("DOMContentLoaded", function () {
 							// console.log('[CURRENT VERSION] Saved card enabled for checkout:', savedCardEnabled);
 							
 							if( savedCardSelected || savedCardEnabled ) {
-								// console.log('[CURRENT VERSION] Saved card selected/enabled - submitting checkout form directly');
+								ckoLogger.debug('[SAVED CARD] Saved card selected - submitting checkout form directly (bypassing Flow component)');
 								// CRITICAL: Ensure payment session ID is in form before submission
 								if (window.ckoAddPaymentSessionIdField) {
 									window.ckoAddPaymentSessionIdField();
 								}
+								// Submit directly - Flow component NOT used for saved cards
+								// WooCommerce will call process_payment() which makes direct API call
 								form.submit();
 							} else {
 								// console.log('[CURRENT VERSION] No saved card - calling flow component submit for checkout');
@@ -3460,7 +3729,12 @@ document.addEventListener("DOMContentLoaded", function () {
 									const isValid = ckoFlow.flowComponent.isValid();
 									if (isValid) {
 										ckoLogger.debug('Flow component is valid, submitting...');
-										ckoFlow.flowComponent.submit();
+										try {
+											ckoFlow.flowComponent.submit();
+										} catch (error) {
+											ckoLogger.error('Flow component submit failed:', error);
+											showError('Payment processing failed. Please try again.');
+										}
 									} else {
 										ckoLogger.error('Flow component is invalid, cannot submit');
 										showError('Payment form is not valid. Please check your payment details and try again.');
@@ -3468,11 +3742,17 @@ document.addEventListener("DOMContentLoaded", function () {
 								} else {
 									// Fallback: submit without validation check
 									ckoLogger.debug('Flow component validity check not available, submitting directly...');
-									ckoFlow.flowComponent.submit();
+									try {
+										ckoFlow.flowComponent.submit();
+									} catch (error) {
+										ckoLogger.error('Flow component submit failed (fallback):', error);
+										showError('Payment processing failed. Please try again.');
+									}
 								}
 							}
 						} else {
-							// console.log('[CURRENT VERSION] No flow component found for checkout');
+							ckoLogger.error('[CREATE ORDER] Flow component not found - cannot process payment');
+							showError('Payment component not loaded. Please refresh the page and try again.');
 						}
 
 						// Place order for saved card.
@@ -3483,6 +3763,7 @@ document.addEventListener("DOMContentLoaded", function () {
 					});
 
 				}
+				})(); // Close async IIFE for early order creation
 			} else {
 				// console.log('[CURRENT VERSION] Flow payment method not selected or not found');
 			}
