@@ -5,10 +5,10 @@
  * Description: Extends WooCommerce by Adding the Checkout.com Gateway.
  * Author: Checkout.com
  * Author URI: https://www.checkout.com/
- * Version: 4.9.2
+ * Version: 5.0.1-beta.5
  * Requires Plugins: woocommerce
  * Requires at least: 5.0
- * Stable tag: 4.9.2
+ * Stable tag: 5.0.1-beta.5
  * Tested up to: 6.7.0
  * WC tested up to: 8.3.1
  * Requires PHP: 7.3
@@ -25,7 +25,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Constants.
  */
-define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '4.9.2' );
+define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '5.0.1-beta.5' );
 define( 'WC_CHECKOUTCOM_PLUGIN_URL', untrailingslashit( plugins_url( basename( plugin_dir_path( __FILE__ ) ), basename( __FILE__ ) ) ) );
 define( 'WC_CHECKOUTCOM_PLUGIN_PATH', untrailingslashit( plugin_dir_path( __FILE__ ) ) );
 
@@ -59,6 +59,9 @@ function init_checkout_com_gateway_class() {
 	include_once 'includes/class-wc-gateway-checkout-com-google-pay.php';
 	include_once 'includes/class-wc-gateway-checkout-com-paypal.php';
 	include_once 'includes/class-wc-gateway-checkout-com-alternative-payments.php';
+	
+	// Flow integration
+	include_once 'flow-integration/class-wc-gateway-checkout-com-flow.php';
 
 	// Load payment gateway class.
 	add_filter( 'woocommerce_payment_gateways', 'checkout_com_add_gateway' );
@@ -80,6 +83,7 @@ function checkout_com_add_gateway( $methods ) {
 	$methods[] = 'WC_Gateway_Checkout_Com_Google_Pay';
 	$methods[] = 'WC_Gateway_Checkout_Com_PayPal';
 	$methods[] = 'WC_Gateway_Checkout_Com_Alternative_Payments';
+	$methods[] = 'WC_Gateway_Checkout_Com_Flow';
 
 	$methods = sizeof( $array ) > 0 ? array_merge( $methods, $array ) : $methods;
 
