@@ -1,63 +1,162 @@
-[![N|Solid](https://cdn.checkout.com/img/checkout-logo-online-payments.jpg)](https://checkout.com/)
+# Checkout.com WooCommerce Plugin - Flow Integration
 
-# Woocommerce Extension
-[Checkout.com](https://www.checkout.com "Checkout.com") is a software platform that has integrated 100% of the value chain to create payment infrastructures that truly make a difference.
+Checkout.com Payment Gateway plugin for WooCommerce with Flow integration support.
 
-This extension allows shop owners to process online payments (card / alternative payments) using:
-  - **Frames.js** - Customisable payment form, embedded within your website
-  - **Apple Pay & Google Pay** - Shoppers can pay using mobile wallets
-  - **Alternative payments** - Shoppers can pay using local payment options (Sofort, iDEAL, Boleto ... etc.)
+## Version
 
-# Installation
-You can find a full installation guide [here](https://github.com/checkout/checkout-woocommerce-plugin/wiki/Installation)
+**Current Version:** 5.0.0
 
-# Initial Setup
-If you do not have an account yet, simply go to [checkout.com](https://checkout.com/) and hit the "Get Test Account" button.
+## Features
 
-# Keys
-There are 3 keys to configure in the module:
-- **Secret Key**
-- **Public Key**
-- **Private Shared Key** (not required if using v4.2.0+ of our WooCommerce plugin)
+### Flow Integration
+- **Checkout.com Flow** - Modern, secure payment processing using Checkout.com's Flow Web Components
+- **Saved Cards** - Customers can save payment methods for future use
+- **3D Secure (3DS)** - Full support for 3D Secure authentication
+- **Card Validation** - Real-time card validation before order creation
+- **Webhook Processing** - Reliable webhook handling with queue system
+- **Order Management** - Automatic order status updates based on payment status
 
-> The Private Shared Key is generated when you [configure the Webhook URL](https://docs.checkout.com/the-hub/manage-webhooks) in the Checkout HUB.
+### Payment Methods Supported
+- Credit/Debit Cards (via Flow)
+- Saved Payment Methods
+- Apple Pay
+- Google Pay
+- PayPal
+- Alternative Payment Methods (APMs)
 
-# Webhook
-In order to keep WooCommerce order statuses in sync you need to configure the following webhook URL in your Checkout HUB (where _example.com_ is your store URL):
+## Installation
 
-> The following URL format is for plugins versions 4.X or newer; click [here](https://github.com/checkout/checkout-woocommerce-plugin/wiki/URLs--2.x) to get the URLs for older plugin versions
+1. Download the plugin zip file: `checkout-com-unified-payments-api.zip`
+2. Go to WordPress Admin → Plugins → Add New → Upload Plugin
+3. Upload the zip file
+4. Activate the plugin
+5. Configure your Checkout.com credentials in WooCommerce → Settings → Payments → Checkout.com Payment
 
+## Configuration
 
-| URL Example | API Version | Events |
-| ------ | ------ | ------ |
-| _example.com_**/?wc-api=wc_checkoutcom_webhook** &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | 2.0 | All |
+### Required Settings
 
-> You can see a guide on how to manage webhooks in the HUB [here](https://docs.checkout.com/the-hub/manage-webhooks) ; You can find test card details [here](https://docs.checkout.com/testing)
+1. **Secret Key** - Your Checkout.com secret key
+2. **Public Key** - Your Checkout.com public key
+3. **Webhook URL** - Configure in Checkout.com Hub:
+   ```
+   https://your-site.com/?wc-api=wc_checkoutcom_webhook
+   ```
 
-# Going LIVE
+### Flow Integration Settings
 
-Upon receiving your live credentials from your account manager, here are the required steps to start processing live transactions:
+- Enable Flow payment method
+- Configure Flow appearance and behavior
+- Set up saved cards functionality
+- Configure 3DS settings
 
-- In the plugin settings, input your **Live** keys
-- Switch the _Endpoint URL mode_ to **Live**.
+## Flow Integration Details
 
-# Development environment Setup
+### How It Works
 
-- Clone the repository to in `wp-content/plugins` folder with the name `woocommerce-gateway-checkout-com`
-  `git clone git@github.com:checkout/checkout-woocommerce-plugin.git woocommerce-gateway-checkout-com`
-  or
-  `git clone https://github.com/checkout/checkout-woocommerce-plugin.git woocommerce-gateway-checkout-com`
-- Use required `npm` version by executing `nvm use`.
-- Install the `npm` packages using `npm install`.
-- Install the `composer` packages using `composer install`.
-- During pushing the committing the code the PHPCS check will run at pre-commit hook. **So, till the PHPCS errors are not fixed for during commit we have to use `--no-verify` option in the git commit command.**
+1. **Order Creation**: Order is created via AJAX before payment processing
+2. **Payment Session**: Payment session is created with Checkout.com
+3. **Flow Component**: Flow Web Component is mounted and validated
+4. **Payment Processing**: Payment is processed through Flow
+5. **Webhook Handling**: Payment status updates are received via webhooks
+6. **Order Update**: Order status is automatically updated based on payment result
 
+### Key Features
 
-# Reference
+- **Early Order Creation**: Orders are created before payment to ensure webhook matching
+- **Client-Side Validation**: Flow component validation before submission
+- **Server-Side Validation**: Comprehensive validation on the server
+- **Duplicate Prevention**: Prevents duplicate order creation
+- **Webhook Queue**: Handles webhooks even if order isn't immediately found
+- **3DS Support**: Full 3D Secure authentication flow
+- **Saved Cards**: Secure tokenization and card saving
 
-You can find our complete Documentation [here](http://docs.checkout.com/).
-If you would like to be assigned an account manager, please contact us at sales@checkout.com
-For help during the integration process you can contact us at integration@checkout.com
-For support, you can contact us at support@checkout.com
+## Webhook Configuration
 
-_Checkout.com is authorised and regulated as a Payment institution by the UK Financial Conduct Authority._
+Configure the following webhook URL in your Checkout.com Hub:
+
+```
+https://your-site.com/?wc-api=wc_checkoutcom_webhook
+```
+
+### Webhook Events Supported
+
+- `payment_approved`
+- `payment_captured`
+- `payment_declined`
+- `payment_cancelled`
+- `payment_voided`
+- `payment_refunded`
+
+## Development
+
+### Building the Plugin
+
+Use the build script to create the plugin zip:
+
+```bash
+./bin/build.sh
+```
+
+This will create `checkout-com-unified-payments-api.zip` with the correct WordPress plugin structure.
+
+### File Structure
+
+```
+checkout-com-unified-payments-api/
+├── woocommerce-gateway-checkout-com.php  # Main plugin file
+├── flow-integration/                      # Flow integration
+│   ├── class-wc-gateway-checkout-com-flow.php
+│   └── assets/
+│       ├── js/
+│       │   ├── payment-session.js
+│       │   ├── flow-container.js
+│       │   └── flow-customization.js
+│       └── css/
+│           └── flow.css
+├── includes/                              # Core functionality
+│   ├── api/
+│   ├── settings/
+│   ├── admin/
+│   └── ...
+├── assets/                                # Frontend assets
+├── lib/                                   # Libraries
+└── vendor/                                # Composer dependencies
+```
+
+## Requirements
+
+- WordPress 5.0+
+- WooCommerce 3.0+
+- PHP 7.3+
+- SSL Certificate (required for production)
+
+## Support
+
+For support and integration help:
+- **Integration Support**: integration@checkout.com
+- **General Support**: support@checkout.com
+- **Sales**: sales@checkout.com
+
+## License
+
+MIT License
+
+## Changelog
+
+### Version 5.0.0
+- Initial Flow integration release
+- Complete Flow Web Components integration
+- Saved cards functionality
+- 3D Secure support
+- Webhook queue system
+- Enhanced order management
+- Comprehensive validation and error handling
+
+## Documentation
+
+For detailed documentation, visit: [Checkout.com Documentation](https://docs.checkout.com)
+
+---
+
+**Checkout.com** is authorised and regulated as a Payment institution by the UK Financial Conduct Authority.
