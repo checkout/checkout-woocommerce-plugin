@@ -1233,8 +1233,12 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		if (typeof window.flowDebugLogging === 'undefined') {
 			window.flowDebugLogging = <?php echo $flow_debug_logging ? 'true' : 'false'; ?>;
 		}
-		const flowDebugLogging = window.flowDebugLogging;
-		const flowLog = flowDebugLogging ? console.log.bind(console, '[FLOW PHP]') : function() {};
+		// Use window.flowDebugLogging directly and check for existing flowLog to avoid redeclaration errors
+		if (typeof window.flowLog === 'undefined') {
+			window.flowLog = window.flowDebugLogging ? console.log.bind(console, '[FLOW PHP]') : function() {};
+		}
+		// Use window.flowLog instead of const to avoid redeclaration
+		var flowLog = window.flowLog;
 		
 		(function() {
 			var displayOrder = '<?php echo esc_js( $flow_saved_card ); ?>';

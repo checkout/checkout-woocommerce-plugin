@@ -21,6 +21,19 @@
 	transition: opacity 0.3s ease, box-shadow 0.3s ease;
 }
 
+/* Flow waiting message - ensure it's always visible */
+#flow-container .flow-waiting-message {
+	display: block !important;
+	visibility: visible !important;
+	opacity: 1 !important;
+}
+
+#flow-container .flow-waiting-message > div {
+	display: block !important;
+	visibility: visible !important;
+	opacity: 1 !important;
+}
+
 /* When saved cards exist, style Flow container as a simple bordered block */
 .saved-cards-accordion-container ~ * #flow-container,
 .payment_method_wc_checkout_com_flow:has(.saved-cards-accordion-container) #flow-container {

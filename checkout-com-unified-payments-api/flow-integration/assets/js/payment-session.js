@@ -113,6 +113,30 @@ var ckoFlow = {
 			return;
 		}
 		
+		// CRITICAL: Validate required fields BEFORE creating payment session
+		// This prevents API errors when fields aren't filled (defense-in-depth)
+		const fieldsFilled = requiredFieldsFilled();
+		const fieldsValid = requiredFieldsFilledAndValid();
+		const emailValue = getCheckoutFieldValue("billing_email");
+		
+		ckoLogger.debug('loadFlow: Field validation check:', {
+			fieldsFilled: fieldsFilled,
+			fieldsValid: fieldsValid,
+			email: emailValue || '(empty)',
+			emailLength: emailValue?.length || 0
+		});
+		
+		if (!fieldsValid) {
+			ckoLogger.debug('loadFlow: Required fields not filled - showing waiting message and aborting');
+			showFlowWaitingMessage();
+			// Reset initialization state so Flow can retry when fields are filled
+			ckoFlowInitialized = false;
+			ckoFlowInitializing = false;
+			return; // Exit - don't proceed with payment session creation
+		}
+		
+		ckoLogger.debug('loadFlow: Validation passed - proceeding with payment session creation');
+		
 		ckoLogger.version('2025-10-13-FINAL-E2E');
 		
 		// Check if we're on a redirect page with payment parameters - if so, don't initialize Flow
@@ -719,15 +743,43 @@ var ckoFlow = {
 			// CRITICAL: Final validation before API call - prevent invalid email from being sent
 			// Validate email format inline (don't rely on function that might not be available)
 			const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-			if (!paymentSessionRequest.customer.email || !emailRegex.test(paymentSessionRequest.customer.email.trim())) {
-				ckoLogger.error('❌ BLOCKED: Invalid email before API call', { 
-					email: paymentSessionRequest.customer.email,
-					emailType: typeof paymentSessionRequest.customer.email,
-					emailLength: paymentSessionRequest.customer.email?.length
+			const emailValue = paymentSessionRequest.customer?.email || '';
+			const emailTrimmed = emailValue.trim();
+			
+			// Check if email is missing or invalid
+			if (!emailValue || !emailTrimmed || !emailRegex.test(emailTrimmed)) {
+				ckoLogger.error('❌ BLOCKED: Invalid or missing email before API call', { 
+					email: emailValue,
+					emailType: typeof emailValue,
+					emailLength: emailValue?.length,
+					emailTrimmed: emailTrimmed,
+					emailRegexTest: emailRegex.test(emailTrimmed)
 				});
 				hideLoadingOverlay();
-				showError('Please enter a valid email address to continue with payment.');
-				return; // Exit - don't call API
+				
+				// Check if required fields are filled - if not, show waiting message instead of error
+				const fieldsFilledCheck = requiredFieldsFilled();
+				const fieldsValidCheck = requiredFieldsFilledAndValid();
+				
+				ckoLogger.debug('Email validation failed - checking field status:', {
+					fieldsFilled: fieldsFilledCheck,
+					fieldsValid: fieldsValidCheck,
+					willShowWaitingMessage: !fieldsValidCheck
+				});
+				
+				if (!fieldsValidCheck) {
+					ckoLogger.debug('Required fields not filled - showing waiting message instead of error');
+					showFlowWaitingMessage();
+					// Reset initialization state so Flow can retry when fields are filled
+					ckoFlowInitialized = false;
+					ckoFlowInitializing = false;
+					return; // Exit - don't call API
+				} else {
+					// Fields are filled but email is invalid - show error
+					ckoLogger.debug('Fields are filled but email is invalid - showing error message');
+					showError('Please enter a valid email address to continue with payment.');
+					return; // Exit - don't call API
+				}
 			}
 			
 			// Trim email to remove any whitespace
@@ -2353,9 +2405,34 @@ function canInitializeFlow() {
  * Show waiting message in Flow container
  */
 function showFlowWaitingMessage() {
-	const flowContainer = document.getElementById("flow-container");
+	let flowContainer = document.getElementById("flow-container");
+	
+	// If container doesn't exist, try to create it or find the payment method container
 	if (!flowContainer) {
-		return;
+		// Try to find the payment method container
+		const paymentContainer = document.querySelector(".payment_method_wc_checkout_com_flow");
+		if (paymentContainer) {
+			// Find or create the payment_box div
+			let paymentBox = paymentContainer.querySelector("div.payment_box");
+			if (!paymentBox) {
+				// Create payment_box if it doesn't exist
+				paymentBox = document.createElement('div');
+				paymentBox.className = 'payment_box';
+				paymentContainer.appendChild(paymentBox);
+			}
+			
+			// Set the id if not already set
+			if (!paymentBox.id) {
+				paymentBox.id = "flow-container";
+				paymentBox.style.padding = "0";
+			}
+			
+			flowContainer = paymentBox;
+		} else {
+			// Payment method container not found - can't show message
+			ckoLogger.debug('Cannot show Flow waiting message - payment method container not found');
+			return;
+		}
 	}
 	
 	// Show container but with waiting message
@@ -2675,6 +2752,46 @@ function setupFieldWatchersForInitialization() {
 		}
 	});
 	
+	// FALLBACK: If no fields found via .required selector, use common required fields
+	// This matches the fallback logic in requiredFieldsFilled()
+	if (fieldSelectors.length === 0) {
+		if (window.flowDebugLogging) {
+			ckoLogger.debug('setupFieldWatchersForInitialization: No fields found via .required, using fallback fields');
+		}
+		
+		const commonRequiredFields = [
+			'#billing_email',
+			'#billing_first_name',
+			'#billing_last_name',
+			'#billing_address_1',
+			'#billing_city',
+			'#billing_country'
+		];
+		
+		// Check which fields exist and are required
+		commonRequiredFields.forEach(selector => {
+			const field = document.querySelector(selector);
+			if (field) {
+				const isRequired = field.hasAttribute('required') || 
+				                  field.hasAttribute('aria-required') ||
+				                  field.closest('label')?.querySelector('.required') !== null ||
+				                  field.closest('.form-row')?.classList.contains('validate-required');
+				
+				const isVisible = field.offsetParent !== null && 
+				                 field.style.display !== 'none' &&
+				                 !field.hasAttribute('disabled');
+				
+				if (isRequired && isVisible) {
+					fieldSelectors.push(selector);
+				}
+			}
+		});
+		
+		if (window.flowDebugLogging) {
+			ckoLogger.debug('setupFieldWatchersForInitialization: Fallback fields to watch:', fieldSelectors);
+		}
+	}
+	
 	// Add critical fields if not already included
 	const criticalFields = ['#billing_email', '#billing_country', '#billing_address_1', '#billing_city', '#billing_postcode'];
 	criticalFields.forEach(selector => {
@@ -2706,6 +2823,15 @@ function setupFieldWatchersForInitialization() {
 			ckoLogger.debug('Field watcher attached:', selector);
 		}
 	});
+	
+	// CRITICAL: Watch the account creation checkbox
+	// When this changes, account_username/account_password become required/not required
+	const createAccountCheckbox = document.querySelector('#createaccount');
+	if (createAccountCheckbox) {
+		jQuery(createAccountCheckbox).off('change.flow-init');
+		jQuery(createAccountCheckbox).on('change.flow-init', debouncedCheck);
+		ckoLogger.debug('Field watcher attached: #createaccount');
+	}
 	
 	ckoLogger.debug('Field watchers setup for initialization', { fieldCount: fieldSelectors.length });
 	
@@ -4244,16 +4370,137 @@ function requiredFieldsFilled() {
 		);
 	}
 
+	// CRITICAL: Filter out account creation fields unless account creation is enabled
+	// Account fields (account_username, account_password) should only be required if:
+	// 1. The "Create an account?" checkbox exists and is checked
+	// 2. The account fields are visible
+	const createAccountCheckbox = document.querySelector('#createaccount');
+	const isCreatingAccount = createAccountCheckbox && createAccountCheckbox.checked;
+	
+	if (!isCreatingAccount) {
+		// Remove account creation fields if account creation is not enabled
+		filteredFieldIds = filteredFieldIds.filter(
+			(id) => id !== "account_username" && id !== "account_password"
+		);
+		if (window.flowDebugLogging) {
+			ckoLogger.debug('requiredFieldsFilled: Account creation not enabled - filtered out account_username and account_password');
+		}
+	} else {
+		// Account creation is enabled - check if fields are visible
+		const accountUsernameField = document.getElementById('account_username');
+		const accountPasswordField = document.getElementById('account_password');
+		const accountFieldsVisible = accountUsernameField && accountPasswordField && 
+			accountUsernameField.offsetParent !== null && 
+			accountPasswordField.offsetParent !== null;
+		
+		if (!accountFieldsVisible) {
+			// Account fields exist but are hidden - remove them
+			filteredFieldIds = filteredFieldIds.filter(
+				(id) => id !== "account_username" && id !== "account_password"
+			);
+			if (window.flowDebugLogging) {
+				ckoLogger.debug('requiredFieldsFilled: Account creation enabled but fields are hidden - filtered out account fields');
+			}
+		} else {
+			if (window.flowDebugLogging) {
+				ckoLogger.debug('requiredFieldsFilled: Account creation enabled and fields visible - including account_username and account_password');
+			}
+		}
+	}
+
+	// FALLBACK: If no fields found via .required selector, check common required fields directly
+	// This handles cases where:
+	// 1. Site uses Blocks checkout (different structure)
+	// 2. Theme doesn't use .required class
+	// 3. Fields are required but not marked with .required
+	if (filteredFieldIds.length === 0) {
+		if (window.flowDebugLogging) {
+			ckoLogger.debug('requiredFieldsFilled: No fields found via .required selector, using fallback');
+		}
+		
+		// Common required billing fields
+		const commonRequiredFields = [
+			'billing_email',
+			'billing_first_name',
+			'billing_last_name',
+			'billing_address_1',
+			'billing_city',
+			'billing_country'
+		];
+		
+		// Check which of these fields exist and are required
+		filteredFieldIds = commonRequiredFields.filter((id) => {
+			const field = document.getElementById(id);
+			if (!field) {
+				return false;
+			}
+			
+			// Check if field has required attribute or is inside a required label
+			const isRequired = field.hasAttribute('required') || 
+			                  field.hasAttribute('aria-required') ||
+			                  field.closest('label')?.querySelector('.required') !== null ||
+			                  field.closest('.form-row')?.classList.contains('validate-required');
+			
+			// Also check if field is visible (not hidden)
+			const isVisible = field.offsetParent !== null && 
+			                 field.style.display !== 'none' &&
+			                 !field.hasAttribute('disabled');
+			
+			return isRequired && isVisible;
+		});
+		
+		if (window.flowDebugLogging) {
+			ckoLogger.debug('requiredFieldsFilled: Fallback found fields:', filteredFieldIds);
+		}
+	}
+
+	// DEBUG: Log field validation details
+	if (window.flowDebugLogging) {
+		ckoLogger.debug('requiredFieldsFilled: Checking ' + filteredFieldIds.length + ' fields:', filteredFieldIds.join(', '));
+	}
+
 	// Check that each field is present and not empty.
+	const fieldResults = {};
+	const failedFields = [];
 	const result = filteredFieldIds.every((id) => {
 		const field = document.getElementById(id);
 		const fieldExists = !!field;
 		const fieldValue = field?.value || '';
 		const fieldValueTrimmed = fieldValue.trim();
 		const isEmpty = fieldValueTrimmed === "";
+		const isValid = fieldExists && !isEmpty;
 		
-		return fieldExists && !isEmpty;
+		// Store result for debugging
+		if (window.flowDebugLogging) {
+			fieldResults[id] = {
+				exists: fieldExists,
+				value: fieldValueTrimmed || '(empty)',
+				isEmpty: isEmpty,
+				isValid: isValid
+			};
+			
+			if (!isValid) {
+				failedFields.push(id + ' (' + (fieldExists ? (isEmpty ? 'empty' : 'invalid') : 'not found') + ')');
+			}
+		}
+		
+		return isValid;
 	});
+
+	// DEBUG: Log field validation results with expanded details
+	if (window.flowDebugLogging) {
+		if (failedFields.length > 0) {
+			ckoLogger.debug('requiredFieldsFilled: ❌ FAILED fields: ' + failedFields.join(', '));
+		}
+		// Log each field's status individually for better visibility
+		Object.keys(fieldResults).forEach(id => {
+			const result = fieldResults[id];
+			if (!result.isValid) {
+				ckoLogger.debug('requiredFieldsFilled: Field "' + id + '" - exists: ' + result.exists + ', value: "' + result.value + '", isEmpty: ' + result.isEmpty);
+			}
+		});
+		ckoLogger.debug('requiredFieldsFilled: Final result: ' + (result ? '✅ PASSED' : '❌ FAILED') + ' (' + filteredFieldIds.length + ' fields checked, ' + failedFields.length + ' failed)');
+	}
 
 	return result;
 }
