@@ -38,15 +38,12 @@ class Checkout_SDK {
 	 * @param bool $use_fallback Use Fallback account flag.
 	 */
 	public function __construct( $use_fallback = false ) {
-<<<<<<< HEAD
-=======
 		// Check if SDK classes are available
 		if ( ! class_exists( 'Checkout\CheckoutSdk' ) ) {
 			WC_Checkoutcom_Utility::logger( 'Checkout.com SDK classes not found. Please ensure vendor/autoload.php is loaded.' );
 			return;
 		}
 		
->>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
 		$environment   = 'sandbox' === $core_settings['ckocom_environment'] ? Environment::sandbox() : Environment::production();
 		$subdomain     = ! isset( $core_settings['ckocom_region'] ) ? '--' : $core_settings['ckocom_region'];
@@ -96,13 +93,10 @@ class Checkout_SDK {
 	 * @return object
 	 */
 	public function get_payment_request() {
-<<<<<<< HEAD
-=======
 		if ( ! class_exists( 'Checkout\CheckoutSdk' ) ) {
 			return null;
 		}
 		
->>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 		if ( $this->nas_account_type ) {
 			return new Checkout\Payments\Request\PaymentRequest();
 		} else {
@@ -116,13 +110,10 @@ class Checkout_SDK {
 	 * @return object
 	 */
 	public function get_capture_request() {
-<<<<<<< HEAD
-=======
 		if ( ! class_exists( 'Checkout\CheckoutSdk' ) ) {
 			return null;
 		}
 		
->>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 		if ( $this->nas_account_type ) {
 			return new Checkout\Payments\CaptureRequest();
 		} else {
