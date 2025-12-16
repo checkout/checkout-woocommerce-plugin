@@ -279,6 +279,7 @@ body.flow-method-selected.flow-ready #place_order {
 	}
 }
 
+<<<<<<< HEAD
 /* Style the main payment method label - Customizable via CSS Variables */
 /* Defaults match standard WooCommerce appearance: transparent background, no border, icon on right */
 .payment_method_wc_checkout_com_flow > label[for="payment_method_wc_checkout_com_flow"] {
@@ -323,17 +324,52 @@ body.flow-method-selected.flow-ready #place_order {
 	width: 40px;
 	height: 24px;
 	margin-left: 12px;
+=======
+/* Style the main payment method label to match accordion design */
+.payment_method_wc_checkout_com_flow > label[for="payment_method_wc_checkout_com_flow"] {
+	display: flex !important;
+	align-items: center;
+	padding: 16px 20px;
+	background: #ffffff;
+	border: 1px solid #186aff;
+	border-radius: 8px;
+	margin: 0 0 12px 0;
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+	cursor: pointer;
+	transition: all 0.2s ease;
+}
+
+.payment_method_wc_checkout_com_flow > label[for="payment_method_wc_checkout_com_flow"]:hover {
+	border-color: #0052cc;
+	box-shadow: 0 2px 8px rgba(24, 106, 255, 0.15);
+}
+
+/* Payment method icon/image */
+.payment_method_wc_checkout_com_flow > label[for="payment_method_wc_checkout_com_flow"]::before {
+	content: '';
+	display: inline-block;
+	width: 40px;
+	height: 24px;
+	margin-right: 12px;
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 	background-image: url('data:image/svg+xml;utf8,<svg width="40" height="24" viewBox="0 0 40 24" xmlns="http://www.w3.org/2000/svg" fill="none"><rect x="0.5" y="0.5" width="39" height="23" rx="3.5" stroke="%23186aff"/><path fill-rule="evenodd" clip-rule="evenodd" d="M26.8571 6.85714H13.1428V17.1429H26.8571V6.85714ZM12.2857 6V18H27.7143V6H12.2857Z" fill="%23186aff"/><path fill-rule="evenodd" clip-rule="evenodd" d="M26.8571 9.42857H13.1428V7.71429H26.8571V9.42857Z" fill="%23186aff"/><path fill-rule="evenodd" clip-rule="evenodd" d="M18.2857 15.4286H14.8571V14.5714H18.2857V15.4286Z" fill="%23186aff"/></svg>');
 	background-size: contain;
 	background-repeat: no-repeat;
 	background-position: center;
 	flex-shrink: 0;
+<<<<<<< HEAD
 	order: var(--cko-payment-label-icon-order-right, 2); /* Right side */
 }
 
 /* Custom image support - add this class to use custom image */
 .payment_method_wc_checkout_com_flow.has-custom-icon > label[for="payment_method_wc_checkout_com_flow"]::before,
 .payment_method_wc_checkout_com_flow.has-custom-icon > label[for="payment_method_wc_checkout_com_flow"]::after {
+=======
+}
+
+/* Custom image support - add this class to use custom image */
+.payment_method_wc_checkout_com_flow.has-custom-icon > label[for="payment_method_wc_checkout_com_flow"]::before {
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 	background-image: var(--checkout-payment-icon);
 }
 
@@ -341,6 +377,7 @@ body.flow-method-selected.flow-ready #place_order {
 	display: flex;
 	flex-direction: column;
 	flex: 1;
+<<<<<<< HEAD
 	order: 1; /* Text always on left */
 	text-align: var(--cko-payment-label-text-align, left); /* Default: left (matches standard WooCommerce) */
 }
@@ -360,6 +397,22 @@ body.flow-method-selected.flow-ready #place_order {
 	line-height: 1.3;
 	opacity: var(--cko-payment-label-subtitle-opacity, 0.7); /* Subtle by default */
 	text-align: var(--cko-payment-label-text-align, left); /* Default: left (matches standard WooCommerce) */
+=======
+}
+
+.payment_method_wc_checkout_com_flow > label[for="payment_method_wc_checkout_com_flow"] .payment-method-title {
+	font-size: 15px;
+	font-weight: 600;
+	color: #1a1a1a;
+	line-height: 1.4;
+}
+
+.payment_method_wc_checkout_com_flow > label[for="payment_method_wc_checkout_com_flow"] .payment-method-subtitle {
+	font-size: 13px;
+	color: #666;
+	margin-top: 2px;
+	line-height: 1.3;
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 }
 
 /* Saved Cards Accordion Style - Matches Flow Style */

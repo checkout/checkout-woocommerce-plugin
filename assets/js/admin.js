@@ -3,13 +3,22 @@ jQuery( function ( $ ) {
 	var admin_functions = {
 
 		hidePaymentMethods: function () {
+<<<<<<< HEAD
 			const applePay = $( '[data-gateway_id="wc_checkout_com_apple_pay"]' );
 			const googlePay = $( '[data-gateway_id="wc_checkout_com_google_pay"]' );
+=======
+			const classicCheckout = $( '[data-gateway_id="wc_checkout_com_cards"]' );
+			const applePay = $( '[data-gateway_id="wc_checkout_com_apple_pay"]' );
+			const googlePay = $( '[data-gateway_id="wc_checkout_com_google_pay"]' );
+			const payPal = $( '[data-gateway_id="wc_checkout_com_paypal"]' );
+			const flowPay = $( '[data-gateway_id="wc_checkout_com_flow"]' );
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 			const alternativePay = $( '[data-gateway_id*="wc_checkout_com_alternative_payments"]' );
 
 			if ( applePay.length > 0 ) {
 				applePay.hide();
 			}
+<<<<<<< HEAD
 			if ( googlePay.length > 0 ) {
 				googlePay.hide();
 			}
@@ -17,6 +26,31 @@ jQuery( function ( $ ) {
 			if ( alternativePay.length > 0 ) {
 				alternativePay.hide();
 			}
+=======
+			// Google Pay is now available in Flow mode - don't hide it
+			// Only hide Google Pay in classic mode, show it in Flow mode
+			if ( googlePay.length > 0 && ! cko_admin_vars.flow_enabled ) {
+				googlePay.hide();
+			}
+
+			if ( flowPay.length > 0 ) {
+				flowPay.hide();
+			}
+
+			if ( alternativePay.length > 0 ) {
+				alternativePay.hide();
+			}
+
+			if( cko_admin_vars.flow_enabled ) {
+				classicCheckout.hide();
+				payPal.hide();
+				flowPay.show();
+				// Show Google Pay when Flow mode is enabled
+				if ( googlePay.length > 0 ) {
+					googlePay.show();
+				}
+			}
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 		},
 
 		disableRefundForZero: function () {
@@ -307,6 +341,62 @@ jQuery( function ( $ ) {
 				} );
 			} );
 
+<<<<<<< HEAD
+=======
+		},
+
+		toggleSecretKeyVisibility: function () {
+			const field = $('#woocommerce_wc_checkout_com_cards_ckocom_sk');
+			if (!field.length) return;
+
+			const wrapper = field.closest('td');
+
+			// Create the toggle button
+			const toggleBtn = $('<button type="button" class="button button-secondary" style="margin-left: 10px;">View</button>');
+			toggleBtn.on('click', function (e) {
+				e.preventDefault();
+				const currentType = field.attr('type');
+				if (currentType === 'password') {
+					field.attr('type', 'text');
+					toggleBtn.text('Hide');
+				} else {
+					field.attr('type', 'password');
+					toggleBtn.text('View');
+				}
+			});
+
+			// Append button after the input field
+			field.after(toggleBtn);
+		},
+
+		expressButtonSizeSettings: function () {
+			// Handle button size preset changes for all three payment methods
+			const paymentMethods = ['apple_pay', 'google_pay', 'paypal'];
+			
+			paymentMethods.forEach(function(paymentMethod) {
+				const presetField = $('#woocommerce_wc_checkout_com_' + paymentMethod + '_' + paymentMethod + '_express_button_size_preset');
+				const customHeightField = $('#woocommerce_wc_checkout_com_' + paymentMethod + '_' + paymentMethod + '_express_button_custom_height');
+				
+				if (!presetField.length || !customHeightField.length) {
+					return;
+				}
+				
+				// Show/hide custom height field based on preset
+				function toggleCustomHeight() {
+					if (presetField.val() === 'custom') {
+						customHeightField.closest('tr').show();
+					} else {
+						customHeightField.closest('tr').hide();
+					}
+				}
+				
+				// Initial state
+				toggleCustomHeight();
+				
+				// On change
+				presetField.on('change', toggleCustomHeight);
+			});
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 		}
 	}
 
@@ -329,4 +419,12 @@ jQuery( function ( $ ) {
 	admin_functions.cardSettings();
 
 	admin_functions.webhookSettings();
+<<<<<<< HEAD
+=======
+
+	admin_functions.toggleSecretKeyVisibility();
+
+	// Handle express button size settings
+	admin_functions.expressButtonSizeSettings();
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 } );

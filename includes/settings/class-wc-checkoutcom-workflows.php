@@ -67,7 +67,11 @@ class WC_Checkoutcom_Workflows {
 
 		$core_settings   = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
 		$environment     = ( 'sandbox' === $core_settings['ckocom_environment'] );
+<<<<<<< HEAD
 		$subdomain_check = isset( $core_settings['ckocom_region'] ) && '--' !== $core_settings['ckocom_region'];
+=======
+		$subdomain_check = isset( $core_settings['ckocom_region'] ) && 'global' !== $core_settings['ckocom_region'];
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 
 		$core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
 
@@ -133,8 +137,20 @@ class WC_Checkoutcom_Workflows {
 		}
 
 		try {
+<<<<<<< HEAD
 
 			$workflows = $this->checkout->get_builder()->getWorkflowsClient()->getWorkflows();
+=======
+			$builder = $this->checkout->get_builder();
+			
+			// Check if SDK was properly initialized
+			if ( ! $builder ) {
+				WC_Checkoutcom_Utility::logger( 'Checkout.com SDK not initialized - cannot fetch workflows' );
+				return array();
+			}
+
+			$workflows = $builder->getWorkflowsClient()->getWorkflows();
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 
 			if ( ! is_wp_error( $workflows ) && ! empty( $workflows ) ) {
 
@@ -192,6 +208,15 @@ class WC_Checkoutcom_Workflows {
 			$url = WC_Checkoutcom_Webhook::get_instance()->generate_current_webhook_url();
 		}
 
+<<<<<<< HEAD
+=======
+		// Check if SDK classes are available
+		if ( ! class_exists( 'Checkout\Workflows\Actions\WebhookSignature' ) ) {
+			WC_Checkoutcom_Utility::logger( 'Checkout.com SDK Workflow classes not found - cannot create webhook workflow' );
+			return array();
+		}
+		
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 		$signature         = new WebhookSignature();
 		$signature->key    = $this->secret_key;
 		$signature->method = 'HMACSHA256';
@@ -258,7 +283,19 @@ class WC_Checkoutcom_Workflows {
 
 		$workflows = [];
 		try {
+<<<<<<< HEAD
 			$workflows = $this->checkout->get_builder()->getWorkflowsClient()->createWorkflow( $workflow_request );
+=======
+			$builder = $this->checkout->get_builder();
+			
+			// Check if SDK was properly initialized
+			if ( ! $builder ) {
+				WC_Checkoutcom_Utility::logger( 'Checkout.com SDK not initialized - cannot create workflow' );
+				return array();
+			}
+			
+			$workflows = $builder->getWorkflowsClient()->createWorkflow( $workflow_request );
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 
 			if ( ! is_wp_error( $workflows ) && ! empty( $workflows ) ) {
 

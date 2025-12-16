@@ -65,6 +65,7 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 		if ( ! empty( $_GET['cko_paypal_action'] ) ) {
 			switch ( $_GET['cko_paypal_action'] ) {
 
+<<<<<<< HEAD
 				case 'create_order':
 					if ( ! empty( $_POST ) ) {
 
@@ -85,6 +86,37 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 						exit();
 					}
 					break;
+=======
+			case 'create_order':
+				if ( ! empty( $_POST ) ) {
+					// Check if this is an express checkout request
+					// phpcs:ignore WordPress.Security.NonceVerification.Missing
+					$express_checkout = ! empty( $_POST['express_checkout'] ) || ! empty( $_POST['use_existing_cart'] );
+					
+					if ( $express_checkout ) {
+						// Route to express checkout handler
+						$this->cko_express_create_order();
+						break;
+					}
+
+					WC()->checkout->process_checkout();
+
+					if ( wc_notice_count( 'error' ) > 0 ) {
+						WC()->session->set( 'reload_checkout', true );
+						$error_messages_data = wc_get_notices( 'error' );
+						$error_messages      = array();
+						foreach ( $error_messages_data as $key => $value ) {
+							$error_messages[] = $value['notice'];
+						}
+						wc_clear_notices();
+						ob_start();
+						wp_send_json_error( array( 'messages' => $error_messages ) );
+						exit;
+					}
+					exit();
+				}
+				break;
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 				
 				case 'empty_session':
 					WC_Checkoutcom_Utility::cko_set_session( 'cko_paypal_order_id', '' );
@@ -137,7 +169,10 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 		// First empty the cart to prevent wrong calculation.
 		WC()->cart->empty_cart();
 
+<<<<<<< HEAD
 		// TODO: Add check for variable type product.
+=======
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 		if ( ( 'variable' === $product_type || 'variable-subscription' === $product_type ) && isset( $_POST['attributes'] ) ) {
 			$attributes = wc_clean( wp_unslash( $_POST['attributes'] ) );
 
@@ -163,12 +198,51 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 	public function cko_express_create_order() {
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing
+<<<<<<< HEAD
 		if ( ! empty( $_POST['express_checkout'] ) && ! empty( $_POST['add_to_cart'] ) && 'success' !== $_POST['add_to_cart'] ) {
 			return null;
 		}
 
 		if ( WC()->cart->is_empty() ) {
 			return null;
+=======
+		$express_checkout = ! empty( $_POST['express_checkout'] );
+		$add_to_cart = isset( $_POST['add_to_cart'] ) ? sanitize_text_field( wp_unslash( $_POST['add_to_cart'] ) ) : '';
+		$use_existing_cart = ! empty( $_POST['use_existing_cart'] );
+
+		// For product pages, check if add_to_cart was successful
+		if ( $express_checkout && ! empty( $add_to_cart ) && 'success' !== $add_to_cart ) {
+			wp_send_json_error( [ 'messages' => 'Failed to add product to cart' ] );
+			return;
+		}
+
+		// Ensure cart is loaded - important for Blocks cart pages
+		if ( ! WC()->cart ) {
+			wp_send_json_error( [ 'messages' => 'Cart not initialized' ] );
+			return;
+		}
+
+		// For Blocks cart pages, ensure cart is loaded from session
+		// This is important because Blocks cart might not have synced with server session
+		if ( $use_existing_cart ) {
+			// Force cart to load from session
+			WC()->cart->get_cart_from_session();
+			
+			// Recalculate totals to ensure we have the latest
+			WC()->cart->calculate_totals();
+			
+			// Check if cart is empty after loading from session
+			if ( WC()->cart->is_empty() ) {
+				wp_send_json_error( [ 'messages' => 'Cart is empty' ] );
+				return;
+			}
+		}
+
+		// For product pages, ensure cart is not empty after adding product
+		if ( ! $use_existing_cart && WC()->cart->is_empty() ) {
+			wp_send_json_error( [ 'messages' => 'Cart is empty' ] );
+			return;
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 		}
 
 		$this->cko_create_order_request( true );
@@ -178,7 +252,268 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 		$cko_paypal_order_id = WC_Checkoutcom_Utility::cko_get_session( 'cko_paypal_order_id' );
 		$cko_pc_id           = WC_Checkoutcom_Utility::cko_get_session( 'cko_pc_id' );
 
+<<<<<<< HEAD
 		wp_send_json_success();
+=======
+		// If we have a payment context, process the express checkout immediately
+		if ( ! empty( $cko_pc_id ) ) {
+			try {
+				// Create the order from cart
+				$order = $this->create_express_order_from_cart();
+				
+				if ( ! $order ) {
+					wp_send_json_error( array( 'messages' => 'Failed to create order for PayPal Express checkout.' ) );
+					return;
+				}
+
+				// Get payment context details
+				$checkout = new Checkout_SDK();
+				$response = $checkout->get_builder()->getPaymentContextsClient()->getPaymentContextDetails( $cko_pc_id );
+				
+				$payment_context_id    = $cko_pc_id;
+				$processing_channel_id = $response['payment_request']['processing_channel_id'];
+
+				// Process the payment immediately
+				$payment_response = $this->request_payment( $order, $payment_context_id, $processing_channel_id );
+
+				// Debug: Log the payment response
+				WC_Checkoutcom_Utility::logger( 'PayPal Express: Payment response received: ' . print_r( $payment_response, true ) );
+
+				// Clear PayPal session
+				WC_Checkoutcom_Utility::cko_set_session( 'cko_paypal_order_id', '' );
+				WC_Checkoutcom_Utility::cko_set_session( 'cko_pc_id', '' );
+
+				// Check if payment was successful
+				if ( isset( $payment_response['result'] ) && $payment_response['result'] === 'success' ) {
+					// Payment was successful - use the redirect URL from the response
+					$redirect_url = $payment_response['redirect'];
+					
+					// Debug logging
+					WC_Checkoutcom_Utility::logger( 'PayPal Express: Payment successful, redirecting to: ' . $redirect_url );
+					WC_Checkoutcom_Utility::logger( 'PayPal Express: Order ID: ' . $order->get_id() . ', Order Key: ' . $order->get_order_key() );
+					
+					wp_send_json_success( array( 'redirect_url' => $redirect_url ) );
+				} else {
+					// Payment failed
+					$order->update_status( 'failed', 'PayPal Express payment failed.' );
+					wp_send_json_error( array( 'messages' => 'Payment failed. Please try again.' ) );
+				}
+
+			} catch ( CheckoutApiException $ex ) {
+				$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
+				$error_message = 'An error occurred while processing PayPal Express payment. ';
+				
+				if ( $gateway_debug ) {
+					$error_message .= $ex->getMessage();
+				}
+
+				WC_Checkoutcom_Utility::logger( $error_message, $ex );
+				wp_send_json_error( array( 'messages' => $error_message ) );
+			}
+		} else {
+			// No payment context, just return success (fallback to old behavior)
+			wp_send_json_success();
+		}
+	}
+
+	/**
+	 * Create order from cart for PayPal Express checkout.
+	 *
+	 * @return WC_Order|false
+	 */
+	private function create_express_order_from_cart() {
+		try {
+			// Determine customer ID and email
+			$customer_id = 0;
+			$customer_email = '';
+			
+			// Check if user is logged in
+			if ( is_user_logged_in() ) {
+				$current_user = wp_get_current_user();
+				$customer_id = $current_user->ID;
+				$customer_email = $current_user->user_email;
+			} else {
+				// For guest users, get email from PayPal data
+				$paypal_email = $this->get_paypal_email_from_context();
+				if ( ! empty( $paypal_email ) ) {
+					$customer_email = $paypal_email;
+				}
+			}
+
+			// Create order with proper customer ID
+			$order = wc_create_order( array( 'customer_id' => $customer_id ) );
+			
+			if ( ! $order ) {
+				return false;
+			}
+
+			// Set customer email if we have one
+			if ( ! empty( $customer_email ) ) {
+				$order->set_billing_email( $customer_email );
+			}
+
+			// Add cart items to order
+			foreach ( WC()->cart->get_cart() as $cart_item_key => $cart_item ) {
+				$product = $cart_item['data'];
+				$order->add_product( $product, $cart_item['quantity'] );
+			}
+
+			// Set order addresses from PayPal data if available
+			$this->set_order_addresses_from_paypal( $order );
+
+			// Set shipping method if available
+			$shipping_packages = WC()->shipping->get_packages();
+			if ( ! empty( $shipping_packages ) ) {
+				foreach ( $shipping_packages as $package ) {
+					$chosen_methods = WC()->session->get( 'chosen_shipping_methods' );
+					if ( ! empty( $chosen_methods ) ) {
+						$order->set_shipping_method( $chosen_methods[0] );
+					}
+				}
+			}
+
+			// Calculate totals
+			$order->calculate_totals();
+
+			// Set payment method to PayPal Express
+			$order->set_payment_method( 'wc_checkout_com_paypal' );
+			$order->set_payment_method_title( 'PayPal Express' );
+
+			// Set order status
+			$order->set_status( 'pending' );
+			$order->save();
+
+			// Store order ID in session for potential use
+			WC()->session->set( 'order_awaiting_payment', $order->get_id() );
+
+			return $order;
+
+		} catch ( Exception $e ) {
+			WC_Checkoutcom_Utility::logger( 'Error creating PayPal Express order: ' . $e->getMessage(), $e );
+			return false;
+		}
+	}
+
+	/**
+	 * Set order addresses from PayPal payment context data.
+	 *
+	 * @param WC_Order $order
+	 */
+	private function set_order_addresses_from_paypal( $order ) {
+		$cko_pc_details = WC_Checkoutcom_Utility::cko_get_session( 'cko_pc_details' );
+		
+		if ( empty( $cko_pc_details ) ) {
+			// Try to get payment context details
+			$cko_pc_id = WC_Checkoutcom_Utility::cko_get_session( 'cko_pc_id' );
+			if ( ! empty( $cko_pc_id ) ) {
+				try {
+					$checkout = new Checkout_SDK();
+					$cko_pc_details = $checkout->get_builder()->getPaymentContextsClient()->getPaymentContextDetails( $cko_pc_id );
+					WC_Checkoutcom_Utility::cko_set_session( 'cko_pc_details', $cko_pc_details );
+				} catch ( Exception $e ) {
+					// If we can't get details, use default addresses
+					return;
+				}
+			}
+		}
+
+		if ( isset( $cko_pc_details['payment_request']['shipping']['address'] ) ) {
+			$paypal_shipping_address = $cko_pc_details['payment_request']['shipping']['address'];
+			$shipping_name = $cko_pc_details['payment_request']['shipping']['first_name'] ?? '';
+			$shipping_name_parts = explode( ' ', $shipping_name );
+			$shipping_first_name = $shipping_name_parts[0] ?? '';
+			$shipping_last_name = $shipping_name_parts[1] ?? '';
+
+			// Set shipping address
+			$order->set_shipping_first_name( $shipping_first_name );
+			$order->set_shipping_last_name( $shipping_last_name );
+			$order->set_shipping_address_1( $paypal_shipping_address['address_line1'] ?? '' );
+			$order->set_shipping_address_2( $paypal_shipping_address['address_line2'] ?? '' );
+			$order->set_shipping_city( $paypal_shipping_address['city'] ?? '' );
+			$order->set_shipping_postcode( $paypal_shipping_address['zip'] ?? '' );
+			$order->set_shipping_country( $paypal_shipping_address['country'] ?? '' );
+
+			// Set billing address (same as shipping for PayPal Express)
+			$order->set_billing_first_name( $shipping_first_name );
+			$order->set_billing_last_name( $shipping_last_name );
+			$order->set_billing_address_1( $paypal_shipping_address['address_line1'] ?? '' );
+			$order->set_billing_address_2( $paypal_shipping_address['address_line2'] ?? '' );
+			$order->set_billing_city( $paypal_shipping_address['city'] ?? '' );
+			$order->set_billing_postcode( $paypal_shipping_address['zip'] ?? '' );
+			$order->set_billing_country( $paypal_shipping_address['country'] ?? '' );
+
+			// Set email based on user login status
+			if ( is_user_logged_in() ) {
+				// For logged-in users, use their account email
+				$current_user = wp_get_current_user();
+				if ( $current_user && $current_user->user_email ) {
+					$order->set_billing_email( $current_user->user_email );
+				}
+			} else {
+				// For guest users, get email from PayPal data
+				$paypal_email = $this->get_paypal_email_from_context( $cko_pc_details );
+				if ( ! empty( $paypal_email ) ) {
+					$order->set_billing_email( $paypal_email );
+				}
+			}
+		}
+	}
+
+	/**
+	 * Get PayPal email from payment context details.
+	 * Checks multiple possible locations in the PayPal response.
+	 *
+	 * @param array $cko_pc_details Payment context details (optional, will fetch if not provided).
+	 * @return string Email address or empty string if not found.
+	 */
+	private function get_paypal_email_from_context( $cko_pc_details = null ) {
+		if ( empty( $cko_pc_details ) ) {
+			$cko_pc_details = WC_Checkoutcom_Utility::cko_get_session( 'cko_pc_details' );
+		}
+		
+		if ( empty( $cko_pc_details ) ) {
+			// Try to get payment context details
+			$cko_pc_id = WC_Checkoutcom_Utility::cko_get_session( 'cko_pc_id' );
+			if ( ! empty( $cko_pc_id ) ) {
+				try {
+					$checkout = new Checkout_SDK();
+					$cko_pc_details = $checkout->get_builder()->getPaymentContextsClient()->getPaymentContextDetails( $cko_pc_id );
+					WC_Checkoutcom_Utility::cko_set_session( 'cko_pc_details', $cko_pc_details );
+				} catch ( Exception $e ) {
+					return '';
+				}
+			}
+		}
+
+		if ( empty( $cko_pc_details ) || ! isset( $cko_pc_details['payment_request'] ) ) {
+			return '';
+		}
+
+		// Try to get email from different possible locations in PayPal response
+		// Check source.account_holder.email first (this is where PayPal often puts it)
+		if ( isset( $cko_pc_details['payment_request']['source']['account_holder']['email'] ) ) {
+			return $cko_pc_details['payment_request']['source']['account_holder']['email'];
+		}
+		
+		if ( isset( $cko_pc_details['payment_request']['shipping']['email'] ) ) {
+			return $cko_pc_details['payment_request']['shipping']['email'];
+		}
+		
+		if ( isset( $cko_pc_details['payment_request']['billing']['email'] ) ) {
+			return $cko_pc_details['payment_request']['billing']['email'];
+		}
+		
+		if ( isset( $cko_pc_details['payment_request']['payer']['email'] ) ) {
+			return $cko_pc_details['payment_request']['payer']['email'];
+		}
+
+		// Try additional locations that might contain email
+		if ( isset( $cko_pc_details['payment_request']['customer']['email'] ) ) {
+			return $cko_pc_details['payment_request']['customer']['email'];
+		}
+
+		return '';
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 	}
 
 	/**
@@ -246,6 +581,34 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 	 */
 	public function cko_create_order_request( $is_express = false ) {
 
+<<<<<<< HEAD
+=======
+		// Ensure cart is loaded and totals are calculated
+		// This is important for Blocks cart pages
+		if ( ! WC()->cart ) {
+			wp_send_json_error( array( 'messages' => 'Cart not initialized' ) );
+			return;
+		}
+
+		// For Blocks cart pages, ensure cart is loaded from session
+		// Sometimes the cart needs to be refreshed from the session
+		if ( WC()->cart->is_empty() ) {
+			// Try to load cart from session
+			WC()->cart->get_cart_from_session();
+			WC()->cart->calculate_totals();
+		}
+		
+		// Recalculate totals to ensure we have the latest (important for Blocks cart)
+		WC()->cart->calculate_totals();
+
+		// For Blocks cart pages, ensure cart contents are loaded
+		if ( WC()->cart->is_empty() ) {
+			WC_Checkoutcom_Utility::logger( 'PayPal Express: Cart is empty after session load. Cart contents: ' . print_r( WC()->cart->get_cart(), true ) );
+			wp_send_json_error( array( 'messages' => 'Cart is empty. Please add items to your cart.' ) );
+			return;
+		}
+
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 		$paymentContextsRequest           = new Checkout\Payments\Contexts\PaymentContextsRequest();
 		$paymentContextsRequest->source   = new Checkout\Payments\Request\Source\Apm\RequestPayPalSource();
 		$paymentContextsRequest->currency = get_woocommerce_currency();
@@ -257,7 +620,24 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 			$paymentContextsRequest->processing->user_action = Checkout\Payments\UserAction::$CONTINUE;
 		}
 
+<<<<<<< HEAD
 		$total_amount = WC()->cart->total;
+=======
+		// Get cart total - use 'raw' to get the numeric value directly
+		$total_amount = WC()->cart->get_total( 'raw' );
+		
+		// Fallback to formatted total if raw is 0
+		if ( $total_amount <= 0 ) {
+			$total_amount = WC()->cart->total;
+		}
+
+		// Validate that we have a valid total amount
+		if ( $total_amount <= 0 ) {
+			WC_Checkoutcom_Utility::logger( 'PayPal Express: Invalid cart total. Cart contents: ' . print_r( WC()->cart->get_cart(), true ) );
+			wp_send_json_error( array( 'messages' => 'Cart total is invalid. Please refresh the page and try again.' ) );
+			return;
+		}
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 
 		// Logic for order-pay page.
 
@@ -310,11 +690,49 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 		try {
 			$response = $checkout->get_builder()->getPaymentContextsClient()->createPaymentContexts( $paymentContextsRequest );
 
+<<<<<<< HEAD
 			WC_Checkoutcom_Utility::cko_set_session( 'cko_pc_id', $response['id'] );
 
 			if ( isset( $response['partner_metadata']['order_id'] ) ) {
 
 				wp_send_json( [ 'order_id' => $response['partner_metadata']['order_id'] ], 200 );
+=======
+			// Log the full response for debugging
+			WC_Checkoutcom_Utility::logger( 'PayPal Express: Payment context response. Full response: ' . print_r( $response, true ) );
+
+			if ( ! isset( $response['id'] ) ) {
+				WC_Checkoutcom_Utility::logger( 'PayPal Express: No payment context ID in response. Response: ' . print_r( $response, true ) );
+				wp_send_json_error( [ 'messages' => 'Failed to create PayPal payment context. No ID returned.' ] );
+				return;
+			}
+
+			WC_Checkoutcom_Utility::cko_set_session( 'cko_pc_id', $response['id'] );
+
+			// Return order_id from partner_metadata (PayPal Order ID)
+			// Check multiple possible locations for order_id
+			$order_id = null;
+			if ( isset( $response['partner_metadata']['order_id'] ) ) {
+				$order_id = $response['partner_metadata']['order_id'];
+			} elseif ( isset( $response['partner_metadata'] ) && is_array( $response['partner_metadata'] ) ) {
+				// Try to find order_id anywhere in partner_metadata
+				foreach ( $response['partner_metadata'] as $key => $value ) {
+					if ( 'order_id' === $key || 'orderId' === $key || 'order-id' === $key ) {
+						$order_id = $value;
+						break;
+					}
+				}
+			} elseif ( isset( $response['order_id'] ) ) {
+				$order_id = $response['order_id'];
+			}
+
+			if ( $order_id ) {
+				WC_Checkoutcom_Utility::logger( 'PayPal Express: Order ID found: ' . $order_id );
+				wp_send_json( [ 'order_id' => $order_id ], 200 );
+			} else {
+				// If no order_id found, log and return error
+				WC_Checkoutcom_Utility::logger( 'PayPal Express: No order_id found in response. Response structure: ' . print_r( $response, true ) );
+				wp_send_json_error( [ 'messages' => 'Failed to create PayPal order. No order ID returned from payment context.' ] );
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 			}
 		} catch ( CheckoutApiException $ex ) {
 			$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
@@ -325,9 +743,33 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 				$error_message .= $ex->getMessage();
 			}
 
+<<<<<<< HEAD
 			WC_Checkoutcom_Utility::logger( $error_message, $ex );
 
 			wp_send_json_error( [ 'messages' => $error_message ] );
+=======
+			// Log detailed error information
+			WC_Checkoutcom_Utility::logger( 'PayPal Express: CheckoutApiException caught. Error message: ' . $ex->getMessage() );
+			WC_Checkoutcom_Utility::logger( 'PayPal Express: Exception details: ' . print_r( $ex, true ) );
+			
+			// Get more detailed error information if available
+			if ( method_exists( $ex, 'getErrorDetails' ) ) {
+				$error_details = $ex->getErrorDetails();
+				WC_Checkoutcom_Utility::logger( 'PayPal Express: Error details: ' . print_r( $error_details, true ) );
+				if ( is_array( $error_details ) && isset( $error_details['error_codes'] ) ) {
+					$error_message .= ' Error codes: ' . implode( ', ', $error_details['error_codes'] );
+				}
+			}
+
+			WC_Checkoutcom_Utility::logger( $error_message, $ex );
+
+			wp_send_json_error( [ 'messages' => $error_message ] );
+		} catch ( \Exception $ex ) {
+			// Catch any other exceptions
+			WC_Checkoutcom_Utility::logger( 'PayPal Express: General exception caught. Error: ' . $ex->getMessage() );
+			WC_Checkoutcom_Utility::logger( 'PayPal Express: Exception trace: ' . $ex->getTraceAsString() );
+			wp_send_json_error( [ 'messages' => 'An unexpected error occurred: ' . $ex->getMessage() ] );
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 		}
 
 		exit();
@@ -521,8 +963,18 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 	public function payment_scripts() {
 		$paypal_enabled = ! empty( $this->get_option( 'enabled' ) ) && 'yes' === $this->get_option( 'enabled' );
 
+<<<<<<< HEAD
 		if ( ! $paypal_enabled ) {
 			return;
+=======
+		$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$checkout_mode    = $checkout_setting['ckocom_checkout_mode'];
+
+		if ( $checkout_mode === 'classic' ) {
+			if ( ! $paypal_enabled ) {
+					return;
+			}
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 		}
 
 		if ( ! empty( WC_Checkoutcom_Utility::cko_get_session( 'cko_pc_id' ) ) ) {
