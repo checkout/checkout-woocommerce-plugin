@@ -86,18 +86,8 @@ class WC_Checkout_Com_Webhook {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order loaded successfully - Order ID: ' . $order->get_id() . ', Status: ' . $order->get_status() );
 		}
 
-		$current_status = $order->get_status();
-		
-		// Simple check: Don't update status if order is already failed
-		if ( $current_status === 'failed' ) {
-			if ( $webhook_debug_enabled ) {
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: authorize_payment - Order status is failed, skipping webhook processing to keep order as failed' );
-			}
-			$order->add_order_note( __( 'Webhook received but ignored - Order status is failed. Order status remains failed.', 'checkout-com-unified-payments-api' ) );
-			return true;
-		}
-
 		$already_captured = $order->get_meta( 'cko_payment_captured' );
+		$current_status = $order->get_status();
 
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: authorize_payment - Current order status: ' . $current_status );
@@ -106,31 +96,7 @@ class WC_Checkout_Com_Webhook {
 
 		$payment_id = $webhook_data->id;
 		$action_id = $webhook_data->action_id;
-		$amount = isset( $webhook_data->amount ) ? $webhook_data->amount : 0;
-		$currency = isset( $webhook_data->currency ) ? $webhook_data->currency : $order->get_currency();
-		
-		// Format amount for display
-		$amount_formatted = '';
-		if ( $amount > 0 ) {
-			$amount_decimal = $amount / 100; // Convert from cents
-			$amount_formatted = wc_price( $amount_decimal, array( 'currency' => $currency ) );
-		}
-		
-		$message = sprintf( 'Webhook received from checkout.com. Payment Authorized - Payment ID: %s, Action ID: %s%s', $payment_id, $action_id, $amount_formatted ? ', Amount: ' . $amount_formatted : '' );
-
-		// CRITICAL: Check if this specific action_id was already processed to prevent duplicate notes
-		$processed_action_ids = $order->get_meta( '_cko_processed_action_ids' );
-		if ( ! is_array( $processed_action_ids ) ) {
-			$processed_action_ids = array();
-		}
-		$action_already_processed = ! empty( $action_id ) && in_array( $action_id, $processed_action_ids, true );
-
-		if ( $action_already_processed ) {
-			if ( $webhook_debug_enabled ) {
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: authorize_payment - Action ID ' . $action_id . ' already processed, skipping duplicate note' );
-			}
-			return true; // Already processed, skip entirely
-		}
+		$message = sprintf( 'Webhook received from checkout.com. Payment Authorized - Payment ID: %s, Action ID: %s', $payment_id, $action_id );
 
 		// CRITICAL: Check if already captured FIRST (most important check)
 		// Don't update status if already captured (even if not authorized yet)
@@ -143,9 +109,6 @@ class WC_Checkout_Com_Webhook {
 			$order->set_transaction_id( $action_id );
 			$order->update_meta_data( '_cko_payment_id', $payment_id );
 			$order->update_meta_data( 'cko_payment_authorized', true );
-			// Track this action_id as processed
-			$processed_action_ids[] = $action_id;
-			$order->update_meta_data( '_cko_processed_action_ids', array_unique( $processed_action_ids ) );
 			$order->add_order_note( $message );
 			return true;
 		}
@@ -158,9 +121,6 @@ class WC_Checkout_Com_Webhook {
 			if ( $webhook_debug_enabled ) {
 				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: authorize_payment - Already authorized with matching status, adding note only' );
 			}
-			// Track this action_id as processed
-			$processed_action_ids[] = $action_id;
-			$order->update_meta_data( '_cko_processed_action_ids', array_unique( $processed_action_ids ) );
 			$order->add_order_note( $message );
 			return true;
 		}
@@ -176,9 +136,6 @@ class WC_Checkout_Com_Webhook {
 			$order->set_transaction_id( $action_id );
 			$order->update_meta_data( '_cko_payment_id', $payment_id );
 			$order->update_meta_data( 'cko_payment_authorized', true );
-			// Track this action_id as processed
-			$processed_action_ids[] = $action_id;
-			$order->update_meta_data( '_cko_processed_action_ids', array_unique( $processed_action_ids ) );
 			$order->add_order_note( $message );
 			return true;
 		}
@@ -187,10 +144,6 @@ class WC_Checkout_Com_Webhook {
 		$order->set_transaction_id( $action_id );
 		$order->update_meta_data( '_cko_payment_id', $payment_id );
 		$order->update_meta_data( 'cko_payment_authorized', true );
-
-		// Track this action_id as processed
-		$processed_action_ids[] = $action_id;
-		$order->update_meta_data( '_cko_processed_action_ids', array_unique( $processed_action_ids ) );
 
 		$order->add_order_note( $message );
 		$order->update_status( $auth_status );
@@ -253,19 +206,8 @@ class WC_Checkout_Com_Webhook {
 			return false;
 		}
 		
-		$current_status = $order->get_status();
-		
 		if ( $webhook_debug_enabled ) {
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order loaded successfully - Order ID: ' . $order->get_id() . ', Status: ' . $current_status );
-		}
-
-		// Simple check: Don't update status if order is already failed
-		if ( $current_status === 'failed' ) {
-			if ( $webhook_debug_enabled ) {
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: card_verified - Order status is failed, skipping webhook processing to keep order as failed' );
-			}
-			$order->add_order_note( __( 'Webhook received but ignored - Order status is failed. Order status remains failed.', 'checkout-com-unified-payments-api' ) );
-			return true;
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order loaded successfully - Order ID: ' . $order->get_id() . ', Status: ' . $order->get_status() );
 		}
 
 		$payment_id = $webhook_data->id;
@@ -338,19 +280,8 @@ class WC_Checkout_Com_Webhook {
 		}
 		
 		$order_id = $order->get_id();
-		$current_status = $order->get_status();
-		
 		if ( $webhook_debug_enabled ) {
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order loaded successfully - Order ID: ' . $order_id . ', Status: ' . $current_status );
-		}
-
-		// Simple check: Don't update status if order is already failed
-		if ( $current_status === 'failed' ) {
-			if ( $webhook_debug_enabled ) {
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: capture_payment - Order status is failed, skipping webhook processing to keep order as failed' );
-			}
-			$order->add_order_note( __( 'Webhook received but ignored - Order status is failed. Order status remains failed.', 'checkout-com-unified-payments-api' ) );
-			return true;
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order loaded successfully - Order ID: ' . $order_id . ', Status: ' . $order->get_status() );
 		}
 
 		// Check if payment is already captured.
@@ -360,29 +291,10 @@ class WC_Checkout_Com_Webhook {
 		// Get action id from webhook data.
 		$action_id          = $webhook_data->action_id;
 		$amount             = $webhook_data->amount;
-		$currency           = isset( $webhook_data->currency ) ? $webhook_data->currency : $order->get_currency();
 		$order_amount       = $order->get_total();
 		$order_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $order_amount, $order->get_currency() );
-		
-		// Format amount for display
-		$amount_decimal = $amount / 100; // Convert from cents
-		$amount_formatted = wc_price( $amount_decimal, array( 'currency' => $currency ) );
 
-		$message          = sprintf( 'Webhook received from checkout.com Payment captured - Payment ID: %s, Action ID: %s, Amount: %s', $payment_id, $action_id, $amount_formatted );
-
-		// CRITICAL: Check if this specific action_id was already processed to prevent duplicate notes
-		$processed_action_ids = $order->get_meta( '_cko_processed_action_ids' );
-		if ( ! is_array( $processed_action_ids ) ) {
-			$processed_action_ids = array();
-		}
-		$action_already_processed = ! empty( $action_id ) && in_array( $action_id, $processed_action_ids, true );
-
-		if ( $action_already_processed ) {
-			if ( $webhook_debug_enabled ) {
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: capture_payment - Action ID ' . $action_id . ' already processed, skipping duplicate note' );
-			}
-			return true; // Already processed, skip entirely
-		}
+		$message          = sprintf( 'Webhook received from checkout.com Payment captured - Payment ID: %s, Action ID: %s', $payment_id, $action_id );
 
 		$already_authorized = $order->get_meta( 'cko_payment_authorized' );
 
@@ -397,33 +309,26 @@ class WC_Checkout_Com_Webhook {
 
 		// Add note to order if captured already.
 		if ( $already_captured ) {
-			// Track this action_id as processed
-			$processed_action_ids[] = $action_id;
-			$order->update_meta_data( '_cko_processed_action_ids', array_unique( $processed_action_ids ) );
 			$order->add_order_note( $message );
 			return true;
 		}
 
-		$order->add_order_note( sprintf( __( 'Checkout.com Payment Capture webhook received - Payment ID: %s, Amount: %s', 'checkout-com-unified-payments-api' ), $payment_id, $amount_formatted ) );
+		$order->add_order_note( sprintf( __( 'Checkout.com Payment Capture webhook received - Payment ID: %s', 'checkout-com-unified-payments-api' ), $payment_id ) );
 
 		// Set action id as woo transaction id.
 		$order->set_transaction_id( $action_id );
 		$order->update_meta_data( 'cko_payment_captured', true );
 
-		// Track this action_id as processed
-		$processed_action_ids[] = $action_id;
-		$order->update_meta_data( '_cko_processed_action_ids', array_unique( $processed_action_ids ) );
-
 		// Get cko capture status configured in admin.
 		$status = WC_Admin_Settings::get_option( 'ckocom_order_captured', 'processing' );
 
-		/* translators: %1$s: Payment ID, %2$s: Action ID, %3$s: Amount. */
-		$order_message = sprintf( esc_html__( 'Checkout.com Payment Captured - Payment ID: %1$s, Action ID: %2$s, Amount: %3$s', 'checkout-com-unified-payments-api' ), $payment_id, $action_id, $amount_formatted );
+		/* translators: %1$s: Payment ID, %2$s: Action ID. */
+		$order_message = sprintf( esc_html__( 'Checkout.com Payment Captured - Payment ID: %1$s, Action ID: %2$s', 'checkout-com-unified-payments-api' ), $payment_id, $action_id );
 
 		// Check if webhook amount is less than order amount.
 		if ( $amount < $order_amount_cents ) {
-			/* translators: %1$s: Payment ID, %2$s: Action ID, %3$s: Amount. */
-			$order_message = sprintf( esc_html__( 'Checkout.com Payment partially captured - Payment ID: %1$s, Action ID: %2$s, Amount: %3$s', 'checkout-com-unified-payments-api' ), $payment_id, $action_id, $amount_formatted );
+			/* translators: %1$s: Payment ID, %2$s: Action ID. */
+			$order_message = sprintf( esc_html__( 'Checkout.com Payment partially captured - Payment ID: %1$s, Action ID: %2$s', 'checkout-com-unified-payments-api' ), $payment_id, $action_id );
 		}
 
 		// add notes for the order and update status.

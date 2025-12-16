@@ -556,37 +556,6 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		$order->set_transaction_id( $result['action_id'] );
 		$order->update_meta_data( '_cko_payment_id', $result['id'] );
 		
-		// Save session+cart identifier for duplicate prevention (if cart is still available)
-		if ( WC()->cart && ! WC()->cart->is_empty() && WC()->session ) {
-			// Get WooCommerce session identifier
-			$session_customer_id = WC()->session->get_customer_id();
-			$session_key = WC()->session->get_customer_unique_id();
-			
-			// Generate cart hash from cart items
-			$cart_items = array();
-			foreach ( WC()->cart->get_cart() as $cart_item_key => $cart_item ) {
-				$cart_items[] = array(
-					'product_id' => $cart_item['product_id'],
-					'variation_id' => $cart_item['variation_id'],
-					'quantity' => $cart_item['quantity'],
-				);
-			}
-			$cart_hash = md5( wp_json_encode( $cart_items ) . WC()->cart->get_total( 'edit' ) );
-			
-			// Combine session ID + cart hash = unique identifier
-			$session_cart_identifier = null;
-			if ( $session_customer_id > 0 ) {
-				$session_cart_identifier = 'customer_' . $session_customer_id . '_' . $cart_hash;
-			} elseif ( ! empty( $session_key ) ) {
-				$session_cart_identifier = 'session_' . $session_key . '_' . $cart_hash;
-			}
-			
-			// Save session+cart identifier if we have it
-			if ( ! empty( $session_cart_identifier ) ) {
-				$order->update_meta_data( '_cko_session_cart_id', $session_cart_identifier );
-				WC_Checkoutcom_Utility::logger( '[CLASSIC CARDS] Saved session+cart identifier to order - Order ID: ' . $order_id . ', Identifier: ' . substr( $session_cart_identifier, 0, 50 ) . '...' );
-			}
-		}
 
 		// Get cko auth status configured in admin.
 		$status = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );

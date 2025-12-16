@@ -1370,6 +1370,10 @@ class WC_Checkoutcom_Api_Request {
 
 	// Initialize virtual product flag
 	$contains_virtual_product = false;
+	// Initialize subscription flags
+	$contains_subscription_product = false;
+	$regular_payment_type = class_exists('Checkout\\Payments\\PaymentType') ? \Checkout\Payments\PaymentType::$regular : 'Regular';
+	$recurring_payment_type = class_exists('Checkout\\Payments\\PaymentType') ? \Checkout\Payments\PaymentType::$recurring : 'Recurring';
 
 	foreach ( $items as $item => $values ) {
 
@@ -1399,6 +1403,32 @@ class WC_Checkoutcom_Api_Request {
 			$contains_virtual_product = true;
 		}
 
+		// Check if product is a subscription product
+		$is_subscription_product = false;
+		$product_id = $_product->get_id();
+		$product_type = $_product->get_type();
+		
+		if ( function_exists( 'wcs_is_subscription_product' ) ) {
+			$is_subscription_product = wcs_is_subscription_product( $_product );
+			if ( $is_subscription_product ) {
+				$contains_subscription_product = true;
+			}
+		} else {
+			// Fallback: Check if product has subscription meta
+			$subscription_period = get_post_meta( $product_id, '_subscription_period', true );
+			$subscription_price = get_post_meta( $product_id, '_subscription_price', true );
+			if ( ! empty( $subscription_period ) || ! empty( $subscription_price ) ) {
+				$is_subscription_product = true;
+				$contains_subscription_product = true;
+			}
+		}
+		
+		// Additional check: product type might be 'subscription' or 'variable-subscription'
+		if ( ! $is_subscription_product && ( $product_type === 'subscription' || $product_type === 'variable-subscription' ) ) {
+			$is_subscription_product = true;
+			$contains_subscription_product = true;
+		}
+
 		if( $flow ) {
 				$quantity   = $values['quantity'];
 				$line_subtotal = $values['line_subtotal'];
@@ -1409,7 +1439,7 @@ class WC_Checkoutcom_Api_Request {
 				$discount_total_cents = WC_Checkoutcom_Utility::value_to_decimal( $unit_discount * $quantity, get_woocommerce_currency() );
 
 				// Flow-specific logic for cart items
-				$products[] = [
+				$product_data = [
 					'name'                  => $_product->get_title(),
 					'quantity'              => $quantity,
 					'unit_price'            => $unit_price_cents,
@@ -1419,6 +1449,13 @@ class WC_Checkoutcom_Api_Request {
 					'reference'             => $_product->get_sku(),
 					'discount_amount'       => $discount_total_cents,
 				];
+				
+				// Add subscription flag to product data if it's a subscription product
+				if ( $is_subscription_product ) {
+					$product_data['is_subscription'] = true;
+				}
+				
+				$products[] = $product_data;
 			} else {
 				$products[] = [
 					'name'                  => $_product->get_title(),
@@ -1493,7 +1530,13 @@ class WC_Checkoutcom_Api_Request {
 		$locale                 = substr( $woo_locale, 0, 5 );
 		$total_tax_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( WC()->cart->get_total_tax(), get_woocommerce_currency() );
 
-		return [
+		// Determine payment type based on subscription detection
+		$payment_type = $regular_payment_type;
+		if ( $contains_subscription_product ) {
+			$payment_type = $recurring_payment_type;
+		}
+
+		$cart_info = [
 			'purchase_country'  => WC()->customer->get_billing_country(),
 			'purchase_currency' => get_woocommerce_currency(),
 			'locale'            => strtolower( $locale ),
@@ -1508,12 +1551,20 @@ class WC_Checkoutcom_Api_Request {
 				'region'          => WC()->customer->get_billing_city(),
 				'phone'           => WC()->customer->get_billing_phone(),
 				'country'         => WC()->customer->get_billing_country(),
-		],
-		'order_amount'      => $amount_cents,
-		'order_tax_amount'  => $total_tax_amount_cents,
-		'order_lines'       => $products,
-		'contains_virtual_product' => $contains_virtual_product,
-	];
+			],
+			'order_amount'      => $amount_cents,
+			'order_tax_amount'  => $total_tax_amount_cents,
+			'order_lines'       => $products,
+			'contains_virtual_product' => $contains_virtual_product,
+		];
+
+		// Add subscription flags and payment type for Flow integration
+		if ( $flow ) {
+			$cart_info['contains_subscription_product'] = $contains_subscription_product;
+			$cart_info['payment_type'] = $payment_type;
+		}
+
+		return $cart_info;
 }
 
 	/**
@@ -1538,11 +1589,25 @@ class WC_Checkoutcom_Api_Request {
 		$total_amount = $order->get_total();
 		$amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $total_amount, $order->get_currency() );
 
+		// Initialize subscription flags
+		$contains_subscription_product = false;
+		$regular_payment_type = class_exists('Checkout\\Payments\\PaymentType') ? \Checkout\Payments\PaymentType::$regular : 'Regular';
+		$recurring_payment_type = class_exists('Checkout\\Payments\\PaymentType') ? \Checkout\Payments\PaymentType::$recurring : 'Recurring';
+
 		foreach ( $items as $item ) {
 			$product = $item->get_product();
 			
 			if ( ! $product ) {
 				continue;
+			}
+
+			// Check if product is a subscription product
+			$is_subscription_product = false;
+			if ( function_exists( 'wcs_is_subscription_product' ) ) {
+				$is_subscription_product = wcs_is_subscription_product( $product );
+				if ( $is_subscription_product ) {
+					$contains_subscription_product = true;
+				}
 			}
 
 			$line_subtotal = $item->get_subtotal();
@@ -1558,7 +1623,7 @@ class WC_Checkoutcom_Api_Request {
 				$tax_amount        = $item->get_subtotal_tax();
 				$total_tax_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $tax_amount, $order->get_currency() );
 
-				$products[] = [
+				$product_data = [
 					'name'                  => $item->get_name(),
 					'quantity'              => $quantity,
 					'unit_price'            => $unit_price_cents,
@@ -1568,6 +1633,13 @@ class WC_Checkoutcom_Api_Request {
 					'reference'             => $product->get_sku() ?: $product->get_id(),
 					'discount_amount'       => $discount_total_cents,
 				];
+				
+				// Add subscription flag to product data if it's a subscription product
+				if ( $is_subscription_product ) {
+					$product_data['is_subscription'] = true;
+				}
+				
+				$products[] = $product_data;
 			} else {
 				$price_excl_tax = $item->get_subtotal();
 				$unit_price_cents = WC_Checkoutcom_Utility::value_to_decimal( $price_excl_tax / $item->get_quantity(), $order->get_currency() );
@@ -1658,7 +1730,7 @@ class WC_Checkoutcom_Api_Request {
 			'order_lines'       => $products,
 		];
 
-		// Add payment type information if requested (for MOTO orders)
+		// Add payment type information if requested (for MOTO orders and subscriptions)
 		if ( $flow ) {
 			// MOTO only for: Admin-created order + Order-pay page + Guest customer
 			$is_order_pay_page = ! empty( $_GET['pay_for_order'] ) && (bool) $_GET['pay_for_order'];
@@ -1666,29 +1738,38 @@ class WC_Checkoutcom_Api_Request {
 			$is_admin_created = $order->is_created_via( 'admin' );
 			$is_moto_payment = $is_admin_created && $is_order_pay_page && $is_guest_customer;
 			
+			// Check if order contains subscription (using WooCommerce Subscriptions function)
+			$order_contains_subscription = false;
+			if ( function_exists( 'wcs_order_contains_subscription' ) ) {
+				$order_contains_subscription = wcs_order_contains_subscription( $order, 'parent' );
+			}
+			
+			// Determine payment type: Priority: MOTO > Subscription > Regular
+			if ( $is_moto_payment ) {
+				$payment_type = 'MOTO';
+			} elseif ( $order_contains_subscription || $contains_subscription_product ) {
+				$payment_type = $recurring_payment_type;
+			} else {
+				$payment_type = $regular_payment_type;
+			}
+			
 			// Enhanced debug logging with more details
-			WC_Checkoutcom_Utility::logger( 'Order info MOTO detection - Order ID: ' . $order->get_id() . 
+			WC_Checkoutcom_Utility::logger( 'Order info payment type detection - Order ID: ' . $order->get_id() . 
 				', Admin created: ' . ($is_admin_created ? 'YES' : 'NO') . 
 				', Order-pay page: ' . ($is_order_pay_page ? 'YES' : 'NO') . 
 				', Guest customer: ' . ($is_guest_customer ? 'YES' : 'NO') . 
-				', Billing email: ' . $order->get_billing_email() . 
-				', GET pay_for_order: ' . (isset($_GET['pay_for_order']) ? $_GET['pay_for_order'] : 'NOT SET') .
-				', Created via: ' . $order->get_created_via() .
-				', Customer ID: ' . $order->get_customer_id() .
-				', Final MOTO: ' . ($is_moto_payment ? 'YES' : 'NO')
+				', Contains subscription product: ' . ($contains_subscription_product ? 'YES' : 'NO') .
+				', Order contains subscription: ' . ($order_contains_subscription ? 'YES' : 'NO') .
+				', Payment type: ' . $payment_type
 			);
 			
-			$order_info['payment_type'] = $is_moto_payment ? 'MOTO' : 'Regular';
+			$order_info['payment_type'] = $payment_type;
+			$order_info['contains_subscription_product'] = $contains_subscription_product || $order_contains_subscription;
 			
 			if ( $is_moto_payment ) {
 				WC_Checkoutcom_Utility::logger( 'Order info: MOTO payment type set - Admin order + Order-pay page + Guest customer. Order ID: ' . $order->get_id() );
-			} else {
-				// Log why it's not MOTO
-				$reasons = [];
-				if (!$is_admin_created) $reasons[] = 'not admin created';
-				if (!$is_order_pay_page) $reasons[] = 'not order-pay page';
-				if (!$is_guest_customer) $reasons[] = 'not guest customer';
-				WC_Checkoutcom_Utility::logger( 'Order info: NOT MOTO - Reasons: ' . implode(', ', $reasons) . '. Order ID: ' . $order->get_id() );
+			} elseif ( $order_contains_subscription || $contains_subscription_product ) {
+				WC_Checkoutcom_Utility::logger( 'Order info: Recurring payment type set - Order contains subscription. Order ID: ' . $order->get_id() );
 			}
 		}
 

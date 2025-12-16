@@ -198,21 +198,38 @@ class WC_Checkoutcom_Utility {
 		// Get file logging from module setting.
 		$file_logging = 'yes' === WC_Admin_Settings::get_option( 'cko_file_logging', 'no' );
 
+		// Determine log level from message prefix
+		$log_level = 'error'; // Default to error for backward compatibility
+		
+		// Check for debug/info prefixes (case-insensitive)
+		if ( preg_match( '/\[FLOW\s+DEBUG\]|\[DEBUG\]|\[ADDRESS\s+DEBUG\]/i', $error_message ) ) {
+			$log_level = 'debug';
+		} elseif ( preg_match( '/\[FLOW\s+INFO\]|\[INFO\]/i', $error_message ) ) {
+			$log_level = 'info';
+		} elseif ( preg_match( '/\[FLOW\s+WARNING\]|\[WARNING\]|\[WARN\]/i', $error_message ) ) {
+			$log_level = 'warning';
+		} elseif ( preg_match( '/\[FLOW\s+ERROR\]|\[ERROR\]/i', $error_message ) ) {
+			$log_level = 'error';
+		} elseif ( preg_match( '/\[FLOW\s+SERVER\]|\[VALIDATE\s+CHECKOUT\]|\[PROCESS\s+PAYMENT\]|\[CREATE\s+ORDER\]|\[FLOW\s+VALID\s+FOR\s+USE\]|\[FLOW\s+AVAILABILITY\]|\[FLOW\s+SAVE\s+CARD\]/i', $error_message ) ) {
+			// Server-side informational logs - use info level
+			$log_level = 'info';
+		}
+
 		// Check if file logging is enabled.
 		if ( $file_logging ) {
-			// Log error message with exception/data.
-			$logger->error( $error_message, $context );
+			// Log message with appropriate level
+			$logger->log( $log_level, $error_message, $context );
 			if ( null !== $exception ) {
 				// If exception is an array, print it properly
 				if ( is_array( $exception ) ) {
-					$logger->error( $error_message . ' Data: ' . wc_print_r( $exception, true ), $context );
+					$logger->log( $log_level, $error_message . ' Data: ' . wc_print_r( $exception, true ), $context );
 				} else {
-					$logger->error( wc_print_r( $exception, true ), $context );
+					$logger->log( $log_level, wc_print_r( $exception, true ), $context );
 				}
 			}
 		} else {
-			// Log only error message.
-			$logger->error( $error_message, $context );
+			// Log only message (still respect log level)
+			$logger->log( $log_level, $error_message, $context );
 		}
 	}
 
