@@ -1229,7 +1229,11 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// Expose saved payment display order to JavaScript
 		window.saved_payment = '<?php echo esc_js( $flow_saved_card ); ?>';
 		// Debug logging flag for PHP-generated JavaScript
-		const flowDebugLogging = <?php echo $flow_debug_logging ? 'true' : 'false'; ?>;
+		// Use window object to prevent duplicate declaration errors
+		if (typeof window.flowDebugLogging === 'undefined') {
+			window.flowDebugLogging = <?php echo $flow_debug_logging ? 'true' : 'false'; ?>;
+		}
+		const flowDebugLogging = window.flowDebugLogging;
 		const flowLog = flowDebugLogging ? console.log.bind(console, '[FLOW PHP]') : function() {};
 		
 		(function() {
@@ -1918,6 +1922,14 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// Process any pending webhooks for this order
 		if ( class_exists( 'WC_Checkout_Com_Webhook_Queue' ) ) {
 			WC_Checkout_Com_Webhook_Queue::process_pending_webhooks_for_order( $order );
+		}
+		
+		// CRITICAL: Reload order object after webhook processing to get latest status and meta
+		// Webhooks may have updated the order status/meta, but the order object in memory is stale
+		$order = wc_get_order( $order_id );
+		if ( ! $order ) {
+			WC_Checkoutcom_Utility::logger( '[3DS RETURN] ERROR: Order not found after webhook processing - Order ID: ' . $order_id );
+			return;
 		}
 		
 	// Set variables for card saving logic below
@@ -4604,6 +4616,18 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		$order      = false;
 		$payment_id = null;
 
+		// ALWAYS log webhook matching details (even if debug disabled) for critical payment events
+		$webhook_event_type = isset( $data->type ) ? $data->type : 'unknown';
+		$webhook_payment_id = isset( $data->data->id ) ? $data->data->id : 'NULL';
+		$webhook_session_id = isset( $data->data->metadata->cko_payment_session_id ) ? $data->data->metadata->cko_payment_session_id : 'NOT SET';
+		$webhook_order_id = isset( $data->data->metadata->order_id ) ? $data->data->metadata->order_id : 'NOT SET';
+		
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ========== STARTING ORDER LOOKUP ==========' );
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Event Type: ' . $webhook_event_type );
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Payment ID: ' . $webhook_payment_id );
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Session ID in metadata: ' . $webhook_session_id );
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Order ID in metadata: ' . $webhook_order_id );
+
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Starting order lookup process' );
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Webhook data structure: ' . print_r($data, true) );
@@ -4611,10 +4635,16 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 		// Method 1: Try order_id from metadata (order-pay page has this)
 		if ( ! empty( $data->data->metadata->order_id ) ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Trying METHOD 1 (Order ID from metadata): ' . $data->data->metadata->order_id );
 			if ( $webhook_debug_enabled ) {
 				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Looking for order by metadata order_id: ' . $data->data->metadata->order_id );
 			}
 			$order = wc_get_order( $data->data->metadata->order_id );
+			if ( $order ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ✅ MATCHED BY METHOD 1 (Order ID from metadata) - Order ID: ' . $order->get_id() );
+			} else {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ❌ METHOD 1 FAILED - Order ID ' . $data->data->metadata->order_id . ' not found' );
+			}
 			if ( $webhook_debug_enabled ) {
 				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order found by metadata order_id: ' . ($order ? 'YES (ID: ' . $order->get_id() . ')' : 'NO') );
 			}
@@ -4673,6 +4703,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			
 			if ( ! empty( $orders ) ) {
 				$order = $orders[0];
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ✅ MATCHED BY METHOD 2 (COMBINED: Session ID + Payment ID) - Order ID: ' . $order->get_id() );
 				if ( $webhook_debug_enabled ) {
 					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: ✅ Order found by COMBINED match (ID: ' . $order->get_id() . ')' );
 				}
@@ -4691,167 +4722,29 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					}
 				}
 			} else {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ❌ METHOD 2 FAILED - No order found by COMBINED match (Session ID: ' . $webhook_session_id . ', Payment ID: ' . $webhook_payment_id . ')' );
 				if ( $webhook_debug_enabled ) {
 					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: ❌ No order found by COMBINED match' );
 				}
 			}
 		}
 		
-		// Method 3: Try payment session ID alone (fallback if payment ID missing)
-		// CRITICAL: Only match orders that need updating (pending, failed, on-hold, processing)
-		// This ensures webhook updates correct order and prevents matching completed orders
-		if ( ! $order && ! empty( $data->data->metadata->cko_payment_session_id ) ) {
-			if ( $webhook_debug_enabled ) {
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Looking for order by payment session ID: ' . $data->data->metadata->cko_payment_session_id );
-			}
-			
-			// First try to match orders that need updating (pending, failed, on-hold, processing)
-			$orders = wc_get_orders( array(
-				'limit'      => 1,
-				'meta_key'   => '_cko_payment_session_id',
-				'meta_value' => $data->data->metadata->cko_payment_session_id,
-				'status'     => array( 'pending', 'failed', 'on-hold', 'processing' ), // ✅ Only match orders that need updating
-				'return'     => 'objects',
-			) );
-			
-			// If not found in active orders, try all orders (fallback for edge cases)
-			if ( empty( $orders ) ) {
-				if ( $webhook_debug_enabled ) {
-					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order not found in active statuses, trying all orders...' );
-				}
-				$orders = wc_get_orders( array(
-					'limit'      => 1,
-					'meta_key'   => '_cko_payment_session_id',
-					'meta_value' => $data->data->metadata->cko_payment_session_id,
-					'return'     => 'objects',
-				) );
-			}
-			
-			if ( ! empty( $orders ) ) {
-				$order = $orders[0];
-				if ( $webhook_debug_enabled ) {
-					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order found by payment session ID: YES (ID: ' . $order->get_id() . ')' );
-				}
-				
-				// Add order_id to metadata so processing functions can find it
-				if ( isset( $data->data->metadata ) && is_object( $data->data->metadata ) ) {
-					$data->data->metadata->order_id = $order->get_id();
-					if ( $webhook_debug_enabled ) {
-						WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Set metadata order_id to: ' . $order->get_id() . ' (from payment session ID lookup)' );
-					}
-				} else {
-					// If metadata is missing or not an object, create it.
-					$data->data->metadata = (object) array( 'order_id' => $order->get_id() );
-					if ( $webhook_debug_enabled ) {
-						WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Created metadata object with order_id: ' . $order->get_id() . ' (from payment session ID lookup)' );
-					}
-				}
-			} else {
-				if ( $webhook_debug_enabled ) {
-					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order found by payment session ID: NO' );
-				}
-			}
-		}
-	
-		// Method 3: Try reference (order number) via our stored meta
-		if ( ! $order && ! empty( $data->data->reference ) ) {
-			if ( $webhook_debug_enabled ) {
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Looking for order by reference: ' . $data->data->reference );
-			}
-			
-			// Try direct lookup first (works for numeric order IDs)
-			$order = wc_get_order( $data->data->reference );
-			if ( $webhook_debug_enabled ) {
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Direct lookup result: ' . ($order ? 'YES (ID: ' . $order->get_id() . ')' : 'NO') );
-			}
-			
-			// Try our stored reference meta (works with ANY order number format including Sequential Order Numbers)
-			if ( ! $order ) {
-				if ( $webhook_debug_enabled ) {
-					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Searching by _cko_order_reference meta: ' . $data->data->reference );
-				}
-				
-				$orders = wc_get_orders( array(
-					'limit'      => 1,
-					'meta_key'   => '_cko_order_reference',
-					'meta_value' => $data->data->reference,
-					'return'     => 'objects',
-				) );
-				
-				if ( ! empty( $orders ) ) {
-					$order = $orders[0];
-					if ( $webhook_debug_enabled ) {
-						WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order found by _cko_order_reference meta: YES (ID: ' . $order->get_id() . ')' );
-					}
-				} else {
-					if ( $webhook_debug_enabled ) {
-						WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order found by _cko_order_reference meta: NO' );
-					}
-				}
-			}
-			
-			// If still not found, try the Sequential Order Numbers plugin meta key
-			if ( ! $order ) {
-				if ( $webhook_debug_enabled ) {
-					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Searching by _order_number meta: ' . $data->data->reference );
-				}
-				
-				$orders = wc_get_orders( array(
-					'limit'      => 1,
-					'meta_key'   => '_order_number',
-					'meta_value' => $data->data->reference,
-					'return'     => 'objects',
-				) );
-				
-				if ( ! empty( $orders ) ) {
-					$order = $orders[0];
-					if ( $webhook_debug_enabled ) {
-						WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order found by _order_number meta: YES (ID: ' . $order->get_id() . ')' );
-					}
-				} else {
-					// Try searching by post name (order number might be stored there)
-					global $wpdb;
-					$post_id = $wpdb->get_var( $wpdb->prepare(
-						"SELECT ID FROM {$wpdb->posts} WHERE post_type IN ('shop_order', 'shop_order_placehold') AND post_name = %s LIMIT 1",
-						sanitize_title( $data->data->reference )
-					) );
-					
-					if ( $post_id ) {
-						$order = wc_get_order( $post_id );
-						if ( $webhook_debug_enabled ) {
-							WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order found by post_name: YES (ID: ' . $order->get_id() . ')' );
-						}
-					} else {
-						if ( $webhook_debug_enabled ) {
-							WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order NOT found by any method' );
-						}
-					}
-				}
-			}
-
-			if ( $order && isset( $data->data->metadata ) ) {
-				$data->data->metadata->order_id = $order->get_id();
-				if ( $webhook_debug_enabled ) {
-					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Set metadata order_id to: ' . $order->get_id() );
-				}
-			} elseif ( $order ) {
-				$data->data->metadata           = new StdClass();
-				$data->data->metadata->order_id = $order->get_id();
-				if ( $webhook_debug_enabled ) {
-					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Created metadata object with order_id: ' . $order->get_id() );
-				}
-			}
+		// ALWAYS log matching result (even if debug disabled)
+		if ( $order ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ✅ ORDER FOUND - Order ID: ' . $order->get_id() );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Order Status: ' . $order->get_status() );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Order Payment Session ID: ' . $order->get_meta( '_cko_payment_session_id' ) );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Order Payment ID (_cko_flow_payment_id): ' . $order->get_meta( '_cko_flow_payment_id' ) );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Order Payment ID (_cko_payment_id): ' . $order->get_meta( '_cko_payment_id' ) );
 		} else {
-			if ( $webhook_debug_enabled ) {
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: No order_id in metadata and no reference found' );
-			}
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ❌ ORDER NOT FOUND - No matching order found' );
 		}
 		
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order lookup result: ' . ($order ? 'FOUND (ID: ' . $order->get_id() . ')' : 'NOT FOUND') );
 		}
 
-		// Method 5: Try payment ID alone (fallback if session ID missing)
+		// Method 3: Try payment ID alone (fallback if combined match failed)
 		// CRITICAL: Only match orders that need updating (pending, failed, on-hold, processing)
 		// This ensures webhook updates correct order and prevents matching completed orders
 		if ( ! $order && ! empty( $data->data->id ) ) {
@@ -4870,6 +4763,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			
 			// If not found in active orders, try all orders (fallback for edge cases)
 			if ( empty( $orders ) ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Order not found in active statuses, trying all orders (fallback)...' );
 				if ( $webhook_debug_enabled ) {
 					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order not found in active statuses, trying all orders...' );
 				}
@@ -4879,10 +4773,15 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					'meta_value'   => $data->data->id,
 					'return'       => 'objects',
 				) );
+				if ( ! empty( $orders ) ) {
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ⚠️ Found order in fallback search (all statuses) - Order ID: ' . $orders[0]->get_id() );
+				}
 			}
 
 			if ( ! empty( $orders ) ) {
 				$order = $orders[0];
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ✅ MATCHED BY METHOD 3 (PAYMENT ID ALONE) - Order ID: ' . $order->get_id() );
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ⚠️ WARNING: Matched by payment ID alone (less reliable than combined match)' );
 				if ( $webhook_debug_enabled ) {
 					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order found by payment ID: YES (ID: ' . $order->get_id() . ')' );
 				}
@@ -4895,12 +4794,15 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					$data->data->metadata = (object) array( 'order_id' => $order->get_id() );
 				}
 			} else {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ❌ METHOD 3 FAILED - No order found by payment ID: ' . $webhook_payment_id );
 				if ( $webhook_debug_enabled ) {
 					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order found by payment ID: NO' );
 					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: This is normal for webhooks that arrive before process_payment() completes' );
 				}
 			}
 		}
+		
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ========== ORDER LOOKUP COMPLETE ==========' );
 
 		if ( $order ) {
 			// CRITICAL: Check if this webhook already processed this order (prevent duplicate processing)
@@ -5418,9 +5320,134 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ✅ No existing order found with payment_session_id - safe to create new order - Payment Session ID: ' . substr( $payment_session_id, 0, 20 ) . '...' );
 			}
 			
-			// Get posted data from form
+			// CRITICAL: Validate checkout form BEFORE getting posted data and creating order
+			// This ensures orders are only created when form is valid (defense-in-depth)
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Validating checkout form before order creation...' );
+			
+			// Run validation hooks FIRST (before getting posted data)
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ========== VALIDATION HOOKS PHASE ==========' );
+			try {
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Step 1: Running woocommerce_before_checkout_process hook' );
+				do_action( 'woocommerce_before_checkout_process' );
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Step 1: ✅ woocommerce_before_checkout_process completed' );
+				
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Step 2: Running woocommerce_checkout_process hook' );
+				do_action( 'woocommerce_checkout_process' );
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Step 2: ✅ woocommerce_checkout_process completed' );
+				
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ✅✅✅ Validation hooks executed successfully ✅✅✅' );
+			} catch ( Exception $e ) {
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ❌❌❌ ERROR in validation hooks ❌❌❌' );
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ERROR message: ' . $e->getMessage() );
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ERROR stack trace: ' . $e->getTraceAsString() );
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ❌❌❌ BLOCKING ORDER CREATION - Returning error ❌❌❌' );
+				wp_send_json_error( array(
+					'message' => __( 'Error during checkout validation: ', 'checkout-com-unified-payments-api' ) . $e->getMessage(),
+				) );
+				return;
+			}
+			
+			// Get posted data from form AFTER validation hooks
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ========== GETTING POSTED DATA ==========' );
 			$posted_data = $checkout->get_posted_data();
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Posted data retrieved' );
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Posted data retrieved - ' . count( $posted_data ) . ' fields' );
+			
+			// Update session with posted data
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ========== UPDATING SESSION ==========' );
+			try {
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Calling update_session via Reflection' );
+				$reflection_session = new ReflectionClass( $checkout );
+				$update_session_method = $reflection_session->getMethod( 'update_session' );
+				$update_session_method->setAccessible( true );
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Invoking update_session method...' );
+				$update_session_method->invoke( $checkout, $posted_data );
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ✅ update_session completed successfully' );
+			} catch ( ReflectionException $e ) {
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ❌❌❌ ERROR in update_session (ReflectionException) ❌❌❌' );
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ERROR: ' . $e->getMessage() );
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ❌❌❌ BLOCKING ORDER CREATION ❌❌❌' );
+				wp_send_json_error( array(
+					'message' => __( 'Could not access checkout update method.', 'checkout-com-unified-payments-api' ),
+				) );
+				return;
+			} catch ( Exception $e ) {
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ❌❌❌ ERROR in update_session (Exception) ❌❌❌' );
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ERROR: ' . $e->getMessage() );
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ERROR stack trace: ' . $e->getTraceAsString() );
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ❌❌❌ BLOCKING ORDER CREATION ❌❌❌' );
+				wp_send_json_error( array(
+					'message' => __( 'Error updating checkout session: ', 'checkout-com-unified-payments-api' ) . $e->getMessage(),
+				) );
+				return;
+			}
+			
+			// Validate checkout fields
+			$errors = new WP_Error();
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ========== STARTING FIELD VALIDATION ==========' );
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Posted data keys: ' . implode( ', ', array_keys( $posted_data ) ) );
+			
+			// Log key field values for debugging
+			$key_fields = array( 'billing_email', 'billing_first_name', 'billing_last_name', 'billing_address_1', 'billing_city', 'billing_country', 'billing_postcode' );
+			foreach ( $key_fields as $field ) {
+				$value = isset( $posted_data[ $field ] ) ? $posted_data[ $field ] : 'NOT SET';
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Field ' . $field . ': ' . ( is_string( $value ) && strlen( $value ) > 50 ? substr( $value, 0, 50 ) . '...' : $value ) );
+			}
+			
+			try {
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Calling validate_checkout via Reflection' );
+				$reflection_validate = new ReflectionClass( $checkout );
+				$validate_method = $reflection_validate->getMethod( 'validate_checkout' );
+				$validate_method->setAccessible( true );
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] About to invoke validate_checkout method' );
+				$validate_method->invokeArgs( $checkout, array( &$posted_data, &$errors ) );
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] validate_checkout completed' );
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Errors object type: ' . gettype( $errors ) );
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Errors object class: ' . get_class( $errors ) );
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Errors->errors is empty?: ' . ( empty( $errors->errors ) ? 'YES' : 'NO' ) );
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Errors->errors count: ' . ( is_array( $errors->errors ) ? count( $errors->errors ) : 'NOT ARRAY' ) );
+			} catch ( ReflectionException $e ) {
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ERROR in validate_checkout: ' . $e->getMessage() );
+				wp_send_json_error( array(
+					'message' => __( 'Could not access checkout validate method.', 'checkout-com-unified-payments-api' ),
+				) );
+				return;
+			} catch ( Exception $e ) {
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ERROR in validate_checkout (general): ' . $e->getMessage() );
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ERROR stack trace: ' . $e->getTraceAsString() );
+				wp_send_json_error( array(
+					'message' => __( 'Error validating checkout: ', 'checkout-com-unified-payments-api' ) . $e->getMessage(),
+				) );
+				return;
+			}
+			
+			// Check for validation errors - CRITICAL: Do NOT create order if validation fails
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ========== CHECKING VALIDATION ERRORS ==========' );
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Checking if errors->errors is empty...' );
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] empty($errors->errors) result: ' . ( empty( $errors->errors ) ? 'TRUE (no errors)' : 'FALSE (errors found)' ) );
+			
+			if ( ! empty( $errors->errors ) ) {
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ❌❌❌ VALIDATION ERRORS FOUND - BLOCKING ORDER CREATION ❌❌❌' );
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Validation errors count: ' . count( $errors->errors ) );
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Validation errors array: ' . print_r( $errors->errors, true ) );
+				$messages = array();
+				foreach ( $errors->errors as $code => $msgs ) {
+					foreach ( $msgs as $msg ) {
+						$messages[] = $msg;
+						WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ❌ Validation error [' . $code . ']: ' . $msg );
+					}
+				}
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ❌❌❌ ORDER CREATION BLOCKED - RETURNING ERROR RESPONSE ❌❌❌' );
+				wp_send_json_error( array(
+					'message' => implode( "\n", $messages ),
+				) );
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ❌❌❌ EXITING - ORDER WILL NOT BE CREATED ❌❌❌' );
+				return; // CRITICAL: Exit here - do NOT create order
+			}
+			
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ✅✅✅ NO VALIDATION ERRORS - ALL VALIDATIONS PASSED ✅✅✅' );
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ✅ Validation passed - proceeding with order creation' );
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ========== ABOUT TO CREATE ORDER ==========' );
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] All validations passed - calling create_order() method' );
 			
 			// Create order using WooCommerce checkout process
 			// Use Reflection to call protected create_order() method which triggers woocommerce_checkout_create_order hook
@@ -5428,10 +5455,16 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			$reflection = new ReflectionClass( $checkout );
 			$create_order_method = $reflection->getMethod( 'create_order' );
 			$create_order_method->setAccessible( true );
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Invoking create_order() method...' );
 			$order_id = $create_order_method->invoke( $checkout, $posted_data );
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] create_order() returned: ' . print_r( $order_id, true ) );
 			
 			if ( is_wp_error( $order_id ) ) {
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ERROR: Failed to create order: ' . $order_id->get_error_message() );
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ❌❌❌ ERROR: Failed to create order ❌❌❌' );
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Error message: ' . $order_id->get_error_message() );
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Error code: ' . $order_id->get_error_code() );
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Error data: ' . print_r( $order_id->get_error_data(), true ) );
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ❌ Order creation failed - returning error response' );
 				wp_send_json_error( array(
 					'message' => __( 'Failed to create order. Please try again.', 'checkout-com-unified-payments-api' ),
 					'error' => $order_id->get_error_message(),
@@ -5440,14 +5473,23 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			}
 			
 			if ( empty( $order_id ) || ! is_numeric( $order_id ) ) {
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ERROR: Invalid order ID returned: ' . print_r( $order_id, true ) );
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ❌❌❌ ERROR: Invalid order ID returned ❌❌❌' );
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Order ID value: ' . print_r( $order_id, true ) );
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Order ID type: ' . gettype( $order_id ) );
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Order ID is empty?: ' . ( empty( $order_id ) ? 'YES' : 'NO' ) );
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Order ID is numeric?: ' . ( is_numeric( $order_id ) ? 'YES' : 'NO' ) );
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ❌ Order creation failed - invalid order ID' );
 				wp_send_json_error( array(
 					'message' => __( 'Failed to create order. Invalid order ID returned.', 'checkout-com-unified-payments-api' ),
 				) );
 				return;
 			}
 			
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Order created successfully - Order ID: ' . $order_id );
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ========== ORDER CREATED SUCCESSFULLY ==========' );
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ✅✅✅ Order created successfully - Order ID: ' . $order_id . ' ✅✅✅' );
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Order ID type: ' . gettype( $order_id ) );
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Order ID is numeric?: ' . ( is_numeric( $order_id ) ? 'YES' : 'NO' ) );
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Order ID value: ' . $order_id );
 			
 			// Load the order
 			$order = wc_get_order( $order_id );
@@ -5758,3 +5800,4 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		}
 	}
 }
+
