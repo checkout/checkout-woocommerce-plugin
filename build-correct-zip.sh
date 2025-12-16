@@ -12,21 +12,29 @@ cd "$SCRIPT_DIR"
 PLUGIN_FOLDER="checkout-com-unified-payments-api"
 MAIN_FILE="woocommerce-gateway-checkout-com.php"
 PLUGIN_NAME="Checkout.com Payment Gateway"
+PLUGIN_SOURCE_DIR="${PLUGIN_FOLDER}"
 
 echo "🔍 Verifying plugin identifiers..."
 echo "   Folder: $PLUGIN_FOLDER"
 echo "   Main file: $MAIN_FILE"
 echo "   Plugin Name: $PLUGIN_NAME"
+echo "   Source directory: $PLUGIN_SOURCE_DIR"
 echo ""
 
-# Verify main file exists
-if [ ! -f "$MAIN_FILE" ]; then
-    echo "❌ ERROR: Main plugin file not found: $MAIN_FILE"
+# Verify source directory exists
+if [ ! -d "$PLUGIN_SOURCE_DIR" ]; then
+    echo "❌ ERROR: Plugin source directory not found: $PLUGIN_SOURCE_DIR"
+    exit 1
+fi
+
+# Verify main file exists in source directory
+if [ ! -f "${PLUGIN_SOURCE_DIR}/${MAIN_FILE}" ]; then
+    echo "❌ ERROR: Main plugin file not found: ${PLUGIN_SOURCE_DIR}/${MAIN_FILE}"
     exit 1
 fi
 
 # Verify Plugin Name in header
-if ! grep -q "Plugin Name: $PLUGIN_NAME" "$MAIN_FILE"; then
+if ! grep -q "Plugin Name: $PLUGIN_NAME" "${PLUGIN_SOURCE_DIR}/${MAIN_FILE}"; then
     echo "⚠️  WARNING: Plugin Name header might not match!"
 else
     echo "✅ Plugin Name header verified"
@@ -46,7 +54,7 @@ mkdir -p "${PLUGIN_DIR}"
 
 echo "📁 Creating plugin folder structure..."
 
-# Copy files (excluding unwanted ones)
+# Copy files from plugin source directory (excluding unwanted ones)
 rsync -av \
   --exclude='.git' \
   --exclude='.gitignore' \
@@ -73,7 +81,7 @@ rsync -av \
   --exclude='verify-and-fix-zip.py' \
   --exclude='diagnose-header-error.py' \
   --exclude='php-uploads.ini' \
-  . "${PLUGIN_DIR}/" > /dev/null 2>&1
+  "${PLUGIN_SOURCE_DIR}/" "${PLUGIN_DIR}/" > /dev/null 2>&1
 
 # Verify structure
 if [ ! -f "${PLUGIN_DIR}/${MAIN_FILE}" ]; then
