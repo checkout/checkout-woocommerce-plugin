@@ -2,7 +2,7 @@
 Contributors: checkoutintegration
 Tags: checkout, payments, credit card, payment gateway, apple pay, google pay, payment request
 Requires at least: 5.0
-Stable tag: 5.0.0_beta
+Stable tag: 5.0.0
 Requires PHP: 7.3
 Tested up to: 6.7.0
 License: GPLv2 or later
