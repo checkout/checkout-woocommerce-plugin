@@ -23,6 +23,10 @@ use Checkout\Payments\Previous\Source\Apm\RequestPayPalSource;
 use Checkout\Payments\Request\Source\Contexts\PaymentContextsKlarnaSource;
 use Checkout\Payments\Request\Source\RequestIdSource;
 use Checkout\Payments\Request\Source\RequestTokenSource;
+<<<<<<< HEAD
+=======
+use Checkout\Payments\Request\Source\RequestNetworkTokenSource;
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 use Checkout\Payments\ThreeDsRequest;
 use Checkout\Payments\VoidRequest;
 use Checkout\Tokens\ApplePayTokenData;
@@ -39,6 +43,25 @@ require 'class-wc-checkoutcom-apm-method.php';
 class WC_Checkoutcom_Api_Request {
 
 	/**
+<<<<<<< HEAD
+=======
+	 * Helper function to safely get SDK builder with null check
+	 *
+	 * @param Checkout_SDK $checkout SDK instance
+	 * @param string $operation Operation name for logging
+	 * @return mixed|null Builder instance or null if SDK not initialized
+	 */
+	private static function get_safe_builder( $checkout, $operation = 'operation' ) {
+		$builder = $checkout->get_builder();
+		if ( ! $builder ) {
+			WC_Checkoutcom_Utility::logger( "Checkout.com SDK not initialized - cannot perform $operation" );
+			return null;
+		}
+		return $builder;
+	}
+
+	/**
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 	 * Create payment and return response.
 	 *
 	 * @param WC_Order $order Order object.
@@ -79,8 +102,18 @@ class WC_Checkoutcom_Api_Request {
 				$cko_idempotency_key .= '-' . gmdate( 'Y-m-d h:i:s' );
 			}
 
+<<<<<<< HEAD
 			// Call to create charge.
 			$response = $checkout->get_builder()->getPaymentsClient()->requestPayment( $request_param, $cko_idempotency_key );
+=======
+		// Call to create charge.
+		$builder = $checkout->get_builder();
+		if ( ! $builder ) {
+			WC_Checkoutcom_Utility::logger( 'Checkout.com SDK not initialized - cannot request payment' );
+			return array( 'error' => 'Payment gateway not properly configured. Please contact support.' );
+		}
+		$response = $builder->getPaymentsClient()->requestPayment( $request_param, $cko_idempotency_key );
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 
 			// Check if payment successful.
 			if ( WC_Checkoutcom_Utility::is_successful( $response ) ) {
@@ -191,7 +224,12 @@ class WC_Checkoutcom_Api_Request {
 			$card_scheme = $arg['preferred_scheme'];
 		}
 
+<<<<<<< HEAD
 		$customer_address = WC_Checkoutcom_Api_Request::customer_address( $post_data );
+=======
+		// For express checkout, if POST data doesn't have address info, get it from order
+		$customer_address = WC_Checkoutcom_Api_Request::customer_address( $post_data, $order );
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 
 		// Prepare payment parameters.
 		if ( 'wc_checkout_com_cards' === $post_data['payment_method'] ) {
@@ -236,6 +274,63 @@ class WC_Checkoutcom_Api_Request {
 
 			$method = new RequestPayPalSource();
 
+<<<<<<< HEAD
+=======
+		} elseif ( 'wc_checkout_com_flow' === $post_data['payment_method'] ) {
+			$payment_option = 'Flow';
+
+			if ( self::is_using_saved_payment_method() ) {
+				// Saved card used with Flow.
+				// Load token id ($arg).
+				$token = WC_Payment_Tokens::get( $arg );
+
+				// Enhanced error handling for old saved cards
+				if ( ! $token ) {
+					WC_Checkoutcom_Utility::logger( 'Error: Token not found for ID: ' . $arg );
+					return array(
+						'error' => array(
+							'type'    => 'token_error',
+							'message' => 'Saved payment method not found. Please try using a new payment method.',
+						),
+					);
+				}
+
+				// Get source_id from $token with validation
+				$source_id = $token->get_token();
+				if ( empty( $source_id ) ) {
+					WC_Checkoutcom_Utility::logger( 'Error: Empty source_id for token ID: ' . $arg );
+					return array(
+						'error' => array(
+							'type'    => 'token_error',
+							'message' => 'Invalid saved payment method. Please try using a new payment method.',
+						),
+					);
+				}
+
+				// Safely get card scheme metadata (may not exist in old tokens)
+				$card_scheme = $token->get_meta( 'preferred_scheme' );
+				if ( empty( $card_scheme ) ) {
+					WC_Checkoutcom_Utility::logger( 'Warning: No preferred_scheme metadata for token ID: ' . $arg . ' (likely old saved card)' );
+				}
+
+				$method     = new RequestIdSource();
+				$method->id = $source_id;
+
+				$is_save_card = true;
+
+				if ( WC_Admin_Settings::get_option( 'ckocom_card_require_cvv' ) ) {
+					$method->cvv = $post_data['wc_checkout_com_flow-card-cvv'];
+				}
+
+				WC_Checkoutcom_Utility::logger( 'Flow saved card processing - Token ID: ' . $arg . ', Source ID: ' . $source_id . ', Card Scheme: ' . ( $card_scheme ?: 'none' ) );
+			} else {
+				// New payment via Flow - this shouldn't happen as Flow handles new payments differently
+				// But we need to handle it to prevent null method
+				$method        = new RequestTokenSource();
+				$method->token = $arg;
+			}
+
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 		} elseif ( in_array( $arg, $apms_selected, true ) ) {
 			// Alternative payment method selected.
 			$method = WC_Checkoutcom_Api_Request::get_apm_method( $post_data, $order, $arg );
@@ -247,6 +342,20 @@ class WC_Checkoutcom_Api_Request {
 			$method->id = $arg['source_id'];
 		}
 
+<<<<<<< HEAD
+=======
+		// Safety check to prevent null method error
+		if ( null === $method ) {
+			WC_Checkoutcom_Utility::logger( 'Error: Payment method is null in get_request_param' );
+			return array(
+				'error' => array(
+					'type'    => 'request_error',
+					'message' => 'Payment method not supported or invalid.',
+				),
+			);
+		}
+
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 		if ( 'klarna' !== $method->type ) {
 			// Set billing address in $method.
 			if ( ! empty( $customer_address['billing_address_1'] ) && ! empty( $customer_address['billing_country'] ) ) {
@@ -271,12 +380,26 @@ class WC_Checkoutcom_Api_Request {
 
 		$payment->source = $method;
 
+<<<<<<< HEAD
 		$email = $post_data['billing_email'];
 		$name  = $post_data['billing_first_name'] . ' ' . $post_data['billing_last_name'];
+=======
+		// Get email and name from POST data or order (for express checkout)
+		$email = isset( $post_data['billing_email'] ) ? $post_data['billing_email'] : '';
+		$name  = isset( $post_data['billing_first_name'] ) && isset( $post_data['billing_last_name'] ) 
+			? $post_data['billing_first_name'] . ' ' . $post_data['billing_last_name'] 
+			: '';
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 
 		// Pay Order Page.
 		$is_pay_order = ! empty( $get_data['pay_for_order'] ) && (bool) $get_data['pay_for_order'];
 
+<<<<<<< HEAD
+=======
+		// Check if this is express checkout (POST data doesn't have address info)
+		$is_express_checkout = empty( $customer_address['billing_address_1'] ) && empty( $customer_address['billing_city'] ) && ! empty( $order );
+
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 		if ( $is_pay_order ) {
 			if ( ! empty( $get_data['order_id'] ) ) {
 				$order_id = $get_data['order_id'];
@@ -288,6 +411,13 @@ class WC_Checkoutcom_Api_Request {
 
 			$email = $order->get_billing_email();
 			$name  = $order->get_billing_first_name() . ' ' . $order->get_billing_last_name();
+<<<<<<< HEAD
+=======
+		} elseif ( $is_express_checkout && ! empty( $order ) ) {
+			// Express checkout: Get email and name from order when POST data is empty
+			$email = $order->get_billing_email();
+			$name  = $order->get_billing_first_name() . ' ' . $order->get_billing_last_name();
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 		}
 
 		// Customer.
@@ -448,10 +578,21 @@ class WC_Checkoutcom_Api_Request {
 			}
 		}
 
+<<<<<<< HEAD
 		// If this is MOTO order(Created via admin paid by customer from email).
 		if ( $order->is_created_via( 'admin' ) ) {
 			$payment->payment_type = PaymentType::$moto;
 			unset( $payment->three_ds );
+=======
+		// If this is MOTO order (Admin-created order + Order-pay page + Guest customer).
+		$is_order_pay_page = ! empty( $_GET['pay_for_order'] ) && (bool) $_GET['pay_for_order'];
+		$is_guest_customer = $order->get_customer_id() == 0; // Guest customer = no customer account
+		
+		if ( $order->is_created_via( 'admin' ) && $is_order_pay_page && $is_guest_customer ) {
+			$payment->payment_type = PaymentType::$moto;
+			unset( $payment->three_ds );
+			WC_Checkoutcom_Utility::logger( 'MOTO payment type set - Admin order + Order-pay page + Guest customer. Order ID: ' . $order->get_id() );
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 		}
 
 		// PayPal add items to payment.
@@ -471,11 +612,20 @@ class WC_Checkoutcom_Api_Request {
 	/**
 	 * Return customer address.
 	 *
+<<<<<<< HEAD
 	 * @param array $data Post data.
 	 *
 	 * @return array
 	 */
 	private static function customer_address( $data ) {
+=======
+	 * @param array    $data Post data.
+	 * @param WC_Order $order Order object (optional, used for express checkout when POST data is empty).
+	 *
+	 * @return array
+	 */
+	private static function customer_address( $data, $order = null ) {
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 		// Pay Order Page.
 		$is_pay_order = ! empty( $_GET['pay_for_order'] ) ? (bool) $_GET['pay_for_order'] : false;
 
@@ -488,6 +638,12 @@ class WC_Checkoutcom_Api_Request {
 		$billing_postcode   = empty( $data['billing_postcode'] ) ? '' : wc_clean( $data['billing_postcode'] );
 		$billing_country    = empty( $data['billing_country'] ) ? '' : wc_clean( $data['billing_country'] );
 
+<<<<<<< HEAD
+=======
+		// Check if POST data is empty (express checkout scenario) and we have an order
+		$is_express_checkout = empty( $billing_address_1 ) && empty( $billing_city ) && ! empty( $order );
+
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 		if ( isset( $data['ship_to_different_address'] ) ) {
 			$shipping_first_name = empty( $data['shipping_first_name'] ) ? '' : wc_clean( $data['shipping_first_name'] );
 			$shipping_last_name  = empty( $data['shipping_last_name'] ) ? '' : wc_clean( $data['shipping_last_name'] );
@@ -527,6 +683,28 @@ class WC_Checkoutcom_Api_Request {
 			$shipping_postcode   = $order->get_shipping_postcode();
 			$shipping_country    = $order->get_shipping_country();
 
+<<<<<<< HEAD
+=======
+		} elseif ( $is_express_checkout && ! empty( $order ) ) {
+			// Express checkout: Get billing and shipping details from order when POST data is empty
+			$billing_first_name = $order->get_billing_first_name();
+			$billing_last_name  = $order->get_billing_last_name();
+			$billing_address_1  = $order->get_billing_address_1();
+			$billing_address_2  = $order->get_billing_address_2();
+			$billing_city       = $order->get_billing_city();
+			$billing_state      = $order->get_billing_state();
+			$billing_postcode   = $order->get_billing_postcode();
+			$billing_country    = $order->get_billing_country();
+
+			$shipping_first_name = $order->get_shipping_first_name();
+			$shipping_last_name  = $order->get_shipping_last_name();
+			$shipping_address_1  = $order->get_shipping_address_1();
+			$shipping_address_2  = $order->get_shipping_address_2();
+			$shipping_city       = $order->get_shipping_city();
+			$shipping_state      = $order->get_shipping_state();
+			$shipping_postcode   = $order->get_shipping_postcode();
+			$shipping_country    = $order->get_shipping_country();
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 		} else {
 			$shipping_first_name = $billing_first_name;
 			$shipping_last_name  = $billing_last_name;
@@ -573,8 +751,18 @@ class WC_Checkoutcom_Api_Request {
 
 		try {
 
+<<<<<<< HEAD
 			// Get payment response.
 			$response = $checkout->get_builder()->getPaymentsClient()->getPaymentDetails( $session_id );
+=======
+		// Get payment response.
+		$builder = $checkout->get_builder();
+		if ( ! $builder ) {
+			WC_Checkoutcom_Utility::logger( 'Checkout.com SDK not initialized - cannot get payment details' );
+			return array( 'error' => 'Payment gateway not properly configured. Please contact support.' );
+		}
+		$response = $builder->getPaymentsClient()->getPaymentDetails( $session_id );
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 
 			// Check if payment is successful.
 			if ( WC_Checkoutcom_Utility::is_successful( $response ) ) {
@@ -640,9 +828,44 @@ class WC_Checkoutcom_Api_Request {
 	 * @return mixed
 	 */
 	public static function generate_google_token() {
+<<<<<<< HEAD
 		$protocol_version = sanitize_text_field( $_POST['cko-google-protocolVersion'] );
 		$signature        = sanitize_text_field( $_POST['cko-google-signature'] );
 		$signed_message   = stripslashes( $_POST['cko-google-signedMessage'] );
+=======
+		// Protocol version is safe to sanitize
+		$protocol_version = sanitize_text_field( $_POST['cko-google-protocolVersion'] );
+		
+		// Signature and signedMessage are base64-encoded strings that should NOT be sanitized
+		// as sanitize_text_field can corrupt base64 data.
+		// IMPORTANT: For classic Google Pay, form POST data is automatically processed by WordPress
+		// For express AJAX, the data comes directly and may already be in the correct format
+		// wp_unslash on signedMessage can reduce it from 672 to 658 chars, corrupting it
+		// So we should check if wp_unslash changes the length, and if so, use the original
+		$signature_raw = $_POST['cko-google-signature'];
+		$signed_message_raw = $_POST['cko-google-signedMessage'];
+		
+		// Apply wp_unslash to match classic Google Pay form POST behavior
+		$signature = wp_unslash( $signature_raw );
+		$signed_message_unslashed = wp_unslash( $signed_message_raw );
+		
+		// If wp_unslash reduced the signedMessage length, it's corrupting it
+		// Use the original instead (for express AJAX, it's already in the correct format)
+		if ( strlen( $signed_message_unslashed ) < strlen( $signed_message_raw ) ) {
+			$signed_message = $signed_message_raw;
+			
+			// Check if signedMessage has escaped quotes (from AJAX POST)
+			// If signedMessage has \" instead of ", we need to unescape it
+			if ( strpos( $signed_message, '\\"' ) !== false ) {
+				// Unescape quotes: \" -> "
+				$signed_message = str_replace( '\\"', '"', $signed_message );
+				// Also unescape backslashes: \\ -> \
+				$signed_message = str_replace( '\\\\', '\\', $signed_message );
+			}
+		} else {
+			$signed_message = $signed_message_unslashed;
+		}
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 
 		$checkout = new Checkout_SDK();
 
@@ -659,7 +882,16 @@ class WC_Checkoutcom_Api_Request {
 			$google_pay_token_request             = new GooglePayTokenRequest();
 			$google_pay_token_request->token_data = $google_pay;
 
+<<<<<<< HEAD
 			$token = $checkout->get_builder()->getTokensClient()->requestWalletToken( $google_pay_token_request );
+=======
+			$builder = $checkout->get_builder();
+		if ( ! $builder ) {
+			WC_Checkoutcom_Utility::logger( 'Checkout.com SDK not initialized - cannot request Google Pay token' );
+			return array( 'error' => 'Payment gateway not properly configured. Please contact support.' );
+		}
+		$token = $builder->getTokensClient()->requestWalletToken( $google_pay_token_request );
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 
 			return [
 				'token'        => $token['token'],
@@ -668,6 +900,10 @@ class WC_Checkoutcom_Api_Request {
 		} catch ( CheckoutApiException $ex ) {
 			$error_message = __( 'An error has occurred while processing your Google pay payment.', 'checkout-com-unified-payments-api' );
 			WC_Checkoutcom_Utility::logger( $error_message, $ex );
+<<<<<<< HEAD
+=======
+			return array( 'error' => $error_message . ' ' . $ex->getMessage() );
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 		}
 	}
 
@@ -1191,12 +1427,17 @@ class WC_Checkoutcom_Api_Request {
 	 *
 	 * @return array
 	 */
+<<<<<<< HEAD
 	public static function get_cart_info() {
+=======
+	public static function get_cart_info( $flow = false ) {
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 
 		if ( ! WC()->cart ) {
 			return [];
 		}
 
+<<<<<<< HEAD
 		$items    = WC()->cart->get_cart();
 		$products = [];
 
@@ -1204,6 +1445,22 @@ class WC_Checkoutcom_Api_Request {
 		$amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $total_amount, get_woocommerce_currency() );
 
 		foreach ( $items as $item => $values ) {
+=======
+	$items    = WC()->cart->get_cart();
+	$products = [];
+
+	$total_amount = WC()->cart->total;
+	$amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $total_amount, get_woocommerce_currency() );
+
+	// Initialize virtual product flag
+	$contains_virtual_product = false;
+	// Initialize subscription flags
+	$contains_subscription_product = false;
+	$regular_payment_type = class_exists('Checkout\\Payments\\PaymentType') ? \Checkout\Payments\PaymentType::$regular : 'Regular';
+	$recurring_payment_type = class_exists('Checkout\\Payments\\PaymentType') ? \Checkout\Payments\PaymentType::$recurring : 'Recurring';
+
+	foreach ( $items as $item => $values ) {
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 
 			$_product         = wc_get_product( $values['data']->get_id() );
 			$wc_product       = wc_get_product( $values['product_id'] );
@@ -1221,6 +1478,7 @@ class WC_Checkoutcom_Api_Request {
 				$reset_tax = reset( $tax )['rate'];
 				$tax_rate  = round( $reset_tax );
 
+<<<<<<< HEAD
 			} else {
 				$tax_rate               = 0;
 				$total_tax_amount_cents = 0;
@@ -1238,6 +1496,84 @@ class WC_Checkoutcom_Api_Request {
 				'total_discount_amount' => 0,
 
 			];
+=======
+		} else {
+			$tax_rate               = 0;
+			$total_tax_amount_cents = 0;
+		}
+
+		// Check if product is virtual
+		if ( $_product->is_virtual() ) {
+			$contains_virtual_product = true;
+		}
+
+		// Check if product is a subscription product
+		$is_subscription_product = false;
+		$product_id = $_product->get_id();
+		$product_type = $_product->get_type();
+		
+		if ( function_exists( 'wcs_is_subscription_product' ) ) {
+			$is_subscription_product = wcs_is_subscription_product( $_product );
+			if ( $is_subscription_product ) {
+				$contains_subscription_product = true;
+			}
+		} else {
+			// Fallback: Check if product has subscription meta
+			$subscription_period = get_post_meta( $product_id, '_subscription_period', true );
+			$subscription_price = get_post_meta( $product_id, '_subscription_price', true );
+			if ( ! empty( $subscription_period ) || ! empty( $subscription_price ) ) {
+				$is_subscription_product = true;
+				$contains_subscription_product = true;
+			}
+		}
+		
+		// Additional check: product type might be 'subscription' or 'variable-subscription'
+		if ( ! $is_subscription_product && ( $product_type === 'subscription' || $product_type === 'variable-subscription' ) ) {
+			$is_subscription_product = true;
+			$contains_subscription_product = true;
+		}
+
+		if( $flow ) {
+				$quantity   = $values['quantity'];
+				$line_subtotal = $values['line_subtotal'];
+				$line_total    = $values['line_total'];
+
+				// Discount Price
+				$unit_discount       = ( $line_subtotal - $line_total ) / $quantity;
+				$discount_total_cents = WC_Checkoutcom_Utility::value_to_decimal( $unit_discount * $quantity, get_woocommerce_currency() );
+
+				// Flow-specific logic for cart items
+				$product_data = [
+					'name'                  => $_product->get_title(),
+					'quantity'              => $quantity,
+					'unit_price'            => $unit_price_cents,
+					'total_amount'          => ( $unit_price_cents * $quantity ) - $discount_total_cents,
+					'tax_amount'            => $total_tax_amount_cents,
+					'type'                  => 'physical',
+					'reference'             => $_product->get_sku(),
+					'discount_amount'       => $discount_total_cents,
+				];
+				
+				// Add subscription flag to product data if it's a subscription product
+				if ( $is_subscription_product ) {
+					$product_data['is_subscription'] = true;
+				}
+				
+				$products[] = $product_data;
+			} else {
+				$products[] = [
+					'name'                  => $_product->get_title(),
+					'quantity'              => $values['quantity'],
+					'unit_price'            => $unit_price_cents,
+					'tax_rate'              => $tax_rate * 100,
+					'total_amount'          => $unit_price_cents * $values['quantity'],
+					'total_tax_amount'      => $total_tax_amount_cents,
+					'type'                  => 'physical',
+					'reference'             => $_product->get_sku(),
+					'total_discount_amount' => 0,
+				];
+			}
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 		}
 
 		$chosen_methods  = wc_get_chosen_shipping_method_ids();
@@ -1268,6 +1604,7 @@ class WC_Checkoutcom_Api_Request {
 					$total_tax_amount_cents = 0;
 				}
 
+<<<<<<< HEAD
 				$products[] = [
 					'name'                  => $chosen_shipping,
 					'quantity'              => 1,
@@ -1279,6 +1616,32 @@ class WC_Checkoutcom_Api_Request {
 					'reference'             => $chosen_shipping,
 					'total_discount_amount' => 0,
 				];
+=======
+				// Only add total_tax_amount and total_discount_amount if flow is false.
+				if ( ! $flow ) {
+					$products[] = [
+						'name'                  => $chosen_shipping,
+						'quantity'              => 1,
+						'unit_price'            => $shipping_amount_cents,
+						'tax_rate'              => $shipping_tax_rate,
+						'total_amount'          => $shipping_amount_cents,
+						'total_tax_amount'      => $total_tax_amount_cents,
+						'type'                  => 'shipping_fee',
+						'reference'             => $chosen_shipping,
+						'total_discount_amount' => 0,
+					];
+				} else {
+					$products[] = [
+						'name'                  => $chosen_shipping,
+						'quantity'              => 1,
+						'unit_price'            => $shipping_amount_cents,
+						'total_amount'          => $shipping_amount_cents,
+						'tax_amount'            => $total_tax_amount_cents,
+						'reference'             => $chosen_shipping,
+						'discount_amount'       => 0,
+					];
+				}
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 			}
 		}
 
@@ -1286,7 +1649,17 @@ class WC_Checkoutcom_Api_Request {
 		$locale                 = substr( $woo_locale, 0, 5 );
 		$total_tax_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( WC()->cart->get_total_tax(), get_woocommerce_currency() );
 
+<<<<<<< HEAD
 		return [
+=======
+		// Determine payment type based on subscription detection
+		$payment_type = $regular_payment_type;
+		if ( $contains_subscription_product ) {
+			$payment_type = $recurring_payment_type;
+		}
+
+		$cart_info = [
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 			'purchase_country'  => WC()->customer->get_billing_country(),
 			'purchase_currency' => get_woocommerce_currency(),
 			'locale'            => strtolower( $locale ),
@@ -1305,7 +1678,229 @@ class WC_Checkoutcom_Api_Request {
 			'order_amount'      => $amount_cents,
 			'order_tax_amount'  => $total_tax_amount_cents,
 			'order_lines'       => $products,
+<<<<<<< HEAD
 		];
+=======
+			'contains_virtual_product' => $contains_virtual_product,
+		];
+
+		// Add subscription flags and payment type for Flow integration
+		if ( $flow ) {
+			$cart_info['contains_subscription_product'] = $contains_subscription_product;
+			$cart_info['payment_type'] = $payment_type;
+		}
+
+		return $cart_info;
+}
+
+	/**
+	 * Get order information for Flow integration.
+	 * Similar to get_cart_info() but for existing orders.
+	 *
+	 * @param int $order_id Order ID.
+	 * @param bool $flow Whether this is for Flow integration (affects field names).
+	 *
+	 * @return array
+	 */
+	public static function get_order_info( $order_id, $flow = false ) {
+		$order = wc_get_order( $order_id );
+		
+		if ( ! $order ) {
+			return [];
+		}
+
+		$items = $order->get_items();
+		$products = [];
+
+		$total_amount = $order->get_total();
+		$amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $total_amount, $order->get_currency() );
+
+		// Initialize subscription flags
+		$contains_subscription_product = false;
+		$regular_payment_type = class_exists('Checkout\\Payments\\PaymentType') ? \Checkout\Payments\PaymentType::$regular : 'Regular';
+		$recurring_payment_type = class_exists('Checkout\\Payments\\PaymentType') ? \Checkout\Payments\PaymentType::$recurring : 'Recurring';
+
+		foreach ( $items as $item ) {
+			$product = $item->get_product();
+			
+			if ( ! $product ) {
+				continue;
+			}
+
+			// Check if product is a subscription product
+			$is_subscription_product = false;
+			if ( function_exists( 'wcs_is_subscription_product' ) ) {
+				$is_subscription_product = wcs_is_subscription_product( $product );
+				if ( $is_subscription_product ) {
+					$contains_subscription_product = true;
+				}
+			}
+
+			$line_subtotal = $item->get_subtotal();
+			$quantity      = $item->get_quantity();
+			$line_total    = $item->get_total();
+	
+			if ( $flow ) {
+				$unit_price        = $line_subtotal / $quantity;
+				$unit_discount     = ( $line_subtotal - $line_total ) / $quantity;
+				$discounted_unit   = $unit_price - $unit_discount;
+				$unit_price_cents  = WC_Checkoutcom_Utility::value_to_decimal( $discounted_unit, $order->get_currency() );
+				$discount_total_cents = WC_Checkoutcom_Utility::value_to_decimal( $unit_discount * $quantity, $order->get_currency() );
+				$tax_amount        = $item->get_subtotal_tax();
+				$total_tax_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $tax_amount, $order->get_currency() );
+
+				$product_data = [
+					'name'                  => $item->get_name(),
+					'quantity'              => $quantity,
+					'unit_price'            => $unit_price_cents,
+					'total_amount'          => $unit_price_cents * $quantity,
+					'tax_amount'            => $total_tax_amount_cents,
+					'type'                  => 'physical',
+					'reference'             => $product->get_sku() ?: $product->get_id(),
+					'discount_amount'       => $discount_total_cents,
+				];
+				
+				// Add subscription flag to product data if it's a subscription product
+				if ( $is_subscription_product ) {
+					$product_data['is_subscription'] = true;
+				}
+				
+				$products[] = $product_data;
+			} else {
+				$price_excl_tax = $item->get_subtotal();
+				$unit_price_cents = WC_Checkoutcom_Utility::value_to_decimal( $price_excl_tax / $item->get_quantity(), $order->get_currency() );
+
+				$tax_amount = $item->get_subtotal_tax();
+				$total_tax_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $tax_amount, $order->get_currency() );
+
+				// Calculate tax rate
+				$tax_rate = 0;
+				if ( $price_excl_tax > 0 ) {
+					$tax_rate = round( ( $tax_amount / $price_excl_tax ) * 100 );
+				}
+
+				$products[] = [
+					'name'                  => $item->get_name(),
+					'quantity'              => $item->get_quantity(),
+					'unit_price'            => $unit_price_cents,
+					'tax_rate'              => $tax_rate * 100,
+					'total_amount'          => WC_Checkoutcom_Utility::value_to_decimal( $price_excl_tax, $order->get_currency() ),
+					'total_tax_amount'      => $total_tax_amount_cents,
+					'type'                  => 'physical',
+					'reference'             => $product->get_sku() ?: $product->get_id(),
+					'total_discount_amount' => WC_Checkoutcom_Utility::value_to_decimal( $item->get_subtotal() - $item->get_total(), $order->get_currency() ),
+				];
+			}
+		}
+
+		// Add shipping if present
+		$shipping_total = $order->get_shipping_total();
+		if ( $shipping_total > 0 ) {
+			$shipping_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $shipping_total, $order->get_currency() );
+			$shipping_tax = $order->get_shipping_tax();
+			$shipping_tax_cents = WC_Checkoutcom_Utility::value_to_decimal( $shipping_tax, $order->get_currency() );
+
+			$shipping_tax_rate = 0;
+			if ( $shipping_total > 0 ) {
+				$shipping_tax_rate = round( ( $shipping_tax / $shipping_total ) * 100 );
+			}
+
+			// Only add total_tax_amount and total_discount_amount if flow is false.
+			if ( ! $flow ) {
+				$products[] = [
+					'name'                  => 'Shipping',
+					'quantity'              => 1,
+					'unit_price'            => $shipping_amount_cents,
+					'tax_rate'              => $shipping_tax_rate * 100,
+					'total_amount'          => $shipping_amount_cents,
+					'total_tax_amount'      => $shipping_tax_cents,
+					'type'                  => 'shipping_fee',
+					'reference'             => 'shipping',
+					'total_discount_amount' => 0,
+				];
+			} else {
+				$products[] = [
+					'name'                  => 'Shipping',
+					'quantity'              => 1,
+					'unit_price'            => $shipping_amount_cents,
+					'total_amount'          => $shipping_amount_cents,
+					'tax_amount'            => $shipping_tax_cents,
+					'reference'             => 'shipping',
+					'discount_amount'       => 0,
+				];
+			}
+		}
+
+		$woo_locale = str_replace( '_', '-', get_locale() );
+		$locale = substr( $woo_locale, 0, 5 );
+		$total_tax_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $order->get_total_tax(), $order->get_currency() );
+
+		$order_info = [
+			'purchase_country'  => $order->get_billing_country(),
+			'purchase_currency' => $order->get_currency(),
+			'locale'            => strtolower( $locale ),
+			'billing_address'   => [
+				'given_name'      => $order->get_billing_first_name(),
+				'family_name'     => $order->get_billing_last_name(),
+				'email'           => $order->get_billing_email(),
+				'street_address'  => $order->get_billing_address_1(),
+				'street_address2' => $order->get_billing_address_2(),
+				'postal_code'     => $order->get_billing_postcode(),
+				'city'            => $order->get_billing_city(),
+				'region'          => $order->get_billing_state(),
+				'phone'           => $order->get_billing_phone(),
+				'country'         => $order->get_billing_country(),
+			],
+			'order_amount'      => $amount_cents,
+			'order_tax_amount'  => $total_tax_amount_cents,
+			'order_lines'       => $products,
+		];
+
+		// Add payment type information if requested (for MOTO orders and subscriptions)
+		if ( $flow ) {
+			// MOTO only for: Admin-created order + Order-pay page + Guest customer
+			$is_order_pay_page = ! empty( $_GET['pay_for_order'] ) && (bool) $_GET['pay_for_order'];
+			$is_guest_customer = $order->get_customer_id() == 0; // Guest customer = no customer account
+			$is_admin_created = $order->is_created_via( 'admin' );
+			$is_moto_payment = $is_admin_created && $is_order_pay_page && $is_guest_customer;
+			
+			// Check if order contains subscription (using WooCommerce Subscriptions function)
+			$order_contains_subscription = false;
+			if ( function_exists( 'wcs_order_contains_subscription' ) ) {
+				$order_contains_subscription = wcs_order_contains_subscription( $order, 'parent' );
+			}
+			
+			// Determine payment type: Priority: MOTO > Subscription > Regular
+			if ( $is_moto_payment ) {
+				$payment_type = 'MOTO';
+			} elseif ( $order_contains_subscription || $contains_subscription_product ) {
+				$payment_type = $recurring_payment_type;
+			} else {
+				$payment_type = $regular_payment_type;
+			}
+			
+			// Enhanced debug logging with more details
+			WC_Checkoutcom_Utility::logger( 'Order info payment type detection - Order ID: ' . $order->get_id() . 
+				', Admin created: ' . ($is_admin_created ? 'YES' : 'NO') . 
+				', Order-pay page: ' . ($is_order_pay_page ? 'YES' : 'NO') . 
+				', Guest customer: ' . ($is_guest_customer ? 'YES' : 'NO') . 
+				', Contains subscription product: ' . ($contains_subscription_product ? 'YES' : 'NO') .
+				', Order contains subscription: ' . ($order_contains_subscription ? 'YES' : 'NO') .
+				', Payment type: ' . $payment_type
+			);
+			
+			$order_info['payment_type'] = $payment_type;
+			$order_info['contains_subscription_product'] = $contains_subscription_product || $order_contains_subscription;
+			
+			if ( $is_moto_payment ) {
+				WC_Checkoutcom_Utility::logger( 'Order info: MOTO payment type set - Admin order + Order-pay page + Guest customer. Order ID: ' . $order->get_id() );
+			} elseif ( $order_contains_subscription || $contains_subscription_product ) {
+				WC_Checkoutcom_Utility::logger( 'Order info: Recurring payment type set - Order contains subscription. Order ID: ' . $order->get_id() );
+			}
+		}
+
+		return $order_info;
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 	}
 
 	/**
@@ -1317,7 +1912,11 @@ class WC_Checkoutcom_Api_Request {
 	 * @return array
 	 */
 	public static function get_paypal_products( $order ) {
+<<<<<<< HEAD
 		$cart_info = WC_Checkoutcom_Api_Request::get_cart_info();
+=======
+		$cart_info = WC_Checkoutcom_Api_Request::get_cart_info(false);
+>>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 		$products  = [];
 
 		if ( $cart_info ) {

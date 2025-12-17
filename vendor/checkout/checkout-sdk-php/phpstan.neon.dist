@@ -1,0 +1,7 @@
+parameters:
+    checkMissingIterableValueType: false
+
+    level: 1
+    paths:
+        - lib
+        - test
