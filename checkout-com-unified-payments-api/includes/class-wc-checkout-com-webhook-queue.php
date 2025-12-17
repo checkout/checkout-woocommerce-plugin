@@ -116,6 +116,34 @@ class WC_Checkout_Com_Webhook_Queue {
 		$payment_session_id = ! empty( $payment_session_id ) ? sanitize_text_field( $payment_session_id ) : null;
 		$webhook_type = sanitize_text_field( $webhook_type );
 
+		// CRITICAL: Check for duplicate webhook before queuing (prevent duplicate queue entries)
+		// Check if same payment_id + webhook_type combination already exists and is unprocessed
+		$existing_query = $wpdb->prepare(
+			"SELECT id FROM {$table_name} 
+			WHERE payment_id = %s 
+			AND webhook_type = %s 
+			AND processed_at IS NULL 
+			LIMIT 1",
+			$payment_id,
+			$webhook_type
+		);
+		$existing_webhook = $wpdb->get_var( $existing_query );
+
+		if ( $existing_webhook ) {
+			// Duplicate webhook already in queue - skip queuing
+			WC_Checkoutcom_Utility::logger(
+				'WEBHOOK PROCESS: WEBHOOK QUEUE: ✅ Duplicate webhook already queued - Skipping - ' .
+				'Type: ' . $webhook_type . ', ' .
+				'Payment ID: ' . $payment_id . ', ' .
+				'Order ID: ' . ( $order_id ?? 'NULL' ) . ', ' .
+				'Existing Queue ID: ' . $existing_webhook
+			);
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: === WEBHOOK QUEUE: save_pending_webhook END (SKIPPED - Duplicate) ===' );
+			}
+			return true; // Return true to indicate "handled" (even though skipped)
+		}
+
 		$result = $wpdb->insert(
 			$table_name,
 			array(
@@ -258,6 +286,53 @@ class WC_Checkout_Com_Webhook_Queue {
 				continue;
 			}
 
+			// CRITICAL: Reload order to get latest state (including processed webhooks)
+			$order = wc_get_order( $order_id );
+			if ( ! $order ) {
+				WC_Checkoutcom_Utility::logger(
+					'WEBHOOK PROCESS: WEBHOOK QUEUE: ERROR - Order not found - Order ID: ' . $order_id . ', Queue ID: ' . $queued_webhook->id
+				);
+				continue;
+			}
+
+			// CRITICAL: Check if this webhook already processed (duplicate prevention)
+			$processed_webhooks = $order->get_meta( '_cko_processed_webhook_ids' );
+			if ( ! is_array( $processed_webhooks ) ) {
+				$processed_webhooks = array();
+			}
+
+			// Create unique webhook identifier (payment_id + event_type)
+			// Use webhook_type from queue (payment_approved/payment_captured) to match event type
+			$event_type = 'payment_approved' === $queued_webhook->webhook_type ? 'payment_approved' : 'payment_captured';
+			$webhook_id = $queued_webhook->payment_id . '_' . $event_type;
+
+			if ( in_array( $webhook_id, $processed_webhooks, true ) ) {
+				// Webhook already processed - skip to prevent duplicate order updates
+				WC_Checkoutcom_Utility::logger(
+					'WEBHOOK PROCESS: WEBHOOK QUEUE: ✅ Already processed - Skipping duplicate queued webhook - ' .
+					'Queue ID: ' . $queued_webhook->id . ', ' .
+					'Payment ID: ' . $queued_webhook->payment_id . ', ' .
+					'Type: ' . $queued_webhook->webhook_type . ', ' .
+					'Order ID: ' . $order_id
+				);
+
+				// Mark as processed in queue table (even though already processed)
+				global $wpdb;
+				$table_name = self::get_table_name();
+				$wpdb->update(
+					$table_name,
+					array( 'processed_at' => current_time( 'mysql' ) ),
+					array( 'id' => $queued_webhook->id ),
+					array( '%s' ),
+					array( '%d' )
+				);
+
+				if ( $webhook_debug_enabled ) {
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: WEBHOOK QUEUE: Marked duplicate webhook as processed in queue table' );
+				}
+				continue;
+			}
+
 			if ( $webhook_debug_enabled ) {
 				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: WEBHOOK QUEUE: Processing queued webhook - Queue ID: ' . $queued_webhook->id . ', Type: ' . $queued_webhook->webhook_type . ', Payment ID: ' . $queued_webhook->payment_id );
 			}
@@ -267,6 +342,11 @@ class WC_Checkout_Com_Webhook_Queue {
 				$webhook_data->data->metadata = new stdClass();
 			}
 			$webhook_data->data->metadata->order_id = $order_id;
+
+			// Ensure event type is set for webhook processing
+			if ( ! isset( $webhook_data->type ) ) {
+				$webhook_data->type = $event_type;
+			}
 
 			// Process webhook based on type
 			$success = false;
@@ -283,7 +363,27 @@ class WC_Checkout_Com_Webhook_Queue {
 			}
 
 			if ( $success ) {
-				// Mark as processed
+				// CRITICAL: Mark webhook as processed in order meta (same as direct webhook processing)
+				// Reload order to get latest state after processing
+				$order = wc_get_order( $order_id );
+				if ( $order ) {
+					$processed_webhooks = $order->get_meta( '_cko_processed_webhook_ids' );
+					if ( ! is_array( $processed_webhooks ) ) {
+						$processed_webhooks = array();
+					}
+
+					// Add to processed list if not already there
+					if ( ! in_array( $webhook_id, $processed_webhooks, true ) ) {
+						$processed_webhooks[] = $webhook_id;
+						$order->update_meta_data( '_cko_processed_webhook_ids', array_unique( $processed_webhooks ) );
+						$order->save();
+						if ( $webhook_debug_enabled ) {
+							WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: WEBHOOK QUEUE: Marked webhook as processed in order meta - Webhook ID: ' . $webhook_id );
+						}
+					}
+				}
+
+				// Mark as processed in queue table
 				global $wpdb;
 				$table_name = self::get_table_name();
 				$wpdb->update(
