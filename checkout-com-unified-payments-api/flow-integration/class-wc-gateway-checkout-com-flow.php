@@ -1472,8 +1472,12 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				
 				if ( $builder ) {
 					$payment_details = $builder->getPaymentsClient()->getPaymentDetails( $flow_payment_id_from_post );
-					if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-						WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] [SHIPPING DEBUG] Payment details fetched successfully (early fetch)' );
+					WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Payment details fetched successfully (early fetch) - Payment ID: ' . $flow_payment_id_from_post );
+					// Log payment session ID if available in metadata
+					if ( isset( $payment_details['metadata']['cko_payment_session_id'] ) ) {
+						WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Payment session ID found in early fetch: ' . substr( $payment_details['metadata']['cko_payment_session_id'], 0, 20 ) . '...' );
+					} else {
+						WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] ⚠️ Payment session ID NOT found in early fetch metadata' );
 					}
 				}
 			} catch ( Exception $e ) {
@@ -1866,7 +1870,14 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			// Set transaction ID and payment ID in order meta for tracking
 			$order->set_transaction_id( $result['action_id'] );
 			$order->update_meta_data( '_cko_payment_id', $flow_payment_id );
-			$order->update_meta_data( '_cko_flow_payment_id', $flow_payment_id );
+			
+			// CRITICAL: Only set _cko_flow_payment_id if not already set (prevent overwriting)
+			$existing_flow_payment_id = $order->get_meta( '_cko_flow_payment_id' );
+			if ( empty( $existing_flow_payment_id ) ) {
+				$order->update_meta_data( '_cko_flow_payment_id', $flow_payment_id );
+			} else {
+				WC_Checkoutcom_Utility::logger( '[3DS RETURN] Payment ID already exists in order (failed payment) - Order ID: ' . $order_id . ', Existing Payment ID: ' . substr( $existing_flow_payment_id, 0, 20 ) . '..., New Payment ID: ' . substr( $flow_payment_id, 0, 20 ) . '... (skipping save to prevent overwrite)' );
+			}
 			
 			// Save addresses BEFORE marking as failed
 			$order->save();
@@ -1913,11 +1924,55 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// Set transaction ID and payment ID in order meta
 			$order->set_transaction_id( $result['action_id'] );
 			$order->update_meta_data( '_cko_payment_id', $flow_payment_id );
-			$order->update_meta_data( '_cko_flow_payment_id', $flow_payment_id );
+			
+			// CRITICAL: Only set _cko_flow_payment_id if not already set (prevent overwriting)
+			$existing_flow_payment_id = $order->get_meta( '_cko_flow_payment_id' );
+			if ( empty( $existing_flow_payment_id ) ) {
+				$order->update_meta_data( '_cko_flow_payment_id', $flow_payment_id );
+			} else {
+				WC_Checkoutcom_Utility::logger( '[3DS RETURN] Payment ID already exists in order - Order ID: ' . $order_id . ', Existing Payment ID: ' . substr( $existing_flow_payment_id, 0, 20 ) . '..., New Payment ID: ' . substr( $flow_payment_id, 0, 20 ) . '... (skipping save to prevent overwrite)' );
+			}
+			
 			$flow_payment_type = isset( $_POST['cko-flow-payment-type'] ) ? sanitize_text_field( $_POST['cko-flow-payment-type'] ) : 'card';
 			$order->update_meta_data( '_cko_flow_payment_type', $flow_payment_type );
 			// Store order number/reference for webhook lookup (works with Sequential Order Numbers plugins)
 			$order->update_meta_data( '_cko_order_reference', $order->get_order_number() );
+			
+			// CRITICAL: Save payment session ID for webhook matching (METHOD 2)
+			// Priority: 1) POST data (from form), 2) Payment metadata (from payment_details)
+			// Only save if order doesn't already have a payment session ID
+			$existing_order_session_id = $order->get_meta( '_cko_payment_session_id' );
+			
+			if ( empty( $existing_order_session_id ) ) {
+				// Order doesn't have payment session ID yet - try to get it
+				$payment_session_id = isset( $_POST['cko-flow-payment-session-id'] ) ? sanitize_text_field( $_POST['cko-flow-payment-session-id'] ) : '';
+				if ( empty( $payment_session_id ) && isset( $payment_details['metadata']['cko_payment_session_id'] ) ) {
+					$payment_session_id = $payment_details['metadata']['cko_payment_session_id'];
+					WC_Checkoutcom_Utility::logger( '[3DS RETURN] Payment session ID retrieved from payment_details metadata: ' . substr( $payment_session_id, 0, 20 ) . '...' );
+				}
+				
+				if ( ! empty( $payment_session_id ) ) {
+					// Check if payment_session_id already exists in another order (prevent duplicates)
+					$existing_orders = wc_get_orders( array(
+						'meta_key'   => '_cko_payment_session_id',
+						'meta_value' => $payment_session_id,
+						'limit'      => 1,
+						'exclude'    => array( $order_id ),
+						'return'     => 'ids',
+					) );
+					
+					if ( ! empty( $existing_orders ) ) {
+						WC_Checkoutcom_Utility::logger( '[3DS RETURN] ❌ CRITICAL ERROR: Payment session ID already used by order: ' . $existing_orders[0] );
+					} else {
+						$order->update_meta_data( '_cko_payment_session_id', $payment_session_id );
+						WC_Checkoutcom_Utility::logger( '[3DS RETURN] ✅ Saved payment session ID to order - Order ID: ' . $order_id . ', Payment Session ID: ' . substr( $payment_session_id, 0, 20 ) . '...' );
+					}
+				} else {
+					WC_Checkoutcom_Utility::logger( '[3DS RETURN] ⚠️ WARNING: Payment session ID is empty - Order ID: ' . $order_id . ', Payment ID: ' . $flow_payment_id );
+				}
+			} else {
+				WC_Checkoutcom_Utility::logger( '[3DS RETURN] Payment session ID already exists in order - Order ID: ' . $order_id . ', Payment Session ID: ' . substr( $existing_order_session_id, 0, 20 ) . '... (skipping save)' );
+			}
 			
 			// CRITICAL: Save order immediately so webhooks can find it (especially for fast APM payments)
 			$order->save();
@@ -1952,27 +2007,30 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	// 3. Order is already in advanced state (processing/completed) - don't downgrade
 	$auth_status = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
 	
+	// Format order amount for notes
+	$formatted_order_amount = wc_price( $order->get_total(), array( 'currency' => $order->get_currency() ) );
+	
 	if ( $already_captured ) {
 		// Payment already captured - just add note, don't change status
-		$message = sprintf( esc_html__( 'Checkout.com Payment Authorised - using FLOW (3DS return): %s - Payment ID: %s', 'checkout-com-unified-payments-api' ), $flow_payment_type, $flow_payment_id );
+		$message = sprintf( esc_html__( 'Checkout.com Payment Authorised - using FLOW (3DS return): %s - Payment ID: %s, Amount: %s', 'checkout-com-unified-payments-api' ), $flow_payment_type, $flow_payment_id, $formatted_order_amount );
 		$status = null; // Signal to skip status update
 	} elseif ( $already_authorized && ( $current_status === $auth_status || in_array( $current_status, array( 'processing', 'completed' ), true ) ) ) {
 		// Already authorized and status matches - webhook already handled it, just add note
-		$message = sprintf( esc_html__( 'Checkout.com Payment Authorised - using FLOW (3DS return): %s - Payment ID: %s', 'checkout-com-unified-payments-api' ), $flow_payment_type, $flow_payment_id );
+		$message = sprintf( esc_html__( 'Checkout.com Payment Authorised - using FLOW (3DS return): %s - Payment ID: %s, Amount: %s', 'checkout-com-unified-payments-api' ), $flow_payment_type, $flow_payment_id, $formatted_order_amount );
 		$status = null; // Signal to skip status update
 	} elseif ( in_array( $current_status, array( 'processing', 'completed' ), true ) ) {
 		// Order already in advanced state - don't downgrade, just add note
-		$message = sprintf( esc_html__( 'Checkout.com Payment Authorised - using FLOW (3DS return): %s - Payment ID: %s', 'checkout-com-unified-payments-api' ), $flow_payment_type, $flow_payment_id );
+		$message = sprintf( esc_html__( 'Checkout.com Payment Authorised - using FLOW (3DS return): %s - Payment ID: %s, Amount: %s', 'checkout-com-unified-payments-api' ), $flow_payment_type, $flow_payment_id, $formatted_order_amount );
 		$status = null; // Signal to skip status update
 	} else {
 		// Payment not yet processed - set status to authorized
 		$status = $auth_status;
-		$message = sprintf( esc_html__( 'Checkout.com Payment Authorised - using FLOW (3DS return): %s - Payment ID: %s', 'checkout-com-unified-payments-api' ), $flow_payment_type, $flow_payment_id );
+		$message = sprintf( esc_html__( 'Checkout.com Payment Authorised - using FLOW (3DS return): %s - Payment ID: %s, Amount: %s', 'checkout-com-unified-payments-api' ), $flow_payment_type, $flow_payment_id, $formatted_order_amount );
 		
 		// Check if payment was flagged
 		if ( isset( $result['risk']['flagged'] ) && $result['risk']['flagged'] ) {
 			$status = WC_Admin_Settings::get_option( 'ckocom_order_flagged', 'flagged' );
-			$message = sprintf( esc_html__( 'Checkout.com Payment Flagged (3DS return) - Payment ID: %s', 'checkout-com-unified-payments-api' ), $flow_payment_id );
+			$message = sprintf( esc_html__( 'Checkout.com Payment Flagged (3DS return) - Payment ID: %s, Amount: %s', 'checkout-com-unified-payments-api' ), $flow_payment_id, $formatted_order_amount );
 		}
 	}
 		
@@ -2277,7 +2335,15 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			// Set transaction ID and payment ID
 			$order->set_transaction_id( $result['action_id'] );
 			$order->update_meta_data( '_cko_payment_id', $result['id'] );
-			$order->update_meta_data( '_cko_flow_payment_id', $result['id'] );
+			
+			// CRITICAL: Only set _cko_flow_payment_id if not already set (prevent overwriting)
+			$existing_flow_payment_id = $order->get_meta( '_cko_flow_payment_id' );
+			if ( empty( $existing_flow_payment_id ) ) {
+				$order->update_meta_data( '_cko_flow_payment_id', $result['id'] );
+			} else {
+				WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Payment ID already exists in order (saved card) - Order ID: ' . $order_id . ', Existing Payment ID: ' . substr( $existing_flow_payment_id, 0, 20 ) . '..., New Payment ID: ' . substr( $result['id'], 0, 20 ) . '... (skipping save to prevent overwrite)' );
+			}
+			
 			$order->update_meta_data( '_cko_flow_payment_type', 'card' );
 			$order->update_meta_data( '_cko_order_reference', $order->get_order_number() );
 			
@@ -2395,7 +2461,15 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 								// Set transaction ID and payment ID
 								$order->set_transaction_id( $result['action_id'] );
 								$order->update_meta_data( '_cko_payment_id', $result['id'] );
-								$order->update_meta_data( '_cko_flow_payment_id', $result['id'] );
+								
+								// CRITICAL: Only set _cko_flow_payment_id if not already set (prevent overwriting)
+								$existing_flow_payment_id = $order->get_meta( '_cko_flow_payment_id' );
+								if ( empty( $existing_flow_payment_id ) ) {
+									$order->update_meta_data( '_cko_flow_payment_id', $result['id'] );
+								} else {
+									WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Payment ID already exists in order (saved card fallback 1) - Order ID: ' . $order_id . ', Existing Payment ID: ' . substr( $existing_flow_payment_id, 0, 20 ) . '..., New Payment ID: ' . substr( $result['id'], 0, 20 ) . '... (skipping save to prevent overwrite)' );
+								}
+								
 								$order->update_meta_data( '_cko_flow_payment_type', 'card' );
 								$order->update_meta_data( '_cko_order_reference', $order->get_order_number() );
 								
@@ -2473,7 +2547,15 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 								// Set transaction ID and payment ID
 								$order->set_transaction_id( $result['action_id'] );
 								$order->update_meta_data( '_cko_payment_id', $result['id'] );
-								$order->update_meta_data( '_cko_flow_payment_id', $result['id'] );
+								
+								// CRITICAL: Only set _cko_flow_payment_id if not already set (prevent overwriting)
+								$existing_flow_payment_id = $order->get_meta( '_cko_flow_payment_id' );
+								if ( empty( $existing_flow_payment_id ) ) {
+									$order->update_meta_data( '_cko_flow_payment_id', $result['id'] );
+								} else {
+									WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Payment ID already exists in order (saved card fallback 1) - Order ID: ' . $order_id . ', Existing Payment ID: ' . substr( $existing_flow_payment_id, 0, 20 ) . '..., New Payment ID: ' . substr( $result['id'], 0, 20 ) . '... (skipping save to prevent overwrite)' );
+								}
+								
 								$order->update_meta_data( '_cko_flow_payment_type', 'card' );
 								$order->update_meta_data( '_cko_order_reference', $order->get_order_number() );
 								
@@ -2530,29 +2612,65 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	}
 
 	$order->update_meta_data( '_cko_payment_id', $flow_pay_id );
-	$order->update_meta_data( '_cko_flow_payment_id', $flow_pay_id );
+	
+	// CRITICAL: Only set _cko_flow_payment_id if not already set (prevent overwriting)
+	$existing_flow_payment_id = $order->get_meta( '_cko_flow_payment_id' );
+	if ( empty( $existing_flow_payment_id ) ) {
+		$order->update_meta_data( '_cko_flow_payment_id', $flow_pay_id );
+	} else {
+		WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Payment ID already exists in order - Order ID: ' . $order_id . ', Existing Payment ID: ' . substr( $existing_flow_payment_id, 0, 20 ) . '..., New Payment ID: ' . substr( $flow_pay_id, 0, 20 ) . '... (skipping save to prevent overwrite)' );
+	}
+	
 	$order->update_meta_data( '_cko_flow_payment_type', $flow_payment_type );
 	// Store order number/reference for webhook lookup (works with Sequential Order Numbers plugins)
 	$order->update_meta_data( '_cko_order_reference', $order->get_order_number() );
 	
 	// Store payment session ID for 3DS return lookup
-	// Priority: 1) POST data (from form), 2) Payment metadata (if payment already exists)
+	// Priority: 1) POST data (from form), 2) Already-fetched payment details, 3) Payment metadata (fetch if needed)
 	$payment_session_id = isset( $_POST['cko-flow-payment-session-id'] ) ? sanitize_text_field( $_POST['cko-flow-payment-session-id'] ) : '';
 	WC_Checkoutcom_Utility::logger( 'Payment session ID from POST: ' . ( ! empty( $payment_session_id ) ? $payment_session_id : 'EMPTY' ) );
 	
 	$payment_details_for_shipping = null;
 	if ( empty( $payment_session_id ) && ! empty( $flow_pay_id ) ) {
-		// Try to get payment session ID from payment metadata
-		try {
-			$checkout = new Checkout_SDK();
-			$builder = $checkout->get_builder();
-			if ( $builder ) {
-				$payment_details_for_shipping = $builder->getPaymentsClient()->getPaymentDetails( $flow_pay_id );
-				$payment_session_id = isset( $payment_details_for_shipping['metadata']['cko_payment_session_id'] ) ? $payment_details_for_shipping['metadata']['cko_payment_session_id'] : '';
+		WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Payment session ID is empty, checking payment details - Payment ID: ' . $flow_pay_id );
+		WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Has already-fetched payment_details: ' . ( ! empty( $payment_details ) ? 'YES' : 'NO' ) );
+		
+		// CRITICAL: First try to use already-fetched payment details (from early fetch at line 1474)
+		// This avoids unnecessary API calls and works better for APM payments
+		if ( ! empty( $payment_details ) ) {
+			WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Checking already-fetched payment_details for payment session ID...' );
+			if ( isset( $payment_details['metadata']['cko_payment_session_id'] ) ) {
+				$payment_session_id = $payment_details['metadata']['cko_payment_session_id'];
+				$payment_details_for_shipping = $payment_details;
+				WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] ✅ Payment session ID retrieved from already-fetched payment details: ' . substr( $payment_session_id, 0, 20 ) . '...' );
+			} else {
+				WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] ⚠️ Payment session ID not found in already-fetched payment_details metadata' );
+				if ( isset( $payment_details['metadata'] ) ) {
+					WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Available metadata keys: ' . implode( ', ', array_keys( $payment_details['metadata'] ) ) );
+				} else {
+					WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] ⚠️ No metadata key found in payment_details' );
+				}
 			}
-		} catch ( Exception $e ) {
-			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-				WC_Checkoutcom_Utility::logger( '[FLOW] [SHIPPING DEBUG] Could not fetch payment details: ' . $e->getMessage() );
+		}
+		
+		// Fallback: Fetch payment details if not already fetched or if payment session ID not found
+		if ( empty( $payment_session_id ) ) {
+			// Fallback: Fetch payment details if not already fetched
+			try {
+				WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Fetching payment details to get payment session ID - Payment ID: ' . $flow_pay_id );
+				$checkout = new Checkout_SDK();
+				$builder = $checkout->get_builder();
+				if ( $builder ) {
+					$payment_details_for_shipping = $builder->getPaymentsClient()->getPaymentDetails( $flow_pay_id );
+					$payment_session_id = isset( $payment_details_for_shipping['metadata']['cko_payment_session_id'] ) ? $payment_details_for_shipping['metadata']['cko_payment_session_id'] : '';
+					if ( ! empty( $payment_session_id ) ) {
+						WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] ✅ Payment session ID retrieved from payment metadata: ' . substr( $payment_session_id, 0, 20 ) . '...' );
+					} else {
+						WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] ⚠️ Payment session ID not found in payment metadata' );
+					}
+				}
+			} catch ( Exception $e ) {
+				WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] ⚠️ Could not fetch payment details to get payment session ID: ' . $e->getMessage() );
 			}
 		}
 	}
@@ -3272,9 +3390,15 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 									$order->set_payment_method( $this->id );
 									$order->set_payment_method_title( $this->get_title() );
 									
-									// Save payment session ID
+									// Save payment session ID (only if not already set)
 									if ( ! empty( $payment_session_id ) ) {
-										$order->update_meta_data( '_cko_payment_session_id', $payment_session_id );
+										$existing_order_session_id = $order->get_meta( '_cko_payment_session_id' );
+										if ( empty( $existing_order_session_id ) ) {
+											$order->update_meta_data( '_cko_payment_session_id', $payment_session_id );
+											WC_Checkoutcom_Utility::logger( '[3DS RETURN] Payment session ID saved to order (from session) - Order ID: ' . $order_id . ', Payment Session ID: ' . substr( $payment_session_id, 0, 20 ) . '...' );
+										} else {
+											WC_Checkoutcom_Utility::logger( '[3DS RETURN] Payment session ID already exists in order (from session) - Order ID: ' . $order_id . ', Existing Payment Session ID: ' . substr( $existing_order_session_id, 0, 20 ) . '..., New Payment Session ID: ' . substr( $payment_session_id, 0, 20 ) . '... (skipping save to prevent overwrite)' );
+										}
 									}
 									
 									// Store save card preference from GET parameter (if available in URL)
@@ -3409,7 +3533,14 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					// Save payment ID to order for reference
 					if ( ! empty( $payment_id ) ) {
 						$order->update_meta_data( '_cko_payment_id', $payment_id );
-						$order->update_meta_data( '_cko_flow_payment_id', $payment_id );
+						
+						// CRITICAL: Only set _cko_flow_payment_id if not already set (prevent overwriting)
+						$existing_flow_payment_id = $order->get_meta( '_cko_flow_payment_id' );
+						if ( empty( $existing_flow_payment_id ) ) {
+							$order->update_meta_data( '_cko_flow_payment_id', $payment_id );
+						} else {
+							WC_Checkoutcom_Utility::logger( '[3DS RETURN] Payment ID already exists in order (failed payment) - Order ID: ' . $order_id . ', Existing Payment ID: ' . substr( $existing_flow_payment_id, 0, 20 ) . '..., New Payment ID: ' . substr( $payment_id, 0, 20 ) . '... (skipping save to prevent overwrite)' );
+						}
 					}
 					
 					// Save order again after marking as failed
@@ -4134,7 +4265,14 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			
 			// Save payment IDs
 			$order->update_meta_data( '_cko_payment_id', $payment_id );
-			$order->update_meta_data( '_cko_flow_payment_id', $payment_id );
+			
+			// CRITICAL: Only set _cko_flow_payment_id if not already set (prevent overwriting)
+			$existing_flow_payment_id = $order->get_meta( '_cko_flow_payment_id' );
+			if ( empty( $existing_flow_payment_id ) ) {
+				$order->update_meta_data( '_cko_flow_payment_id', $payment_id );
+			} else {
+				WC_Checkoutcom_Utility::logger( '[CREATE MINIMAL ORDER] Payment ID already exists in order - Order ID: ' . $order_id . ', Existing Payment ID: ' . substr( $existing_flow_payment_id, 0, 20 ) . '..., New Payment ID: ' . substr( $payment_id, 0, 20 ) . '... (skipping save to prevent overwrite)' );
+			}
 			
 			// Mark as minimal order (created from payment details)
 			$order->update_meta_data( '_cko_minimal_order', 'yes' );
@@ -4659,6 +4797,9 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// This ensures webhook updates correct order and prevents matching completed orders
 		// Both identifiers must match - eliminates false positives and provides highest confidence match
 		if ( ! $order && ! empty( $data->data->metadata->cko_payment_session_id ) && ! empty( $data->data->id ) ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Trying METHOD 2 (COMBINED: Session ID + Payment ID)' );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Session ID: ' . $data->data->metadata->cko_payment_session_id );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Payment ID: ' . $data->data->id );
 			if ( $webhook_debug_enabled ) {
 				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Looking for order by COMBINED (session ID + payment ID)' );
 				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Session ID: ' . $data->data->metadata->cko_payment_session_id );
@@ -4666,16 +4807,19 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			}
 			
 			// First try to match orders that need updating (pending, failed, on-hold, processing)
+			// CRITICAL: Use 'compare' => '=' explicitly and ensure both meta keys exist
 			$orders = wc_get_orders( array(
 				'meta_query' => array(
 					'relation' => 'AND',
 					array(
-						'key'   => '_cko_payment_session_id',
-						'value' => $data->data->metadata->cko_payment_session_id,
+						'key'     => '_cko_payment_session_id',
+						'value'   => $data->data->metadata->cko_payment_session_id,
+						'compare' => '=',
 					),
 					array(
-						'key'   => '_cko_flow_payment_id',
-						'value' => $data->data->id,
+						'key'     => '_cko_flow_payment_id',
+						'value'   => $data->data->id,
+						'compare' => '=',
 					),
 				),
 				'status'     => array( 'pending', 'failed', 'on-hold', 'processing' ), // ✅ Only match orders that need updating
@@ -4692,12 +4836,14 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					'meta_query' => array(
 						'relation' => 'AND',
 						array(
-							'key'   => '_cko_payment_session_id',
-							'value' => $data->data->metadata->cko_payment_session_id,
+							'key'     => '_cko_payment_session_id',
+							'value'   => $data->data->metadata->cko_payment_session_id,
+							'compare' => '=',
 						),
 						array(
-							'key'   => '_cko_flow_payment_id',
-							'value' => $data->data->id,
+							'key'     => '_cko_flow_payment_id',
+							'value'   => $data->data->id,
+							'compare' => '=',
 						),
 					),
 					'limit'      => 1,
@@ -4706,24 +4852,48 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			}
 			
 			if ( ! empty( $orders ) ) {
-				$order = $orders[0];
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ✅ MATCHED BY METHOD 2 (COMBINED: Session ID + Payment ID) - Order ID: ' . $order->get_id() );
-				if ( $webhook_debug_enabled ) {
-					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: ✅ Order found by COMBINED match (ID: ' . $order->get_id() . ')' );
-				}
+				$matched_order = $orders[0];
 				
-				// Add order_id to metadata so processing functions can find it
-				if ( isset( $data->data->metadata ) && is_object( $data->data->metadata ) ) {
-					$data->data->metadata->order_id = $order->get_id();
+				// CRITICAL: Validate that BOTH meta values actually match (WooCommerce meta_query can match even if one meta key doesn't exist)
+				$order_session_id = $matched_order->get_meta( '_cko_payment_session_id' );
+				$order_payment_id = $matched_order->get_meta( '_cko_flow_payment_id' );
+				$webhook_session_id = $data->data->metadata->cko_payment_session_id;
+				$webhook_payment_id = $data->data->id;
+				
+				// Both must exist AND match
+				$session_id_matches = ! empty( $order_session_id ) && $order_session_id === $webhook_session_id;
+				$payment_id_matches = ! empty( $order_payment_id ) && $order_payment_id === $webhook_payment_id;
+				
+				if ( $session_id_matches && $payment_id_matches ) {
+					// Both match - valid match
+					$order = $matched_order;
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ✅ MATCHED BY METHOD 2 (COMBINED: Session ID + Payment ID) - Order ID: ' . $order->get_id() );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ✅ VALIDATION PASSED - Session ID matches: ' . $order_session_id . ', Payment ID matches: ' . $order_payment_id );
 					if ( $webhook_debug_enabled ) {
-						WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Set metadata order_id to: ' . $order->get_id() . ' (from COMBINED match)' );
+						WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: ✅ Order found by COMBINED match (ID: ' . $order->get_id() . ')' );
+					}
+					
+					// Add order_id to metadata so processing functions can find it
+					if ( isset( $data->data->metadata ) && is_object( $data->data->metadata ) ) {
+						$data->data->metadata->order_id = $order->get_id();
+						if ( $webhook_debug_enabled ) {
+							WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Set metadata order_id to: ' . $order->get_id() . ' (from COMBINED match)' );
+						}
+					} else {
+						// If metadata is missing or not an object, create it.
+						$data->data->metadata = (object) array( 'order_id' => $order->get_id() );
+						if ( $webhook_debug_enabled ) {
+							WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Created metadata object with order_id: ' . $order->get_id() . ' (from COMBINED match)' );
+						}
 					}
 				} else {
-					// If metadata is missing or not an object, create it.
-					$data->data->metadata = (object) array( 'order_id' => $order->get_id() );
-					if ( $webhook_debug_enabled ) {
-						WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Created metadata object with order_id: ' . $order->get_id() . ' (from COMBINED match)' );
-					}
+					// Query matched but validation failed - reject this match
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ❌ METHOD 2 VALIDATION FAILED - Query matched Order ID: ' . $matched_order->get_id() . ' but values don\'t match!' );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Order Session ID: ' . ( $order_session_id ?: 'NOT SET' ) . ', Webhook Session ID: ' . $webhook_session_id );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Order Payment ID: ' . ( $order_payment_id ?: 'NOT SET' ) . ', Webhook Payment ID: ' . $webhook_payment_id );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Session ID matches: ' . ( $session_id_matches ? 'YES' : 'NO' ) . ', Payment ID matches: ' . ( $payment_id_matches ? 'YES' : 'NO' ) );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ❌ REJECTING INVALID MATCH - Continuing to Method 3' );
+					// Don't set $order - continue to Method 3
 				}
 			} else {
 				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ❌ METHOD 2 FAILED - No order found by COMBINED match (Session ID: ' . $webhook_session_id . ', Payment ID: ' . $webhook_payment_id . ')' );
@@ -4846,22 +5016,48 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Payment ID from webhook: ' . ($data->data->id ?? 'NULL') );
 		}
 
-		// For Flow payments, be more flexible with payment ID matching
-		// Flow payments might not have payment ID set yet, or might have different ID format
-		if ( $order && is_null( $payment_id ) ) {
-			// If no payment ID is set, try to set it from the webhook
-			if ( $webhook_debug_enabled ) {
-				WC_Checkoutcom_Utility::logger( 'Flow webhook: No payment ID found in order, setting from webhook: ' . $data->data->id );
+		// CRITICAL: Validate payment ID matches order (prevent wrong webhooks from matching orders)
+		// This validation happens BEFORE processing webhook events
+		if ( $order ) {
+			$order_payment_id = $order->get_meta( '_cko_flow_payment_id' );
+			$order_payment_id_alt = $order->get_meta( '_cko_payment_id' );
+			$webhook_payment_id = $data->data->id;
+			
+			// Use Flow payment ID if available, otherwise fall back to regular payment ID
+			$expected_payment_id = ! empty( $order_payment_id ) ? $order_payment_id : $order_payment_id_alt;
+			
+			// CRITICAL: If order has a payment ID, it MUST match the webhook payment ID
+			if ( ! empty( $expected_payment_id ) && $expected_payment_id !== $webhook_payment_id ) {
+				// Payment ID mismatch - reject webhook BEFORE processing
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ❌ CRITICAL ERROR - Payment ID mismatch in Flow webhook handler!' );
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Order ID: ' . $order->get_id() );
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Order _cko_flow_payment_id: ' . ( $order_payment_id ?: 'NOT SET' ) );
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Order _cko_payment_id: ' . ( $order_payment_id_alt ?: 'NOT SET' ) );
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Expected payment ID: ' . $expected_payment_id );
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Webhook payment ID: ' . $webhook_payment_id );
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ❌ REJECTING WEBHOOK - Payment ID does not match order!' );
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: This webhook is for a different payment - ignoring to prevent incorrect order updates' );
+				
+				// Reject webhook - return HTTP 200 but don't process
+				$this->send_response( 200, 'Webhook payment ID does not match order payment ID' );
+				return;
 			}
-			$order->set_transaction_id( $data->data->id );
-			$order->update_meta_data( '_cko_payment_id', $data->data->id );
-			$order->update_meta_data( '_cko_flow_payment_id', $data->data->id );
-			$order->save();
-			$payment_id = $data->data->id;
-		} elseif ( $order && $payment_id !== $data->data->id ) {
-			// Payment ID exists but doesn't match - log but don't fail for Flow payments
-			if ( $webhook_debug_enabled ) {
-				WC_Checkoutcom_Utility::logger( 'Flow webhook: Payment ID mismatch - Order: ' . $payment_id . ', Webhook: ' . $data->data->id . ' - Continuing processing' );
+			
+			// If order doesn't have payment ID yet, set it from webhook (for first payment attempt)
+			if ( empty( $expected_payment_id ) && ! empty( $webhook_payment_id ) ) {
+				if ( $webhook_debug_enabled ) {
+					WC_Checkoutcom_Utility::logger( 'Flow webhook: No payment ID found in order, setting from webhook: ' . $webhook_payment_id );
+				}
+				$order->set_transaction_id( $webhook_payment_id );
+				$order->update_meta_data( '_cko_payment_id', $webhook_payment_id );
+				$order->update_meta_data( '_cko_flow_payment_id', $webhook_payment_id );
+				$order->save();
+				$payment_id = $webhook_payment_id;
+			} elseif ( ! empty( $expected_payment_id ) ) {
+				// Payment IDs match - continue processing
+				if ( $webhook_debug_enabled ) {
+					WC_Checkoutcom_Utility::logger( 'Flow webhook: ✅ Payment ID validation passed - Order payment ID: ' . $expected_payment_id . ', Webhook payment ID: ' . $webhook_payment_id );
+				}
 			}
 		} elseif ( ! $order ) {
 			// No order found - log but continue processing to allow queue system to handle it
@@ -5609,19 +5805,29 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			return;
 		}
 		
-		// Check if payment session ID already saved (avoid duplicate saves)
+		// CRITICAL: Check if payment session ID already saved (prevent overwriting)
 		$existing_payment_session_id = $order->get_meta( '_cko_payment_session_id' );
 		
-		if ( ! empty( $existing_payment_session_id ) && $existing_payment_session_id === $payment_session_id ) {
-			// Already saved, return success
-			wp_send_json_success( array(
-				'message' => __( 'Payment session ID already saved.', 'checkout-com-unified-payments-api' ),
-				'order_id' => $order_id,
-			) );
-			return;
+		if ( ! empty( $existing_payment_session_id ) ) {
+			if ( $existing_payment_session_id === $payment_session_id ) {
+				// Already saved with same value, return success
+				wp_send_json_success( array(
+					'message' => __( 'Payment session ID already saved.', 'checkout-com-unified-payments-api' ),
+					'order_id' => $order_id,
+				) );
+				return;
+			} else {
+				// Different payment session ID exists - prevent overwriting
+				WC_Checkoutcom_Utility::logger( '[SAVE PAYMENT SESSION ID] ❌ CRITICAL ERROR: Payment session ID already exists with different value - Order ID: ' . $order_id . ', Existing: ' . substr( $existing_payment_session_id, 0, 20 ) . '..., New: ' . substr( $payment_session_id, 0, 20 ) . '... (preventing overwrite)' );
+				wp_send_json_error( array(
+					'message' => __( 'Payment session ID already exists with different value. Cannot overwrite.', 'checkout-com-unified-payments-api' ),
+					'order_id' => $order_id,
+				) );
+				return;
+			}
 		}
 		
-		// Save payment session ID to order
+		// Save payment session ID to order (order doesn't have it yet)
 		$order->update_meta_data( '_cko_payment_session_id', $payment_session_id );
 		$order->save();
 		

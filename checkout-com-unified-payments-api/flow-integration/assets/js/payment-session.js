@@ -227,14 +227,16 @@ var ckoFlow = {
 
 		let reference = "WOO" + (cko_flow_vars.ref_session || 'default');
 
+		// CRITICAL: Check if billing_address exists before accessing properties
+		const billingAddress = cartInfo["billing_address"] || {};
 		let email =
-			cartInfo["billing_address"]["email"] ||
+			billingAddress["email"] ||
 			(document.getElementById("billing_email") ? document.getElementById("billing_email").value : '');
 		let family_name =
-			cartInfo["billing_address"]["family_name"] ||
+			billingAddress["family_name"] ||
 			(document.getElementById("billing_last_name") ? document.getElementById("billing_last_name").value : '');
 		let given_name =
-			cartInfo["billing_address"]["given_name"] ||
+			billingAddress["given_name"] ||
 			(document.getElementById("billing_first_name") ? document.getElementById("billing_first_name").value : '');
 		
 		// CRITICAL: Validate email before proceeding - prevent API call with invalid email
@@ -255,23 +257,25 @@ var ckoFlow = {
 		// Trim email to remove whitespace
 		email = email.trim();
 		let phone =
-			cartInfo["billing_address"]["phone"] ||
+			billingAddress["phone"] ||
 			(document.getElementById("billing_phone") ? document.getElementById("billing_phone").value : '');
 
-		let address1 = shippingAddress1 = cartInfo["billing_address"]["street_address"];
-		let address2 = shippingAddress2 = cartInfo["billing_address"]["street_address2"];
-		let city = shippingCity = cartInfo["billing_address"]["city"];
-		let zip = shippingZip = cartInfo["billing_address"]["postal_code"];
-		let country = shippingCountry = cartInfo["billing_address"]["country"];
+		let address1 = shippingAddress1 = billingAddress["street_address"] || '';
+		let address2 = shippingAddress2 = billingAddress["street_address2"] || '';
+		let city = shippingCity = billingAddress["city"] || '';
+		let zip = shippingZip = billingAddress["postal_code"] || '';
+		let country = shippingCountry = billingAddress["country"] || '';
 			
 
 		let shippingElement = document.getElementById("ship-to-different-address-checkbox");
 		if ( shippingElement?.checked ) {
-			shippingAddress1 = cartInfo["shipping_address"]["street_address"];
-			shippingAddress2 = cartInfo["shipping_address"]["street_address2"];
-			shippingCity = cartInfo["shipping_address"]["city"];
-			shippingZip = cartInfo["shipping_address"]["postal_code"];
-			shippingCountry = cartInfo["shipping_address"]["country"];
+			// CRITICAL: Check if shipping_address exists before accessing properties
+			const shippingAddress = cartInfo["shipping_address"] || {};
+			shippingAddress1 = shippingAddress["street_address"] || address1;
+			shippingAddress2 = shippingAddress["street_address2"] || address2;
+			shippingCity = shippingAddress["city"] || city;
+			shippingZip = shippingAddress["postal_code"] || zip;
+			shippingCountry = shippingAddress["country"] || country;
 		}
 
 		let orders = cartInfo["order_lines"];
@@ -1154,17 +1158,166 @@ var ckoFlow = {
 				jQuery("#cko-flow-payment-id").val(paymentResponse.id);
 				jQuery("#cko-flow-payment-type").val(paymentResponse?.type || "");
 
-				if ( ! orderId ) {
-					// Trigger WooCommerce order placement on checkout page.
+				// Check if this is an APM payment (Alternative Payment Method)
+				// APM payments should submit form normally instead of redirecting
+				// This is because handle_3ds_return() tries to fetch payment details which may fail for APM
+				const paymentType = paymentResponse?.type || "";
+				const isAPMPayment = paymentType && !['card', ''].includes(paymentType.toLowerCase());
+				const apmTypes = ['googlepay', 'applepay', 'paypal', 'octopus', 'twint', 'klarna', 'sofort', 'ideal', 'giropay', 'bancontact', 'eps', 'p24', 'knet', 'fawry', 'qpay', 'multibanco', 'stcpay', 'alipay', 'wechatpay'];
+				const isKnownAPM = apmTypes.includes(paymentType.toLowerCase());
+				
+				ckoLogger.debug('[PAYMENT COMPLETED] Payment type check:', {
+					paymentType: paymentType,
+					isAPMPayment: isAPMPayment,
+					isKnownAPM: isKnownAPM
+				});
+
+				// CRITICAL: Check form field for order ID (set by createOrderBeforePayment())
+				// Don't use orderId from loadFlow() scope - it's only set for order-pay pages
+				const formOrderId = jQuery('input[name="order_id"]').val();
+				const sessionOrderId = sessionStorage.getItem('cko_flow_order_id');
+				const hasOrderId = formOrderId || sessionOrderId || orderId; // orderId is fallback for order-pay pages
+				
+				ckoLogger.debug('[PAYMENT COMPLETED] Order ID check:', {
+					formOrderId: formOrderId || 'NOT SET',
+					sessionOrderId: sessionOrderId || 'NOT SET',
+					loadFlowOrderId: orderId || 'NOT SET',
+					hasOrderId: !!hasOrderId
+				});
+
+				if ( ! hasOrderId ) {
+					// No order exists - trigger WooCommerce order placement on checkout page.
+					ckoLogger.debug('[PAYMENT COMPLETED] No order ID found - submitting form to create order');
+					
+					// CRITICAL: Ensure payment session ID is in form before submitting
+					// This ensures payment_session_id is saved to order metadata
+					const existingSessionIdField = document.getElementById('cko-flow-payment-session-id');
+					const existingSessionIdValue = existingSessionIdField ? existingSessionIdField.value : '';
+					
+					if (!existingSessionIdField || !existingSessionIdValue) {
+						if (window.ckoAddPaymentSessionIdField) {
+							const added = window.ckoAddPaymentSessionIdField();
+							if (added) {
+								ckoLogger.debug('[PAYMENT COMPLETED] Payment session ID added to form before submission (no order ID)');
+							} else if (window.currentPaymentSessionId) {
+								// Fallback: Try to manually add
+								const checkoutForm = document.querySelector('form.checkout');
+								if (checkoutForm) {
+									const manualField = document.createElement('input');
+									manualField.type = 'hidden';
+									manualField.id = 'cko-flow-payment-session-id';
+									manualField.name = 'cko-flow-payment-session-id';
+									manualField.value = window.currentPaymentSessionId;
+									checkoutForm.appendChild(manualField);
+									ckoLogger.debug('[PAYMENT COMPLETED] Payment session ID manually added (fallback)');
+								}
+							}
+						} else if (window.currentPaymentSessionId) {
+							// Fallback: Try to manually add if function not available
+							const checkoutForm = document.querySelector('form.checkout');
+							if (checkoutForm) {
+								const manualField = document.createElement('input');
+								manualField.type = 'hidden';
+								manualField.id = 'cko-flow-payment-session-id';
+								manualField.name = 'cko-flow-payment-session-id';
+								manualField.value = window.currentPaymentSessionId;
+								checkoutForm.appendChild(manualField);
+								ckoLogger.debug('[PAYMENT COMPLETED] Payment session ID manually added (no function available)');
+							}
+						}
+					}
+					
 					jQuery("form.checkout").submit();
 				} else {
+					// Order already exists (created via AJAX)
+					const orderIdToUse = formOrderId || sessionOrderId || orderId;
+					
+					// For APM payments, always submit form instead of redirecting
+					// This prevents payment details fetch errors in handle_3ds_return()
+					if (isKnownAPM || isAPMPayment) {
+						ckoLogger.debug('[PAYMENT COMPLETED] APM payment detected (' + paymentType + ') - submitting form instead of redirecting');
+						
+						// CRITICAL: Ensure payment session ID is in form before submitting
+						// This ensures payment_session_id is saved to order metadata
+						const existingSessionIdField = document.getElementById('cko-flow-payment-session-id');
+						const existingSessionIdValue = existingSessionIdField ? existingSessionIdField.value : '';
+						
+						ckoLogger.debug('[PAYMENT COMPLETED] Payment session ID check:', {
+							hasExistingField: !!existingSessionIdField,
+							existingValue: existingSessionIdValue || 'EMPTY',
+							hasWindowFunction: !!window.ckoAddPaymentSessionIdField,
+							hasWindowSessionId: !!window.currentPaymentSessionId,
+							windowSessionId: window.currentPaymentSessionId || 'NOT SET'
+						});
+						
+						// If field doesn't exist or is empty, try to add it
+						if (!existingSessionIdField || !existingSessionIdValue) {
+							if (window.ckoAddPaymentSessionIdField) {
+								const added = window.ckoAddPaymentSessionIdField();
+								if (added) {
+									ckoLogger.debug('[PAYMENT COMPLETED] Payment session ID added to form before APM submission');
+								} else {
+									ckoLogger.warn('[PAYMENT COMPLETED] Failed to add payment session ID to form - window.currentPaymentSessionId: ' + (window.currentPaymentSessionId || 'NOT SET'));
+									
+									// Fallback: Try to manually add if we have the session ID
+									if (window.currentPaymentSessionId) {
+										const checkoutForm = document.querySelector('form.checkout');
+										if (checkoutForm) {
+											const manualField = document.createElement('input');
+											manualField.type = 'hidden';
+											manualField.id = 'cko-flow-payment-session-id';
+											manualField.name = 'cko-flow-payment-session-id';
+											manualField.value = window.currentPaymentSessionId;
+											checkoutForm.appendChild(manualField);
+											ckoLogger.debug('[PAYMENT COMPLETED] Payment session ID manually added to form (fallback)');
+										}
+									}
+								}
+							} else {
+								ckoLogger.warn('[PAYMENT COMPLETED] window.ckoAddPaymentSessionIdField not available');
+								
+								// Fallback: Try to manually add if we have the session ID
+								if (window.currentPaymentSessionId) {
+									const checkoutForm = document.querySelector('form.checkout');
+									if (checkoutForm) {
+										const manualField = document.createElement('input');
+										manualField.type = 'hidden';
+										manualField.id = 'cko-flow-payment-session-id';
+										manualField.name = 'cko-flow-payment-session-id';
+										manualField.value = window.currentPaymentSessionId;
+										checkoutForm.appendChild(manualField);
+										ckoLogger.debug('[PAYMENT COMPLETED] Payment session ID manually added to form (fallback - no function)');
+									}
+								} else {
+									ckoLogger.error('[PAYMENT COMPLETED] CRITICAL: Payment session ID cannot be added - window.currentPaymentSessionId is not set!');
+								}
+							}
+						} else {
+							ckoLogger.debug('[PAYMENT COMPLETED] Payment session ID already in form: ' + existingSessionIdValue.substring(0, 20) + '...');
+						}
+						
+						jQuery("form.checkout").submit();
+						return;
+					}
+					
+					ckoLogger.debug('[PAYMENT COMPLETED] Order already exists (ID: ' + orderIdToUse + ') - redirecting to process payment endpoint');
+					
 					// For order-pay pages, use native DOM submit to bypass event handlers
-					ckoLogger.threeDS('Submitting order-pay form using native submit after payment completion');
-					const orderPayForm = document.querySelector('form#order_review');
-					if (orderPayForm) {
-						orderPayForm.submit();
+					if (orderId && window.location.pathname.includes('/order-pay/')) {
+						ckoLogger.threeDS('Submitting order-pay form using native submit after payment completion');
+						const orderPayForm = document.querySelector('form#order_review');
+						if (orderPayForm) {
+							orderPayForm.submit();
+						} else {
+							ckoLogger.error('ERROR: form#order_review not found!');
+						}
 					} else {
-						ckoLogger.error('ERROR: form#order_review not found!');
+						// For regular checkout with card payments, redirect to process payment endpoint with order ID and payment ID
+						// This ensures process_payment() is called with the existing order
+						// CRITICAL: handle_3ds_return() requires cko-payment-id in GET params
+						const redirectUrl = window.location.origin + '/?wc-api=wc_checkoutcom_flow_process&order_id=' + orderIdToUse + '&cko-payment-id=' + paymentResponse.id;
+						ckoLogger.debug('[PAYMENT COMPLETED] Redirecting to process payment endpoint: ' + redirectUrl);
+						window.location.href = redirectUrl;
 					}
 				}
 			}
