@@ -48,6 +48,101 @@ var ckoLogger = {
  * CRITICAL: Early 3DS Detection - MUST run before any other code
  * This prevents Flow from initializing during 3DS returns
  */
+
+/**
+ * TERMS CHECKBOX FIX: Prevent page reload when terms checkbox is clicked
+ * 
+ * Strategy: Intercept checkbox change events in CAPTURE phase BEFORE WooCommerce handlers run
+ * This prevents WooCommerce from triggering update_checkout for terms checkboxes
+ */
+
+/**
+ * Helper function to detect if an element is a terms/agreement checkbox
+ * Works generically for any terms checkbox regardless of ID/name/class
+ * Defined globally so it's accessible in updated_checkout handler
+ */
+function isTermsCheckbox(element) {
+	if (!element || element.type !== 'checkbox') {
+		return false;
+	}
+	
+	const $element = jQuery(element);
+	const id = (element.id || '').toLowerCase();
+	const name = (element.name || '').toLowerCase();
+	const className = (element.className || '').toLowerCase();
+	
+	// Check ID/name patterns
+	if (id.includes('terms') || id.includes('agree') || id.includes('policy') ||
+	    name.includes('terms') || name.includes('agree') || name.includes('policy')) {
+		return true;
+	}
+	
+	// Check for WooCommerce terms wrapper classes
+	if ($element.closest('.woocommerce-terms-and-conditions-wrapper').length > 0 ||
+	    $element.closest('.woocommerce-terms-and-conditions-checkbox-text').length > 0 ||
+	    $element.closest('.terms-wrapper').length > 0) {
+		return true;
+	}
+	
+	// Check label text for agreement phrases
+	const label = $element.closest('label');
+	if (label.length) {
+		const labelText = label.text().toLowerCase();
+		const agreementPhrases = [
+			'read and agree', 'read and accept', 'agree to', 'agree with',
+			'accept the', 'accept our', 'terms and conditions', 'terms & conditions',
+			'i agree', 'i accept', 'agree me'
+		];
+		if (agreementPhrases.some(phrase => labelText.includes(phrase))) {
+			return true;
+		}
+	}
+	
+	return false;
+}
+
+(function() {
+	/**
+	 * Track last clicked element to detect if update_checkout was triggered by terms checkbox
+	 * This allows us to prevent update_checkout without interfering with checkbox functionality
+	 * Using global variables so they're accessible in updated_checkout handler
+	 */
+	window.ckoTermsCheckboxLastClicked = null;
+	window.ckoTermsCheckboxLastClickTime = 0;
+	
+	// Track clicks on checkboxes (but don't interfere with them)
+	document.addEventListener('click', function(e) {
+		if (e.target.type === 'checkbox' && isTermsCheckbox(e.target)) {
+			window.ckoTermsCheckboxLastClicked = e.target;
+			window.ckoTermsCheckboxLastClickTime = Date.now();
+			ckoLogger.debug('Terms checkbox clicked - tracking for update_checkout prevention', {
+				elementId: e.target.id || 'no-id',
+				elementName: e.target.name || 'no-name'
+			});
+		}
+	}, true); // Capture phase to track early
+	
+	// Track change events (but don't interfere - allow checkbox to work normally)
+	document.addEventListener('change', function(e) {
+		if (e.target.type === 'checkbox' && isTermsCheckbox(e.target)) {
+			// Update tracking but don't stop propagation - allow checkbox to work normally
+			window.ckoTermsCheckboxLastClicked = e.target;
+			window.ckoTermsCheckboxLastClickTime = Date.now();
+			ckoLogger.debug('Terms checkbox changed - tracking for update_checkout prevention', {
+				elementId: e.target.id || 'no-id',
+				elementName: e.target.name || 'no-name'
+			});
+		}
+	}, true);
+	
+	// Clear tracking after a delay (update_checkout might fire asynchronously)
+	setInterval(function() {
+		const timeSinceLastClick = Date.now() - window.ckoTermsCheckboxLastClickTime;
+		if (timeSinceLastClick > 2000) { // Clear after 2 seconds
+			window.ckoTermsCheckboxLastClicked = null;
+		}
+	}, 500);
+})();
 (function() {
 	// Check URL parameters immediately (before any other code runs)
 	const urlParams = new URLSearchParams(window.location.search);
@@ -3014,8 +3109,34 @@ function handleFlowPaymentSelection() {
 // Track previous cart total for change detection
 let previousCartTotal = typeof cko_flow_vars !== 'undefined' && cko_flow_vars.cart_total ? parseFloat(cko_flow_vars.cart_total) : 0;
 
-jQuery(document).on("updated_checkout", function () {
+jQuery(document).on("updated_checkout", function (event) {
 	ckoLogger.debug('===== updated_checkout EVENT FIRED =====');
+	
+	// CRITICAL: Prevent update_checkout if it was triggered by a terms checkbox
+	// Check if the last clicked/changed element was a terms checkbox
+	// This prevents page reload while allowing checkbox to work normally
+	const activeElement = document.activeElement;
+	const lastClicked = window.ckoTermsCheckboxLastClicked;
+	const isTermsTriggered = 
+		(lastClicked && isTermsCheckbox(lastClicked)) ||
+		(activeElement && isTermsCheckbox(activeElement));
+	
+	if (isTermsTriggered) {
+		ckoLogger.debug('updated_checkout triggered by terms checkbox - preventing page reload', {
+			lastClickedId: lastClicked ? (lastClicked.id || 'no-id') : 'none',
+			activeElementId: activeElement ? (activeElement.id || 'no-id') : 'none'
+		});
+		
+		// Stop the event to prevent page reload
+		event.stopImmediatePropagation();
+		event.preventDefault();
+		
+		// Clear tracking
+		window.ckoTermsCheckboxLastClicked = null;
+		
+		// Exit early - don't process updated_checkout
+		return false;
+	}
 	
 	// Log field values BEFORE DOM update
 	const emailBefore = getCheckoutFieldValue("billing_email");
@@ -4366,14 +4487,16 @@ jQuery(function ($) {
 	});
 
 	// Attach to all other inputs/selects, excluding the key billing fields above.
+	// EXCLUDE CHECKBOXES - they don't need to trigger Flow updates and cause form reload issues
 	$(
-		"input:not(#billing_first_name, #billing_last_name, #billing_email, #billing_phone), select"
+		"input:not(#billing_first_name, #billing_last_name, #billing_email, #billing_phone):not([type='checkbox']), select"
 	).on("input change", function (e) {
 		debouncedTyping(e);
 	});
 
 	// Attach handler to all input/selects, but ignore payment method fields.
-	$(document).on("input change", "input, select", function (e) {
+	// EXCLUDE CHECKBOXES - they don't need to trigger Flow updates and cause form reload issues
+	$(document).on("input change", "input:not([type='checkbox']), select", function (e) {
 		if ($(this).closest(".wc_payment_method").length === 0) {
 			
 			debouncedTyping(e);
@@ -4385,6 +4508,19 @@ jQuery(function ($) {
 			debouncedTyping(e);
 			virtual = true;
 		}
+	});
+	
+	// Handle checkboxes that legitimately need to trigger update_checkout
+	// These checkboxes change the checkout form structure (shipping fields, account creation)
+	// Note: Terms checkboxes are handled separately above and do NOT trigger update_checkout
+	jQuery(document).on('change', '#ship-to-different-address-checkbox, #createaccount', function() {
+		ckoLogger.debug('Checkbox change detected - triggering update_checkout', {
+			checkboxId: this.id,
+			checked: this.checked
+		});
+		// These checkboxes legitimately need to trigger update_checkout
+		// They show/hide form fields that require checkout refresh
+		jQuery('body').trigger('update_checkout');
 	});
 	
 	// Watch country field specifically for Flow reload
