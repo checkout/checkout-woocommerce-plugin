@@ -273,6 +273,7 @@ class WC_Checkoutcom_Api_Request {
 			$payment_option = 'PayPal';
 
 			$method = new RequestPayPalSource();
+			$method->invoice_number = $order->get_id();
 
 <<<<<<< HEAD
 =======
