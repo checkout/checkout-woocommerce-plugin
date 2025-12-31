@@ -3210,6 +3210,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 									// If payment_session_id in URL doesn't match existing order, create new order
 									// This ensures every payment session (request to Checkout.com) has corresponding order
 									$payment_amount = isset( $payment_details['amount'] ) ? $payment_details['amount'] : 0;
+									$payment_currency = isset( $payment_details['currency'] ) ? $payment_details['currency'] : '';
 									foreach ( $orders_by_email as $potential_order ) {
 										$potential_order_status = $potential_order->get_status();
 										// Double-check status (should already be filtered, but be safe)
@@ -3240,7 +3241,11 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 											continue; // Skip this order, check next one
 										}
 										
-										$order_amount = (int) round( $potential_order->get_total() * 100 ); // Convert to cents
+										// CRITICAL FIX: Use utility function to convert order total to currency subunit format
+										// This handles zero-decimal (JPY, ISK, UGX), three-decimal (BHD, KWD), and two-decimal (USD, EUR) currencies correctly
+										$potential_order_currency = $potential_order->get_currency();
+										$order_total_decimal = (float) $potential_order->get_total();
+										$order_amount = (int) WC_Checkoutcom_Utility::value_to_decimal( $order_total_decimal, $potential_order_currency );
 										if ( $order_amount === $payment_amount ) {
 											$order = $potential_order;
 											$order_id = $order->get_id();
@@ -3633,13 +3638,16 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		}
 		
 		if ( ! $payment_already_processed && ! empty( $payment_details ) && isset( $payment_details['amount'] ) && $order ) {
-			$payment_amount_cents = (int) $payment_details['amount'];
-			$order_total_cents = (int) round( $order->get_total() * 100 ); // Convert to cents
-			$currency = isset( $payment_details['currency'] ) ? $payment_details['currency'] : '';
+			$payment_amount_subunits = (int) $payment_details['amount']; // Already in currency subunit format from API
 			$order_currency = $order->get_currency();
+			$order_total_decimal = (float) $order->get_total();
+			// CRITICAL FIX: Use utility function to convert order total to currency subunit format
+			// This handles zero-decimal (JPY, ISK, UGX), three-decimal (BHD, KWD), and two-decimal (USD, EUR) currencies correctly
+			$order_total_subunits = (int) WC_Checkoutcom_Utility::value_to_decimal( $order_total_decimal, $order_currency );
+			$currency = isset( $payment_details['currency'] ) ? $payment_details['currency'] : '';
 			
 			if ( $is_debug ) {
-				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] [SECURITY] Validating payment amount - Payment: ' . $payment_amount_cents . ' cents, Order: ' . $order_total_cents . ' cents' );
+				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] [SECURITY] Validating payment amount - Payment: ' . $payment_amount_subunits . ' subunits (' . $order_currency . '), Order: ' . $order_total_subunits . ' subunits (decimal: ' . $order_total_decimal . ')' );
 			}
 			
 			// Check currency match first
@@ -3655,13 +3663,20 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				exit;
 			}
 			
-			// Check amount match (allow 1 cent difference for rounding)
-			if ( abs( $payment_amount_cents - $order_total_cents ) > 1 ) {
-				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] [SECURITY] ERROR: Payment amount (' . $payment_amount_cents . ' cents) does not match order total (' . $order_total_cents . ' cents). Possible cart manipulation attack.' );
+			// Check amount match (allow 1 subunit difference for rounding)
+			// For zero-decimal currencies, this allows 1 unit difference
+			// For two-decimal currencies, this allows 1 cent difference
+			// For three-decimal currencies, this allows 1 mill difference
+			if ( abs( $payment_amount_subunits - $order_total_subunits ) > 1 ) {
+				// Convert back to decimal for error message display
+				$payment_amount_display = WC_Checkoutcom_Utility::decimal_to_value( $payment_amount_subunits, $order_currency );
+				$order_total_display = WC_Checkoutcom_Utility::decimal_to_value( $order_total_subunits, $order_currency );
+				
+				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] [SECURITY] ERROR: Payment amount (' . $payment_amount_subunits . ' subunits = ' . $payment_amount_display . ' ' . $order_currency . ') does not match order total (' . $order_total_subunits . ' subunits = ' . $order_total_display . ' ' . $order_currency . '). Possible cart manipulation attack.' );
 				
 				// Mark order as failed due to security check - webhooks should NOT process this
 				$order->update_meta_data( '_cko_security_check_failed', 'amount_mismatch' );
-				$order->update_status( 'failed', sprintf( __( 'Payment security check failed: Amount mismatch. Payment amount (%s) does not match order total (%s). Cart may have been modified during payment.', 'checkout-com-unified-payments-api' ), wc_price( $payment_amount_cents / 100, array( 'currency' => $order_currency ) ), wc_price( $order_total_cents / 100, array( 'currency' => $order_currency ) ) ) );
+				$order->update_status( 'failed', sprintf( __( 'Payment security check failed: Amount mismatch. Payment amount (%s) does not match order total (%s). Cart may have been modified during payment.', 'checkout-com-unified-payments-api' ), wc_price( $payment_amount_display, array( 'currency' => $order_currency ) ), wc_price( $order_total_display, array( 'currency' => $order_currency ) ) ) );
 				$order->save();
 				WC_Checkoutcom_Utility::wc_add_notice_self( __( 'Security check failed: Payment amount does not match order total. Your cart may have been modified during payment. Please try again.', 'checkout-com-unified-payments-api' ), 'error' );
 				wp_safe_redirect( wc_get_checkout_url() );
@@ -4051,7 +4066,11 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			if ( $is_shipping ) {
 				$shipping_items_found++;
 				$shipping_name = ! empty( $item_name ) ? $item_name : __( 'Shipping', 'checkout-com-unified-payments-api' );
-				$shipping_total = isset( $item_data['total_amount'] ) ? ( $item_data['total_amount'] / 100 ) : 0; // Convert from cents
+				// CRITICAL FIX: Use utility function to convert from currency subunit to decimal
+				// This handles zero-decimal (JPY, ISK, UGX), three-decimal (BHD, KWD), and two-decimal (USD, EUR) currencies correctly
+				$order_currency = $order->get_currency();
+				$shipping_amount_subunits = isset( $item_data['total_amount'] ) ? (int) $item_data['total_amount'] : 0;
+				$shipping_total = $shipping_amount_subunits > 0 ? WC_Checkoutcom_Utility::decimal_to_value( $shipping_amount_subunits, $order_currency ) : 0;
 				$shipping_reference = ! empty( $item_reference ) ? $item_reference : 'flat_rate';
 				
 				if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
@@ -4099,14 +4118,16 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				$customer_name = $payment_details['customer']['name'];
 			}
 			
-			// Extract amount (convert from cents to major currency)
+			// Extract currency first (needed for amount conversion)
+			$currency = isset( $payment_details['currency'] ) ? $payment_details['currency'] : get_woocommerce_currency();
+			
+			// CRITICAL FIX: Use utility function to convert from currency subunit to decimal
+			// This handles zero-decimal (JPY, ISK, UGX), three-decimal (BHD, KWD), and two-decimal (USD, EUR) currencies correctly
 			$amount = 0;
 			if ( isset( $payment_details['amount'] ) ) {
-				$amount = $payment_details['amount'] / 100; // Convert from cents
+				$amount_subunits = (int) $payment_details['amount'];
+				$amount = WC_Checkoutcom_Utility::decimal_to_value( $amount_subunits, $currency );
 			}
-			
-			// Extract currency
-			$currency = isset( $payment_details['currency'] ) ? $payment_details['currency'] : get_woocommerce_currency();
 			
 			// Create order
 			$order = wc_create_order( array( 'customer_id' => $customer_id ) );
@@ -4221,7 +4242,11 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 						// Add shipping item
 						$shipping_item = new WC_Order_Item_Shipping();
 						$shipping_name = ! empty( $item_name ) ? $item_name : __( 'Shipping', 'checkout-com-unified-payments-api' );
-						$shipping_total = isset( $item_data['total_amount'] ) ? ( $item_data['total_amount'] / 100 ) : 0; // Convert from cents
+						// CRITICAL FIX: Use utility function to convert from currency subunit to decimal
+						// This handles zero-decimal (JPY, ISK, UGX), three-decimal (BHD, KWD), and two-decimal (USD, EUR) currencies correctly
+						$order_currency = $order->get_currency();
+						$shipping_amount_subunits = isset( $item_data['total_amount'] ) ? (int) $item_data['total_amount'] : 0;
+						$shipping_total = $shipping_amount_subunits > 0 ? WC_Checkoutcom_Utility::decimal_to_value( $shipping_amount_subunits, $order_currency ) : 0;
 						
 						$shipping_item->set_props( array(
 							'method_title' => $shipping_name,
@@ -4233,7 +4258,11 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					} else {
 						// Add product item
 						$product_name = isset( $item_data['name'] ) ? $item_data['name'] : __( 'Product', 'checkout-com-unified-payments-api' );
-						$product_total = isset( $item_data['total_amount'] ) ? ( $item_data['total_amount'] / 100 ) : 0; // Convert from cents
+						// CRITICAL FIX: Use utility function to convert from currency subunit to decimal
+						// This handles zero-decimal (JPY, ISK, UGX), three-decimal (BHD, KWD), and two-decimal (USD, EUR) currencies correctly
+						$order_currency = $order->get_currency();
+						$product_amount_subunits = isset( $item_data['total_amount'] ) ? (int) $item_data['total_amount'] : 0;
+						$product_total = $product_amount_subunits > 0 ? WC_Checkoutcom_Utility::decimal_to_value( $product_amount_subunits, $order_currency ) : 0;
 						$product_quantity = isset( $item_data['quantity'] ) ? $item_data['quantity'] : 1;
 						
 						$product_item = new WC_Order_Item_Fee();
@@ -4520,23 +4549,18 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	 * @return bool
 	 */
 	public function process_refund( $order_id, $amount = null, $reason = '' ) {
-		WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Flow gateway process_refund called for order $order_id, amount: $amount, reason: $reason" );
-		
 		$order  = wc_get_order( $order_id );
-		WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Order loaded. Payment method: " . $order->get_payment_method() );
 		
 		$result = (array) WC_Checkoutcom_Api_Request::refund_payment( $order_id, $order );
-		WC_Checkoutcom_Utility::logger( "REFUND DEBUG: API refund result: " . print_r( $result, true ) );
 
 		// check if result has error and return error message.
 		if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {
-			WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Error in refund result: " . $result['error'] );
+			WC_Checkoutcom_Utility::logger( '[FLOW ERROR] Refund failed for order ' . $order_id . ': ' . $result['error'] );
 			WC_Checkoutcom_Utility::wc_add_notice_self( $result['error'] );
 			return false;
 		}
 
 		// Set action id as woo transaction id.
-		WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Setting transaction ID: " . $result['action_id'] );
 		$order->set_transaction_id( $result['action_id'] );
 		$order->update_meta_data( 'cko_payment_refunded', true );
 		$order->save();
@@ -4546,7 +4570,6 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 		if ( isset( $_SESSION['cko-refund-is-less'] ) ) {
 			if ( $_SESSION['cko-refund-is-less'] ) {
-				WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Partial refund completed" );
 				/* translators: %s: Action ID. */
 				$order->add_order_note( sprintf( esc_html__( 'Checkout.com Payment Partially refunded from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] ) );
 
@@ -4557,7 +4580,6 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		}
 
 		// add note for order.
-		WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Full refund completed" );
 		$order->add_order_note( $message );
 
 		// when true is returned, status is changed to refunded automatically.

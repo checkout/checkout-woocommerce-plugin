@@ -348,38 +348,9 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 	 * @return void
 	 */
 	public function process_admin_options() {
-		// DEBUG: Log that function was called
-		error_log( '[CKO SAVE DEBUG] ===== process_admin_options() CALLED =====' );
-		error_log( '[CKO SAVE DEBUG] Gateway ID: ' . $this->id );
-		error_log( '[CKO SAVE DEBUG] REQUEST_METHOD: ' . ( isset( $_SERVER['REQUEST_METHOD'] ) ? $_SERVER['REQUEST_METHOD'] : 'NOT SET' ) );
-		error_log( '[CKO SAVE DEBUG] GET screen: ' . ( isset( $_GET['screen'] ) ? $_GET['screen'] : 'NOT SET' ) );
-		error_log( '[CKO SAVE DEBUG] POST keys: ' . print_r( array_keys( $_POST ), true ) );
-		
 		$screen = ! empty( $_GET['screen'] ) ? sanitize_text_field( $_GET['screen'] ) : 'quick_settings';
-		error_log( '[CKO SAVE DEBUG] Screen determined: ' . $screen );
 
 		if ( 'quick_settings' === $screen ) {
-			// DEBUG: Log POST data
-			error_log( '[CKO SAVE DEBUG] ===== QUICK SETTINGS SAVE STARTED =====' );
-			error_log( '[CKO SAVE DEBUG] Screen: ' . $screen );
-			error_log( '[CKO SAVE DEBUG] POST keys: ' . print_r( array_keys( $_POST ), true ) );
-			if ( isset( $_POST['woocommerce_wc_checkout_com_cards_settings'] ) ) {
-				$post_settings = $_POST['woocommerce_wc_checkout_com_cards_settings'];
-				error_log( '[CKO SAVE DEBUG] POST settings keys: ' . print_r( array_keys( $post_settings ), true ) );
-				error_log( '[CKO SAVE DEBUG] ckocom_sk in POST: ' . ( isset( $post_settings['ckocom_sk'] ) ? 'YES (length: ' . strlen( $post_settings['ckocom_sk'] ) . ')' : 'NO' ) );
-				error_log( '[CKO SAVE DEBUG] ckocom_pk in POST: ' . ( isset( $post_settings['ckocom_pk'] ) ? 'YES (value: ' . substr( $post_settings['ckocom_pk'], 0, 10 ) . '...)' : 'NO' ) );
-				error_log( '[CKO SAVE DEBUG] ckocom_environment in POST: ' . ( isset( $post_settings['ckocom_environment'] ) ? 'YES (value: ' . $post_settings['ckocom_environment'] . ')' : 'NO' ) );
-				error_log( '[CKO SAVE DEBUG] title in POST: ' . ( isset( $post_settings['title'] ) ? 'YES (value: ' . $post_settings['title'] . ')' : 'NO' ) );
-			} else {
-				error_log( '[CKO SAVE DEBUG] WARNING: woocommerce_wc_checkout_com_cards_settings not in POST!' );
-			}
-			
-			// Get existing settings BEFORE save_fields()
-			$settings_before = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
-			error_log( '[CKO SAVE DEBUG] Settings BEFORE save_fields(): ' . print_r( array_keys( $settings_before ), true ) );
-			error_log( '[CKO SAVE DEBUG] Existing ckocom_sk: ' . ( isset( $settings_before['ckocom_sk'] ) ? 'YES (length: ' . strlen( $settings_before['ckocom_sk'] ) . ')' : 'NO' ) );
-			error_log( '[CKO SAVE DEBUG] Existing ckocom_pk: ' . ( isset( $settings_before['ckocom_pk'] ) ? 'YES (value: ' . substr( $settings_before['ckocom_pk'], 0, 10 ) . '...)' : 'NO' ) );
-			
 			// CRITICAL FIX: Manually extract values from POST before save_fields()
 			// This ensures the values are saved even if save_fields() doesn't pick them up
 			$checkout_mode_from_post = null;
@@ -399,100 +370,58 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 			// Extract Secret Key (password field - may be empty if not changed, but we still need to check)
 			if ( isset( $_POST['woocommerce_wc_checkout_com_cards_settings']['ckocom_sk'] ) ) {
 				$secret_key_from_post = sanitize_text_field( $_POST['woocommerce_wc_checkout_com_cards_settings']['ckocom_sk'] );
-				error_log( '[CKO SAVE DEBUG] Secret Key extracted from POST (length: ' . strlen( $secret_key_from_post ) . ')' );
-			} else {
-				error_log( '[CKO SAVE DEBUG] Secret Key NOT in POST' );
 			}
 			
 			// Extract Public Key
 			if ( isset( $_POST['woocommerce_wc_checkout_com_cards_settings']['ckocom_pk'] ) ) {
 				$public_key_from_post = sanitize_text_field( $_POST['woocommerce_wc_checkout_com_cards_settings']['ckocom_pk'] );
-				error_log( '[CKO SAVE DEBUG] Public Key extracted from POST (value: ' . substr( $public_key_from_post, 0, 10 ) . '...)' );
-			} else {
-				error_log( '[CKO SAVE DEBUG] Public Key NOT in POST' );
 			}
 			
 			// Extract Environment
 			if ( isset( $_POST['woocommerce_wc_checkout_com_cards_settings']['ckocom_environment'] ) ) {
 				$environment_from_post = sanitize_text_field( $_POST['woocommerce_wc_checkout_com_cards_settings']['ckocom_environment'] );
-				error_log( '[CKO SAVE DEBUG] Environment extracted from POST: ' . $environment_from_post );
-			} else {
-				error_log( '[CKO SAVE DEBUG] Environment NOT in POST' );
 			}
 			
 			// Extract Title
 			if ( isset( $_POST['woocommerce_wc_checkout_com_cards_settings']['title'] ) ) {
 				$title_from_post = sanitize_text_field( $_POST['woocommerce_wc_checkout_com_cards_settings']['title'] );
-				error_log( '[CKO SAVE DEBUG] Title extracted from POST: ' . $title_from_post );
-			} else {
-				error_log( '[CKO SAVE DEBUG] Title NOT in POST' );
 			}
 			
-			error_log( '[CKO SAVE DEBUG] Calling WC_Admin_Settings::save_fields()...' );
 			WC_Admin_Settings::save_fields( WC_Checkoutcom_Cards_Settings::quick_settings(), 'woocommerce_wc_checkout_com_cards_settings' );
-			error_log( '[CKO SAVE DEBUG] WC_Admin_Settings::save_fields() completed' );
 			
 			// Ensure account type is set to NAS and cannot be changed
 			$settings = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
-			error_log( '[CKO SAVE DEBUG] Settings AFTER save_fields(): ' . print_r( array_keys( $settings ), true ) );
-			error_log( '[CKO SAVE DEBUG] ckocom_sk after save_fields(): ' . ( isset( $settings['ckocom_sk'] ) ? 'YES (length: ' . strlen( $settings['ckocom_sk'] ) . ')' : 'NO' ) );
-			error_log( '[CKO SAVE DEBUG] ckocom_pk after save_fields(): ' . ( isset( $settings['ckocom_pk'] ) ? 'YES (value: ' . substr( $settings['ckocom_pk'], 0, 10 ) . '...)' : 'NO' ) );
 			
 			// CRITICAL FIX: Manually save checkout mode if it wasn't saved by save_fields()
 			if ( ! empty( $checkout_mode_from_post ) && in_array( $checkout_mode_from_post, array( 'flow', 'classic' ), true ) ) {
 				// Check if save_fields() actually saved it
 				if ( ! isset( $settings['ckocom_checkout_mode'] ) || $settings['ckocom_checkout_mode'] !== $checkout_mode_from_post ) {
 					$settings['ckocom_checkout_mode'] = $checkout_mode_from_post;
-					error_log( '[CKO SAVE DEBUG] Manually saved checkout_mode: ' . $checkout_mode_from_post );
 				}
 			}
 			
 			// CRITICAL FIX: Manually save Secret Key if provided (password fields may not be saved if empty)
 			if ( ! is_null( $secret_key_from_post ) && '' !== $secret_key_from_post ) {
 				$settings['ckocom_sk'] = $secret_key_from_post;
-				error_log( '[CKO SAVE DEBUG] Manually saving Secret Key (length: ' . strlen( $secret_key_from_post ) . ')' );
-			} else {
-				error_log( '[CKO SAVE DEBUG] Secret Key NOT saved - is_null: ' . ( is_null( $secret_key_from_post ) ? 'YES' : 'NO' ) . ', empty: ' . ( '' === $secret_key_from_post ? 'YES' : 'NO' ) );
 			}
 			
 			// CRITICAL FIX: Manually save Public Key if provided
 			if ( ! is_null( $public_key_from_post ) && '' !== $public_key_from_post ) {
 				$settings['ckocom_pk'] = $public_key_from_post;
-				error_log( '[CKO SAVE DEBUG] Manually saving Public Key: ' . substr( $public_key_from_post, 0, 10 ) . '...' );
-			} else {
-				error_log( '[CKO SAVE DEBUG] Public Key NOT saved - is_null: ' . ( is_null( $public_key_from_post ) ? 'YES' : 'NO' ) . ', empty: ' . ( '' === $public_key_from_post ? 'YES' : 'NO' ) );
 			}
 			
 			// CRITICAL FIX: Manually save Environment if provided
 			if ( ! is_null( $environment_from_post ) && in_array( $environment_from_post, array( 'sandbox', 'live' ), true ) ) {
 				$settings['ckocom_environment'] = $environment_from_post;
-				error_log( '[CKO SAVE DEBUG] Manually saving Environment: ' . $environment_from_post );
-			} else {
-				error_log( '[CKO SAVE DEBUG] Environment NOT saved - is_null: ' . ( is_null( $environment_from_post ) ? 'YES' : 'NO' ) . ', valid: ' . ( in_array( $environment_from_post, array( 'sandbox', 'live' ), true ) ? 'YES' : 'NO' ) );
 			}
 			
 			// CRITICAL FIX: Manually save Title if provided
 			if ( ! is_null( $title_from_post ) && '' !== $title_from_post ) {
 				$settings['title'] = $title_from_post;
-				error_log( '[CKO SAVE DEBUG] Manually saving Title: ' . $title_from_post );
-			} else {
-				error_log( '[CKO SAVE DEBUG] Title NOT saved - is_null: ' . ( is_null( $title_from_post ) ? 'YES' : 'NO' ) . ', empty: ' . ( '' === $title_from_post ? 'YES' : 'NO' ) );
 			}
 			
 			$settings['ckocom_account_type'] = 'NAS';
-			error_log( '[CKO SAVE DEBUG] Final settings keys before update_option: ' . print_r( array_keys( $settings ), true ) );
-			error_log( '[CKO SAVE DEBUG] Final ckocom_sk: ' . ( isset( $settings['ckocom_sk'] ) ? 'YES (length: ' . strlen( $settings['ckocom_sk'] ) . ')' : 'NO' ) );
-			error_log( '[CKO SAVE DEBUG] Final ckocom_pk: ' . ( isset( $settings['ckocom_pk'] ) ? 'YES (value: ' . substr( $settings['ckocom_pk'], 0, 10 ) . '...)' : 'NO' ) );
-			
-			$update_result = update_option( 'woocommerce_wc_checkout_com_cards_settings', $settings );
-			error_log( '[CKO SAVE DEBUG] update_option() result: ' . ( $update_result ? 'SUCCESS' : 'FAILED (no changes or error)' ) );
-			
-			// Verify what was actually saved
-			$settings_after = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
-			error_log( '[CKO SAVE DEBUG] Settings AFTER update_option(): ' . print_r( array_keys( $settings_after ), true ) );
-			error_log( '[CKO SAVE DEBUG] Verified ckocom_sk: ' . ( isset( $settings_after['ckocom_sk'] ) ? 'YES (length: ' . strlen( $settings_after['ckocom_sk'] ) . ')' : 'NO' ) );
-			error_log( '[CKO SAVE DEBUG] Verified ckocom_pk: ' . ( isset( $settings_after['ckocom_pk'] ) ? 'YES (value: ' . substr( $settings_after['ckocom_pk'], 0, 10 ) . '...)' : 'NO' ) );
-			error_log( '[CKO SAVE DEBUG] ===== QUICK SETTINGS SAVE COMPLETED =====' );
+			update_option( 'woocommerce_wc_checkout_com_cards_settings', $settings );
 			
 			// If Flow mode, also save enabled payment methods to Flow settings
 			if ( isset( $settings['ckocom_checkout_mode'] ) && 'flow' === $settings['ckocom_checkout_mode'] ) {

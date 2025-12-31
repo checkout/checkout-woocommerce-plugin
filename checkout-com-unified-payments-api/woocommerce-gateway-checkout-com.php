@@ -5,7 +5,7 @@
  * Description: Extends WooCommerce by Adding the Checkout.com Gateway.
  * Author: Checkout.com
  * Author URI: https://www.checkout.com/
- * Version: 5.0.0
+ * Version: 5.0.1
  * Requires at least: 5.0
  * Tested up to: 6.7.0
  * WC requires at least: 3.0
@@ -231,7 +231,7 @@ add_action( 'woocommerce_new_order', function( $order_id ) {
 /**
  * Constants.
  */
-define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '5.0.0' );
+define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '5.0.1' );
 define( 'WC_CHECKOUTCOM_PLUGIN_URL', untrailingslashit( plugins_url( basename( plugin_dir_path( __FILE__ ) ), basename( __FILE__ ) ) ) );
 define( 'WC_CHECKOUTCOM_PLUGIN_PATH', untrailingslashit( plugin_dir_path( __FILE__ ) ) );
 
@@ -1005,6 +1005,12 @@ function cko_admin_enqueue_scripts() {
 
 	// Load admin scripts.
 	wp_enqueue_script( 'cko-admin-script', WC_CHECKOUTCOM_PLUGIN_URL . '/assets/js/admin.js', [ 'jquery' ], WC_CHECKOUTCOM_PLUGIN_VERSION );
+	
+	// Load checkout mode toggle script for Quick Settings page
+	wp_enqueue_script( 'cko-admin-checkout-mode-toggle', WC_CHECKOUTCOM_PLUGIN_URL . '/assets/js/admin-checkout-mode-toggle.js', [ 'jquery' ], WC_CHECKOUTCOM_PLUGIN_VERSION );
+	
+	// Load admin settings CSS
+	wp_enqueue_style( 'cko-admin-settings', WC_CHECKOUTCOM_PLUGIN_URL . '/assets/css/admin-settings.css', [], WC_CHECKOUTCOM_PLUGIN_VERSION );
 
 	$vars = [
 		'nas_docs'                           => 'https://www.checkout.com/docs/four/resources/api-authentication/api-keys',
