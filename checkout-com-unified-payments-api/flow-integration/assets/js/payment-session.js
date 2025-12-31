@@ -103,45 +103,187 @@ function isTermsCheckbox(element) {
 
 (function() {
 	/**
-	 * Track last clicked element to detect if update_checkout was triggered by terms checkbox
-	 * This allows us to prevent update_checkout without interfering with checkbox functionality
-	 * Using global variables so they're accessible in updated_checkout handler
+	 * CRITICAL FIX: Prevent page reload when terms checkbox is clicked
+	 * 
+	 * Strategy: Intercept jQuery's trigger() method BEFORE it fires update_checkout
+	 * This prevents WooCommerce from triggering the event that causes page reload
 	 */
+	
+	// Global flag to prevent update_checkout when terms checkbox is clicked
+	window.ckoPreventUpdateCheckout = false;
 	window.ckoTermsCheckboxLastClicked = null;
 	window.ckoTermsCheckboxLastClickTime = 0;
 	
-	// Track clicks on checkboxes (but don't interfere with them)
+	// Track clicks on checkboxes and set prevention flag
 	document.addEventListener('click', function(e) {
 		if (e.target.type === 'checkbox' && isTermsCheckbox(e.target)) {
+			window.ckoPreventUpdateCheckout = true;
 			window.ckoTermsCheckboxLastClicked = e.target;
 			window.ckoTermsCheckboxLastClickTime = Date.now();
-			ckoLogger.debug('Terms checkbox clicked - tracking for update_checkout prevention', {
+			ckoLogger.debug('Terms checkbox clicked - setting prevention flag', {
 				elementId: e.target.id || 'no-id',
 				elementName: e.target.name || 'no-name'
 			});
+			
+			// Clear flag after longer delay to catch async triggers
+			setTimeout(function() {
+				window.ckoPreventUpdateCheckout = false;
+			}, 3000); // Increased to 3 seconds to catch async triggers
 		}
-	}, true); // Capture phase to track early
+	}, true); // Capture phase to set flag early
 	
-	// Track change events (but don't interfere - allow checkbox to work normally)
+	// CRITICAL: Intercept change events on terms checkboxes BEFORE they reach WooCommerce
+	// This prevents WooCommerce from triggering update_checkout
 	document.addEventListener('change', function(e) {
 		if (e.target.type === 'checkbox' && isTermsCheckbox(e.target)) {
-			// Update tracking but don't stop propagation - allow checkbox to work normally
+			window.ckoPreventUpdateCheckout = true;
 			window.ckoTermsCheckboxLastClicked = e.target;
 			window.ckoTermsCheckboxLastClickTime = Date.now();
-			ckoLogger.debug('Terms checkbox changed - tracking for update_checkout prevention', {
+			ckoLogger.debug('Terms checkbox changed - setting prevention flag', {
 				elementId: e.target.id || 'no-id',
 				elementName: e.target.name || 'no-name'
 			});
+			
+			// Clear flag after longer delay (for change events which trigger async updates)
+			setTimeout(function() {
+				window.ckoPreventUpdateCheckout = false;
+			}, 3000); // Increased to 3 seconds to catch async triggers
 		}
-	}, true);
+	}, true); // Capture phase - runs BEFORE WooCommerce handlers
 	
-	// Clear tracking after a delay (update_checkout might fire asynchronously)
-	setInterval(function() {
-		const timeSinceLastClick = Date.now() - window.ckoTermsCheckboxLastClickTime;
-		if (timeSinceLastClick > 2000) { // Clear after 2 seconds
-			window.ckoTermsCheckboxLastClicked = null;
+	// CRITICAL: Intercept checkbox change events via jQuery BEFORE WooCommerce handlers
+	// This must run immediately, not wait for DOM ready
+	if (typeof jQuery !== 'undefined') {
+		// Use event delegation on document to catch all checkbox changes early
+		jQuery(document).on('change.cko-terms-prevention', 'input[type="checkbox"]', function(e) {
+			if (isTermsCheckbox(this)) {
+				window.ckoPreventUpdateCheckout = true;
+				window.ckoTermsCheckboxLastClicked = this;
+				window.ckoTermsCheckboxLastClickTime = Date.now();
+				ckoLogger.debug('🚫 Terms checkbox change intercepted via jQuery delegation - preventing update_checkout', {
+					elementId: this.id || 'no-id',
+					elementName: this.name || 'no-name'
+				});
+				
+				// CRITICAL: Stop this event from reaching WooCommerce handlers
+				e.stopImmediatePropagation();
+				
+				// Clear flag after delay
+				setTimeout(function() {
+					window.ckoPreventUpdateCheckout = false;
+				}, 3000);
+			}
+		});
+		
+		// Also intercept on body (WooCommerce often uses body for event delegation)
+		jQuery('body').on('change.cko-terms-prevention', 'input[type="checkbox"]', function(e) {
+			if (isTermsCheckbox(this)) {
+				window.ckoPreventUpdateCheckout = true;
+				window.ckoTermsCheckboxLastClicked = this;
+				window.ckoTermsCheckboxLastClickTime = Date.now();
+				ckoLogger.debug('🚫 Terms checkbox change intercepted via body delegation - preventing update_checkout');
+				e.stopImmediatePropagation();
+				setTimeout(function() {
+					window.ckoPreventUpdateCheckout = false;
+				}, 3000);
+			}
+		});
+	}
+	
+	// CRITICAL: Intercept jQuery's trigger() method to block update_checkout events
+	// This must happen BEFORE WooCommerce's handlers run
+	if (typeof jQuery !== 'undefined') {
+		// Store original trigger methods
+		const originalTrigger = jQuery.fn.trigger;
+		const originalEventTrigger = jQuery.event.trigger;
+		
+		// Override jQuery.fn.trigger()
+		// PERFORMANCE: Check flag first (fastest check) before string/object comparisons
+		jQuery.fn.trigger = function(event, data) {
+			// Fast path: Only check if prevention flag is set (most trigger calls skip this)
+			if (window.ckoPreventUpdateCheckout) {
+				// Only do expensive checks if flag is set (rare case)
+				const eventName = typeof event === 'string' ? event : (event && event.type ? event.type : 'unknown');
+				const isUpdateCheckout = eventName === 'update_checkout' || 
+				                        (typeof event === 'object' && event && event.type === 'update_checkout');
+				if (isUpdateCheckout) {
+					ckoLogger.debug('✅ BLOCKED update_checkout trigger from jQuery.fn.trigger() - terms checkbox prevention active', {
+						event: eventName,
+						element: this[0] ? (this[0].id || this[0].tagName || this[0].className) : 'unknown',
+						preventionFlag: window.ckoPreventUpdateCheckout
+					});
+					return this; // Return jQuery object without triggering event
+				}
+			}
+			// Call original trigger for all other events (99.9% of calls take this path)
+			return originalTrigger.apply(this, arguments);
+		};
+		
+		// Override jQuery.event.trigger() (used by jQuery internally)
+		// PERFORMANCE: Check flag first (fastest check) before string/object comparisons
+		jQuery.event.trigger = function(event, data, elem, onlyHandlers) {
+			// Fast path: Only check if prevention flag is set (most trigger calls skip this)
+			if (window.ckoPreventUpdateCheckout) {
+				// Only do expensive checks if flag is set (rare case)
+				const eventName = typeof event === 'string' ? event : (event && event.type ? event.type : 'unknown');
+				const isUpdateCheckout = eventName === 'update_checkout' || 
+				                        (typeof event === 'object' && event && event.type === 'update_checkout');
+				if (isUpdateCheckout) {
+					ckoLogger.debug('✅ BLOCKED update_checkout trigger from jQuery.event.trigger() - terms checkbox prevention active', {
+						event: eventName,
+						element: elem ? (elem.id || elem.tagName || elem.className) : 'unknown',
+						preventionFlag: window.ckoPreventUpdateCheckout
+					});
+					return; // Exit without triggering event
+				}
+			}
+			// Call original trigger for all other events (99.9% of calls take this path)
+			return originalEventTrigger.apply(this, arguments);
+		};
+		
+		ckoLogger.debug('jQuery trigger interception installed for terms checkbox prevention');
+		
+		// CRITICAL: Also intercept form submissions triggered by terms checkbox
+		// WooCommerce might submit the form after update_checkout event
+		const checkoutForm = document.querySelector('form.checkout');
+		if (checkoutForm) {
+			// Intercept form submit events
+			checkoutForm.addEventListener('submit', function(e) {
+				// Check if prevention flag is set (terms checkbox was clicked recently)
+				if (window.ckoPreventUpdateCheckout || 
+				    (window.ckoTermsCheckboxLastClicked && 
+				     isTermsCheckbox(window.ckoTermsCheckboxLastClicked) && 
+				     (Date.now() - window.ckoTermsCheckboxLastClickTime) < 2000)) {
+					ckoLogger.debug('Blocked form submission triggered by terms checkbox', {
+						preventionFlag: window.ckoPreventUpdateCheckout,
+						lastClickedId: window.ckoTermsCheckboxLastClicked ? (window.ckoTermsCheckboxLastClicked.id || 'no-id') : 'none'
+					});
+					e.preventDefault();
+					e.stopImmediatePropagation();
+					// Clear flags
+					window.ckoPreventUpdateCheckout = false;
+					window.ckoTermsCheckboxLastClicked = null;
+					return false;
+				}
+			}, true); // Capture phase to intercept early
 		}
-	}, 500);
+		
+		// Also intercept via jQuery (backup)
+		jQuery(document).on('submit', 'form.checkout', function(e) {
+			if (window.ckoPreventUpdateCheckout || 
+			    (window.ckoTermsCheckboxLastClicked && 
+			     isTermsCheckbox(window.ckoTermsCheckboxLastClicked) && 
+			     (Date.now() - window.ckoTermsCheckboxLastClickTime) < 2000)) {
+				ckoLogger.debug('Blocked jQuery form submission triggered by terms checkbox');
+				e.preventDefault();
+				e.stopImmediatePropagation();
+				window.ckoPreventUpdateCheckout = false;
+				window.ckoTermsCheckboxLastClicked = null;
+				return false;
+			}
+		});
+		
+	}
 })();
 (function() {
 	// Check URL parameters immediately (before any other code runs)
@@ -1886,90 +2028,10 @@ var ckoFlow = {
 					});
 					
 					if (available) {
-						// Performance: Track component mount
-						const mountStart = performance.now();
-						if (ckoFlow.performanceMetrics.enableLogging) {
-							ckoLogger.performance('Mounting component to DOM...');
-						}
-				flowComponent.mount(document.getElementById("flow-container"));
-				const mountEnd = performance.now();
-				if (ckoFlow.performanceMetrics.enableLogging) {
-					ckoLogger.performance(`Component mounted in ${(mountEnd - mountStart).toFixed(2)}ms`);
-				}
-				
-				// Mark Flow as initialized and clear guard flag now that component is mounted
-				ckoFlowInitialized = true;
-				ckoFlowInitializing = false;
-				
-				// ============================================================
-				// SMOOTH CHECKOUT EXPERIENCE - Enable UI after mount
-				// ============================================================
-				ckoLogger.debug('Component mounted - enabling UI! 🔥🔥🔥');
-				
-				const skeleton = document.getElementById("flow-skeleton");
-				const placeOrderBtn = document.getElementById("place_order");
-				const saveCardCheckbox = document.querySelector('.cko-save-card-checkbox');
-				
-				// Step 1: Hide skeleton loader
-				if (skeleton) {
-					skeleton.classList.remove("show");
-					ckoLogger.debug('✓ Skeleton loader hidden');
-				}
-				
-				// Step 2: Enable Place Order button
-				if (placeOrderBtn) {
-					placeOrderBtn.classList.remove("flow-loading");
-					placeOrderBtn.style.removeProperty('opacity');
-					placeOrderBtn.style.removeProperty('visibility');
-					console.log('[FLOW] ✓ Place Order button enabled');
-				}
-				
-				// Step 3: Hide save card checkbox initially
-				if (saveCardCheckbox) {
-					saveCardCheckbox.style.display = 'none';
-				} else {
-					console.log('[FLOW] Mount - Save card checkbox not available (feature disabled)');
-				}
-				
-				// Step 4: Mark Flow as ready
-				document.body.classList.add("flow-ready");
-				console.log('[FLOW] ✓ Checkout is now fully interactive');
-				
-				// CRITICAL: Listen for user interaction with Flow fields (click, focus, input)
-					// This detects when user actually starts using Flow (not just onChange firing on load)
-					setTimeout(() => {
-						const flowContainer = document.getElementById("flow-container");
-						if (flowContainer) {
-							// Listen for any interaction with Flow component
-							flowContainer.addEventListener('click', function() {
-								if (!window.flowUserInteracted) {
-									console.log('[FLOW] User clicked on Flow component - marking as interacted');
-									window.flowUserInteracted = true;
-									window.flowSavedCardSelected = false; // Reset saved card flag when user interacts with Flow
-								}
-							}, { once: false });
-							
-							flowContainer.addEventListener('focus', function(e) {
-								if (!window.flowUserInteracted) {
-									console.log('[FLOW] User focused on Flow field - marking as interacted');
-									window.flowUserInteracted = true;
-									window.flowSavedCardSelected = false; // Reset saved card flag when user interacts with Flow
-								}
-							}, { capture: true });
-							
-							flowContainer.addEventListener('input', function(e) {
-								if (!window.flowUserInteracted) {
-									console.log('[FLOW] User typing in Flow field - marking as interacted');
-									window.flowUserInteracted = true;
-									window.flowSavedCardSelected = false; // Reset saved card flag when user interacts with Flow
-								}
-							}, { capture: true });
-							
-							console.log('[FLOW] Flow interaction listeners attached');
-						}
-					}, 500);
-					
-				} else {
+						// CRITICAL FIX: Ensure container exists before mounting with retry logic
+						// mountWithRetry will handle container creation, mounting, and UI enabling
+						ckoFlow.mountWithRetry(flowComponent);
+					} else {
 						// Hide loading overlay.
 						hideLoadingOverlay();
 						ckoLogger.error("Component is not available.");
@@ -2013,6 +2075,197 @@ var ckoFlow = {
 					)
 			);
 		}
+	},
+
+	/**
+	 * CRITICAL FIX: Mount Flow component with retry logic to handle container race conditions
+	 * This ensures the container exists before mounting and handles cases where
+	 * WooCommerce removes the container during initialization
+	 */
+	mountWithRetry: function(flowComponent, attempt = 1, maxAttempts = 5) {
+		const mountStart = performance.now();
+		if (ckoFlow.performanceMetrics.enableLogging) {
+			ckoLogger.performance('Attempting to mount component (attempt ' + attempt + ')...');
+		}
+
+		// Get container - may be null if WooCommerce removed it
+		let flowContainer = document.getElementById("flow-container");
+		
+		// If container doesn't exist, try to create it efficiently
+		if (!flowContainer) {
+			ckoLogger.debug('Container not found before mount (attempt ' + attempt + ') - ensuring container exists', {
+				attempt: attempt,
+				maxAttempts: maxAttempts,
+				flowInitializing: typeof ckoFlowInitializing !== 'undefined' ? ckoFlowInitializing : false
+			});
+
+			// OPTIMIZATION: Try direct container creation first (faster than calling addPaymentMethod)
+			// This avoids unnecessary DOM queries in addPaymentMethod if container can be created directly
+			const paymentMethod = document.querySelector('.payment_method_wc_checkout_com_flow');
+			if (paymentMethod) {
+				const paymentBox = paymentMethod.querySelector("div.payment_box");
+				if (paymentBox && !paymentBox.id) {
+					paymentBox.id = "flow-container";
+					paymentBox.style.padding = "0";
+					flowContainer = paymentBox; // Use the newly created container directly
+					ckoLogger.debug('Created flow-container id directly on payment_box div');
+				} else if (paymentBox && paymentBox.id === 'flow-container') {
+					flowContainer = paymentBox; // Container exists but getElementById didn't find it (timing issue)
+				}
+			}
+
+			// If direct creation failed, try addPaymentMethod (more comprehensive but slower)
+			if (!flowContainer && typeof addPaymentMethod === 'function') {
+				addPaymentMethod();
+				// Re-check container after addPaymentMethod call
+				flowContainer = document.getElementById("flow-container");
+			}
+		}
+
+		// If container still doesn't exist, retry with exponential backoff
+		if (!flowContainer) {
+			if (attempt < maxAttempts) {
+				const delay = Math.min(200 * Math.pow(2, attempt - 1), 1000); // Exponential backoff: 200ms, 400ms, 600ms, 800ms, 1000ms
+				ckoLogger.debug('Container still not found, retrying in ' + delay + 'ms (attempt ' + attempt + '/' + maxAttempts + ')');
+				
+				setTimeout(() => {
+					ckoFlow.mountWithRetry(flowComponent, attempt + 1, maxAttempts);
+				}, delay);
+				return;
+			} else {
+				// Max attempts reached - show error
+				ckoLogger.error('Failed to mount Flow component: Container not found after ' + maxAttempts + ' attempts');
+				hideLoadingOverlay();
+				showError(
+					wp.i18n.__(
+						"Unable to initialize payment form. Please refresh the page and try again.",
+						"checkout-com-unified-payments-api"
+					)
+				);
+				// Clear initialization flags
+				ckoFlowInitializing = false;
+				ckoFlowInitialized = false;
+				return;
+			}
+		}
+
+		// Container exists - proceed with mount
+		try {
+			ckoLogger.debug('Container found, mounting Flow component', {
+				containerId: flowContainer.id,
+				attempt: attempt
+			});
+
+			flowComponent.mount(flowContainer);
+			
+			const mountEnd = performance.now();
+			if (ckoFlow.performanceMetrics.enableLogging) {
+				ckoLogger.performance(`Component mounted successfully in ${(mountEnd - mountStart).toFixed(2)}ms (attempt ${attempt})`);
+			}
+
+			// Mark Flow as initialized and clear guard flag now that component is mounted
+			ckoFlowInitialized = true;
+			ckoFlowInitializing = false;
+
+			// Enable UI after successful mount
+			ckoFlow.enableUIAfterMount();
+			
+		} catch (error) {
+			ckoLogger.error('Error mounting Flow component:', error);
+			
+			// If mount fails, retry if we haven't exceeded max attempts
+			if (attempt < maxAttempts) {
+				const delay = Math.min(200 * Math.pow(2, attempt - 1), 1000);
+				ckoLogger.debug('Mount failed, retrying in ' + delay + 'ms (attempt ' + attempt + '/' + maxAttempts + ')');
+				
+				setTimeout(() => {
+					ckoFlow.mountWithRetry(flowComponent, attempt + 1, maxAttempts);
+				}, delay);
+			} else {
+				// Max attempts reached - show error
+				ckoLogger.error('Failed to mount Flow component after ' + maxAttempts + ' attempts:', error);
+				hideLoadingOverlay();
+				showError(
+					wp.i18n.__(
+						"Unable to initialize payment form. Please refresh the page and try again.",
+						"checkout-com-unified-payments-api"
+					)
+				);
+				// Clear initialization flags
+				ckoFlowInitializing = false;
+				ckoFlowInitialized = false;
+			}
+		}
+	},
+
+	/**
+	 * Enable UI elements after successful Flow component mount
+	 */
+	enableUIAfterMount: function() {
+		ckoLogger.debug('Component mounted - enabling UI! 🔥🔥🔥');
+		
+		const skeleton = document.getElementById("flow-skeleton");
+		const placeOrderBtn = document.getElementById("place_order");
+		const saveCardCheckbox = document.querySelector('.cko-save-card-checkbox');
+		
+		// Step 1: Hide skeleton loader
+		if (skeleton) {
+			skeleton.classList.remove("show");
+			ckoLogger.debug('✓ Skeleton loader hidden');
+		}
+		
+		// Step 2: Enable Place Order button
+		if (placeOrderBtn) {
+			placeOrderBtn.classList.remove("flow-loading");
+			placeOrderBtn.style.removeProperty('opacity');
+			placeOrderBtn.style.removeProperty('visibility');
+			console.log('[FLOW] ✓ Place Order button enabled');
+		}
+		
+		// Step 3: Hide save card checkbox initially
+		if (saveCardCheckbox) {
+			saveCardCheckbox.style.display = 'none';
+		} else {
+			console.log('[FLOW] Mount - Save card checkbox not available (feature disabled)');
+		}
+		
+		// Step 4: Mark Flow as ready
+		document.body.classList.add("flow-ready");
+		console.log('[FLOW] ✓ Checkout is now fully interactive');
+		
+		// CRITICAL: Listen for user interaction with Flow fields (click, focus, input)
+		// This detects when user actually starts using Flow (not just onChange firing on load)
+		setTimeout(() => {
+			const flowContainer = document.getElementById("flow-container");
+			if (flowContainer) {
+				// Listen for any interaction with Flow component
+				flowContainer.addEventListener('click', function() {
+					if (!window.flowUserInteracted) {
+						console.log('[FLOW] User clicked on Flow component - marking as interacted');
+						window.flowUserInteracted = true;
+						window.flowSavedCardSelected = false; // Reset saved card flag when user interacts with Flow
+					}
+				}, { once: false });
+				
+				flowContainer.addEventListener('focus', function(e) {
+					if (!window.flowUserInteracted) {
+						console.log('[FLOW] User focused on Flow field - marking as interacted');
+						window.flowUserInteracted = true;
+						window.flowSavedCardSelected = false; // Reset saved card flag when user interacts with Flow
+					}
+				}, { capture: true });
+				
+				flowContainer.addEventListener('input', function(e) {
+					if (!window.flowUserInteracted) {
+						console.log('[FLOW] User typing in Flow field - marking as interacted');
+						window.flowUserInteracted = true;
+						window.flowSavedCardSelected = false; // Reset saved card flag when user interacts with Flow
+					}
+				}, { capture: true });
+				
+				console.log('[FLOW] Flow interaction listeners attached');
+			}
+		}, 500);
 	},
 };
 
@@ -3109,30 +3362,55 @@ function handleFlowPaymentSelection() {
 // Track previous cart total for change detection
 let previousCartTotal = typeof cko_flow_vars !== 'undefined' && cko_flow_vars.cart_total ? parseFloat(cko_flow_vars.cart_total) : 0;
 
-jQuery(document).on("updated_checkout", function (event) {
+// CRITICAL: Attach updated_checkout handler IMMEDIATELY with HIGHEST PRIORITY
+// This must run BEFORE WooCommerce attaches its handlers
+// Use immediate execution (IIFE) to attach handler as early as possible
+(function() {
+	if (typeof jQuery !== 'undefined') {
+		// Remove any existing handler first
+		jQuery(document).off("updated_checkout.cko-terms-prevention");
+		
+		// Attach handler immediately (before DOM ready) with capture-like behavior
+		// Use body instead of document to catch events earlier
+		jQuery('body').on("updated_checkout.cko-terms-prevention", function (event) {
 	ckoLogger.debug('===== updated_checkout EVENT FIRED =====');
 	
 	// CRITICAL: Prevent update_checkout if it was triggered by a terms checkbox
-	// Check if the last clicked/changed element was a terms checkbox
-	// This prevents page reload while allowing checkbox to work normally
+	// Check prevention flag first (set by jQuery trigger interception)
+	// Also check if the last clicked/changed element was a terms checkbox (backup check)
 	const activeElement = document.activeElement;
 	const lastClicked = window.ckoTermsCheckboxLastClicked;
+	const timeSinceLastClick = Date.now() - window.ckoTermsCheckboxLastClickTime;
 	const isTermsTriggered = 
-		(lastClicked && isTermsCheckbox(lastClicked)) ||
+		window.ckoPreventUpdateCheckout ||
+		((lastClicked && isTermsCheckbox(lastClicked)) && timeSinceLastClick < 2000) ||
 		(activeElement && isTermsCheckbox(activeElement));
 	
 	if (isTermsTriggered) {
-		ckoLogger.debug('updated_checkout triggered by terms checkbox - preventing page reload', {
+		ckoLogger.debug('🚫🚫🚫 updated_checkout triggered by terms checkbox - BLOCKING page reload', {
+			preventionFlag: window.ckoPreventUpdateCheckout,
 			lastClickedId: lastClicked ? (lastClicked.id || 'no-id') : 'none',
-			activeElementId: activeElement ? (activeElement.id || 'no-id') : 'none'
+			activeElementId: activeElement ? (activeElement.id || 'no-id') : 'none',
+			timeSinceClick: timeSinceLastClick + 'ms'
 		});
 		
-		// Stop the event to prevent page reload
+		// CRITICAL: Stop ALL event propagation immediately
 		event.stopImmediatePropagation();
+		event.stopPropagation();
 		event.preventDefault();
 		
-		// Clear tracking
-		window.ckoTermsCheckboxLastClicked = null;
+		// Also prevent default behavior on the document
+		if (event.originalEvent) {
+			event.originalEvent.stopImmediatePropagation();
+			event.originalEvent.stopPropagation();
+			event.originalEvent.preventDefault();
+		}
+		
+		// Clear tracking after a delay (keep flag active longer to catch async triggers)
+		setTimeout(function() {
+			window.ckoPreventUpdateCheckout = false;
+			window.ckoTermsCheckboxLastClicked = null;
+		}, 3000);
 		
 		// Exit early - don't process updated_checkout
 		return false;
@@ -3205,123 +3483,79 @@ jQuery(document).on("updated_checkout", function (event) {
 		flowPaymentChecked: document.getElementById("payment_method_wc_checkout_com_flow")?.checked || false
 	});
 	
-	// CRITICAL: Wait for DOM to be updated by WooCommerce before checking
-	// WooCommerce replaces the HTML asynchronously, so we need to check after it completes
-	setTimeout(function() {
-		// CRITICAL: Check for 3DS return again in setTimeout callback
-		if (window.ckoFlow3DSReturn) {
-			ckoLogger.threeDS('Skipping updated_checkout setTimeout callback - 3DS return in progress');
-			return;
-		}
-		
-		// Also check URL parameters as fallback
-		const urlParamsCheck = new URLSearchParams(window.location.search);
-		const paymentIdCheck = urlParamsCheck.get("cko-payment-id");
-		const sessionIdCheck = urlParamsCheck.get("cko-session-id");
-		const paymentSessionIdCheck = urlParamsCheck.get("cko-payment-session-id");
-		
-		if (paymentIdCheck || sessionIdCheck || paymentSessionIdCheck) {
-			ckoLogger.threeDS('Skipping updated_checkout setTimeout callback - 3DS return detected in URL');
-			window.ckoFlow3DSReturn = true;
-			return;
-		}
-		
-		const flowPayment = document.getElementById("payment_method_wc_checkout_com_flow");
-		const flowComponentRoot = document.querySelector('[data-testid="checkout-web-component-root"]');
-		const flowContainer = document.getElementById("flow-container");
-		
-		// Log field values AFTER DOM update (capture before values from closure)
-		const emailAfter = getCheckoutFieldValue("billing_email");
-		const addressAfter = getCheckoutFieldValue("billing_address_1");
-		const cityAfter = getCheckoutFieldValue("billing_city");
-		const countryAfter = getCheckoutFieldValue("billing_country");
-		
-		ckoLogger.debug('===== updated_checkout: State AFTER 100ms delay =====');
-		ckoLogger.debug('Field values AFTER updated_checkout:', {
-			email: emailAfter || 'EMPTY',
-			address1: addressAfter || 'EMPTY',
-			city: cityAfter || 'EMPTY',
-			country: countryAfter || 'EMPTY',
-			fieldsChanged: {
-				email: emailBefore !== emailAfter,
-				address1: addressBefore !== addressAfter,
-				city: cityBefore !== cityAfter,
-				country: countryBefore !== countryAfter
-			}
-		});
-		
-		ckoLogger.debug('Flow state AFTER updated_checkout (100ms delay):', {
-			flowPaymentExists: !!flowPayment,
-			flowPaymentChecked: flowPayment?.checked || false,
-			flowComponentRootExists: !!flowComponentRoot,
-			flowContainerExists: !!flowContainer,
-			flowInitialized: ckoFlowInitialized,
-			flowComponentExists: !!ckoFlow.flowComponent,
-			requiredFieldsFilled: requiredFieldsFilled(),
-			requiredFieldsValid: requiredFieldsFilledAndValid(),
-			canInitialize: canInitializeFlow()
-		});
-		
-		// Only re-initialize if:
-		// 1. Flow payment method is still selected
-		// 2. Flow component is NOT mounted (was destroyed by updated_checkout)
-		// 3. Flow container exists (DOM was updated)
-		// 4. Flow is NOT currently initializing (prevent duplicate calls)
-		if (flowPayment && flowPayment.checked && flowContainer) {
-			if (!flowComponentRoot) {
-				// Check if initialization is already in progress
-				if (ckoFlowInitializing) {
-					ckoLogger.debug('Flow component not mounted but initialization already in progress, skipping duplicate call');
-					return;
-				}
-				
-				ckoLogger.debug('Flow component was destroyed by updated_checkout, re-initializing...');
-				// Reset flag so Flow can be re-initialized
-				ckoFlowInitialized = false;
-				ckoFlow.flowComponent = null;
-				// Re-initialize
-				initializeFlowIfNeeded();
-			} else {
-				ckoLogger.debug('Flow component still mounted after updated_checkout, no action needed');
-			}
-		} else if (flowPayment && flowPayment.checked && !flowContainer) {
-			// Check if initialization is already in progress
+	// EVENT-DRIVEN: Flow remounting is now handled by cko:flow-container-ready event listener
+	// No need for setTimeout delays - flow-container.js will emit event when container is ready
+	});
+	}
+})(); // Close IIFE - handler attached immediately
+
+// EVENT-DRIVEN DESIGN: Listen for container-ready events from flow-container.js
+// This eliminates timing race conditions - Flow remounts immediately when container is ready
+document.addEventListener('cko:flow-container-ready', function(event) {
+	// CRITICAL: Check for 3DS return
+	if (window.ckoFlow3DSReturn) {
+		ckoLogger.threeDS('Skipping container-ready handler - 3DS return in progress');
+		return;
+	}
+	
+	// Check URL parameters as fallback
+	const urlParams = new URLSearchParams(window.location.search);
+	if (urlParams.get("cko-payment-id") || urlParams.get("cko-session-id") || urlParams.get("cko-payment-session-id")) {
+		ckoLogger.threeDS('Skipping container-ready handler - 3DS return detected in URL');
+		window.ckoFlow3DSReturn = true;
+		return;
+	}
+	
+	const flowContainer = event.detail?.container || document.getElementById("flow-container");
+	const flowPayment = document.getElementById("payment_method_wc_checkout_com_flow");
+	const flowComponentRoot = document.querySelector('[data-testid="checkout-web-component-root"]');
+	
+	// Check if Flow component is actually mounted
+	const flowComponentActuallyMounted = flowComponentRoot && flowComponentRoot.isConnected;
+	const flowWasInitializedBefore = ckoFlowInitialized && ckoFlow.flowComponent && !flowComponentActuallyMounted;
+	
+	ckoLogger.debug('🔔 Container-ready event received - checking if Flow needs remounting', {
+		flowPaymentChecked: flowPayment?.checked || false,
+		flowContainerExists: !!flowContainer,
+		flowComponentRootExists: !!flowComponentRoot,
+		flowComponentMounted: flowComponentActuallyMounted,
+		flowInitialized: ckoFlowInitialized,
+		flowComponentExists: !!ckoFlow.flowComponent,
+		flowWasInitializedBefore: flowWasInitializedBefore
+	});
+	
+	// Only remount if:
+	// 1. Flow payment method is selected
+	// 2. Container exists
+	// 3. Flow component is NOT mounted (was destroyed by updated_checkout)
+	// 4. Flow is NOT currently initializing
+	if (flowPayment && flowPayment.checked && flowContainer) {
+		if (!flowComponentActuallyMounted || flowWasInitializedBefore) {
+			// Component was destroyed by updated_checkout
 			if (ckoFlowInitializing) {
-				ckoLogger.debug('Flow container not found but initialization already in progress, skipping duplicate call');
+				ckoLogger.debug('Flow component not mounted but initialization already in progress, skipping');
 				return;
 			}
 			
-			ckoLogger.debug('Flow payment selected but container not found yet, waiting...');
-			// Container might not be ready yet, check again after a short delay
-			setTimeout(function() {
-				const flowContainerRetry = document.getElementById("flow-container");
-				const flowComponentRootRetry = document.querySelector('[data-testid="checkout-web-component-root"]');
-				ckoLogger.debug('Retry check (300ms total):', {
-					flowContainerExists: !!flowContainerRetry,
-					flowComponentRootExists: !!flowComponentRootRetry,
-					flowInitializing: ckoFlowInitializing
-				});
-				if (flowContainerRetry && !flowComponentRootRetry && !ckoFlowInitializing) {
-					ckoLogger.debug('Flow container found on retry, re-initializing...');
-					ckoFlowInitialized = false;
-					ckoFlow.flowComponent = null;
-					initializeFlowIfNeeded();
-				} else if (flowContainerRetry && flowComponentRootRetry) {
-					ckoLogger.debug('Flow component found on retry, no re-initialization needed');
-				} else if (ckoFlowInitializing) {
-					ckoLogger.debug('Flow initialization already in progress on retry, skipping');
-				} else {
-					ckoLogger.debug('Flow container still not found on retry');
+			ckoLogger.debug('🔄 Flow component needs remounting - container is ready, re-initializing...');
+			
+			// Reset flag so Flow can be re-initialized
+			ckoFlowInitialized = false;
+			if (ckoFlow.flowComponent) {
+				// Component exists but was unmounted - destroy it so we can create a new one
+				try {
+					ckoFlow.flowComponent.destroy();
+				} catch (e) {
+					ckoLogger.debug('Error destroying Flow component:', e);
 				}
-			}, 200);
+				ckoFlow.flowComponent = null;
+			}
+			// Re-initialize
+			initializeFlowIfNeeded();
 		} else {
-			ckoLogger.debug('Conditions not met for re-initialization:', {
-				flowPaymentExists: !!flowPayment,
-				flowPaymentChecked: flowPayment?.checked || false,
-				flowContainerExists: !!flowContainer
-			});
+			ckoLogger.debug('✅ Flow component still mounted, no remounting needed');
 		}
-	}, 100); // Wait 100ms for WooCommerce to finish updating DOM
+	}
 });
 
 /**

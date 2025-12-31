@@ -717,6 +717,15 @@ jQuery( function ( $ ) {
 
                 // Use API v1 structure (same as classic Google Pay) to match working configuration
                 // This ensures compatibility with Google Pay merchant configuration
+                
+                // Format amount based on currency decimal places
+                // Zero-decimal currencies (JPY, KRW, etc.) should be rounded to integers
+                // Two-decimal currencies (USD, EUR, etc.) use 2 decimal places
+                const currencyCode = cko_google_pay_vars.currency_code || 'USD';
+                const zeroDecimalCurrencies = ['JPY', 'KRW', 'VND', 'CLP', 'ISK', 'UGX', 'XAF', 'XOF', 'XPF', 'BIF', 'DJF', 'GNF', 'KMF', 'PYG', 'RWF', 'VUV'];
+                const isZeroDecimal = zeroDecimalCurrencies.includes(currencyCode.toUpperCase());
+                const formattedAmount = isZeroDecimal ? Math.round(cartTotal).toString() : cartTotal.toFixed(2);
+                
                 const paymentDataRequest = {
                     merchantId: cko_google_pay_vars.merchant_id.trim(),
                     paymentMethodTokenizationParameters: {
@@ -733,9 +742,9 @@ jQuery( function ( $ ) {
                         allowedCardAuthMethods: ['CRYPTOGRAM_3DS']
                     },
                     transactionInfo: {
-                        currencyCode: cko_google_pay_vars.currency_code || 'USD',
+                        currencyCode: currencyCode,
                         totalPriceStatus: 'FINAL',
-                        totalPrice: cartTotal.toFixed(2),
+                        totalPrice: formattedAmount,
                         totalPriceLabel: 'Total'
                     },
                     // Add display items for breakdown in popup (API v1 supports this)
