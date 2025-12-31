@@ -58,6 +58,16 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		$this->init_form_fields();
 		$this->init_settings();
 
+		// Ensure account type defaults to NAS if not set
+		if ( empty( $this->settings['ckocom_account_type'] ) ) {
+			$this->settings['ckocom_account_type'] = 'NAS';
+			update_option( $this->get_option_key(), $this->settings );
+		} elseif ( 'NAS' !== $this->settings['ckocom_account_type'] ) {
+			// Force account type to NAS (cannot be changed)
+			$this->settings['ckocom_account_type'] = 'NAS';
+			update_option( $this->get_option_key(), $this->settings );
+		}
+
 		// Turn these settings into variables we can use.
 		foreach ( $this->settings as $setting_key => $value ) {
 			$this->$setting_key = $value;
@@ -200,56 +210,135 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 	 * Show module settings links.
 	 */
 	public function admin_options() {
-		if ( ! isset( $_GET['screen'] ) || '' === sanitize_text_field( $_GET['screen'] ) ) {
-			parent::admin_options();
-		} else {
+		$screen = ! empty( $_GET['screen'] ) ? sanitize_text_field( $_GET['screen'] ) : '';
+		$subtab = ! empty( $_GET['subtab'] ) ? sanitize_text_field( $_GET['subtab'] ) : '';
+		$section = ! empty( $_GET['section'] ) ? sanitize_text_field( $_GET['section'] ) : '';
 
-			$screen = sanitize_text_field( $_GET['screen'] );
+		// Map sections to screens for proper handling
+		$section_to_screen_map = array(
+			'wc_checkout_com_cards' => 'quick_settings',
+			'wc_checkout_com_google_pay' => 'express_payments',
+			'wc_checkout_com_apple_pay' => 'express_payments',
+			'wc_checkout_com_paypal' => 'express_payments',
+			'wc_checkout_com_alternative_payments' => 'wc_checkout_com_alternative_payments',
+			'wc_checkout_com_flow' => 'wc_checkout_com_flow_settings',
+		);
+		
+		// If no screen but we have a section, map it
+		if ( empty( $screen ) && ! empty( $section ) ) {
+			if ( isset( $section_to_screen_map[ $section ] ) ) {
+				$screen = $section_to_screen_map[ $section ];
+			} elseif ( 'wc_checkout_com_cards' === $section ) {
+				$screen = 'quick_settings';
+			}
+		}
+		
+		// Default to quick_settings if still empty
+		if ( empty( $screen ) ) {
+			$screen = 'quick_settings';
+		}
 
-			$test = [
-				'screen_button' => [
-					'id'    => 'screen_button',
-					'type'  => 'screen_button',
-					'title' => __( 'Settings', 'checkout-com-unified-payments-api' ),
-				],
-			];
+		// Handle express payments sub-tabs
+		if ( in_array( $section, array( 'wc_checkout_com_google_pay', 'wc_checkout_com_apple_pay', 'wc_checkout_com_paypal' ), true ) ) {
+			$subtab = $section;
+			$screen = 'express_payments';
+		} elseif ( 'express_payments' === $screen && empty( $subtab ) ) {
+			$subtab = ! empty( $section ) ? $section : 'wc_checkout_com_google_pay';
+		}
 
-			echo '<h3>' . $this->method_title . ' </h3>';
-			echo '<p>' . $this->method_description . ' </p>';
-			$this->generate_screen_button_html( 'screen_button', $test );
+		// Handle advanced sub-tabs
+		if ( in_array( $screen, array( 'webhook_queue', 'debug_settings' ), true ) ) {
+			$subtab = $screen;
+			$screen  = 'advanced';
+		} elseif ( 'advanced' === $screen && empty( $subtab ) ) {
+			$subtab = 'webhook_queue';
+		}
+		
+		// Handle direct access to alternative payments
+		if ( 'wc_checkout_com_alternative_payments' === $section ) {
+			$screen = 'wc_checkout_com_alternative_payments';
+		}
+		
+		// Handle direct access to flow settings
+		if ( 'wc_checkout_com_flow' === $section ) {
+			$screen = 'wc_checkout_com_flow_settings';
+		}
 
-			if ( 'orders_settings' === $screen ) {
-				echo '<table class="form-table">';
-				WC_Admin_Settings::output_fields( WC_Checkoutcom_Cards_Settings::order_settings() );
-				echo '</table>';
-			} elseif ( 'card_settings' === $screen ) {
+		$test = [
+			'screen_button' => [
+				'id'    => 'screen_button',
+				'type'  => 'screen_button',
+				'title' => __( 'Settings', 'checkout-com-unified-payments-api' ),
+			],
+		];
 
-				echo '<table class="form-table">';
-				WC_Admin_Settings::output_fields( WC_Checkoutcom_Cards_Settings::cards_settings() );
-				echo '</table>';
-			} elseif ( 'debug_settings' === $screen ) {
+		echo '<h3>' . $this->method_title . ' </h3>';
+		echo '<p>' . $this->method_description . ' </p>';
+		$this->generate_screen_button_html( 'screen_button', $test );
 
-				echo '<table class="form-table">';
-				WC_Admin_Settings::output_fields( WC_Checkoutcom_Cards_Settings::debug_settings() );
-				echo '</table>';
-			} elseif ( 'webhook' === $screen ) {
-
-				echo '<table class="form-table">';
-				WC_Admin_Settings::output_fields( WC_Checkoutcom_Cards_Settings::webhook_settings() );
-				echo '</table>';
-			} elseif ( 'webhook_queue' === $screen ) {
+		if ( 'quick_settings' === $screen ) {
+			echo '<table class="form-table">';
+			WC_Admin_Settings::output_fields( WC_Checkoutcom_Cards_Settings::quick_settings(), 'woocommerce_wc_checkout_com_cards_settings' );
+			echo '</table>';
+		} elseif ( 'orders_settings' === $screen ) {
+			echo '<table class="form-table">';
+			WC_Admin_Settings::output_fields( WC_Checkoutcom_Cards_Settings::order_settings() );
+			echo '</table>';
+		} elseif ( 'card_settings' === $screen ) {
+			echo '<table class="form-table">';
+			WC_Admin_Settings::output_fields( WC_Checkoutcom_Cards_Settings::cards_settings() );
+			echo '</table>';
+		} elseif ( 'express_payments' === $screen ) {
+			// Handle express payments sub-tabs - redirect to actual payment method sections
+			// These are handled by their respective gateway classes
+			if ( empty( $subtab ) ) {
+				$subtab = 'wc_checkout_com_google_pay';
+			}
+			// Redirect to the actual payment method section
+			wp_safe_redirect( admin_url( 'admin.php?page=wc-settings&tab=checkout&section=' . esc_attr( $subtab ) ) );
+			exit;
+		} elseif ( 'advanced' === $screen ) {
+			// Handle advanced sub-tabs
+			if ( empty( $subtab ) ) {
+				$subtab = 'webhook_queue';
+			}
+			if ( 'webhook_queue' === $subtab ) {
 				// Render webhook queue page
 				if ( class_exists( 'WC_Checkoutcom_Webhook_Queue_Admin' ) ) {
 					WC_Checkoutcom_Webhook_Queue_Admin::render_admin_page();
 				} else {
 					echo '<div class="notice notice-error"><p>' . esc_html__( 'Webhook Queue Admin class not found.', 'checkout-com-unified-payments-api' ) . '</p></div>';
 				}
-			} else {
-
+			} elseif ( 'debug_settings' === $subtab ) {
 				echo '<table class="form-table">';
-				WC_Admin_Settings::output_fields( WC_Checkoutcom_Cards_Settings::core_settings() );
+				WC_Admin_Settings::output_fields( WC_Checkoutcom_Cards_Settings::debug_settings() );
 				echo '</table>';
 			}
+		} elseif ( 'debug_settings' === $screen ) {
+			// Legacy support - redirect to advanced
+			wp_safe_redirect( admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards&screen=advanced&subtab=debug_settings' ) );
+			exit;
+		} elseif ( 'webhook_queue' === $screen ) {
+			// Legacy support - redirect to advanced
+			wp_safe_redirect( admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards&screen=advanced&subtab=webhook_queue' ) );
+			exit;
+		} elseif ( 'webhook' === $screen ) {
+			echo '<table class="form-table">';
+			WC_Admin_Settings::output_fields( WC_Checkoutcom_Cards_Settings::webhook_settings() );
+			echo '</table>';
+		} elseif ( 'wc_checkout_com_alternative_payments' === $screen || 'wc_checkout_com_alternative_payments' === $section ) {
+			// Alternative Payments is handled by its own gateway class
+			// This shouldn't normally be reached, but handle it just in case
+			return;
+		} elseif ( 'wc_checkout_com_flow_settings' === $screen || 'wc_checkout_com_flow' === $section ) {
+			// Flow Settings is handled by its own gateway class
+			// This shouldn't normally be reached, but handle it just in case
+			return;
+		} else {
+			// Default to quick settings if screen is unknown
+			echo '<table class="form-table">';
+			WC_Admin_Settings::output_fields( WC_Checkoutcom_Cards_Settings::quick_settings(), 'woocommerce_wc_checkout_com_cards_settings' );
+			echo '</table>';
 		}
 	}
 
@@ -259,21 +348,180 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 	 * @return void
 	 */
 	public function process_admin_options() {
-		if ( isset( $_GET['screen'] ) && '' !== $_GET['screen'] ) {
-			if ( 'card_settings' === $_GET['screen'] ) {
-				WC_Admin_Settings::save_fields( WC_Checkoutcom_Cards_Settings::cards_settings() );
-			} elseif ( 'orders_settings' === $_GET['screen'] ) {
-				WC_Admin_Settings::save_fields( WC_Checkoutcom_Cards_Settings::order_settings() );
-			} elseif ( 'debug_settings' === $_GET['screen'] ) {
-				WC_Admin_Settings::save_fields( WC_Checkoutcom_Cards_Settings::debug_settings() );
+		// DEBUG: Log that function was called
+		error_log( '[CKO SAVE DEBUG] ===== process_admin_options() CALLED =====' );
+		error_log( '[CKO SAVE DEBUG] Gateway ID: ' . $this->id );
+		error_log( '[CKO SAVE DEBUG] REQUEST_METHOD: ' . ( isset( $_SERVER['REQUEST_METHOD'] ) ? $_SERVER['REQUEST_METHOD'] : 'NOT SET' ) );
+		error_log( '[CKO SAVE DEBUG] GET screen: ' . ( isset( $_GET['screen'] ) ? $_GET['screen'] : 'NOT SET' ) );
+		error_log( '[CKO SAVE DEBUG] POST keys: ' . print_r( array_keys( $_POST ), true ) );
+		
+		$screen = ! empty( $_GET['screen'] ) ? sanitize_text_field( $_GET['screen'] ) : 'quick_settings';
+		error_log( '[CKO SAVE DEBUG] Screen determined: ' . $screen );
+
+		if ( 'quick_settings' === $screen ) {
+			// DEBUG: Log POST data
+			error_log( '[CKO SAVE DEBUG] ===== QUICK SETTINGS SAVE STARTED =====' );
+			error_log( '[CKO SAVE DEBUG] Screen: ' . $screen );
+			error_log( '[CKO SAVE DEBUG] POST keys: ' . print_r( array_keys( $_POST ), true ) );
+			if ( isset( $_POST['woocommerce_wc_checkout_com_cards_settings'] ) ) {
+				$post_settings = $_POST['woocommerce_wc_checkout_com_cards_settings'];
+				error_log( '[CKO SAVE DEBUG] POST settings keys: ' . print_r( array_keys( $post_settings ), true ) );
+				error_log( '[CKO SAVE DEBUG] ckocom_sk in POST: ' . ( isset( $post_settings['ckocom_sk'] ) ? 'YES (length: ' . strlen( $post_settings['ckocom_sk'] ) . ')' : 'NO' ) );
+				error_log( '[CKO SAVE DEBUG] ckocom_pk in POST: ' . ( isset( $post_settings['ckocom_pk'] ) ? 'YES (value: ' . substr( $post_settings['ckocom_pk'], 0, 10 ) . '...)' : 'NO' ) );
+				error_log( '[CKO SAVE DEBUG] ckocom_environment in POST: ' . ( isset( $post_settings['ckocom_environment'] ) ? 'YES (value: ' . $post_settings['ckocom_environment'] . ')' : 'NO' ) );
+				error_log( '[CKO SAVE DEBUG] title in POST: ' . ( isset( $post_settings['title'] ) ? 'YES (value: ' . $post_settings['title'] . ')' : 'NO' ) );
 			} else {
-				WC_Admin_Settings::save_fields( WC_Checkoutcom_Cards_Settings::core_settings() );
+				error_log( '[CKO SAVE DEBUG] WARNING: woocommerce_wc_checkout_com_cards_settings not in POST!' );
 			}
-			do_action( 'woocommerce_update_options_' . $this->id );
+			
+			// Get existing settings BEFORE save_fields()
+			$settings_before = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+			error_log( '[CKO SAVE DEBUG] Settings BEFORE save_fields(): ' . print_r( array_keys( $settings_before ), true ) );
+			error_log( '[CKO SAVE DEBUG] Existing ckocom_sk: ' . ( isset( $settings_before['ckocom_sk'] ) ? 'YES (length: ' . strlen( $settings_before['ckocom_sk'] ) . ')' : 'NO' ) );
+			error_log( '[CKO SAVE DEBUG] Existing ckocom_pk: ' . ( isset( $settings_before['ckocom_pk'] ) ? 'YES (value: ' . substr( $settings_before['ckocom_pk'], 0, 10 ) . '...)' : 'NO' ) );
+			
+			// CRITICAL FIX: Manually extract values from POST before save_fields()
+			// This ensures the values are saved even if save_fields() doesn't pick them up
+			$checkout_mode_from_post = null;
+			$secret_key_from_post = null;
+			$public_key_from_post = null;
+			$environment_from_post = null;
+			$title_from_post = null;
+			
+			// Extract checkout mode
+			if ( isset( $_POST['woocommerce_wc_checkout_com_cards_settings']['ckocom_checkout_mode'] ) ) {
+				$checkout_mode_from_post = sanitize_text_field( $_POST['woocommerce_wc_checkout_com_cards_settings']['ckocom_checkout_mode'] );
+			} elseif ( isset( $_POST['ckocom_checkout_mode'] ) ) {
+				// Fallback: Check direct POST key (in case name attribute is wrong)
+				$checkout_mode_from_post = sanitize_text_field( $_POST['ckocom_checkout_mode'] );
+			}
+			
+			// Extract Secret Key (password field - may be empty if not changed, but we still need to check)
+			if ( isset( $_POST['woocommerce_wc_checkout_com_cards_settings']['ckocom_sk'] ) ) {
+				$secret_key_from_post = sanitize_text_field( $_POST['woocommerce_wc_checkout_com_cards_settings']['ckocom_sk'] );
+				error_log( '[CKO SAVE DEBUG] Secret Key extracted from POST (length: ' . strlen( $secret_key_from_post ) . ')' );
+			} else {
+				error_log( '[CKO SAVE DEBUG] Secret Key NOT in POST' );
+			}
+			
+			// Extract Public Key
+			if ( isset( $_POST['woocommerce_wc_checkout_com_cards_settings']['ckocom_pk'] ) ) {
+				$public_key_from_post = sanitize_text_field( $_POST['woocommerce_wc_checkout_com_cards_settings']['ckocom_pk'] );
+				error_log( '[CKO SAVE DEBUG] Public Key extracted from POST (value: ' . substr( $public_key_from_post, 0, 10 ) . '...)' );
+			} else {
+				error_log( '[CKO SAVE DEBUG] Public Key NOT in POST' );
+			}
+			
+			// Extract Environment
+			if ( isset( $_POST['woocommerce_wc_checkout_com_cards_settings']['ckocom_environment'] ) ) {
+				$environment_from_post = sanitize_text_field( $_POST['woocommerce_wc_checkout_com_cards_settings']['ckocom_environment'] );
+				error_log( '[CKO SAVE DEBUG] Environment extracted from POST: ' . $environment_from_post );
+			} else {
+				error_log( '[CKO SAVE DEBUG] Environment NOT in POST' );
+			}
+			
+			// Extract Title
+			if ( isset( $_POST['woocommerce_wc_checkout_com_cards_settings']['title'] ) ) {
+				$title_from_post = sanitize_text_field( $_POST['woocommerce_wc_checkout_com_cards_settings']['title'] );
+				error_log( '[CKO SAVE DEBUG] Title extracted from POST: ' . $title_from_post );
+			} else {
+				error_log( '[CKO SAVE DEBUG] Title NOT in POST' );
+			}
+			
+			error_log( '[CKO SAVE DEBUG] Calling WC_Admin_Settings::save_fields()...' );
+			WC_Admin_Settings::save_fields( WC_Checkoutcom_Cards_Settings::quick_settings(), 'woocommerce_wc_checkout_com_cards_settings' );
+			error_log( '[CKO SAVE DEBUG] WC_Admin_Settings::save_fields() completed' );
+			
+			// Ensure account type is set to NAS and cannot be changed
+			$settings = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+			error_log( '[CKO SAVE DEBUG] Settings AFTER save_fields(): ' . print_r( array_keys( $settings ), true ) );
+			error_log( '[CKO SAVE DEBUG] ckocom_sk after save_fields(): ' . ( isset( $settings['ckocom_sk'] ) ? 'YES (length: ' . strlen( $settings['ckocom_sk'] ) . ')' : 'NO' ) );
+			error_log( '[CKO SAVE DEBUG] ckocom_pk after save_fields(): ' . ( isset( $settings['ckocom_pk'] ) ? 'YES (value: ' . substr( $settings['ckocom_pk'], 0, 10 ) . '...)' : 'NO' ) );
+			
+			// CRITICAL FIX: Manually save checkout mode if it wasn't saved by save_fields()
+			if ( ! empty( $checkout_mode_from_post ) && in_array( $checkout_mode_from_post, array( 'flow', 'classic' ), true ) ) {
+				// Check if save_fields() actually saved it
+				if ( ! isset( $settings['ckocom_checkout_mode'] ) || $settings['ckocom_checkout_mode'] !== $checkout_mode_from_post ) {
+					$settings['ckocom_checkout_mode'] = $checkout_mode_from_post;
+					error_log( '[CKO SAVE DEBUG] Manually saved checkout_mode: ' . $checkout_mode_from_post );
+				}
+			}
+			
+			// CRITICAL FIX: Manually save Secret Key if provided (password fields may not be saved if empty)
+			if ( ! is_null( $secret_key_from_post ) && '' !== $secret_key_from_post ) {
+				$settings['ckocom_sk'] = $secret_key_from_post;
+				error_log( '[CKO SAVE DEBUG] Manually saving Secret Key (length: ' . strlen( $secret_key_from_post ) . ')' );
+			} else {
+				error_log( '[CKO SAVE DEBUG] Secret Key NOT saved - is_null: ' . ( is_null( $secret_key_from_post ) ? 'YES' : 'NO' ) . ', empty: ' . ( '' === $secret_key_from_post ? 'YES' : 'NO' ) );
+			}
+			
+			// CRITICAL FIX: Manually save Public Key if provided
+			if ( ! is_null( $public_key_from_post ) && '' !== $public_key_from_post ) {
+				$settings['ckocom_pk'] = $public_key_from_post;
+				error_log( '[CKO SAVE DEBUG] Manually saving Public Key: ' . substr( $public_key_from_post, 0, 10 ) . '...' );
+			} else {
+				error_log( '[CKO SAVE DEBUG] Public Key NOT saved - is_null: ' . ( is_null( $public_key_from_post ) ? 'YES' : 'NO' ) . ', empty: ' . ( '' === $public_key_from_post ? 'YES' : 'NO' ) );
+			}
+			
+			// CRITICAL FIX: Manually save Environment if provided
+			if ( ! is_null( $environment_from_post ) && in_array( $environment_from_post, array( 'sandbox', 'live' ), true ) ) {
+				$settings['ckocom_environment'] = $environment_from_post;
+				error_log( '[CKO SAVE DEBUG] Manually saving Environment: ' . $environment_from_post );
+			} else {
+				error_log( '[CKO SAVE DEBUG] Environment NOT saved - is_null: ' . ( is_null( $environment_from_post ) ? 'YES' : 'NO' ) . ', valid: ' . ( in_array( $environment_from_post, array( 'sandbox', 'live' ), true ) ? 'YES' : 'NO' ) );
+			}
+			
+			// CRITICAL FIX: Manually save Title if provided
+			if ( ! is_null( $title_from_post ) && '' !== $title_from_post ) {
+				$settings['title'] = $title_from_post;
+				error_log( '[CKO SAVE DEBUG] Manually saving Title: ' . $title_from_post );
+			} else {
+				error_log( '[CKO SAVE DEBUG] Title NOT saved - is_null: ' . ( is_null( $title_from_post ) ? 'YES' : 'NO' ) . ', empty: ' . ( '' === $title_from_post ? 'YES' : 'NO' ) );
+			}
+			
+			$settings['ckocom_account_type'] = 'NAS';
+			error_log( '[CKO SAVE DEBUG] Final settings keys before update_option: ' . print_r( array_keys( $settings ), true ) );
+			error_log( '[CKO SAVE DEBUG] Final ckocom_sk: ' . ( isset( $settings['ckocom_sk'] ) ? 'YES (length: ' . strlen( $settings['ckocom_sk'] ) . ')' : 'NO' ) );
+			error_log( '[CKO SAVE DEBUG] Final ckocom_pk: ' . ( isset( $settings['ckocom_pk'] ) ? 'YES (value: ' . substr( $settings['ckocom_pk'], 0, 10 ) . '...)' : 'NO' ) );
+			
+			$update_result = update_option( 'woocommerce_wc_checkout_com_cards_settings', $settings );
+			error_log( '[CKO SAVE DEBUG] update_option() result: ' . ( $update_result ? 'SUCCESS' : 'FAILED (no changes or error)' ) );
+			
+			// Verify what was actually saved
+			$settings_after = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+			error_log( '[CKO SAVE DEBUG] Settings AFTER update_option(): ' . print_r( array_keys( $settings_after ), true ) );
+			error_log( '[CKO SAVE DEBUG] Verified ckocom_sk: ' . ( isset( $settings_after['ckocom_sk'] ) ? 'YES (length: ' . strlen( $settings_after['ckocom_sk'] ) . ')' : 'NO' ) );
+			error_log( '[CKO SAVE DEBUG] Verified ckocom_pk: ' . ( isset( $settings_after['ckocom_pk'] ) ? 'YES (value: ' . substr( $settings_after['ckocom_pk'], 0, 10 ) . '...)' : 'NO' ) );
+			error_log( '[CKO SAVE DEBUG] ===== QUICK SETTINGS SAVE COMPLETED =====' );
+			
+			// If Flow mode, also save enabled payment methods to Flow settings
+			if ( isset( $settings['ckocom_checkout_mode'] ) && 'flow' === $settings['ckocom_checkout_mode'] ) {
+				if ( isset( $_POST['flow_enabled_payment_methods'] ) ) {
+					$flow_settings = get_option( 'woocommerce_wc_checkout_com_flow_settings', array() );
+					$flow_settings['flow_enabled_payment_methods'] = is_array( $_POST['flow_enabled_payment_methods'] ) ? array_map( 'sanitize_text_field', $_POST['flow_enabled_payment_methods'] ) : array();
+					update_option( 'woocommerce_wc_checkout_com_flow_settings', $flow_settings );
+				}
+			}
+			
+			// If Classic mode, also save alternative payment methods to Alternative Payments settings
+			if ( isset( $settings['ckocom_checkout_mode'] ) && 'classic' === $settings['ckocom_checkout_mode'] ) {
+				if ( isset( $_POST['ckocom_apms_selector'] ) ) {
+					$apm_settings = get_option( 'woocommerce_wc_checkout_com_alternative_payments_settings', array() );
+					$apm_settings['ckocom_apms_selector'] = is_array( $_POST['ckocom_apms_selector'] ) ? array_map( 'sanitize_text_field', $_POST['ckocom_apms_selector'] ) : array();
+					update_option( 'woocommerce_wc_checkout_com_alternative_payments_settings', $apm_settings );
+				}
+			}
+		} elseif ( 'card_settings' === $screen ) {
+			WC_Admin_Settings::save_fields( WC_Checkoutcom_Cards_Settings::cards_settings() );
+		} elseif ( 'orders_settings' === $screen ) {
+			WC_Admin_Settings::save_fields( WC_Checkoutcom_Cards_Settings::order_settings() );
+		} elseif ( 'debug_settings' === $screen ) {
+			WC_Admin_Settings::save_fields( WC_Checkoutcom_Cards_Settings::debug_settings() );
 		} else {
-			parent::process_admin_options();
-			do_action( 'woocommerce_update_options_' . $this->id );
+			WC_Admin_Settings::save_fields( WC_Checkoutcom_Cards_Settings::core_settings() );
 		}
+		
+		do_action( 'woocommerce_update_options_' . $this->id );
 	}
 
 	/**

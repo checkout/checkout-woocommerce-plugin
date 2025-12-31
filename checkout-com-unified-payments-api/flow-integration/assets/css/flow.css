@@ -539,3 +539,78 @@ body[data-saved-payment-order="new_payment_first"].flow-ready .saved-cards-accor
 	border-color: #186aff;
 	border-width: 1px;
 }
+
+/* Responsive adjustments for smaller screens */
+@media screen and (max-width: 768px) {
+	/* When saved cards exist, reduce padding on mobile */
+	.saved-cards-accordion-container ~ * #flow-container,
+	.payment_method_wc_checkout_com_flow:has(.saved-cards-accordion-container) #flow-container {
+		padding: 15px;
+		margin: 15px 0;
+	}
+	/* Accordion containers - mobile spacing */
+	.flow-accordion-container, .saved-cards-accordion-container {
+		margin: 15px 0;
+	}
+	/* Accordion headers - mobile padding */
+	.flow-accordion-header, .saved-cards-accordion-header {
+		padding: 12px 15px;
+	}
+	/* Accordion panels - mobile padding */
+	.flow-accordion-panel, .saved-cards-accordion-panel {
+		padding: 0 15px 12px 15px;
+	}
+	/* Adjust font sizes for better readability on mobile */
+	.flow-label-text, .saved-cards-label-text {
+		font-size: 13px;
+	}
+	.flow-label-subtext, .saved-cards-label-subtext {
+		font-size: 11px;
+	}
+	/* Ensure text wraps in labels */
+	.flow-label, .saved-cards-label {
+		word-break: break-word;
+	}
+	/* Adjust iframe height for responsive fields */
+	.f12r58da iframe {
+		height: 40px !important; /* Standard input height */
+	}
+}
+
+@media screen and (min-width: 769px) and (max-width: 1024px) {
+	/* Tablet adjustments */
+	.saved-cards-accordion-container ~ * #flow-container,
+	.payment_method_wc_checkout_com_flow:has(.saved-cards-accordion-container) #flow-container {
+		padding: 18px;
+		margin: 18px 0;
+	}
+	.flow-accordion-header, .saved-cards-accordion-header {
+		padding: 14px 18px;
+	}
+	.flow-accordion-panel, .saved-cards-accordion-panel {
+		padding: 0 18px 14px 18px;
+	}
+}
+
+@media screen and (max-width: 480px) {
+	/* Extra small mobile adjustments */
+	.saved-cards-accordion-container ~ * #flow-container,
+	.payment_method_wc_checkout_com_flow:has(.saved-cards-accordion-container) #flow-container {
+		padding: 10px;
+		margin: 10px 0;
+	}
+	.flow-accordion-header, .saved-cards-accordion-header {
+		padding: 10px 12px;
+	}
+	.flow-accordion-panel, .saved-cards-accordion-panel {
+		padding: 0 12px 10px 12px;
+	}
+	.flow-icon, .saved-cards-icon {
+		width: 30px;
+		height: 18px;
+	}
+	.flow-icon svg, .saved-cards-icon svg {
+		width: 30px;
+		height: 18px;
+	}
+}

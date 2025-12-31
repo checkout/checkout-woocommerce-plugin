@@ -26,13 +26,14 @@ print(f'Main File: {MAIN_FILE}')
 print(f'Plugin Name: {PLUGIN_NAME}')
 print('')
 
-# Verify main file exists
-if not os.path.exists(MAIN_FILE):
-    print(f'❌ ERROR: Main plugin file not found: {MAIN_FILE}')
+# Verify main file exists (check in plugin folder)
+main_file_path = os.path.join(PLUGIN_FOLDER, MAIN_FILE)
+if not os.path.exists(main_file_path):
+    print(f'❌ ERROR: Main plugin file not found: {main_file_path}')
     exit(1)
 
 # Verify Plugin Name in header
-with open(MAIN_FILE, 'r', encoding='utf-8') as f:
+with open(main_file_path, 'r', encoding='utf-8') as f:
     content = f.read()
     if f'Plugin Name: {PLUGIN_NAME}' not in content:
         print('⚠️  WARNING: Plugin Name header might not match!')
@@ -75,9 +76,16 @@ def should_exclude(path):
             return True
     return False
 
-# Copy files
+# Copy files from plugin folder only
 copied_count = 0
-for root, dirs, files in os.walk('.'):
+plugin_source_dir = os.path.join(SCRIPT_DIR, PLUGIN_FOLDER)
+
+if not os.path.exists(plugin_source_dir):
+    print(f'❌ ERROR: Plugin folder not found: {plugin_source_dir}')
+    shutil.rmtree(temp_dir)
+    exit(1)
+
+for root, dirs, files in os.walk(plugin_source_dir):
     # Filter excluded directories
     dirs[:] = [d for d in dirs if not should_exclude(d)]
     
@@ -89,7 +97,8 @@ for root, dirs, files in os.walk('.'):
         if should_exclude(src):
             continue
         
-        rel_path = os.path.relpath(src, '.')
+        # Calculate relative path from plugin folder
+        rel_path = os.path.relpath(src, plugin_source_dir)
         dst = os.path.join(plugin_dir, rel_path)
         
         try:
@@ -105,8 +114,18 @@ print(f'✅ Copied {copied_count} files')
 main_file_path = os.path.join(plugin_dir, MAIN_FILE)
 if not os.path.exists(main_file_path):
     print(f'❌ ERROR: Main plugin file not found in plugin directory!')
+    print(f'   Expected: {main_file_path}')
     shutil.rmtree(temp_dir)
     exit(1)
+
+# Check if vendor directory exists (required for SDK)
+vendor_autoload = os.path.join(plugin_dir, 'vendor', 'autoload.php')
+if not os.path.exists(vendor_autoload):
+    print('⚠️  WARNING: vendor/autoload.php not found!')
+    print('   The plugin requires vendor dependencies. Please ensure vendor/ folder exists.')
+    print('   You may need to run \'composer install\' or copy vendor from Release folder.')
+else:
+    print('✅ Vendor dependencies found')
 
 # Create zip from temp directory
 print('📦 Creating zip archive...')

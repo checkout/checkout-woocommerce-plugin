@@ -33,23 +33,27 @@ class WC_Checkoutcom_Utility {
 	 */
 	public static function value_to_decimal( $amount, $currency_symbol ) {
 		$currency                    = strtoupper( $currency_symbol );
+		// Three-decimal currencies: amount divided by 1000
+		// Reference: https://www.checkout.com/docs/payments/accept-payments/format-the-amount-value
 		$three_decimal_currency_list = [ 'BHD', 'LYD', 'JOD', 'IQD', 'KWD', 'OMR', 'TND' ];
+		// Zero-decimal currencies: amount is the full amount (no division)
+		// Reference: https://www.checkout.com/docs/payments/accept-payments/format-the-amount-value
 		$zero_decimal_currency_list  = [
-			'BYR',
-			'XOF',
-			'BIF',
-			'XAF',
-			'KMF',
-			'XOF',
-			'DJF',
-			'XPF',
-			'GNF',
-			'JPY',
-			'KRW',
-			'PYG',
-			'RWF',
-			'VUV',
-			'VND',
+			'BIF', // Burundian Franc
+			'DJF', // Djiboutian Franc
+			'GNF', // Guinean Franc
+			'ISK', // Icelandic Krona
+			'JPY', // Japanese Yen
+			'KMF', // Comoran Franc
+			'KRW', // South Korean Won
+			'PYG', // Paraguayan Guarani
+			'RWF', // Rwandan Franc
+			'UGX', // Ugandan Shilling
+			'VUV', // Vanuatu Vatu
+			'VND', // Vietnamese Dong
+			'XAF', // Central African Franc
+			'XOF', // West African CFA franc
+			'XPF', // Comptoirs Français du Pacifique
 		];
 
 		if ( in_array( $currency, $three_decimal_currency_list, true ) ) {
@@ -73,23 +77,27 @@ class WC_Checkoutcom_Utility {
 	 */
 	public static function decimal_to_value( $amount, $currency_symbol ) {
 		$currency                    = strtoupper( $currency_symbol );
+		// Three-decimal currencies: amount divided by 1000
+		// Reference: https://www.checkout.com/docs/payments/accept-payments/format-the-amount-value
 		$three_decimal_currency_list = [ 'BHD', 'LYD', 'JOD', 'IQD', 'KWD', 'OMR', 'TND' ];
+		// Zero-decimal currencies: amount is the full amount (no division)
+		// Reference: https://www.checkout.com/docs/payments/accept-payments/format-the-amount-value
 		$zero_decimal_currency_list  = [
-			'BYR',
-			'XOF',
-			'BIF',
-			'XAF',
-			'KMF',
-			'XOF',
-			'DJF',
-			'XPF',
-			'GNF',
-			'JPY',
-			'KRW',
-			'PYG',
-			'RWF',
-			'VUV',
-			'VND',
+			'BIF', // Burundian Franc
+			'DJF', // Djiboutian Franc
+			'GNF', // Guinean Franc
+			'ISK', // Icelandic Krona
+			'JPY', // Japanese Yen
+			'KMF', // Comoran Franc
+			'KRW', // South Korean Won
+			'PYG', // Paraguayan Guarani
+			'RWF', // Rwandan Franc
+			'UGX', // Ugandan Shilling
+			'VUV', // Vanuatu Vatu
+			'VND', // Vietnamese Dong
+			'XAF', // Central African Franc
+			'XOF', // West African CFA franc
+			'XPF', // Comptoirs Français du Pacifique
 		];
 
 		if ( in_array( $currency, $three_decimal_currency_list, true ) ) {
@@ -188,12 +196,22 @@ class WC_Checkoutcom_Utility {
 	/**
 	 * Log data to file using WC logger.
 	 *
-	 * @param string    $error_message Error message to log.
-	 * @param Exception $exception Exception object.
+	 * @param string|array $error_message Error message to log.
+	 * @param Exception     $exception Exception object.
 	 */
 	public static function logger( $error_message, $exception = null ) {
 		$logger  = wc_get_logger();
 		$context = [ 'source' => 'wc_checkoutcom_gateway_log' ];
+
+		// Convert array to string if needed
+		if ( is_array( $error_message ) || is_object( $error_message ) ) {
+			$error_message = wc_print_r( $error_message, true );
+		}
+
+		// Ensure error_message is a string
+		if ( ! is_string( $error_message ) ) {
+			$error_message = (string) $error_message;
+		}
 
 		// Get file logging from module setting.
 		$file_logging = 'yes' === WC_Admin_Settings::get_option( 'cko_file_logging', 'no' );
