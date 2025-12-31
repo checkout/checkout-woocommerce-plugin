@@ -82,6 +82,15 @@ if [ ! -f "${PLUGIN_DIR}/${MAIN_FILE}" ]; then
     exit 1
 fi
 
+# Check if vendor directory exists (required for SDK)
+if [ ! -f "${PLUGIN_DIR}/vendor/autoload.php" ]; then
+    echo "⚠️  WARNING: vendor/autoload.php not found!"
+    echo "   The plugin requires vendor dependencies. Please ensure vendor/ folder exists."
+    echo "   You may need to run 'composer install' or copy vendor from Release folder."
+else
+    echo "✅ Vendor dependencies found"
+fi
+
 echo "✅ Files copied to plugin folder"
 
 # Create zip from temp directory (so folder structure is preserved)
