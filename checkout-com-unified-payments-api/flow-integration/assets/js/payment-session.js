@@ -1,290 +1,70 @@
 /*
- * Centralized logging utility for Checkout.com Flow integration.
- * Controls what logs appear in production vs debug mode.
+ * REFACTORED: Logger module extracted to modules/flow-logger.js
+ * 
+ * The logger is now loaded as a separate module before this file.
+ * This reduces complexity and improves maintainability.
+ * 
+ * Module location: flow-integration/assets/js/modules/flow-logger.js
+ * 
+ * Fallback: If logger module didn't load (shouldn't happen), use basic console methods
  */
-var ckoLogger = {
-	debugEnabled: (typeof cko_flow_vars !== 'undefined' && cko_flow_vars.debug_logging) || false,
-	
-	// ALWAYS VISIBLE (Production + Debug) - Critical for payment troubleshooting
-	error: function(message, data) {
-		console.error('[FLOW ERROR] ' + message, data !== undefined ? data : '');
-	},
-	
-	warn: function(message, data) {
-		console.warn('[FLOW WARNING] ' + message, data !== undefined ? data : '');
-	},
-	
-	webhook: function(message, data) {
-		console.log('[FLOW WEBHOOK] ' + message, data !== undefined ? data : '');
-	},
-	
-	threeDS: function(message, data) {
-		console.log('[FLOW 3DS] ' + message, data !== undefined ? data : '');
-	},
-	
-	payment: function(message, data) {
-		console.log('[FLOW PAYMENT] ' + message, data !== undefined ? data : '');
-	},
-	
-	version: function(version) {
-		console.log('🚀 Checkout.com Flow v' + version);
-	},
-	
-	// DEBUG ONLY (Hidden in Production) - Enable via "Debug Logging" setting
-	debug: function(message, data) {
-		if (this.debugEnabled) {
-			console.log('[FLOW DEBUG] ' + message, data !== undefined ? data : '');
+if (typeof window.ckoLogger === 'undefined') {
+	console.warn('[FLOW] Logger module not loaded - using fallback logger');
+	window.ckoLogger = {
+		debugEnabled: (typeof cko_flow_vars !== 'undefined' && cko_flow_vars.debug_logging) || false,
+		error: function(m, d) { console.error('[FLOW ERROR] ' + m, d !== undefined ? d : ''); },
+		warn: function(m, d) { console.warn('[FLOW WARNING] ' + m, d !== undefined ? d : ''); },
+		webhook: function(m, d) { console.log('[FLOW WEBHOOK] ' + m, d !== undefined ? d : ''); },
+		threeDS: function(m, d) { console.log('[FLOW 3DS] ' + m, d !== undefined ? d : ''); },
+		payment: function(m, d) { console.log('[FLOW PAYMENT] ' + m, d !== undefined ? d : ''); },
+		version: function(v) { console.log('🚀 Checkout.com Flow v' + v); },
+		debug: function(m, d) { 
+			if (this.debugEnabled) {
+				console.log('[FLOW DEBUG] ' + m, d !== undefined ? d : '');
+			}
+		},
+		performance: function(m, d) { 
+			if (this.debugEnabled) {
+				console.log('[FLOW PERFORMANCE] ' + m, d !== undefined ? d : '');
+			}
 		}
-	},
-	
-	performance: function(message, data) {
-		if (this.debugEnabled) {
-			console.log('[FLOW PERFORMANCE] ' + message, data !== undefined ? data : '');
-		}
-	}
-};
+	};
+}
 
 /*
  * CRITICAL: Early 3DS Detection - MUST run before any other code
  * This prevents Flow from initializing during 3DS returns
  */
 
-/**
- * TERMS CHECKBOX FIX: Prevent page reload when terms checkbox is clicked
+/*
+ * REFACTORED: Terms checkbox prevention extracted to modules/flow-terms-prevention.js
  * 
- * Strategy: Intercept checkbox change events in CAPTURE phase BEFORE WooCommerce handlers run
- * This prevents WooCommerce from triggering update_checkout for terms checkboxes
+ * The terms checkbox prevention logic is now loaded as a separate module before this file.
+ * This reduces complexity and improves maintainability.
+ * 
+ * Module location: flow-integration/assets/js/modules/flow-terms-prevention.js
+ * 
+ * The module exposes:
+ * - window.isTermsCheckbox() - Helper function (used in updated_checkout handler)
+ * - window.ckoPreventUpdateCheckout - Prevention flag
+ * - window.ckoTermsCheckboxLastClicked - Last clicked checkbox reference
+ * - window.ckoTermsCheckboxLastClickTime - Timestamp of last click
+ * 
+ * Fallback: If module didn't load, isTermsCheckbox will be undefined and updated_checkout
+ * handler will skip terms checkbox checks (graceful degradation)
  */
-
-/**
- * Helper function to detect if an element is a terms/agreement checkbox
- * Works generically for any terms checkbox regardless of ID/name/class
- * Defined globally so it's accessible in updated_checkout handler
- */
-function isTermsCheckbox(element) {
-	if (!element || element.type !== 'checkbox') {
-		return false;
-	}
-	
-	const $element = jQuery(element);
-	const id = (element.id || '').toLowerCase();
-	const name = (element.name || '').toLowerCase();
-	const className = (element.className || '').toLowerCase();
-	
-	// Check ID/name patterns
-	if (id.includes('terms') || id.includes('agree') || id.includes('policy') ||
-	    name.includes('terms') || name.includes('agree') || name.includes('policy')) {
-		return true;
-	}
-	
-	// Check for WooCommerce terms wrapper classes
-	if ($element.closest('.woocommerce-terms-and-conditions-wrapper').length > 0 ||
-	    $element.closest('.woocommerce-terms-and-conditions-checkbox-text').length > 0 ||
-	    $element.closest('.terms-wrapper').length > 0) {
-		return true;
-	}
-	
-	// Check label text for agreement phrases
-	const label = $element.closest('label');
-	if (label.length) {
-		const labelText = label.text().toLowerCase();
-		const agreementPhrases = [
-			'read and agree', 'read and accept', 'agree to', 'agree with',
-			'accept the', 'accept our', 'terms and conditions', 'terms & conditions',
-			'i agree', 'i accept', 'agree me'
-		];
-		if (agreementPhrases.some(phrase => labelText.includes(phrase))) {
-			return true;
-		}
-	}
-	
-	return false;
+// Ensure isTermsCheckbox is available (should be set by module, but check for safety)
+if (typeof window.isTermsCheckbox === 'undefined') {
+	console.warn('[FLOW] Terms prevention module not loaded - isTermsCheckbox unavailable');
+	// Fallback function (minimal implementation)
+	window.isTermsCheckbox = function(element) {
+		if (!element || element.type !== 'checkbox') return false;
+		const id = (element.id || '').toLowerCase();
+		const name = (element.name || '').toLowerCase();
+		return id.includes('terms') || id.includes('agree') || 
+		       name.includes('terms') || name.includes('agree');
+	};
 }
-
-(function() {
-	/**
-	 * CRITICAL FIX: Prevent page reload when terms checkbox is clicked
-	 * 
-	 * Strategy: Intercept jQuery's trigger() method BEFORE it fires update_checkout
-	 * This prevents WooCommerce from triggering the event that causes page reload
-	 */
-	
-	// Global flag to prevent update_checkout when terms checkbox is clicked
-	window.ckoPreventUpdateCheckout = false;
-	window.ckoTermsCheckboxLastClicked = null;
-	window.ckoTermsCheckboxLastClickTime = 0;
-	
-	// Track clicks on checkboxes and set prevention flag
-	document.addEventListener('click', function(e) {
-		if (e.target.type === 'checkbox' && isTermsCheckbox(e.target)) {
-			window.ckoPreventUpdateCheckout = true;
-			window.ckoTermsCheckboxLastClicked = e.target;
-			window.ckoTermsCheckboxLastClickTime = Date.now();
-			ckoLogger.debug('Terms checkbox clicked - setting prevention flag', {
-				elementId: e.target.id || 'no-id',
-				elementName: e.target.name || 'no-name'
-			});
-			
-			// Clear flag after longer delay to catch async triggers
-			setTimeout(function() {
-				window.ckoPreventUpdateCheckout = false;
-			}, 3000); // Increased to 3 seconds to catch async triggers
-		}
-	}, true); // Capture phase to set flag early
-	
-	// CRITICAL: Intercept change events on terms checkboxes BEFORE they reach WooCommerce
-	// This prevents WooCommerce from triggering update_checkout
-	document.addEventListener('change', function(e) {
-		if (e.target.type === 'checkbox' && isTermsCheckbox(e.target)) {
-			window.ckoPreventUpdateCheckout = true;
-			window.ckoTermsCheckboxLastClicked = e.target;
-			window.ckoTermsCheckboxLastClickTime = Date.now();
-			ckoLogger.debug('Terms checkbox changed - setting prevention flag', {
-				elementId: e.target.id || 'no-id',
-				elementName: e.target.name || 'no-name'
-			});
-			
-			// Clear flag after longer delay (for change events which trigger async updates)
-			setTimeout(function() {
-				window.ckoPreventUpdateCheckout = false;
-			}, 3000); // Increased to 3 seconds to catch async triggers
-		}
-	}, true); // Capture phase - runs BEFORE WooCommerce handlers
-	
-	// CRITICAL: Intercept checkbox change events via jQuery BEFORE WooCommerce handlers
-	// This must run immediately, not wait for DOM ready
-	if (typeof jQuery !== 'undefined') {
-		// Use event delegation on document to catch all checkbox changes early
-		jQuery(document).on('change.cko-terms-prevention', 'input[type="checkbox"]', function(e) {
-			if (isTermsCheckbox(this)) {
-				window.ckoPreventUpdateCheckout = true;
-				window.ckoTermsCheckboxLastClicked = this;
-				window.ckoTermsCheckboxLastClickTime = Date.now();
-				ckoLogger.debug('🚫 Terms checkbox change intercepted via jQuery delegation - preventing update_checkout', {
-					elementId: this.id || 'no-id',
-					elementName: this.name || 'no-name'
-				});
-				
-				// CRITICAL: Stop this event from reaching WooCommerce handlers
-				e.stopImmediatePropagation();
-				
-				// Clear flag after delay
-				setTimeout(function() {
-					window.ckoPreventUpdateCheckout = false;
-				}, 3000);
-			}
-		});
-		
-		// Also intercept on body (WooCommerce often uses body for event delegation)
-		jQuery('body').on('change.cko-terms-prevention', 'input[type="checkbox"]', function(e) {
-			if (isTermsCheckbox(this)) {
-				window.ckoPreventUpdateCheckout = true;
-				window.ckoTermsCheckboxLastClicked = this;
-				window.ckoTermsCheckboxLastClickTime = Date.now();
-				ckoLogger.debug('🚫 Terms checkbox change intercepted via body delegation - preventing update_checkout');
-				e.stopImmediatePropagation();
-				setTimeout(function() {
-					window.ckoPreventUpdateCheckout = false;
-				}, 3000);
-			}
-		});
-	}
-	
-	// CRITICAL: Intercept jQuery's trigger() method to block update_checkout events
-	// This must happen BEFORE WooCommerce's handlers run
-	if (typeof jQuery !== 'undefined') {
-		// Store original trigger methods
-		const originalTrigger = jQuery.fn.trigger;
-		const originalEventTrigger = jQuery.event.trigger;
-		
-		// Override jQuery.fn.trigger()
-		// PERFORMANCE: Check flag first (fastest check) before string/object comparisons
-		jQuery.fn.trigger = function(event, data) {
-			// Fast path: Only check if prevention flag is set (most trigger calls skip this)
-			if (window.ckoPreventUpdateCheckout) {
-				// Only do expensive checks if flag is set (rare case)
-				const eventName = typeof event === 'string' ? event : (event && event.type ? event.type : 'unknown');
-				const isUpdateCheckout = eventName === 'update_checkout' || 
-				                        (typeof event === 'object' && event && event.type === 'update_checkout');
-				if (isUpdateCheckout) {
-					ckoLogger.debug('✅ BLOCKED update_checkout trigger from jQuery.fn.trigger() - terms checkbox prevention active', {
-						event: eventName,
-						element: this[0] ? (this[0].id || this[0].tagName || this[0].className) : 'unknown',
-						preventionFlag: window.ckoPreventUpdateCheckout
-					});
-					return this; // Return jQuery object without triggering event
-				}
-			}
-			// Call original trigger for all other events (99.9% of calls take this path)
-			return originalTrigger.apply(this, arguments);
-		};
-		
-		// Override jQuery.event.trigger() (used by jQuery internally)
-		// PERFORMANCE: Check flag first (fastest check) before string/object comparisons
-		jQuery.event.trigger = function(event, data, elem, onlyHandlers) {
-			// Fast path: Only check if prevention flag is set (most trigger calls skip this)
-			if (window.ckoPreventUpdateCheckout) {
-				// Only do expensive checks if flag is set (rare case)
-				const eventName = typeof event === 'string' ? event : (event && event.type ? event.type : 'unknown');
-				const isUpdateCheckout = eventName === 'update_checkout' || 
-				                        (typeof event === 'object' && event && event.type === 'update_checkout');
-				if (isUpdateCheckout) {
-					ckoLogger.debug('✅ BLOCKED update_checkout trigger from jQuery.event.trigger() - terms checkbox prevention active', {
-						event: eventName,
-						element: elem ? (elem.id || elem.tagName || elem.className) : 'unknown',
-						preventionFlag: window.ckoPreventUpdateCheckout
-					});
-					return; // Exit without triggering event
-				}
-			}
-			// Call original trigger for all other events (99.9% of calls take this path)
-			return originalEventTrigger.apply(this, arguments);
-		};
-		
-		ckoLogger.debug('jQuery trigger interception installed for terms checkbox prevention');
-		
-		// CRITICAL: Also intercept form submissions triggered by terms checkbox
-		// WooCommerce might submit the form after update_checkout event
-		const checkoutForm = document.querySelector('form.checkout');
-		if (checkoutForm) {
-			// Intercept form submit events
-			checkoutForm.addEventListener('submit', function(e) {
-				// Check if prevention flag is set (terms checkbox was clicked recently)
-				if (window.ckoPreventUpdateCheckout || 
-				    (window.ckoTermsCheckboxLastClicked && 
-				     isTermsCheckbox(window.ckoTermsCheckboxLastClicked) && 
-				     (Date.now() - window.ckoTermsCheckboxLastClickTime) < 2000)) {
-					ckoLogger.debug('Blocked form submission triggered by terms checkbox', {
-						preventionFlag: window.ckoPreventUpdateCheckout,
-						lastClickedId: window.ckoTermsCheckboxLastClicked ? (window.ckoTermsCheckboxLastClicked.id || 'no-id') : 'none'
-					});
-					e.preventDefault();
-					e.stopImmediatePropagation();
-					// Clear flags
-					window.ckoPreventUpdateCheckout = false;
-					window.ckoTermsCheckboxLastClicked = null;
-					return false;
-				}
-			}, true); // Capture phase to intercept early
-		}
-		
-		// Also intercept via jQuery (backup)
-		jQuery(document).on('submit', 'form.checkout', function(e) {
-			if (window.ckoPreventUpdateCheckout || 
-			    (window.ckoTermsCheckboxLastClicked && 
-			     isTermsCheckbox(window.ckoTermsCheckboxLastClicked) && 
-			     (Date.now() - window.ckoTermsCheckboxLastClickTime) < 2000)) {
-				ckoLogger.debug('Blocked jQuery form submission triggered by terms checkbox');
-				e.preventDefault();
-				e.stopImmediatePropagation();
-				window.ckoPreventUpdateCheckout = false;
-				window.ckoTermsCheckboxLastClicked = null;
-				return false;
-			}
-		});
-		
-	}
-})();
 (function() {
 	// Check URL parameters immediately (before any other code runs)
 	const urlParams = new URLSearchParams(window.location.search);

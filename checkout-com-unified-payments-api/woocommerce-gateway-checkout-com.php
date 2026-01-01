@@ -1118,10 +1118,30 @@ function callback_for_setting_up_scripts() {
 		wp_register_style( 'cko-flow-style', WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/css/flow.css', array(), WC_CHECKOUTCOM_PLUGIN_VERSION );
 		wp_enqueue_style( 'cko-flow-style' );
 
+		// REFACTORED: Enqueue logger module FIRST (before other Flow scripts)
+		// Logger module has no dependencies - must load before payment-session.js
+		wp_enqueue_script(
+			'checkout-com-flow-logger-script', 
+			WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/js/modules/flow-logger.js', 
+			array(), // No dependencies - must load first
+			WC_CHECKOUTCOM_PLUGIN_VERSION,
+			false // Load in header to ensure it's available early
+		);
+
+		// REFACTORED: Enqueue terms prevention module (needs jQuery and logger)
+		// Must load before payment-session.js to intercept events early
+		wp_enqueue_script(
+			'checkout-com-flow-terms-prevention-script', 
+			WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/js/modules/flow-terms-prevention.js', 
+			array( 'jquery', 'checkout-com-flow-logger-script' ), // jQuery and logger are dependencies
+			WC_CHECKOUTCOM_PLUGIN_VERSION,
+			false // Load in header to intercept events early
+		);
+
 		wp_enqueue_script(
 			'checkout-com-flow-container-script', 
 			WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/js/flow-container.js', 
-			array( 'jquery' ), 
+			array( 'jquery', 'checkout-com-flow-logger-script' ), // Logger is dependency
 			WC_CHECKOUTCOM_PLUGIN_VERSION
 		);
 
@@ -1138,7 +1158,7 @@ function callback_for_setting_up_scripts() {
 	wp_enqueue_script(
 		'checkout-com-flow-payment-session-script', 
 		WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/js/payment-session.js', 
-		array( 'jquery', 'flow-customization-script', 'checkout-com-flow-container-script', 'wp-i18n' ), 
+		array( 'jquery', 'flow-customization-script', 'checkout-com-flow-container-script', 'checkout-com-flow-logger-script', 'checkout-com-flow-terms-prevention-script', 'wp-i18n' ), // Logger and terms prevention are dependencies
 			$payment_session_version
 	);
 
