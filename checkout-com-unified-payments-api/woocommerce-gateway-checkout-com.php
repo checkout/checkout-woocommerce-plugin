@@ -1138,6 +1138,36 @@ function callback_for_setting_up_scripts() {
 			false // Load in header to intercept events early
 		);
 
+		// REFACTORED: Enqueue validation module (needs jQuery and logger)
+		// Must load before payment-session.js
+		wp_enqueue_script(
+			'checkout-com-flow-validation-script', 
+			WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/js/modules/flow-validation.js', 
+			array( 'jquery', 'checkout-com-flow-logger-script' ), // jQuery and logger are dependencies
+			WC_CHECKOUTCOM_PLUGIN_VERSION,
+			false // Load in header
+		);
+
+		// REFACTORED: Enqueue state management module (needs logger)
+		// Must load before payment-session.js to provide centralized state
+		wp_enqueue_script(
+			'checkout-com-flow-state-script', 
+			WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/js/modules/flow-state.js', 
+			array( 'checkout-com-flow-logger-script' ), // Logger is dependency
+			WC_CHECKOUTCOM_PLUGIN_VERSION,
+			false // Load in header
+		);
+
+		// REFACTORED: Enqueue initialization helper module (needs jQuery, logger, validation, state)
+		// Must load before payment-session.js to provide initialization helpers
+		wp_enqueue_script(
+			'checkout-com-flow-initialization-script', 
+			WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/js/modules/flow-initialization.js', 
+			array( 'jquery', 'checkout-com-flow-logger-script', 'checkout-com-flow-validation-script', 'checkout-com-flow-state-script' ), // jQuery, logger, validation, and state are dependencies
+			WC_CHECKOUTCOM_PLUGIN_VERSION,
+			false // Load in header
+		);
+
 		wp_enqueue_script(
 			'checkout-com-flow-container-script', 
 			WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/js/flow-container.js', 
@@ -1158,7 +1188,7 @@ function callback_for_setting_up_scripts() {
 	wp_enqueue_script(
 		'checkout-com-flow-payment-session-script', 
 		WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/js/payment-session.js', 
-		array( 'jquery', 'flow-customization-script', 'checkout-com-flow-container-script', 'checkout-com-flow-logger-script', 'checkout-com-flow-terms-prevention-script', 'wp-i18n' ), // Logger and terms prevention are dependencies
+		array( 'jquery', 'flow-customization-script', 'checkout-com-flow-container-script', 'checkout-com-flow-logger-script', 'checkout-com-flow-terms-prevention-script', 'checkout-com-flow-validation-script', 'checkout-com-flow-state-script', 'checkout-com-flow-initialization-script', 'wp-i18n' ), // Logger, terms prevention, validation, state, and initialization are dependencies
 			$payment_session_version
 	);
 
