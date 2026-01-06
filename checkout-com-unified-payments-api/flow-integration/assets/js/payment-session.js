@@ -82,7 +82,7 @@ if (typeof window.isTermsCheckbox === 'undefined') {
 		}
 		
 		// Log using console.log (always available, even before ckoLogger is defined)
-		console.log('[FLOW 3DS] ⚠️⚠️⚠️ EARLY DETECTION: 3DS return detected, preventing ALL Flow initialization', {
+		ckoLogger.threeDS('⚠️⚠️⚠️ EARLY DETECTION: 3DS return detected, preventing ALL Flow initialization', {
 			paymentId: paymentId,
 			sessionId: sessionId,
 			paymentSessionId: paymentSessionId,
@@ -1381,8 +1381,8 @@ var ckoFlow = {
 						ckoLogger.debug('onChange - Save card checkbox not available (feature disabled)');
 					}
 
-					console.log(
-						`[FLOW] onChange() -> isValid: "${component.isValid()}" for "${
+					ckoLogger.debug(
+						`onChange() -> isValid: "${component.isValid()}" for "${
 							component.type
 						}"`
 					);
@@ -1893,19 +1893,19 @@ var ckoFlow = {
 			placeOrderBtn.classList.remove("flow-loading");
 			placeOrderBtn.style.removeProperty('opacity');
 			placeOrderBtn.style.removeProperty('visibility');
-			console.log('[FLOW] ✓ Place Order button enabled');
+			ckoLogger.debug('Place Order button enabled');
 		}
 		
 		// Step 3: Hide save card checkbox initially
 		if (saveCardCheckbox) {
 			saveCardCheckbox.style.display = 'none';
 		} else {
-			console.log('[FLOW] Mount - Save card checkbox not available (feature disabled)');
+			ckoLogger.debug('Mount - Save card checkbox not available (feature disabled)');
 		}
 		
 		// Step 4: Mark Flow as ready
 		document.body.classList.add("flow-ready");
-		console.log('[FLOW] ✓ Checkout is now fully interactive');
+		ckoLogger.debug('Checkout is now fully interactive');
 		
 		// CRITICAL: Listen for user interaction with Flow fields (click, focus, input)
 		// This detects when user actually starts using Flow (not just onChange firing on load)
@@ -1915,7 +1915,7 @@ var ckoFlow = {
 				// Listen for any interaction with Flow component
 				flowContainer.addEventListener('click', function() {
 					if (!FlowState.get('userInteracted')) {
-						console.log('[FLOW] User clicked on Flow component - marking as interacted');
+						ckoLogger.debug('User clicked on Flow component - marking as interacted');
 						FlowState.set('userInteracted', true);
 						window.flowSavedCardSelected = false; // Reset saved card flag when user interacts with Flow
 					}
@@ -1923,7 +1923,7 @@ var ckoFlow = {
 				
 				flowContainer.addEventListener('focus', function(e) {
 					if (!FlowState.get('userInteracted')) {
-						console.log('[FLOW] User focused on Flow field - marking as interacted');
+						ckoLogger.debug('User focused on Flow field - marking as interacted');
 						FlowState.set('userInteracted', true);
 						window.flowSavedCardSelected = false; // Reset saved card flag when user interacts with Flow
 					}
@@ -1931,13 +1931,13 @@ var ckoFlow = {
 				
 				flowContainer.addEventListener('input', function(e) {
 					if (!FlowState.get('userInteracted')) {
-						console.log('[FLOW] User typing in Flow field - marking as interacted');
+						ckoLogger.debug('User typing in Flow field - marking as interacted');
 						FlowState.set('userInteracted', true);
 						window.flowSavedCardSelected = false; // Reset saved card flag when user interacts with Flow
 					}
 				}, { capture: true });
 				
-				console.log('[FLOW] Flow interaction listeners attached');
+				ckoLogger.debug('Flow interaction listeners attached');
 			}
 		}, 500);
 	},
@@ -2138,7 +2138,7 @@ document.addEventListener("DOMContentLoaded", function () {
 	// CRITICAL: Check for 3DS return FIRST - before any other checks
 	// Check flag first (set by early detection)
 	if (FlowState.get('is3DSReturn')) {
-		console.log('[FLOW 3DS] ⚠️ DOMContentLoaded: Blocked by 3DS return flag');
+		ckoLogger.threeDS('⚠️ DOMContentLoaded: Blocked by 3DS return flag');
 		if (typeof ckoLogger !== 'undefined') {
 			ckoLogger.threeDS('DOMContentLoaded: 3DS return in progress, skipping all Flow initialization');
 		}
@@ -2152,7 +2152,7 @@ document.addEventListener("DOMContentLoaded", function () {
 	const paymentSessionId = urlParams.get("cko-payment-session-id");
 	
 	if (paymentId || sessionId || paymentSessionId) {
-		console.log('[FLOW 3DS] ⚠️ DOMContentLoaded: Blocked by 3DS return URL parameters', {
+		ckoLogger.threeDS('⚠️ DOMContentLoaded: Blocked by 3DS return URL parameters', {
 			paymentId: paymentId,
 			sessionId: sessionId,
 			paymentSessionId: paymentSessionId
@@ -2533,7 +2533,7 @@ function reloadFlowComponent() {
 		window.ckoReloadCount = 0;
 	}
 	window.ckoReloadCount++;
-	console.log(`[FLOW RELOAD] 🔄 Reloading Flow component (#${window.ckoReloadCount})`, {
+	ckoLogger.debug(`🔄 Reloading Flow component (#${window.ckoReloadCount})`, {
 		timestamp: new Date().toLocaleTimeString(),
 		reason: 'field change'
 	});
@@ -2620,7 +2620,7 @@ function debouncedCheckFlowReload(fieldName, newValue) {
 		}
 		
 		// Critical field changed - reload Flow
-		console.log(`[FLOW RELOAD] 🔄 Critical field "${fieldName}" changed - reloading Flow`, {
+		ckoLogger.debug(`🔄 Critical field "${fieldName}" changed - reloading Flow`, {
 			newValue: newValue,
 			timestamp: new Date().toLocaleTimeString()
 		});
@@ -2650,13 +2650,13 @@ function initializeFlowIfNeeded() {
 	if (typeof window.FlowInitialization !== 'undefined' && window.FlowInitialization.canInitialize) {
 		guardCheck = window.FlowInitialization.canInitialize();
 		if (!guardCheck.canInitialize) {
-			console.log(`[FLOW INIT] ⏭️ ATTEMPT #${attemptNumber} BLOCKED - Reason: ${guardCheck.reason}`, {
+			ckoLogger.debug(`⏭️ ATTEMPT #${attemptNumber} BLOCKED - Reason: ${guardCheck.reason}`, {
 				timestamp: new Date().toLocaleTimeString()
 			});
 			if (guardCheck.reason === 'ALREADY_INITIALIZING') {
 				ckoLogger.debug('Flow initialization already in progress, skipping duplicate call');
 			} else if (guardCheck.reason === '3DS_RETURN' || guardCheck.reason === '3DS_RETURN_URL') {
-				console.log('[FLOW 3DS] ⚠️ initializeFlowIfNeeded: Blocked by 3DS return');
+				ckoLogger.threeDS('⚠️ initializeFlowIfNeeded: Blocked by 3DS return');
 				ckoLogger.threeDS('Skipping Flow initialization - 3DS return in progress');
 			} else if (guardCheck.reason === 'PAYMENT_NOT_SELECTED') {
 				ckoLogger.debug('Flow payment method not selected, skipping initialization');
@@ -2670,7 +2670,7 @@ function initializeFlowIfNeeded() {
 					document.body.classList.add("flow-method-selected");
 					hideFlowWaitingMessage();
 				}
-				console.log(`[FLOW INIT] ✅ ATTEMPT #${attemptNumber} - Already initialized and mounted, skipping`);
+				ckoLogger.debug(`✅ ATTEMPT #${attemptNumber} - Already initialized and mounted, skipping`);
 				ckoLogger.debug('Flow already initialized and mounted, skipping');
 			}
 			return;
@@ -2730,7 +2730,7 @@ function initializeFlowIfNeeded() {
 	});
 	
 	if (!canInit) {
-		console.log('[FLOW INIT] ❌ BLOCKED - Cannot initialize Flow - validation failed', {
+		ckoLogger.debug('❌ BLOCKED - Cannot initialize Flow - validation failed', {
 			requiredFieldsFilled: requiredFieldsFilled(),
 			requiredFieldsValid: requiredFieldsFilledAndValid(),
 			isLoggedIn: isUserLoggedIn(),
@@ -2747,7 +2747,7 @@ function initializeFlowIfNeeded() {
 	hideFlowWaitingMessage();
 	
 	// Initialize Flow
-	console.log('[FLOW INIT] ✅ PROCEEDING - Initializing Flow - payment selected, container exists, validation passed');
+	ckoLogger.debug('✅ PROCEEDING - Initializing Flow - payment selected, container exists, validation passed');
 	ckoLogger.debug('Initializing Flow - payment selected, container exists, validation passed');
 	document.body.classList.add("flow-method-selected");
 	if (elements.flowContainer) {
@@ -2759,7 +2759,7 @@ function initializeFlowIfNeeded() {
 	
 	// Only initialize if not already initialized
 	if (!FlowState.get('initialized') || !ckoFlow.flowComponent) {
-		console.log('[FLOW INIT] 🚀 STARTING - Calling ckoFlow.init()...', {
+		ckoLogger.debug('🚀 STARTING - Calling ckoFlow.init()...', {
 			alreadyInitialized: FlowState.get('initialized'),
 			componentExists: !!ckoFlow.flowComponent,
 			timestamp: new Date().toLocaleTimeString()
@@ -2777,7 +2777,7 @@ function initializeFlowIfNeeded() {
 			throw error;
 		}
 	} else {
-		console.log('[FLOW INIT] ⏭️ SKIPPED - Already initialized, skipping ckoFlow.init()');
+		ckoLogger.debug('⏭️ SKIPPED - Already initialized, skipping ckoFlow.init()');
 		ckoLogger.debug('Skipping ckoFlow.init() - already initialized');
 	}
 }
@@ -2944,7 +2944,7 @@ let previousCartTotal = typeof cko_flow_vars !== 'undefined' && cko_flow_vars.ca
 		}
 		
 		// ALWAYS log (not just debug) so we can see reloads even when debug is off
-		console.log(`[FLOW RELOAD] updated_checkout EVENT #${window.ckoUpdatedCheckoutCount} fired at ${new Date().toLocaleTimeString()}`);
+		ckoLogger.debug(`updated_checkout EVENT #${window.ckoUpdatedCheckoutCount} fired at ${new Date().toLocaleTimeString()}`);
 		ckoLogger.debug(`===== updated_checkout EVENT FIRED (#${window.ckoUpdatedCheckoutCount}) =====`);
 	
 	// CRITICAL: Prevent update_checkout if it was triggered by a terms checkbox
@@ -3253,7 +3253,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		console.warn(`⚠️ [FLOW RELOAD] MULTIPLE page loads detected: ${recentLoads.length} loads in last 2 seconds (Total: ${window.ckoPageLoadCount})`);
 	}
 	
-	console.log(`[FLOW RELOAD] Page load #${window.ckoPageLoadCount} at ${new Date().toLocaleTimeString()}`);
+	ckoLogger.debug(`Page load #${window.ckoPageLoadCount} at ${new Date().toLocaleTimeString()}`);
 	
 	// CRITICAL: Check for 3DS return FIRST - before any other checks
 	// This must be the very first thing we check
@@ -3354,7 +3354,7 @@ document.addEventListener("DOMContentLoaded", function () {
 	// Function to activate Flow and deselect saved cards
 	// Make it globally accessible so onChange callback can use it
 	window.activateFlowPayment = function() {
-		console.log('[FLOW] Activating Flow payment method');
+		ckoLogger.debug('Activating Flow payment method');
 		
 		const flowContainer = document.getElementById("flow-container");
 		if (!flowContainer) return;
@@ -3410,7 +3410,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		
 		// Only activate if Flow is currently de-emphasized (saved card selected)
 		if (flowContainer && flowContainer.classList.contains('flow-de-emphasized')) {
-			console.log('[FLOW] User clicked on Flow field - auto-activating Flow');
+			ckoLogger.debug('User clicked on Flow field - auto-activating Flow');
 			window.activateFlowPayment();
 		}
 	});
@@ -4000,7 +4000,7 @@ document.addEventListener("DOMContentLoaded", function () {
 							// ALWAYS persist save card checkbox on order-pay page (for new card payments)
 							if (!savedCardSelected) {
 								persistSaveCardCheckbox();
-								console.log('[FLOW] Order-pay: Persisted save card checkbox for new card payment');
+								ckoLogger.debug('Order-pay: Persisted save card checkbox for new card payment');
 							}
 							
 							if( savedCardSelected || savedCardEnabled ) {
@@ -4206,7 +4206,7 @@ jQuery(function ($) {
 
 		// If the field is a shipping-related field, trigger WooCommerce checkout update and exit early.
 		if (isShippingField) {
-			console.log("Triggered by a shipping field, skipping...");
+			ckoLogger.debug("Triggered by a shipping field, skipping...");
 			// Debounce to prevent rapid triggers
 			if (!window.ckoUpdateCheckoutDebounce) {
 				window.ckoUpdateCheckoutDebounce = null;
@@ -4286,7 +4286,7 @@ jQuery(function ($) {
 				) &&
 				jQuery(event.target).is(":checked")
 			) {
-				console.log("User just checked the checkbox. Returning early...");
+				ckoLogger.debug("User just checked the checkbox. Returning early...");
 				return;
 			}
 
@@ -4301,14 +4301,10 @@ jQuery(function ($) {
 			) {
 				let cartData = $("#cart-info").data("cart");
 				if ( !cartData || !cartData["contains_virtual_product"] ) {
-					console.log(
-						"Neither billing nor the shipping checkbox. Returning early..."
-					);
+					ckoLogger.debug("Neither billing nor the shipping checkbox. Returning early...");
 					return;
 				}
-				console.log(
-					"Virtual Product found. Triggering FLOW..."
-				);
+				ckoLogger.debug("Virtual Product found. Triggering FLOW...");
 			}
 
 			// Check required fields status (for initialization/reload)
@@ -4554,9 +4550,9 @@ document.addEventListener('DOMContentLoaded', function () {
             label.style.removeProperty('display');
             
             if (hasSavedCards) {
-                console.log('[FLOW LABEL] Label shown - saved cards present');
+                ckoLogger.debug('Label shown - saved cards present');
             } else {
-                console.log('[FLOW LABEL] Label shown - no saved cards (default label)');
+                ckoLogger.debug('Label shown - no saved cards (default label)');
             }
             
             /* DISABLED - Old behavior that was hiding the label
@@ -4608,7 +4604,7 @@ document.addEventListener('DOMContentLoaded', function () {
 document.addEventListener('DOMContentLoaded', function () {
 	const orderPayInfo = jQuery("#order-pay-info")?.data("order-pay");
 	if ( orderPayInfo?.payment_type === 'MOTO' ) {
-		console.log('here');
+		ckoLogger.debug('MOTO payment type detected');
 		const radios = document.querySelectorAll(
 			'input[name="wc-wc_checkout_com_flow-payment-token"], input[name="wc-wc_checkout_com_cards-payment-token"]'
 		);

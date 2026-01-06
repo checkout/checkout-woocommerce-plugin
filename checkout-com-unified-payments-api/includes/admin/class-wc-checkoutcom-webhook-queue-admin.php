@@ -58,9 +58,7 @@ class WC_Checkoutcom_Webhook_Queue_Admin {
 				WC_Checkout_Com_Webhook_Queue::cleanup_old_webhooks( 7 );
 				WC_Checkout_Com_Webhook_Queue::cleanup_old_unprocessed_webhooks( 7 );
 				
-				add_action( 'admin_notices', function() {
-					echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Old webhooks cleaned up successfully.', 'checkout-com-unified-payments-api' ) . '</p></div>';
-				} );
+				add_action( 'admin_notices', 'cko_webhook_cleanup_success_notice' );
 			}
 		}
 	}
@@ -210,6 +208,13 @@ class WC_Checkoutcom_Webhook_Queue_Admin {
 		</div>
 		<?php
 	}
+}
+
+/**
+ * Show success notice after webhook cleanup.
+ */
+function cko_webhook_cleanup_success_notice() {
+	echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Old webhooks cleaned up successfully.', 'checkout-com-unified-payments-api' ) . '</p></div>';
 }
 
 // Initialize admin page

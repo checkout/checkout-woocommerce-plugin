@@ -214,8 +214,8 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		}
 		
 		// Check if customer wants to save card (from POST data during order creation)
-		$save_card_hidden = isset( $_POST['cko-flow-save-card-persist'] ) ? sanitize_text_field( $_POST['cko-flow-save-card-persist'] ) : '';
-		$save_card_post = isset( $_POST['wc-wc_checkout_com_flow-new-payment-method'] ) ? sanitize_text_field( $_POST['wc-wc_checkout_com_flow-new-payment-method'] ) : '';
+		$save_card_hidden = isset( $_POST['cko-flow-save-card-persist'] ) ? sanitize_text_field( wp_unslash( $_POST['cko-flow-save-card-persist'] ) ) : '';
+		$save_card_post = isset( $_POST['wc-wc_checkout_com_flow-new-payment-method'] ) ? sanitize_text_field( wp_unslash( $_POST['wc-wc_checkout_com_flow-new-payment-method'] ) ) : '';
 		$save_card_session = WC()->session->get( 'wc-wc_checkout_com_flow-new-payment-method' );
 		
 		// Determine if checkbox was checked
@@ -1460,7 +1460,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Order ID: ' . $order_id );
 		
 		// Fetch payment details early (before order lookup) so we can use them as fallback if order lookup fails
-		$flow_payment_id_from_post = isset( $_POST['cko-flow-payment-id'] ) ? \sanitize_text_field( $_POST['cko-flow-payment-id'] ) : '';
+		$flow_payment_id_from_post = isset( $_POST['cko-flow-payment-id'] ) ? sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-id'] ) ) : '';
 		$payment_details = null;
 		WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] flow_payment_id_from_post: ' . $flow_payment_id_from_post );
 		
@@ -1491,7 +1491,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			
 			// Check if order was created via AJAX (early order creation)
 			// Order ID might be in POST data or session
-			$order_id_from_post = isset( $_POST['order_id'] ) ? absint( $_POST['order_id'] ) : 0;
+			$order_id_from_post = isset( $_POST['order_id'] ) ? absint( wp_unslash( $_POST['order_id'] ) ) : 0;
 			if ( $order_id_from_post ) {
 				$early_order = wc_get_order( $order_id_from_post );
 				if ( $early_order && $early_order->get_status() === 'pending' ) {
@@ -1583,15 +1583,15 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		
 		// DUPLICATE PREVENTION: Check if this order has already been processed
 		$existing_transaction_id = $order->get_transaction_id();
-		$flow_payment_id = isset( $_POST['cko-flow-payment-id'] ) ? sanitize_text_field( $_POST['cko-flow-payment-id'] ) : '';
+		$flow_payment_id = isset( $_POST['cko-flow-payment-id'] ) ? sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-id'] ) ) : '';
 		
 		// Fallback 1: Get payment ID from GET parameter (from handle_3ds_return URL)
 		if ( empty( $flow_payment_id ) && isset( $_GET['cko-payment-id'] ) ) {
-			$flow_payment_id = sanitize_text_field( $_GET['cko-payment-id'] );
+			$flow_payment_id = sanitize_text_field( wp_unslash( $_GET['cko-payment-id'] ) );
 			WC_Checkoutcom_Utility::logger( '[FLOW SAVE CARD] Payment ID retrieved from GET parameter: ' . $flow_payment_id );
 		}
 		
-		// Fallback 2: Get payment ID from order metadata if not in POST/GET (webhook may have set it)
+		// Fallback 2: Get payment ID from order metadata if not in POST/GET (webhook may have set it, or 3DS return stored it)
 		if ( empty( $flow_payment_id ) ) {
 			$flow_payment_id = $order->get_meta( '_cko_flow_payment_id' );
 			if ( empty( $flow_payment_id ) ) {
@@ -1604,15 +1604,15 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		
 		if ( ! empty( $existing_transaction_id ) ) {
 			WC_Checkoutcom_Utility::logger( 'DUPLICATE PREVENTION: Order ' . $order_id . ' already has transaction ID: ' . $existing_transaction_id . ' - skipping processing' );
-			WC_Checkoutcom_Utility::logger( '[FLOW SAVE CARD] [DUPLICATE PREVENTION] Payment ID check - POST: ' . ( isset( $_POST['cko-flow-payment-id'] ) ? $_POST['cko-flow-payment-id'] : 'NOT SET' ) . ', Order meta _cko_flow_payment_id: ' . $order->get_meta( '_cko_flow_payment_id' ) . ', Order meta _cko_payment_id: ' . $order->get_meta( '_cko_payment_id' ) . ', Final flow_payment_id: ' . $flow_payment_id );
+			WC_Checkoutcom_Utility::logger( '[FLOW SAVE CARD] [DUPLICATE PREVENTION] Payment ID check - POST: ' . ( isset( $_POST['cko-flow-payment-id'] ) ? sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-id'] ) ) : 'NOT SET' ) . ', Order meta _cko_flow_payment_id: ' . $order->get_meta( '_cko_flow_payment_id' ) . ', Order meta _cko_payment_id: ' . $order->get_meta( '_cko_payment_id' ) . ', Final flow_payment_id: ' . $flow_payment_id );
 			
 				// Still check for card saving even when duplicate prevention kicks in
 				// The payment may have been processed by webhook, but card saving might not have run yet
 			if ( ! empty( $flow_payment_id ) ) {
 				// Get payment type from POST, GET, or order metadata
-				$flow_payment_type_for_save = isset( $_POST['cko-flow-payment-type'] ) ? sanitize_text_field( $_POST['cko-flow-payment-type'] ) : '';
+				$flow_payment_type_for_save = isset( $_POST['cko-flow-payment-type'] ) ? sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-type'] ) ) : '';
 				if ( empty( $flow_payment_type_for_save ) && isset( $_GET['cko-payment-type'] ) ) {
-					$flow_payment_type_for_save = sanitize_text_field( $_GET['cko-payment-type'] );
+					$flow_payment_type_for_save = sanitize_text_field( wp_unslash( $_GET['cko-payment-type'] ) );
 				}
 				if ( empty( $flow_payment_type_for_save ) ) {
 					$flow_payment_type_for_save = $order->get_meta( '_cko_flow_payment_type' );
@@ -1627,13 +1627,13 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				$save_card_from_order = $order->get_meta( '_cko_save_card_preference' );
 				
 				// Check GET parameter (from URL after 3DS redirect)
-				$save_card_from_get = isset( $_GET['cko-save-card'] ) ? sanitize_text_field( $_GET['cko-save-card'] ) : '';
+				$save_card_from_get = isset( $_GET['cko-save-card'] ) ? sanitize_text_field( wp_unslash( $_GET['cko-save-card'] ) ) : '';
 				
 				// Check hidden field (POST data - may not be available after 3DS redirect)
-				$save_card_hidden = isset( $_POST['cko-flow-save-card-persist'] ) ? sanitize_text_field( $_POST['cko-flow-save-card-persist'] ) : '';
+				$save_card_hidden = isset( $_POST['cko-flow-save-card-persist'] ) ? sanitize_text_field( wp_unslash( $_POST['cko-flow-save-card-persist'] ) ) : '';
 				
 				// Fallback to POST checkbox
-				$save_card_post = isset( $_POST['wc-wc_checkout_com_flow-new-payment-method'] ) ? sanitize_text_field( $_POST['wc-wc_checkout_com_flow-new-payment-method'] ) : '';
+				$save_card_post = isset( $_POST['wc-wc_checkout_com_flow-new-payment-method'] ) ? sanitize_text_field( wp_unslash( $_POST['wc-wc_checkout_com_flow-new-payment-method'] ) ) : '';
 				
 				// Fallback to session
 				$save_card_session = WC()->session->get( 'wc-wc_checkout_com_flow-new-payment-method' );
@@ -1712,9 +1712,9 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				
 				// CRITICAL: Still check for card saving even when duplicate prevention kicks in
 				// Get payment type from POST, GET, or order metadata
-				$flow_payment_type_for_save = isset( $_POST['cko-flow-payment-type'] ) ? sanitize_text_field( $_POST['cko-flow-payment-type'] ) : '';
+				$flow_payment_type_for_save = isset( $_POST['cko-flow-payment-type'] ) ? sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-type'] ) ) : '';
 				if ( empty( $flow_payment_type_for_save ) && isset( $_GET['cko-payment-type'] ) ) {
-					$flow_payment_type_for_save = sanitize_text_field( $_GET['cko-payment-type'] );
+					$flow_payment_type_for_save = sanitize_text_field( wp_unslash( $_GET['cko-payment-type'] ) );
 				}
 				if ( empty( $flow_payment_type_for_save ) ) {
 					$flow_payment_type_for_save = $order->get_meta( '_cko_flow_payment_type' );
@@ -1729,13 +1729,13 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				$save_card_from_order = $order->get_meta( '_cko_save_card_preference' );
 				
 				// Check GET parameter (from URL after 3DS redirect)
-				$save_card_from_get = isset( $_GET['cko-save-card'] ) ? sanitize_text_field( $_GET['cko-save-card'] ) : '';
+				$save_card_from_get = isset( $_GET['cko-save-card'] ) ? sanitize_text_field( wp_unslash( $_GET['cko-save-card'] ) ) : '';
 				
 				// Check hidden field (POST data - may not be available after 3DS redirect)
-				$save_card_hidden = isset( $_POST['cko-flow-save-card-persist'] ) ? sanitize_text_field( $_POST['cko-flow-save-card-persist'] ) : '';
+				$save_card_hidden = isset( $_POST['cko-flow-save-card-persist'] ) ? sanitize_text_field( wp_unslash( $_POST['cko-flow-save-card-persist'] ) ) : '';
 				
 				// Fallback to POST checkbox
-				$save_card_post = isset( $_POST['wc-wc_checkout_com_flow-new-payment-method'] ) ? sanitize_text_field( $_POST['wc-wc_checkout_com_flow-new-payment-method'] ) : '';
+				$save_card_post = isset( $_POST['wc-wc_checkout_com_flow-new-payment-method'] ) ? sanitize_text_field( wp_unslash( $_POST['wc-wc_checkout_com_flow-new-payment-method'] ) ) : '';
 				
 				// Fallback to session
 				$save_card_session = WC()->session->get( 'wc-wc_checkout_com_flow-new-payment-method' );
@@ -1794,7 +1794,26 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 	// 3DS RETURN HANDLER: If we already have a payment ID from Flow (after 3DS redirect),
 	// don't create a new payment - just fetch the payment details and complete the order
-	if ( ! empty( $flow_payment_id ) && isset( $_POST['cko-flow-payment-type'] ) ) {
+	// CRITICAL FIX: Check for payment type from GET, POST, or order metadata (not just POST)
+	// After 3DS redirect, POST is empty, so we need to check GET and order meta
+	$flow_payment_type_for_3ds_check = isset( $_POST['cko-flow-payment-type'] ) ? sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-type'] ) ) : '';
+	if ( empty( $flow_payment_type_for_3ds_check ) && isset( $_GET['cko-payment-type'] ) ) {
+		$flow_payment_type_for_3ds_check = sanitize_text_field( wp_unslash( $_GET['cko-payment-type'] ) );
+	}
+	if ( empty( $flow_payment_type_for_3ds_check ) && $order ) {
+		$flow_payment_type_for_3ds_check = $order->get_meta( '_cko_flow_payment_type' );
+	}
+	// Default to 'card' if still empty (most common case for Flow payments)
+	if ( empty( $flow_payment_type_for_3ds_check ) ) {
+		$flow_payment_type_for_3ds_check = 'card';
+	}
+	
+	// CRITICAL FIX: Enter 3DS handler if we have payment ID from GET (3DS return) OR from POST
+	// Payment type can be defaulted to 'card' if not found
+	$is_3ds_return = ! empty( $flow_payment_id ) && ( isset( $_GET['cko-payment-id'] ) || isset( $_POST['cko-flow-payment-id'] ) );
+	
+	if ( $is_3ds_return ) {
+		// Payment type will be handled below with wp_unslash()
 		
 	// Fetch the payment details from Checkout.com to verify and get status
 		try {
@@ -1933,7 +1952,11 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				WC_Checkoutcom_Utility::logger( '[3DS RETURN] Payment ID already exists in order - Order ID: ' . $order_id . ', Existing Payment ID: ' . substr( $existing_flow_payment_id, 0, 20 ) . '..., New Payment ID: ' . substr( $flow_payment_id, 0, 20 ) . '... (skipping save to prevent overwrite)' );
 			}
 			
-			$flow_payment_type = isset( $_POST['cko-flow-payment-type'] ) ? sanitize_text_field( $_POST['cko-flow-payment-type'] ) : 'card';
+			// Use the payment type we already retrieved for the 3DS check (from POST, GET, or order meta)
+			$flow_payment_type = $flow_payment_type_for_3ds_check;
+			if ( empty( $flow_payment_type ) ) {
+				$flow_payment_type = 'card'; // Default fallback
+			}
 			$order->update_meta_data( '_cko_flow_payment_type', $flow_payment_type );
 			// Store order number/reference for webhook lookup (works with Sequential Order Numbers plugins)
 			$order->update_meta_data( '_cko_order_reference', $order->get_order_number() );
@@ -1945,7 +1968,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			
 			if ( empty( $existing_order_session_id ) ) {
 				// Order doesn't have payment session ID yet - try to get it
-				$payment_session_id = isset( $_POST['cko-flow-payment-session-id'] ) ? sanitize_text_field( $_POST['cko-flow-payment-session-id'] ) : '';
+				$payment_session_id = isset( $_POST['cko-flow-payment-session-id'] ) ? sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-session-id'] ) ) : '';
 				if ( empty( $payment_session_id ) && isset( $payment_details['metadata']['cko_payment_session_id'] ) ) {
 					$payment_session_id = $payment_details['metadata']['cko_payment_session_id'];
 					WC_Checkoutcom_Utility::logger( '[3DS RETURN] Payment session ID retrieved from payment_details metadata: ' . substr( $payment_session_id, 0, 20 ) . '...' );
@@ -2053,13 +2076,14 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		$token = 'wc-wc_checkout_com_flow-payment-token';
 
 			if ( ! isset( $_POST[ $token ] ) ) {
+				// Token check - will be sanitized when accessed
 				$token = 'wc-wc_checkout_com_cards-payment-token';
 			} else {
 				$token = 'wc-wc_checkout_com_flow-payment-token';
 			}
 
 			// Saved card selected.
-			$arg = sanitize_text_field( $_POST[ $token ] );
+			$arg = sanitize_text_field( wp_unslash( $_POST[ $token ] ) );
 			
 			// CRITICAL: Validate token exists before processing payment (especially for newly saved cards)
 			// Try to get token directly first
@@ -2160,7 +2184,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			if ( isset( $result['3d'] ) && ! empty( $result['3d'] ) ) {
 
 				// Check if save card is enable and customer select to save card.
-				if ( $save_card && isset( $_POST['wc-wc_checkout_com_cards-new-payment-method'] ) && sanitize_text_field( $_POST['wc-wc_checkout_com_cards-new-payment-method'] ) ) {
+				if ( $save_card && isset( $_POST['wc-wc_checkout_com_cards-new-payment-method'] ) && sanitize_text_field( wp_unslash( $_POST['wc-wc_checkout_com_cards-new-payment-method'] ) ) ) {
 					// Save in session for 3D secure payment.
 					WC()->session->set( 'wc-wc_checkout_com_cards-new-payment-method', 'yes' );
 				} else {
@@ -2232,9 +2256,9 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			wp_cache_delete( 'customer_tokens_' . $order->get_user_id() . '_' . $classic_gateway->id, 'woocommerce' );
 		}
 		
-		$saved_card_token = isset( $_POST['wc-wc_checkout_com_flow-payment-token'] ) ? sanitize_text_field( $_POST['wc-wc_checkout_com_flow-payment-token'] ) : '';
+		$saved_card_token = isset( $_POST['wc-wc_checkout_com_flow-payment-token'] ) ? sanitize_text_field( wp_unslash( $_POST['wc-wc_checkout_com_flow-payment-token'] ) ) : '';
 		if ( empty( $saved_card_token ) ) {
-			$saved_card_token = isset( $_POST['wc-wc_checkout_com_cards-payment-token'] ) ? sanitize_text_field( $_POST['wc-wc_checkout_com_cards-payment-token'] ) : '';
+			$saved_card_token = isset( $_POST['wc-wc_checkout_com_cards-payment-token'] ) ? sanitize_text_field( wp_unslash( $_POST['wc-wc_checkout_com_cards-payment-token'] ) ) : '';
 		}
 		
 		WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Fallback check - Token value: ' . ( $saved_card_token ? $saved_card_token : 'EMPTY' ) . ', Is "new": ' . ( 'new' === $saved_card_token ? 'YES' : 'NO' ) );
@@ -2246,11 +2270,11 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			
 			// Process as saved card payment
 			$token = 'wc-wc_checkout_com_flow-payment-token';
-			if ( ! isset( $_POST[ $token ] ) || empty( $_POST[ $token ] ) || 'new' === $_POST[ $token ] ) {
+			if ( ! isset( $_POST[ $token ] ) || empty( $_POST[ $token ] ) || 'new' === sanitize_text_field( wp_unslash( $_POST[ $token ] ) ) ) {
 				$token = 'wc-wc_checkout_com_cards-payment-token';
 			}
 			
-			$arg = sanitize_text_field( $_POST[ $token ] );
+			$arg = sanitize_text_field( wp_unslash( $_POST[ $token ] ) );
 			
 			// CRITICAL: Validate token exists before processing payment
 			$token_obj = WC_Payment_Tokens::get( $arg );
@@ -2376,12 +2400,12 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			$flow_payment_type = 'card';
 		} else {
 			// Normal Flow payment (new card)
-			$flow_pay_id = isset( $_POST['cko-flow-payment-id'] ) ? sanitize_text_field( $_POST['cko-flow-payment-id'] ) : '';
+			$flow_pay_id = isset( $_POST['cko-flow-payment-id'] ) ? sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-id'] ) ) : '';
 			$payment_processed_via_fallback = false;
 			
 			// Log detailed information for debugging
 			WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Normal Flow payment branch - Payment ID: ' . ( $flow_pay_id ? $flow_pay_id : 'EMPTY' ) );
-			WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Token value from POST: ' . ( isset( $_POST['wc-wc_checkout_com_flow-payment-token'] ) ? sanitize_text_field( $_POST['wc-wc_checkout_com_flow-payment-token'] ) : 'NOT SET' ) );
+			WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Token value from POST: ' . ( isset( $_POST['wc-wc_checkout_com_flow-payment-token'] ) ? sanitize_text_field( wp_unslash( $_POST['wc-wc_checkout_com_flow-payment-token'] ) ) : 'NOT SET' ) );
 			WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] is_using_saved_payment_method() result: ' . ( WC_Checkoutcom_Api_Request::is_using_saved_payment_method() ? 'TRUE' : 'FALSE' ) );
 
 			// Check if $flow_pay_id is not empty.
@@ -2605,7 +2629,14 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			}
 		}
 
-	$flow_payment_type = isset( $_POST['cko-flow-payment-type'] ) ? sanitize_text_field( $_POST['cko-flow-payment-type'] ) : '';
+	// Get payment type from POST, or fallback to order meta (for 3DS returns that stored it in meta)
+	$flow_payment_type = isset( $_POST['cko-flow-payment-type'] ) ? sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-type'] ) ) : '';
+	if ( empty( $flow_payment_type ) && $order ) {
+		$flow_payment_type = $order->get_meta( '_cko_flow_payment_type' );
+	}
+	if ( empty( $flow_payment_type ) ) {
+		$flow_payment_type = 'card'; // Default fallback
+	}
 
 	if ( "card" === $flow_payment_type ) {
 		$subs_payment_type = $flow_payment_type;
@@ -2627,7 +2658,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	
 	// Store payment session ID for 3DS return lookup
 	// Priority: 1) POST data (from form), 2) Already-fetched payment details, 3) Payment metadata (fetch if needed)
-	$payment_session_id = isset( $_POST['cko-flow-payment-session-id'] ) ? sanitize_text_field( $_POST['cko-flow-payment-session-id'] ) : '';
+	$payment_session_id = isset( $_POST['cko-flow-payment-session-id'] ) ? sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-session-id'] ) ) : '';
 	WC_Checkoutcom_Utility::logger( 'Payment session ID from POST: ' . ( ! empty( $payment_session_id ) ? $payment_session_id : 'EMPTY' ) );
 	
 	$payment_details_for_shipping = null;
@@ -2759,7 +2790,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	// Card saving logic (runs for both normal Flow payments and 3DS returns)
 	// Check if $flow_pay_id is set (it's set in both the 3DS return handler and normal Flow payment)
 	if ( isset( $flow_pay_id ) && ! empty( $flow_pay_id ) ) {
-		$flow_payment_type_for_save = isset( $flow_payment_type ) ? $flow_payment_type : ( isset( $_POST['cko-flow-payment-type'] ) ? sanitize_text_field( $_POST['cko-flow-payment-type'] ) : '' );
+		$flow_payment_type_for_save = isset( $flow_payment_type ) ? $flow_payment_type : ( isset( $_POST['cko-flow-payment-type'] ) ? sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-type'] ) ) : '' );
 		
 		// Check if customer wants to save card
 		// Priority: 1. Order metadata (stored before 3DS redirect), 2. GET parameter (from URL), 3. Hidden field (POST), 4. POST checkbox, 5. Session
@@ -2769,13 +2800,13 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		$save_card_from_order = $order->get_meta( '_cko_save_card_preference' );
 		
 		// Check GET parameter (from URL after 3DS redirect)
-		$save_card_from_get = isset( $_GET['cko-save-card'] ) ? sanitize_text_field( $_GET['cko-save-card'] ) : '';
+		$save_card_from_get = isset( $_GET['cko-save-card'] ) ? sanitize_text_field( wp_unslash( $_GET['cko-save-card'] ) ) : '';
 		
 		// Check hidden field (POST data - may not be available after 3DS redirect)
-		$save_card_hidden = isset( $_POST['cko-flow-save-card-persist'] ) ? sanitize_text_field( $_POST['cko-flow-save-card-persist'] ) : '';
+		$save_card_hidden = isset( $_POST['cko-flow-save-card-persist'] ) ? sanitize_text_field( wp_unslash( $_POST['cko-flow-save-card-persist'] ) ) : '';
 		
 		// Fallback to POST checkbox
-		$save_card_post = isset( $_POST['wc-wc_checkout_com_flow-new-payment-method'] ) ? sanitize_text_field( $_POST['wc-wc_checkout_com_flow-new-payment-method'] ) : '';
+		$save_card_post = isset( $_POST['wc-wc_checkout_com_flow-new-payment-method'] ) ? sanitize_text_field( wp_unslash( $_POST['wc-wc_checkout_com_flow-new-payment-method'] ) ) : '';
 		
 		// Fallback to session
 		$save_card_session = WC()->session->get( 'wc-wc_checkout_com_flow-new-payment-method' );
@@ -2900,9 +2931,9 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	public function detect_and_process_3ds_return_on_checkout() {
 		// Check if 3DS return parameters are present FIRST (before checking is_checkout)
 		// This ensures we catch it even if is_checkout() hasn't loaded yet in slow environments
-		$payment_id = isset( $_GET['cko-payment-id'] ) ? sanitize_text_field( $_GET['cko-payment-id'] ) : '';
-		$session_id = isset( $_GET['cko-session-id'] ) ? sanitize_text_field( $_GET['cko-session-id'] ) : '';
-		$payment_session_id = isset( $_GET['cko-payment-session-id'] ) ? sanitize_text_field( $_GET['cko-payment-session-id'] ) : '';
+		$payment_id = isset( $_GET['cko-payment-id'] ) ? sanitize_text_field( wp_unslash( $_GET['cko-payment-id'] ) ) : '';
+		$session_id = isset( $_GET['cko-session-id'] ) ? sanitize_text_field( wp_unslash( $_GET['cko-session-id'] ) ) : '';
+		$payment_session_id = isset( $_GET['cko-payment-session-id'] ) ? sanitize_text_field( wp_unslash( $_GET['cko-payment-session-id'] ) ) : '';
 		
 		// If we have payment ID or session ID, it's a 3DS return
 		if ( empty( $payment_id ) && empty( $session_id ) && empty( $payment_session_id ) ) {
@@ -2969,10 +3000,10 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Request URI: ' . ( isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : 'N/A' ) );
 		}
 		
-		$payment_id = isset( $_GET['cko-payment-id'] ) ? sanitize_text_field( $_GET['cko-payment-id'] ) : '';
-		$payment_session_id_from_url = isset( $_GET['cko-payment-session-id'] ) ? sanitize_text_field( $_GET['cko-payment-session-id'] ) : '';
-		$order_id   = isset( $_GET['order_id'] ) ? absint( $_GET['order_id'] ) : 0;
-		$order_key  = isset( $_GET['key'] ) ? sanitize_text_field( $_GET['key'] ) : '';
+		$payment_id = isset( $_GET['cko-payment-id'] ) ? sanitize_text_field( wp_unslash( $_GET['cko-payment-id'] ) ) : '';
+		$payment_session_id_from_url = isset( $_GET['cko-payment-session-id'] ) ? sanitize_text_field( wp_unslash( $_GET['cko-payment-session-id'] ) ) : '';
+		$order_id   = isset( $_GET['order_id'] ) ? absint( wp_unslash( $_GET['order_id'] ) ) : 0;
+		$order_key  = isset( $_GET['key'] ) ? sanitize_text_field( wp_unslash( $_GET['key'] ) ) : '';
 		
 		if ( $is_debug ) {
 			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment ID: ' . $payment_id . ', Order ID: ' . $order_id );
@@ -3407,7 +3438,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 									}
 									
 									// Store save card preference from GET parameter (if available in URL)
-									$save_card_from_get = isset( $_GET['cko-save-card'] ) ? sanitize_text_field( $_GET['cko-save-card'] ) : '';
+									$save_card_from_get = isset( $_GET['cko-save-card'] ) ? sanitize_text_field( wp_unslash( $_GET['cko-save-card'] ) ) : '';
 									if ( 'yes' === $save_card_from_get ) {
 										$order->update_meta_data( '_cko_save_card_preference', 'yes' );
 									}
@@ -3692,13 +3723,18 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			}
 		}
 		
-		// Process the payment by simulating POST data and calling process_payment
+		// Process the payment by storing payment data in order meta (WordPress-compliant approach)
 		$payment_type = isset( $payment_details['source']['type'] ) ? $payment_details['source']['type'] : 'card';
-		WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Setting POST data - Payment ID: ' . $payment_id . ', Payment Type: ' . $payment_type );
+		WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Storing payment data in order meta - Payment ID: ' . $payment_id . ', Payment Type: ' . $payment_type );
 		
-		// Set POST data for process_payment method
-		$_POST['cko-flow-payment-id'] = $payment_id;
-		$_POST['cko-flow-payment-type'] = $payment_type;
+		// Store payment data in order meta instead of modifying $_POST (WordPress coding standards compliant)
+		// process_payment() will check order meta as fallback if $_POST is not available
+		if ( $order ) {
+			// Store in the same meta keys that process_payment() checks as fallback
+			$order->update_meta_data( '_cko_flow_payment_id', $payment_id );
+			$order->update_meta_data( '_cko_flow_payment_type', $payment_type );
+			$order->save();
+		}
 		
 		if ( $is_debug ) {
 			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Calling process_payment for order: ' . $order_id );
@@ -3728,9 +3764,9 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			// Check save card preference (priority: order metadata > cookie > GET > hidden field > POST > session)
 			$save_card_from_order = $order->get_meta( '_cko_save_card_preference' );
 			$save_card_from_cookie = isset( $_COOKIE['cko_flow_save_card_preference'] ) ? sanitize_text_field( $_COOKIE['cko_flow_save_card_preference'] ) : '';
-			$save_card_from_get = isset( $_GET['cko-save-card'] ) ? sanitize_text_field( $_GET['cko-save-card'] ) : '';
-			$save_card_hidden = isset( $_POST['cko-flow-save-card-persist'] ) ? sanitize_text_field( $_POST['cko-flow-save-card-persist'] ) : '';
-			$save_card_post = isset( $_POST['wc-wc_checkout_com_flow-new-payment-method'] ) ? sanitize_text_field( $_POST['wc-wc_checkout_com_flow-new-payment-method'] ) : '';
+				$save_card_from_get = isset( $_GET['cko-save-card'] ) ? sanitize_text_field( wp_unslash( $_GET['cko-save-card'] ) ) : '';
+				$save_card_hidden = isset( $_POST['cko-flow-save-card-persist'] ) ? sanitize_text_field( wp_unslash( $_POST['cko-flow-save-card-persist'] ) ) : '';
+				$save_card_post = isset( $_POST['wc-wc_checkout_com_flow-new-payment-method'] ) ? sanitize_text_field( wp_unslash( $_POST['wc-wc_checkout_com_flow-new-payment-method'] ) ) : '';
 			$save_card_session = WC()->session ? WC()->session->get( 'wc-wc_checkout_com_flow-new-payment-method' ) : '';
 			
 			// Determine if checkbox was checked
@@ -3903,30 +3939,30 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			if ( $is_debug ) {
 				WC_Checkoutcom_Utility::logger( '[SET ADDRESSES] Setting addresses from POST data (Priority 2)' );
 			}
-			if ( isset( $_POST['billing_first_name'] ) ) $order->set_billing_first_name( sanitize_text_field( $_POST['billing_first_name'] ) );
-			if ( isset( $_POST['billing_last_name'] ) ) $order->set_billing_last_name( sanitize_text_field( $_POST['billing_last_name'] ) );
-			if ( isset( $_POST['billing_company'] ) ) $order->set_billing_company( sanitize_text_field( $_POST['billing_company'] ) );
-			if ( isset( $_POST['billing_address_1'] ) ) $order->set_billing_address_1( sanitize_text_field( $_POST['billing_address_1'] ) );
-			if ( isset( $_POST['billing_address_2'] ) ) $order->set_billing_address_2( sanitize_text_field( $_POST['billing_address_2'] ) );
-			if ( isset( $_POST['billing_city'] ) ) $order->set_billing_city( sanitize_text_field( $_POST['billing_city'] ) );
-			if ( isset( $_POST['billing_state'] ) ) $order->set_billing_state( sanitize_text_field( $_POST['billing_state'] ) );
-			if ( isset( $_POST['billing_postcode'] ) ) $order->set_billing_postcode( sanitize_text_field( $_POST['billing_postcode'] ) );
-			if ( isset( $_POST['billing_country'] ) ) $order->set_billing_country( sanitize_text_field( $_POST['billing_country'] ) );
-			if ( isset( $_POST['billing_phone'] ) ) $order->set_billing_phone( sanitize_text_field( $_POST['billing_phone'] ) );
-			if ( isset( $_POST['billing_email'] ) ) $order->set_billing_email( sanitize_email( $_POST['billing_email'] ) );
+			if ( isset( $_POST['billing_first_name'] ) ) $order->set_billing_first_name( sanitize_text_field( wp_unslash( $_POST['billing_first_name'] ) ) );
+			if ( isset( $_POST['billing_last_name'] ) ) $order->set_billing_last_name( sanitize_text_field( wp_unslash( $_POST['billing_last_name'] ) ) );
+			if ( isset( $_POST['billing_company'] ) ) $order->set_billing_company( sanitize_text_field( wp_unslash( $_POST['billing_company'] ) ) );
+			if ( isset( $_POST['billing_address_1'] ) ) $order->set_billing_address_1( sanitize_text_field( wp_unslash( $_POST['billing_address_1'] ) ) );
+			if ( isset( $_POST['billing_address_2'] ) ) $order->set_billing_address_2( sanitize_text_field( wp_unslash( $_POST['billing_address_2'] ) ) );
+			if ( isset( $_POST['billing_city'] ) ) $order->set_billing_city( sanitize_text_field( wp_unslash( $_POST['billing_city'] ) ) );
+			if ( isset( $_POST['billing_state'] ) ) $order->set_billing_state( sanitize_text_field( wp_unslash( $_POST['billing_state'] ) ) );
+			if ( isset( $_POST['billing_postcode'] ) ) $order->set_billing_postcode( sanitize_text_field( wp_unslash( $_POST['billing_postcode'] ) ) );
+			if ( isset( $_POST['billing_country'] ) ) $order->set_billing_country( sanitize_text_field( wp_unslash( $_POST['billing_country'] ) ) );
+			if ( isset( $_POST['billing_phone'] ) ) $order->set_billing_phone( sanitize_text_field( wp_unslash( $_POST['billing_phone'] ) ) );
+			if ( isset( $_POST['billing_email'] ) ) $order->set_billing_email( sanitize_email( wp_unslash( $_POST['billing_email'] ) ) );
 			
 			// Set shipping address
-			$ship_to_different_address = isset( $_POST['ship_to_different_address'] ) ? (bool) $_POST['ship_to_different_address'] : false;
+			$ship_to_different_address = isset( $_POST['ship_to_different_address'] ) ? (bool) wp_unslash( $_POST['ship_to_different_address'] ) : false;
 			if ( $ship_to_different_address ) {
-				if ( isset( $_POST['shipping_first_name'] ) ) $order->set_shipping_first_name( sanitize_text_field( $_POST['shipping_first_name'] ) );
-				if ( isset( $_POST['shipping_last_name'] ) ) $order->set_shipping_last_name( sanitize_text_field( $_POST['shipping_last_name'] ) );
-				if ( isset( $_POST['shipping_company'] ) ) $order->set_shipping_company( sanitize_text_field( $_POST['shipping_company'] ) );
-				if ( isset( $_POST['shipping_address_1'] ) ) $order->set_shipping_address_1( sanitize_text_field( $_POST['shipping_address_1'] ) );
-				if ( isset( $_POST['shipping_address_2'] ) ) $order->set_shipping_address_2( sanitize_text_field( $_POST['shipping_address_2'] ) );
-				if ( isset( $_POST['shipping_city'] ) ) $order->set_shipping_city( sanitize_text_field( $_POST['shipping_city'] ) );
-				if ( isset( $_POST['shipping_state'] ) ) $order->set_shipping_state( sanitize_text_field( $_POST['shipping_state'] ) );
-				if ( isset( $_POST['shipping_postcode'] ) ) $order->set_shipping_postcode( sanitize_text_field( $_POST['shipping_postcode'] ) );
-				if ( isset( $_POST['shipping_country'] ) ) $order->set_shipping_country( sanitize_text_field( $_POST['shipping_country'] ) );
+				if ( isset( $_POST['shipping_first_name'] ) ) $order->set_shipping_first_name( sanitize_text_field( wp_unslash( $_POST['shipping_first_name'] ) ) );
+				if ( isset( $_POST['shipping_last_name'] ) ) $order->set_shipping_last_name( sanitize_text_field( wp_unslash( $_POST['shipping_last_name'] ) ) );
+				if ( isset( $_POST['shipping_company'] ) ) $order->set_shipping_company( sanitize_text_field( wp_unslash( $_POST['shipping_company'] ) ) );
+				if ( isset( $_POST['shipping_address_1'] ) ) $order->set_shipping_address_1( sanitize_text_field( wp_unslash( $_POST['shipping_address_1'] ) ) );
+				if ( isset( $_POST['shipping_address_2'] ) ) $order->set_shipping_address_2( sanitize_text_field( wp_unslash( $_POST['shipping_address_2'] ) ) );
+				if ( isset( $_POST['shipping_city'] ) ) $order->set_shipping_city( sanitize_text_field( wp_unslash( $_POST['shipping_city'] ) ) );
+				if ( isset( $_POST['shipping_state'] ) ) $order->set_shipping_state( sanitize_text_field( wp_unslash( $_POST['shipping_state'] ) ) );
+				if ( isset( $_POST['shipping_postcode'] ) ) $order->set_shipping_postcode( sanitize_text_field( wp_unslash( $_POST['shipping_postcode'] ) ) );
+				if ( isset( $_POST['shipping_country'] ) ) $order->set_shipping_country( sanitize_text_field( wp_unslash( $_POST['shipping_country'] ) ) );
 			} else {
 				// Shipping same as billing
 				$order->set_shipping_first_name( $order->get_billing_first_name() );
@@ -5450,13 +5486,13 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// Verify nonce for security - check multiple possible locations
 		$nonce_value = '';
 		if ( isset( $_POST['woocommerce-process-checkout-nonce'] ) ) {
-			$nonce_value = sanitize_text_field( $_POST['woocommerce-process-checkout-nonce'] );
+			$nonce_value = sanitize_text_field( wp_unslash( $_POST['woocommerce-process-checkout-nonce'] ) );
 			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Nonce from POST: ' . ( ! empty( $nonce_value ) ? substr( $nonce_value, 0, 10 ) . '...' : 'EMPTY' ) );
 		} elseif ( isset( $_REQUEST['woocommerce-process-checkout-nonce'] ) ) {
-			$nonce_value = sanitize_text_field( $_REQUEST['woocommerce-process-checkout-nonce'] );
+			$nonce_value = sanitize_text_field( wp_unslash( $_REQUEST['woocommerce-process-checkout-nonce'] ) );
 			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Nonce from REQUEST: ' . ( ! empty( $nonce_value ) ? substr( $nonce_value, 0, 10 ) . '...' : 'EMPTY' ) );
 		} elseif ( isset( $_REQUEST['_wpnonce'] ) ) {
-			$nonce_value = sanitize_text_field( $_REQUEST['_wpnonce'] );
+			$nonce_value = sanitize_text_field( wp_unslash( $_REQUEST['_wpnonce'] ) );
 			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Nonce from _wpnonce: ' . ( ! empty( $nonce_value ) ? substr( $nonce_value, 0, 10 ) . '...' : 'EMPTY' ) );
 		}
 		
@@ -5483,7 +5519,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Nonce validated successfully' );
 		
 		// Get payment session ID if available
-		$payment_session_id = isset( $_POST['cko-flow-payment-session-id'] ) ? sanitize_text_field( $_POST['cko-flow-payment-session-id'] ) : '';
+		$payment_session_id = isset( $_POST['cko-flow-payment-session-id'] ) ? sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-session-id'] ) ) : '';
 		
 		// Load WooCommerce checkout class
 		if ( ! function_exists( 'WC' ) || ! WC() ) {
@@ -5522,7 +5558,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 						WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ✅ Reusing existing order instead of creating duplicate - Payment Session ID: ' . substr( $payment_session_id, 0, 20 ) . '...' );
 						
 						// Store save card preference if available (update existing order)
-						$save_card_preference = isset( $_POST['cko-flow-save-card-persist'] ) ? sanitize_text_field( $_POST['cko-flow-save-card-persist'] ) : '';
+						$save_card_preference = isset( $_POST['cko-flow-save-card-persist'] ) ? sanitize_text_field( wp_unslash( $_POST['cko-flow-save-card-persist'] ) ) : '';
 						if ( 'true' === $save_card_preference || 'yes' === $save_card_preference ) {
 							$existing_order->update_meta_data( '_cko_save_card_preference', 'yes' );
 							$existing_order->save();
@@ -5762,7 +5798,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			}
 			
 			// Store save card preference if available
-			$save_card_preference = isset( $_POST['cko-flow-save-card-persist'] ) ? sanitize_text_field( $_POST['cko-flow-save-card-persist'] ) : '';
+			$save_card_preference = isset( $_POST['cko-flow-save-card-persist'] ) ? sanitize_text_field( wp_unslash( $_POST['cko-flow-save-card-persist'] ) ) : '';
 			if ( 'true' === $save_card_preference || 'yes' === $save_card_preference ) {
 				$order->update_meta_data( '_cko_save_card_preference', 'yes' );
 				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Save card preference saved to order: YES' );
@@ -5878,13 +5914,13 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// Verify nonce for security - check multiple possible locations
 		$nonce_value = '';
 		if ( isset( $_POST['woocommerce-process-checkout-nonce'] ) ) {
-			$nonce_value = sanitize_text_field( $_POST['woocommerce-process-checkout-nonce'] );
+			$nonce_value = sanitize_text_field( wp_unslash( $_POST['woocommerce-process-checkout-nonce'] ) );
 			WC_Checkoutcom_Utility::logger( '[CREATE FAILED ORDER] Nonce from POST: ' . ( ! empty( $nonce_value ) ? substr( $nonce_value, 0, 10 ) . '...' : 'EMPTY' ) );
 		} elseif ( isset( $_REQUEST['woocommerce-process-checkout-nonce'] ) ) {
-			$nonce_value = sanitize_text_field( $_REQUEST['woocommerce-process-checkout-nonce'] );
+			$nonce_value = sanitize_text_field( wp_unslash( $_REQUEST['woocommerce-process-checkout-nonce'] ) );
 			WC_Checkoutcom_Utility::logger( '[CREATE FAILED ORDER] Nonce from REQUEST: ' . ( ! empty( $nonce_value ) ? substr( $nonce_value, 0, 10 ) . '...' : 'EMPTY' ) );
 		} elseif ( isset( $_REQUEST['_wpnonce'] ) ) {
-			$nonce_value = sanitize_text_field( $_REQUEST['_wpnonce'] );
+			$nonce_value = sanitize_text_field( wp_unslash( $_REQUEST['_wpnonce'] ) );
 			WC_Checkoutcom_Utility::logger( '[CREATE FAILED ORDER] Nonce from _wpnonce: ' . ( ! empty( $nonce_value ) ? substr( $nonce_value, 0, 10 ) . '...' : 'EMPTY' ) );
 		}
 		
@@ -5901,8 +5937,8 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		WC_Checkoutcom_Utility::logger( '[CREATE FAILED ORDER] Nonce validated successfully' );
 		
 		// Get error reason and message
-		$error_reason = isset( $_POST['error_reason'] ) ? sanitize_text_field( $_POST['error_reason'] ) : 'payment_declined';
-		$error_message = isset( $_POST['error_message'] ) ? sanitize_text_field( $_POST['error_message'] ) : __( 'Payment was declined.', 'checkout-com-unified-payments-api' );
+		$error_reason = isset( $_POST['error_reason'] ) ? sanitize_text_field( wp_unslash( $_POST['error_reason'] ) ) : 'payment_declined';
+		$error_message = isset( $_POST['error_message'] ) ? sanitize_text_field( wp_unslash( $_POST['error_message'] ) ) : __( 'Payment was declined.', 'checkout-com-unified-payments-api' );
 		
 		WC_Checkoutcom_Utility::logger( '[CREATE FAILED ORDER] Error reason: ' . $error_reason . ', Error message: ' . $error_message );
 		
@@ -6008,7 +6044,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		}
 		
 		// Get save card preference value
-		$save_card_value = isset( $_POST['save_card_value'] ) ? sanitize_text_field( $_POST['save_card_value'] ) : 'no';
+		$save_card_value = isset( $_POST['save_card_value'] ) ? sanitize_text_field( wp_unslash( $_POST['save_card_value'] ) ) : 'no';
 		WC_Checkoutcom_Utility::logger( '[FLOW SAVE CARD] Save card value received: ' . $save_card_value );
 		
 		// Initialize WooCommerce session if not already initialized

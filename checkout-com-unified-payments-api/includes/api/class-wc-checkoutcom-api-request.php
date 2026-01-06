@@ -805,7 +805,24 @@ class WC_Checkoutcom_Api_Request {
 
 		$checkout = new Checkout_SDK();
 
-		$google_pay            = new GooglePayTokenData();
+		// Ensure SDK classes are loaded - check if GooglePayTokenData class exists
+		if ( ! class_exists( 'Checkout\Tokens\GooglePayTokenData' ) ) {
+			// Try to load autoloader if not already loaded
+			$autoloader_path = dirname( dirname( dirname( __FILE__ ) ) ) . '/vendor/autoload.php';
+			if ( file_exists( $autoloader_path ) ) {
+				require_once $autoloader_path;
+			}
+			
+			// Check again after loading autoloader
+			if ( ! class_exists( 'Checkout\Tokens\GooglePayTokenData' ) ) {
+				$error_message = 'GooglePayTokenData class not found. Please ensure Composer dependencies are installed. Run "composer install" in the plugin directory: ' . dirname( dirname( dirname( __FILE__ ) ) );
+				WC_Checkoutcom_Utility::logger( $error_message );
+				return array( 'error' => __( 'Payment gateway SDK not properly configured. Please contact support.', 'checkout-com-unified-payments-api' ) );
+			}
+		}
+
+		// Use fully qualified namespace to ensure class is found
+		$google_pay            = new \Checkout\Tokens\GooglePayTokenData();
 		$google_pay->signature = $signature;
 
 		// PHPCS:disable WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
@@ -814,8 +831,15 @@ class WC_Checkoutcom_Api_Request {
 		// PHPCS:enable WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
 
 		try {
+			// Ensure GooglePayTokenRequest class is also available
+			if ( ! class_exists( 'Checkout\Tokens\GooglePayTokenRequest' ) ) {
+				$error_message = 'GooglePayTokenRequest class not found. Please ensure Composer dependencies are installed. Run "composer install" in the plugin directory.';
+				WC_Checkoutcom_Utility::logger( $error_message );
+				return array( 'error' => __( 'Payment gateway SDK not properly configured. Please contact support.', 'checkout-com-unified-payments-api' ) );
+			}
 
-			$google_pay_token_request             = new GooglePayTokenRequest();
+			// Use fully qualified namespace to ensure class is found
+			$google_pay_token_request             = new \Checkout\Tokens\GooglePayTokenRequest();
 			$google_pay_token_request->token_data = $google_pay;
 
 			$builder = $checkout->get_builder();
