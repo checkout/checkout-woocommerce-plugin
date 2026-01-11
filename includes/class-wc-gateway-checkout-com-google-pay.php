@@ -44,6 +44,9 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 
 		// Payment scripts.
 		add_action( 'wp_enqueue_scripts', [ $this, 'payment_scripts' ] );
+
+		// API endpoint for Google Pay Express
+		// add_action( 'woocommerce_api_' . strtolower( 'CKO_Google_Pay_Woocommerce' ), [ $this, 'handle_wc_api' ] );
 	}
 
 	/**
@@ -285,5 +288,165 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 		$order->update_status( $status );
 
 		return true;
+	}
+
+	/**
+	 * Handle WooCommerce API requests for Google Pay Express.
+	 */
+	public function handle_wc_api() {
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended, WordPress.Security.NonceVerification.Missing
+		if ( ! empty( $_GET['cko_google_pay_action'] ) ) {
+			switch ( $_GET['cko_google_pay_action'] ) {
+
+				case 'direct_payment':
+					$this->cko_direct_payment();
+					break;
+
+				default:
+					wp_send_json( [ 'result' => 'failed' ] );
+					break;
+			}
+		}
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended, WordPress.Security.NonceVerification.Missing
+	}
+
+	/**
+	 * Handle Google Pay Express direct payment - bypasses checkout form
+	 */
+	public function cko_direct_payment() {
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ) ), 'woocommerce-process_checkout' ) ) {
+			wp_send_json( [ 'success' => false, 'message' => 'Invalid nonce' ] );
+		}
+
+		try {
+			// Get product information
+			$product_id = absint( $_POST['product_id'] );
+			$quantity = absint( $_POST['quantity'] );
+			$attributes = json_decode( sanitize_text_field( wp_unslash( $_POST['attributes'] ) ), true );
+			$payment_data = json_decode( sanitize_text_field( wp_unslash( $_POST['payment_data'] ) ), true );
+
+			if ( ! $product_id || ! $payment_data ) {
+				throw new Exception( 'Missing required data' );
+			}
+
+			// Create order directly
+			$order = wc_create_order();
+			if ( is_wp_error( $order ) ) {
+				throw new Exception( 'Failed to create order' );
+			}
+
+			// Get product
+			$product = wc_get_product( $product_id );
+			if ( ! $product ) {
+				throw new Exception( 'Product not found' );
+			}
+
+			// Add product to order
+			$order->add_product( $product, $quantity, [
+				'variation' => $attributes
+			] );
+
+			// Set billing address from Google Pay data
+			if ( ! empty( $payment_data['shippingAddress'] ) ) {
+				$address = $payment_data['shippingAddress'];
+				$order->set_billing_first_name( $address['name'] ?? '' );
+				$order->set_billing_address_1( $address['address1'] ?? '' );
+				$order->set_billing_address_2( $address['address2'] ?? '' );
+				$order->set_billing_city( $address['locality'] ?? '' );
+				$order->set_billing_state( $address['administrativeAreaLevel1'] ?? '' );
+				$order->set_billing_postcode( $address['postalCode'] ?? '' );
+				$order->set_billing_country( $address['countryCode'] ?? '' );
+				$order->set_billing_phone( $address['phoneNumber'] ?? '' );
+			}
+
+			// Set email from Google Pay data
+			if ( ! empty( $payment_data['email'] ) ) {
+				$order->set_billing_email( $payment_data['email'] );
+			}
+
+			// Set payment method
+			$order->set_payment_method( 'wc_checkout_com_google_pay' );
+			$order->set_payment_method_title( 'Google Pay' );
+
+			// Calculate totals
+			$order->calculate_totals();
+			$order->save();
+
+			// Process payment using Checkout.com API
+			$payment_result = $this->process_google_pay_payment( $order, $payment_data );
+
+			if ( $payment_result['success'] ) {
+				// Payment successful
+				$order->payment_complete( $payment_result['transaction_id'] );
+				$order->add_order_note( 'Payment completed via Google Pay Express' );
+
+				// Clear cart
+				WC()->cart->empty_cart();
+
+				// Return success with redirect to thank you page
+				wp_send_json( [
+					'success' => true,
+					'redirect' => $order->get_checkout_order_received_url()
+				] );
+			} else {
+				throw new Exception( $payment_result['message'] ?? 'Payment failed' );
+			}
+
+		} catch ( Exception $e ) {
+			wp_send_json( [
+				'success' => false,
+				'message' => $e->getMessage()
+			] );
+		}
+	}
+
+	/**
+	 * Process Google Pay payment via Checkout.com API
+	 */
+	private function process_google_pay_payment( $order, $payment_data ) {
+		try {
+			// Convert Google Pay token to Checkout.com token
+			$checkout_token = WC_Checkoutcom_Api_Request::generate_google_pay_token( $payment_data );
+
+			if ( ! $checkout_token ) {
+				return [ 'success' => false, 'message' => 'Failed to process payment token' ];
+			}
+
+			// Create payment request
+			$payment_request = [
+				'source' => [
+					'type' => 'token',
+					'token' => $checkout_token
+				],
+				'amount' => WC_Checkoutcom_Utility::value_to_decimal( $order->get_total(), $order->get_currency() ),
+				'currency' => $order->get_currency(),
+				'reference' => $order->get_order_number(),
+				'customer' => [
+					'email' => $order->get_billing_email(),
+					'name' => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name()
+				]
+			];
+
+			// Send payment request to Checkout.com
+			$response = WC_Checkoutcom_Api_Request::request( $payment_request );
+
+			if ( $response['approved'] ) {
+				return [
+					'success' => true,
+					'transaction_id' => $response['id']
+				];
+			} else {
+				return [
+					'success' => false,
+					'message' => $response['response_summary'] ?? 'Payment declined'
+				];
+			}
+
+		} catch ( Exception $e ) {
+			return [
+				'success' => false,
+				'message' => $e->getMessage()
+			];
+		}
 	}
 }

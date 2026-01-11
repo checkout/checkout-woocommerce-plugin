@@ -130,6 +130,7 @@ function init_checkout_com_gateway_class() {
 	include_once 'includes/class-wc-gateway-checkout-com-apple-pay.php';
 	include_once 'includes/class-wc-gateway-checkout-com-google-pay.php';
 	include_once 'includes/class-wc-gateway-checkout-com-paypal.php';
+	// include_once 'includes/express/google-pay/class-google-pay-express.php';
 	include_once 'includes/class-wc-gateway-checkout-com-alternative-payments.php';
 	include_once 'flow-integration/class-wc-gateway-checkout-com-flow.php';
 
@@ -1313,3 +1314,6 @@ function get_updated_cart_info() {
 
 add_action('wp_ajax_get_cart_info', 'get_updated_cart_info');
 add_action('wp_ajax_nopriv_get_cart_info', 'get_updated_cart_info');
+
+// Initialize Google Pay Express
+// CKO_Google_Pay_Express::get_instance();

@@ -753,6 +753,14 @@ class WC_Checkoutcom_Cards_Settings {
 					'google-pay-white' => __( 'White', 'checkout-com-unified-payments-api' ),
 				],
 			],
+			'google_pay_express'            => [
+				'title'       => __( 'Google Pay Express', 'checkout-com-unified-payments-api' ),
+				'label'       => __( 'Enable Google Pay Express', 'checkout-com-unified-payments-api' ),
+				'type'        => 'checkbox',
+				'description' => __( 'Toggle to activate Google Pay Express checkout on product pages for faster checkout.', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => false,
+				'default'     => 'no',
+			],
 		];
 
 		return apply_filters( 'wc_checkout_com_google_pay', $settings );
