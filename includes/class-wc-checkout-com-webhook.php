@@ -13,6 +13,16 @@ use Checkout\CheckoutApiException;
 class WC_Checkout_Com_Webhook {
 
 	/**
+	 * Check if webhook debug logging is enabled.
+	 *
+	 * @return bool
+	 */
+	private static function is_webhook_debug_enabled() {
+		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		return ( isset( $core_settings['cko_gateway_responses'] ) && $core_settings['cko_gateway_responses'] === 'yes' );
+	}
+
+	/**
 	 * Process webhook for authorize payment.
 	 *
 	 * @param array $data Webhook data.
@@ -20,45 +30,128 @@ class WC_Checkout_Com_Webhook {
 	 * @return boolean
 	 */
 	public static function authorize_payment( $data ) {
+		$webhook_debug_enabled = self::is_webhook_debug_enabled();
+		
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: authorize_payment START ===' );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Event type: payment_approved' );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Full webhook data structure: ' . print_r($data, true) );
+		}
+		
 		$webhook_data = $data->data;
-		$order_id     = $webhook_data->metadata->order_id;
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Webhook data extracted: ' . print_r($webhook_data, true) );
+		}
+		
+		$order_id = isset($webhook_data->metadata->order_id) ? $webhook_data->metadata->order_id : null;
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order ID from metadata: ' . ($order_id ?? 'NULL') );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Payment ID: ' . ($webhook_data->id ?? 'NULL') );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Reference: ' . ($webhook_data->reference ?? 'NULL') );
+			
+			// Log all available metadata
+			if (isset($webhook_data->metadata)) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: All metadata: ' . print_r($webhook_data->metadata, true) );
+			}
+		}
 
 		// Return false if no order id.
 		if ( empty( $order_id ) || ! is_numeric( $order_id ) ) {
-			WC_Checkoutcom_Utility::logger( "Invalid/Empty order_id : $order_id" );
+			// Always log errors, even if debug is disabled
+			WC_Checkoutcom_Utility::logger( "WEBHOOK PROCESS: ERROR - Invalid/Empty order_id: " . ($order_id ?? 'NULL') );
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( "WEBHOOK PROCESS: Order ID type: " . gettype($order_id) );
+				WC_Checkoutcom_Utility::logger( "WEBHOOK PROCESS: Order ID is_numeric: " . (is_numeric($order_id) ? 'YES' : 'NO') );
+				WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: authorize_payment END (FAILED - Invalid Order ID) ===' );
+			}
 			return false;
 		}
 
 		// Load order form order id.
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Attempting to load order ID: ' . $order_id );
+		}
 		$order = self::get_wc_order( $order_id );
+		
+		if ( ! $order ) {
+			// Always log errors, even if debug is disabled
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: ERROR - Order not found for ID: ' . $order_id );
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: authorize_payment END (FAILED - Order Not Found) ===' );
+			}
+			return false;
+		}
+		
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order loaded successfully - Order ID: ' . $order->get_id() . ', Status: ' . $order->get_status() );
+		}
 
 		$already_captured = $order->get_meta( 'cko_payment_captured' );
+		$current_status = $order->get_status();
 
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: authorize_payment - Current order status: ' . $current_status );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: authorize_payment - Already captured: ' . ( $already_captured ? 'YES' : 'NO' ) );
+		}
+
+		$payment_id = $webhook_data->id;
+		$action_id = $webhook_data->action_id;
+		$message = sprintf( 'Webhook received from checkout.com. Payment Authorized - Payment ID: %s, Action ID: %s', $payment_id, $action_id );
+
+		// CRITICAL: Check if already captured FIRST (most important check)
+		// Don't update status if already captured (even if not authorized yet)
+		// This prevents downgrading from processing back to on-hold
 		if ( $already_captured ) {
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: authorize_payment - Payment already captured, skipping status update to prevent downgrade' );
+			}
+			// Payment already captured - just add note and update meta, don't change status
+			$order->set_transaction_id( $action_id );
+			$order->update_meta_data( '_cko_payment_id', $payment_id );
+			$order->update_meta_data( 'cko_payment_authorized', true );
+			$order->add_order_note( $message );
 			return true;
 		}
 
 		$already_authorized = $order->get_meta( 'cko_payment_authorized' );
 		$auth_status        = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
-		$message            = 'Webhook received from checkout.com. Payment Authorized';
 
-		// Add note to order if Authorized already.
+		// Don't update status if already authorized AND status matches
 		if ( $already_authorized && $order->get_status() === $auth_status ) {
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: authorize_payment - Already authorized with matching status, adding note only' );
+			}
 			$order->add_order_note( $message );
 			return true;
 		}
 
-		// Get action id from webhook data.
-		$action_id = $webhook_data->action_id;
+		// Don't update status if order is already in a more advanced state (processing, completed)
+		// This prevents race conditions where capture webhook updated status but meta not saved yet
+		if ( in_array( $current_status, array( 'processing', 'completed' ), true ) ) {
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: authorize_payment - Order already in advanced state (' . $current_status . '), skipping status update to prevent downgrade' );
+			}
+			// Order is already processing/completed - don't downgrade to on-hold
+			// Just add note and update meta, but don't change status
+			$order->set_transaction_id( $action_id );
+			$order->update_meta_data( '_cko_payment_id', $payment_id );
+			$order->update_meta_data( 'cko_payment_authorized', true );
+			$order->add_order_note( $message );
+			return true;
+		}
 
 		// Set action id as woo transaction id.
 		$order->set_transaction_id( $action_id );
-		$order->update_meta_data( '_cko_payment_id', $webhook_data->id );
+		$order->update_meta_data( '_cko_payment_id', $payment_id );
 		$order->update_meta_data( 'cko_payment_authorized', true );
 
 		$order->add_order_note( $message );
 		$order->update_status( $auth_status );
 
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order status updated to: ' . $auth_status );
+			WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: authorize_payment END (SUCCESS) ===' );
+		}
 		return true;
 	}
 
@@ -70,20 +163,55 @@ class WC_Checkout_Com_Webhook {
 	 * @return bool
 	 */
 	public static function card_verified( $data ) {
+		$webhook_debug_enabled = self::is_webhook_debug_enabled();
+		
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: card_verified START ===' );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Event type: card_verified' );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Full webhook data structure: ' . print_r($data, true) );
+		}
+		
 		$webhook_data = $data->data;
-		$order_id     = $webhook_data->metadata->order_id;
-		$action_id    = $webhook_data->action_id;
+		$order_id     = isset($webhook_data->metadata->order_id) ? $webhook_data->metadata->order_id : null;
+		$action_id    = isset($webhook_data->action_id) ? $webhook_data->action_id : null;
+		
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order ID from metadata: ' . ($order_id ?? 'NULL') );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Action ID: ' . ($action_id ?? 'NULL') );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Payment ID: ' . ($webhook_data->id ?? 'NULL') );
+		}
 
 		// Return false if no order id.
 		if ( empty( $order_id ) || ! is_numeric( $order_id ) ) {
-			WC_Checkoutcom_Utility::logger( "Invalid/Empty order_id : $order_id" );
+			// Always log errors
+			WC_Checkoutcom_Utility::logger( "WEBHOOK PROCESS: ERROR - Invalid/Empty order_id: " . ($order_id ?? 'NULL') );
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: card_verified END (FAILED - Invalid Order ID) ===' );
+			}
 			return false;
 		}
 
 		// Load order form order id.
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Attempting to load order ID: ' . $order_id );
+		}
 		$order = self::get_wc_order( $order_id );
+		
+		if ( ! $order ) {
+			// Always log errors
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: ERROR - Order not found for ID: ' . $order_id );
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: card_verified END (FAILED - Order Not Found) ===' );
+			}
+			return false;
+		}
+		
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order loaded successfully - Order ID: ' . $order->get_id() . ', Status: ' . $order->get_status() );
+		}
 
-		$order->add_order_note( __( 'Checkout.com Card verified webhook received', 'checkout-com-unified-payments-api' ) );
+		$payment_id = $webhook_data->id;
+		$order->add_order_note( sprintf( __( 'Checkout.com Card verified webhook received - Payment ID: %s, Action ID: %s', 'checkout-com-unified-payments-api' ), $payment_id, $action_id ) );
 		// Set action id as woo transaction id.
 		$order->set_transaction_id( $action_id );
 
@@ -93,6 +221,10 @@ class WC_Checkout_Com_Webhook {
 		// update status of the order.
 		$order->update_status( $status );
 
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order status updated to: ' . $status );
+			WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: card_verified END (SUCCESS) ===' );
+		}
 		return true;
 	}
 
@@ -104,32 +236,75 @@ class WC_Checkout_Com_Webhook {
 	 * @return bool
 	 */
 	public static function capture_payment( $data ) {
+		$webhook_debug_enabled = self::is_webhook_debug_enabled();
+		
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: capture_payment START ===' );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Event type: payment_captured' );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Full webhook data structure: ' . print_r($data, true) );
+		}
+		
 		$webhook_data = $data->data;
-		$order_id     = $webhook_data->metadata->order_id;
+		$order_id     = isset($webhook_data->metadata->order_id) ? $webhook_data->metadata->order_id : null;
+		
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order ID from metadata: ' . ($order_id ?? 'NULL') );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Payment ID: ' . ($webhook_data->id ?? 'NULL') );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Amount: ' . (isset($webhook_data->amount) ? $webhook_data->amount : 'NULL') );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Action ID: ' . (isset($webhook_data->action_id) ? $webhook_data->action_id : 'NULL') );
+		}
 
 		// Return false if no order id.
 		if ( empty( $order_id ) || ! is_numeric( $order_id ) ) {
-			WC_Checkoutcom_Utility::logger( "Invalid/Empty order_id : $order_id" );
+			// Always log errors
+			WC_Checkoutcom_Utility::logger( "WEBHOOK PROCESS: ERROR - Invalid/Empty order_id: " . ($order_id ?? 'NULL') );
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: capture_payment END (FAILED - Invalid Order ID) ===' );
+			}
 			return false;
 		}
 
 		// Load order form order id.
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Attempting to load order ID: ' . $order_id );
+		}
 		$order    = self::get_wc_order( $order_id );
+		
+		if ( ! $order ) {
+			// Always log errors
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: ERROR - Order not found for ID: ' . $order_id );
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: capture_payment END (FAILED - Order Not Found) ===' );
+			}
+			return false;
+		}
+		
 		$order_id = $order->get_id();
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order loaded successfully - Order ID: ' . $order_id . ', Status: ' . $order->get_status() );
+		}
 
 		// Check if payment is already captured.
 		$already_captured = $order->get_meta( 'cko_payment_captured' );
-		$message          = 'Webhook received from checkout.com Payment captured';
+		$payment_id       = $webhook_data->id;
+
+		// Get action id from webhook data.
+		$action_id          = $webhook_data->action_id;
+		$amount             = $webhook_data->amount;
+		$order_amount       = $order->get_total();
+		$order_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $order_amount, $order->get_currency() );
+
+		$message          = sprintf( 'Webhook received from checkout.com Payment captured - Payment ID: %s, Action ID: %s', $payment_id, $action_id );
 
 		$already_authorized = $order->get_meta( 'cko_payment_authorized' );
 
-		/**
-		* We return false here as payment approved webhook is not yet delivered
-		* Gateway will retry sending the captured webhook.
-		*/
+		// If not already authorized, set it now (capture implies authorization)
+		// This handles cases where capture webhook arrives before auth webhook
 		if ( ! $already_authorized ) {
-			WC_Checkoutcom_Utility::logger( 'Payment approved webhook not received yet : ' . $order_id, null );
-			return false;
+			$order->update_meta_data( 'cko_payment_authorized', true );
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Capture webhook arrived before auth - setting authorization status automatically for order: ' . $order_id );
+			}
 		}
 
 		// Add note to order if captured already.
@@ -138,13 +313,7 @@ class WC_Checkout_Com_Webhook {
 			return true;
 		}
 
-		$order->add_order_note( __( 'Checkout.com Payment Capture webhook received', 'checkout-com-unified-payments-api' ) );
-
-		// Get action id from webhook data.
-		$action_id          = $webhook_data->action_id;
-		$amount             = $webhook_data->amount;
-		$order_amount       = $order->get_total();
-		$order_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $order_amount, $order->get_currency() );
+		$order->add_order_note( sprintf( __( 'Checkout.com Payment Capture webhook received - Payment ID: %s', 'checkout-com-unified-payments-api' ), $payment_id ) );
 
 		// Set action id as woo transaction id.
 		$order->set_transaction_id( $action_id );
@@ -153,19 +322,23 @@ class WC_Checkout_Com_Webhook {
 		// Get cko capture status configured in admin.
 		$status = WC_Admin_Settings::get_option( 'ckocom_order_captured', 'processing' );
 
-		/* translators: %s: Action ID. */
-		$order_message = sprintf( esc_html__( 'Checkout.com Payment Captured - Action ID : %s', 'checkout-com-unified-payments-api' ), $action_id );
+		/* translators: %1$s: Payment ID, %2$s: Action ID. */
+		$order_message = sprintf( esc_html__( 'Checkout.com Payment Captured - Payment ID: %1$s, Action ID: %2$s', 'checkout-com-unified-payments-api' ), $payment_id, $action_id );
 
 		// Check if webhook amount is less than order amount.
 		if ( $amount < $order_amount_cents ) {
-			/* translators: %s: Action ID. */
-			$order_message = sprintf( esc_html__( 'Checkout.com Payment partially captured - Action ID : %s', 'checkout-com-unified-payments-api' ), $action_id );
+			/* translators: %1$s: Payment ID, %2$s: Action ID. */
+			$order_message = sprintf( esc_html__( 'Checkout.com Payment partially captured - Payment ID: %1$s, Action ID: %2$s', 'checkout-com-unified-payments-api' ), $payment_id, $action_id );
 		}
 
 		// add notes for the order and update status.
 		$order->add_order_note( $order_message );
 		$order->update_status( $status );
 
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order status updated to: ' . $status );
+			WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: capture_payment END (SUCCESS) ===' );
+		}
 		return true;
 	}
 
@@ -177,23 +350,70 @@ class WC_Checkout_Com_Webhook {
 	 * @return bool
 	 */
 	public static function capture_declined( $data ) {
+		$webhook_debug_enabled = self::is_webhook_debug_enabled();
+		
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: capture_declined START ===' );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Event type: payment_capture_declined' );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Full webhook data structure: ' . print_r($data, true) );
+		}
+		
 		$webhook_data = $data->data;
-		$order_id     = $webhook_data->metadata->order_id;
+		$order_id     = isset($webhook_data->metadata->order_id) ? $webhook_data->metadata->order_id : null;
+		$payment_id   = isset($webhook_data->id) ? $webhook_data->id : null;
+		$action_id    = isset($webhook_data->action_id) ? $webhook_data->action_id : null;
+		$response_summary = isset($webhook_data->response_summary) ? $webhook_data->response_summary : 'N/A';
+		
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order ID from metadata: ' . ($order_id ?? 'NULL') );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Payment ID: ' . ($payment_id ?? 'NULL') );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Action ID: ' . ($action_id ?? 'NULL') );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Response summary: ' . $response_summary );
+		}
 
 		// Return false if no order id.
 		if ( empty( $order_id ) || ! is_numeric( $order_id ) ) {
-			WC_Checkoutcom_Utility::logger( "Invalid/Empty order_id : $order_id" );
+			// Always log errors
+			WC_Checkoutcom_Utility::logger( "WEBHOOK PROCESS: ERROR - Invalid/Empty order_id: " . ($order_id ?? 'NULL') );
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: capture_declined END (FAILED - Invalid Order ID) ===' );
+			}
 			return false;
 		}
 
 		// Load order form order id.
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Attempting to load order ID: ' . $order_id );
+		}
 		$order = self::get_wc_order( $order_id );
+		
+		if ( ! $order ) {
+			// Always log errors
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: ERROR - Order not found for ID: ' . $order_id );
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: capture_declined END (FAILED - Order Not Found) ===' );
+			}
+			return false;
+		}
+		
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order loaded successfully - Order ID: ' . $order->get_id() . ', Status: ' . $order->get_status() );
+		}
 
-		$message = 'Webhook received from checkout.com. Payment capture declined. Reason : ' . $webhook_data->response_summary;
+		// Include Payment ID and Action ID (if available) in the order note for consistency with other webhook handlers
+		if ( ! empty( $action_id ) ) {
+			$message = sprintf( 'Webhook received from checkout.com. Payment capture declined - Payment ID: %s, Action ID: %s, Reason: %s', $payment_id, $action_id, $response_summary );
+		} else {
+			$message = sprintf( 'Webhook received from checkout.com. Payment capture declined - Payment ID: %s, Reason: %s', $payment_id, $response_summary );
+		}
 
 		// Add note to order if capture declined.
 		$order->add_order_note( $message );
 
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Capture declined note added to order' );
+			WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: capture_declined END (SUCCESS) ===' );
+		}
 		return true;
 	}
 
@@ -205,22 +425,60 @@ class WC_Checkout_Com_Webhook {
 	 * @return bool
 	 */
 	public static function void_payment( $data ) {
+		$webhook_debug_enabled = self::is_webhook_debug_enabled();
+		
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: void_payment START ===' );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Event type: payment_voided' );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Full webhook data structure: ' . print_r($data, true) );
+		}
+		
 		$webhook_data = $data->data;
-		$order_id     = $webhook_data->metadata->order_id;
+		$order_id     = isset($webhook_data->metadata->order_id) ? $webhook_data->metadata->order_id : null;
+		
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order ID from metadata: ' . ($order_id ?? 'NULL') );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Payment ID: ' . ($webhook_data->id ?? 'NULL') );
+		}
 
 		// Return false if no order id.
 		if ( empty( $order_id ) || ! is_numeric( $order_id ) ) {
-			WC_Checkoutcom_Utility::logger( "Invalid/Empty order_id : $order_id" );
+			// Always log errors
+			WC_Checkoutcom_Utility::logger( "WEBHOOK PROCESS: ERROR - Invalid/Empty order_id: " . ($order_id ?? 'NULL') );
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: void_payment END (FAILED - Invalid Order ID) ===' );
+			}
 			return false;
 		}
 
 		// Load order form order id.
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Attempting to load order ID: ' . $order_id );
+		}
 		$order    = self::get_wc_order( $order_id );
+		
+		if ( ! $order ) {
+			// Always log errors
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: ERROR - Order not found for ID: ' . $order_id );
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: void_payment END (FAILED - Order Not Found) ===' );
+			}
+			return false;
+		}
+		
 		$order_id = $order->get_id();
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order loaded successfully - Order ID: ' . $order_id . ', Status: ' . $order->get_status() );
+		}
 
 		// check if payment is already captured.
 		$already_voided = $order->get_meta( 'cko_payment_voided' );
-		$message        = 'Webhook received from checkout.com. Payment voided';
+		$payment_id      = $webhook_data->id;
+
+		// Get action id from webhook data.
+		$action_id = $webhook_data->action_id;
+
+		$message        = sprintf( 'Webhook received from checkout.com. Payment voided - Payment ID: %s, Action ID: %s', $payment_id, $action_id );
 
 		// Add note to order if captured already.
 		if ( $already_voided ) {
@@ -228,10 +486,7 @@ class WC_Checkout_Com_Webhook {
 			return true;
 		}
 
-		$order->add_order_note( esc_html__( 'Checkout.com Payment Void webhook received', 'checkout-com-unified-payments-api' ) );
-
-		// Get action id from webhook data.
-		$action_id = $webhook_data->action_id;
+		$order->add_order_note( sprintf( esc_html__( 'Checkout.com Payment Void webhook received - Payment ID: %s', 'checkout-com-unified-payments-api' ), $payment_id ) );
 
 		// Set action id as woo transaction id.
 		$order->set_transaction_id( $action_id );
@@ -240,13 +495,17 @@ class WC_Checkout_Com_Webhook {
 		// Get cko capture status configured in admin.
 		$status = WC_Admin_Settings::get_option( 'ckocom_order_void', 'cancelled' );
 
-		/* translators: %s: Action ID. */
-		$order_message = sprintf( esc_html__( 'Checkout.com Payment Voided - Action ID : %s', 'checkout-com-unified-payments-api' ), $action_id );
+		/* translators: %1$s: Payment ID, %2$s: Action ID. */
+		$order_message = sprintf( esc_html__( 'Checkout.com Payment Voided - Payment ID: %1$s, Action ID: %2$s', 'checkout-com-unified-payments-api' ), $payment_id, $action_id );
 
 		// add notes for the order and update status.
 		$order->add_order_note( $order_message );
 		$order->update_status( $status );
 
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order status updated to: ' . $status );
+			WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: void_payment END (SUCCESS) ===' );
+		}
 		return true;
 	}
 
@@ -261,22 +520,56 @@ class WC_Checkout_Com_Webhook {
 	 * @return bool
 	 */
 	public static function refund_payment( $data ) {
+		$webhook_debug_enabled = self::is_webhook_debug_enabled();
+		
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: refund_payment START ===' );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Event type: payment_refunded' );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Full webhook data structure: ' . print_r($data, true) );
+		}
+		
 		$webhook_data = $data->data;
-		$order_id     = $webhook_data->metadata->order_id;
+		$order_id     = isset($webhook_data->metadata->order_id) ? $webhook_data->metadata->order_id : null;
+		
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order ID from metadata: ' . ($order_id ?? 'NULL') );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Payment ID: ' . ($webhook_data->id ?? 'NULL') );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Refund amount: ' . (isset($webhook_data->amount) ? $webhook_data->amount : 'NULL') );
+		}
 
 		// Return false if no order id.
 		if ( empty( $order_id ) || ! is_numeric( $order_id ) ) {
-			WC_Checkoutcom_Utility::logger( "Invalid/Empty order_id : $order_id" );
+			// Always log errors
+			WC_Checkoutcom_Utility::logger( "WEBHOOK PROCESS: ERROR - Invalid/Empty order_id: " . ($order_id ?? 'NULL') );
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: refund_payment END (FAILED - Invalid Order ID) ===' );
+			}
 			return false;
 		}
 
 		// Load order form order id.
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Attempting to load order ID: ' . $order_id );
+		}
 		$order    = self::get_wc_order( $order_id );
+		
+		if ( ! $order ) {
+			// Always log errors
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: ERROR - Order not found for ID: ' . $order_id );
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: refund_payment END (FAILED - Order Not Found) ===' );
+			}
+			return false;
+		}
+		
 		$order_id = $order->get_id();
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order loaded successfully - Order ID: ' . $order_id . ', Status: ' . $order->get_status() );
+		}
 
 		// check if payment is already refunded.
 		$already_refunded = $order->get_meta( 'cko_payment_refunded' );
-		$message          = 'Webhook received from checkout.com. Payment refunded';
+		$payment_id      = $webhook_data->id;
 
 		// Get action id from webhook data.
 		$action_id          = $webhook_data->action_id;
@@ -284,6 +577,8 @@ class WC_Checkout_Com_Webhook {
 		$order_amount       = $order->get_total();
 		$order_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $order_amount, $order->get_currency() );
 		$get_transaction_id = $order->get_transaction_id();
+
+		$message          = sprintf( 'Webhook received from checkout.com. Payment refunded - Payment ID: %s, Action ID: %s', $payment_id, $action_id );
 
 		if ( $get_transaction_id === $action_id ) {
 			return true;
@@ -295,7 +590,7 @@ class WC_Checkout_Com_Webhook {
 			return true;
 		}
 
-		$order->add_order_note( esc_html__( 'Checkout.com Payment Refund webhook received', 'checkout-com-unified-payments-api' ) );
+		$order->add_order_note( sprintf( esc_html__( 'Checkout.com Payment Refund webhook received - Payment ID: %s', 'checkout-com-unified-payments-api' ), $payment_id ) );
 
 		// Set action id as woo transaction id.
 		$order->set_transaction_id( $action_id );
@@ -303,13 +598,13 @@ class WC_Checkout_Com_Webhook {
 
 		$refund_amount = WC_Checkoutcom_Utility::decimal_to_value( $amount, $order->get_currency() );
 
-		/* translators: %s: Action ID. */
-		$order_message = sprintf( esc_html__( 'Checkout.com Payment Refunded - Action ID : %s', 'checkout-com-unified-payments-api' ), $action_id );
+		/* translators: %1$s: Payment ID, %2$s: Action ID. */
+		$order_message = sprintf( esc_html__( 'Checkout.com Payment Refunded - Payment ID: %1$s, Action ID: %2$s', 'checkout-com-unified-payments-api' ), $payment_id, $action_id );
 
 		// Check if webhook amount is less than order amount - partial refund.
 		if ( $amount < $order_amount_cents ) {
-			/* translators: %s: Action ID. */
-			$order_message = sprintf( esc_html__( 'Checkout.com Payment partially refunded - Action ID : %s', 'checkout-com-unified-payments-api' ), $action_id );
+			/* translators: %1$s: Payment ID, %2$s: Action ID. */
+			$order_message = sprintf( esc_html__( 'Checkout.com Payment partially refunded - Payment ID: %1$s, Action ID: %2$s', 'checkout-com-unified-payments-api' ), $payment_id, $action_id );
 
 			$refund = wc_create_refund(
 				[
@@ -322,8 +617,8 @@ class WC_Checkout_Com_Webhook {
 
 		} elseif ( $amount == $order_amount_cents ) { // PHPCS:ignore WordPress.PHP.StrictComparisons.LooseComparison
 			// Full refund.
-			/* translators: %s: Action ID. */
-			$order_message = sprintf( esc_html__( 'Checkout.com Payment fully refunded - Action ID : %s', 'checkout-com-unified-payments-api' ), $action_id );
+			/* translators: %1$s: Payment ID, %2$s: Action ID. */
+			$order_message = sprintf( esc_html__( 'Checkout.com Payment fully refunded - Payment ID: %1$s, Action ID: %2$s', 'checkout-com-unified-payments-api' ), $payment_id, $action_id );
 
 			$refund = wc_create_refund(
 				[
@@ -338,6 +633,10 @@ class WC_Checkout_Com_Webhook {
 		// add notes for the order and update status.
 		$order->add_order_note( $order_message );
 
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Refund processed successfully' );
+			WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: refund_payment END (SUCCESS) ===' );
+		}
 		return true;
 	}
 
@@ -349,28 +648,68 @@ class WC_Checkout_Com_Webhook {
 	 * @return bool
 	 */
 	public static function cancel_payment( $data ) {
+		$webhook_debug_enabled = self::is_webhook_debug_enabled();
+		
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: cancel_payment START ===' );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Event type: payment_canceled' );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Full webhook data structure: ' . print_r($data, true) );
+		}
+		
 		$webhook_data  = $data->data;
-		$payment_id    = $webhook_data->id;
-		$gateway_debug = 'yes' === WC_Admin_Settings::get_option( 'cko_gateway_responses', 'no' );
+		$payment_id    = isset($webhook_data->id) ? $webhook_data->id : null;
+		
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Payment ID: ' . ($payment_id ?? 'NULL') );
+		}
 
 		// Initialize the Checkout Api.
 		$checkout = new Checkout_SDK();
 
 		try {
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Fetching payment details from Checkout.com for payment ID: ' . $payment_id );
+			}
 			// Check if payment is already voided or captured on checkout.com hub.
 			$details = $checkout->get_builder()->getPaymentsClient()->getPaymentDetails( $payment_id );
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Payment details retrieved: ' . print_r($details, true) );
+			}
 
 			$order_id = ! empty( $details['metadata']['order_id'] ) ? $details['metadata']['order_id'] : null;
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order ID from payment details metadata: ' . ($order_id ?? 'NULL') );
+			}
 
 			// Return false if no order id.
 			if ( empty( $order_id ) || ! is_numeric( $order_id ) ) {
-				WC_Checkoutcom_Utility::logger( 'No order id', null );
-
+				// Always log errors
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: ERROR - No valid order_id found in payment details' );
+				if ( $webhook_debug_enabled ) {
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Payment details metadata: ' . print_r(isset($details['metadata']) ? $details['metadata'] : 'N/A', true) );
+					WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: cancel_payment END (FAILED - Invalid Order ID) ===' );
+				}
 				return false;
 			}
 
 			// Load order form order id.
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Attempting to load order ID: ' . $order_id );
+			}
 			$order = self::get_wc_order( $order_id );
+			
+			if ( ! $order ) {
+				// Always log errors
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: ERROR - Order not found for ID: ' . $order_id );
+				if ( $webhook_debug_enabled ) {
+					WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: cancel_payment END (FAILED - Order Not Found) ===' );
+				}
+				return false;
+			}
+			
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order loaded successfully - Order ID: ' . $order->get_id() . ', Status: ' . $order->get_status() );
+			}
 
 			$status  = 'wc-cancelled';
 			$message = 'Webhook received from checkout.com. Payment cancelled';
@@ -379,18 +718,31 @@ class WC_Checkout_Com_Webhook {
 			$order->add_order_note( $message );
 			$order->update_status( $status );
 
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order status updated to: ' . $status );
+				WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: cancel_payment END (SUCCESS) ===' );
+			}
 			return true;
 
 		} catch ( CheckoutApiException $ex ) {
-			$error_message = 'An error has occurred while processing your cancel request.';
+			// Always log errors
+			$error_message = 'WEBHOOK PROCESS: ERROR - An error has occurred while processing cancel request.';
+			WC_Checkoutcom_Utility::logger( $error_message );
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Exception message: ' . $ex->getMessage() );
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Exception code: ' . $ex->getCode() );
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Exception trace: ' . $ex->getTraceAsString() );
+			}
 
 			// Check if gateway response is enabled from module settings.
-			if ( $gateway_debug ) {
+			if ( $webhook_debug_enabled ) {
 				$error_message .= $ex->getMessage();
 			}
 
 			WC_Checkoutcom_Utility::logger( $error_message, $ex );
-
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: cancel_payment END (FAILED - Exception) ===' );
+			}
 			return false;
 		}
 	}
@@ -404,26 +756,70 @@ class WC_Checkout_Com_Webhook {
 	 * @return bool
 	 */
 	public static function decline_payment( $data ) {
+		$webhook_debug_enabled = self::is_webhook_debug_enabled();
+		
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: decline_payment START ===' );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Event type: payment_declined/payment_authentication_failed' );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Full webhook data structure: ' . print_r($data, true) );
+		}
+		
 		$webhook_data     = $data->data;
-		$order_id         = $webhook_data->metadata->order_id;
-		$payment_id       = $webhook_data->id;
-		$response_summary = $webhook_data->response_summary;
+		$order_id         = isset($webhook_data->metadata->order_id) ? $webhook_data->metadata->order_id : null;
+		$payment_id       = isset($webhook_data->id) ? $webhook_data->id : null;
+		$action_id        = isset($webhook_data->action_id) ? $webhook_data->action_id : null;
+		$response_summary = isset($webhook_data->response_summary) ? $webhook_data->response_summary : null;
+		
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order ID from metadata: ' . ($order_id ?? 'NULL') );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Payment ID: ' . ($payment_id ?? 'NULL') );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Action ID: ' . ($action_id ?? 'NULL') );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Response summary: ' . ($response_summary ?? 'NULL') );
+		}
 
 		if ( empty( $order_id ) || ! is_numeric( $order_id ) ) {
-			WC_Checkoutcom_Utility::logger( 'No order id for payment ' . $payment_id, null );
-
+			// Always log errors
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: ERROR - No valid order_id for payment: ' . ($payment_id ?? 'NULL') );
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: decline_payment END (FAILED - Invalid Order ID) ===' );
+			}
 			return false;
 		}
 
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Attempting to load order ID: ' . $order_id );
+		}
 		$order = self::get_wc_order( $order_id );
+		
+		if ( ! $order ) {
+			// Always log errors
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: ERROR - Order not found for ID: ' . $order_id );
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: decline_payment END (FAILED - Order Not Found) ===' );
+			}
+			return false;
+		}
+		
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order loaded successfully - Order ID: ' . $order->get_id() . ', Status: ' . $order->get_status() );
+		}
 
 		$status  = 'wc-failed';
-		$message = 'Webhook received from checkout.com. Payment declined Reason : ' . $response_summary;
+		// Include Payment ID and Action ID (if available) in the order note for consistency with other webhook handlers
+		if ( ! empty( $action_id ) ) {
+			$message = sprintf( 'Webhook received from checkout.com. Payment declined - Payment ID: %s, Action ID: %s, Reason: %s', $payment_id, $action_id, $response_summary );
+		} else {
+			$message = sprintf( 'Webhook received from checkout.com. Payment declined - Payment ID: %s, Reason: %s', $payment_id, $response_summary );
+		}
 
 		// Add notes for the order and update status.
 		$order->add_order_note( $message );
 		$order->update_status( $status );
 
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order status updated to: ' . $status );
+			WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: decline_payment END (SUCCESS) ===' );
+		}
 		return true;
 	}
 
@@ -435,19 +831,41 @@ class WC_Checkout_Com_Webhook {
 	 * @return bool|mixed|WC_Order|WC_Order_Refund
 	 */
 	private static function get_wc_order( $order_id ) {
+		$webhook_debug_enabled = self::is_webhook_debug_enabled();
+		
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: get_wc_order - Looking up order ID: ' . $order_id );
+		}
+		
 		$order = wc_get_order( $order_id );
-
-		// Query order by order number to check if order exist.
-		if ( ! $order ) {
-			$orders = wc_get_orders(
-				[
-					'order_number' => $order_id,
-				]
-			);
-
-			$order = $orders[0];
+		
+		if ( $order ) {
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: get_wc_order - Order found via wc_get_order - ID: ' . $order->get_id() . ', Status: ' . $order->get_status() );
+			}
+			return $order;
 		}
 
-		return $order;
+		// Query order by order number to check if order exist.
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: get_wc_order - Order not found via wc_get_order, trying order_number lookup' );
+		}
+		$orders = wc_get_orders(
+			[
+				'order_number' => $order_id,
+			]
+		);
+
+		if ( ! empty( $orders ) && isset( $orders[0] ) ) {
+			$order = $orders[0];
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: get_wc_order - Order found via order_number lookup - ID: ' . $order->get_id() . ', Status: ' . $order->get_status() );
+			}
+			return $order;
+		}
+		
+		// Always log errors
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: get_wc_order - ERROR - Order not found by ID or order_number: ' . $order_id );
+		return false;
 	}
 }

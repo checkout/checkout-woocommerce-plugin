@@ -22,7 +22,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	 */
 	public function __construct() {
 
-		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 
 		$this->id                 = 'wc_checkout_com_flow';
 		$this->method_title       = __( 'Checkout.com', 'checkout-com-unified-payments-api' );
@@ -55,9 +55,107 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// Webhook handler hook - ENABLED for Flow integration
 		// Flow integration uses direct redirect for successful payments, but webhooks for 3DS, failures, etc.
 		add_action( 'woocommerce_api_wc_checkoutcom_webhook', [ $this, 'webhook_handler' ] );
+		
+		// WC API endpoint for processing 3DS returns (similar to PayPal)
+		// This allows direct redirect to order-received page without showing checkout page
+		add_action( 'woocommerce_api_wc_checkoutcom_flow_process', [ $this, 'handle_3ds_return' ] );
+		
+		// Detect 3DS return on checkout page load and process server-side (no AJAX)
+		// This handles cases where user returns to checkout page with 3DS parameters
+		// Priority 1 ensures it runs very early, before other template_redirect hooks
+		add_action( 'template_redirect', [ $this, 'detect_and_process_3ds_return_on_checkout' ], 1 );
 
 		// Meta field on subscription edit.
 		add_filter( 'woocommerce_subscription_payment_meta', [ $this, 'add_payment_meta_field' ], 10, 2 );
+
+		// Secure AJAX handler for creating payment sessions (prevents secret key exposure to frontend)
+		add_action( 'wp_ajax_cko_flow_create_payment_session', [ $this, 'ajax_create_payment_session' ] );
+		add_action( 'wp_ajax_nopriv_cko_flow_create_payment_session', [ $this, 'ajax_create_payment_session' ] );
+	}
+
+	/**
+	 * Check if the gateway is available.
+	 * 
+	 * Override parent method to ensure gateway is available when enabled and checkout mode is 'flow'.
+	 * This bypasses WooCommerce's default currency/country restrictions.
+	 *
+	 * @return bool
+	 */
+	public function is_available() {
+		// Log availability check start
+		WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Checking if Flow gateway is available...' );
+		WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Gateway enabled setting: ' . ( isset( $this->enabled ) ? $this->enabled : 'NOT SET' ) );
+		
+		// First check if gateway is enabled
+		if ( 'yes' !== $this->enabled ) {
+			WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Gateway is NOT available - enabled setting is not "yes"' );
+			return false;
+		}
+
+		// Check if checkout mode is set to 'flow'
+		$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		$checkout_mode = isset( $checkout_setting['ckocom_checkout_mode'] ) ? $checkout_setting['ckocom_checkout_mode'] : 'classic';
+		
+		WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Checkout mode: ' . $checkout_mode );
+		
+		if ( 'flow' !== $checkout_mode ) {
+			WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Gateway is NOT available - checkout mode is not "flow" (current: ' . $checkout_mode . ')' );
+			return false;
+		}
+
+		// Check if API credentials are set
+		$secret_key = isset( $checkout_setting['ckocom_secret_key'] ) ? $checkout_setting['ckocom_secret_key'] : '';
+		$public_key = isset( $checkout_setting['ckocom_public_key'] ) ? $checkout_setting['ckocom_public_key'] : '';
+		
+		WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Secret key: ' . ( ! empty( $secret_key ) ? 'SET (' . substr( $secret_key, 0, 10 ) . '...)' : 'NOT SET' ) );
+		WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Public key: ' . ( ! empty( $public_key ) ? 'SET (' . substr( $public_key, 0, 10 ) . '...)' : 'NOT SET' ) );
+		
+		if ( empty( $secret_key ) || empty( $public_key ) ) {
+			// Log warning but don't block availability (credentials might be set later)
+			WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] WARNING: API credentials not set, but gateway is still available' );
+		}
+
+		// Gateway is available if enabled and checkout mode is 'flow'
+		// We bypass currency/country restrictions as Flow supports all currencies/countries
+		WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Gateway IS available - all checks passed' );
+		return true;
+	}
+
+	/**
+	 * Check if the gateway is valid for use.
+	 * 
+	 * Override parent method to bypass currency/country restrictions.
+	 * Flow supports all currencies and countries, so we always return true
+	 * when the gateway is enabled and checkout mode is 'flow'.
+	 *
+	 * @return bool
+	 */
+	public function valid_for_use() {
+		// Log valid_for_use check start
+		WC_Checkoutcom_Utility::logger( '[FLOW VALID FOR USE] Checking if Flow gateway is valid for use...' );
+		WC_Checkoutcom_Utility::logger( '[FLOW VALID FOR USE] Gateway enabled setting: ' . ( isset( $this->enabled ) ? $this->enabled : 'NOT SET' ) );
+		
+		// Check if gateway is enabled
+		if ( 'yes' !== $this->enabled ) {
+			WC_Checkoutcom_Utility::logger( '[FLOW VALID FOR USE] Gateway is NOT valid - enabled setting is not "yes"' );
+			return false;
+		}
+
+		// Check if checkout mode is set to 'flow'
+		$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		$checkout_mode = isset( $checkout_setting['ckocom_checkout_mode'] ) ? $checkout_setting['ckocom_checkout_mode'] : 'classic';
+		
+		WC_Checkoutcom_Utility::logger( '[FLOW VALID FOR USE] Checkout mode: ' . $checkout_mode );
+		
+		if ( 'flow' !== $checkout_mode ) {
+			WC_Checkoutcom_Utility::logger( '[FLOW VALID FOR USE] Gateway is NOT valid - checkout mode is not "flow" (current: ' . $checkout_mode . ')' );
+			return false;
+		}
+
+		// Flow supports all currencies and countries, so always return true
+		// This bypasses WooCommerce's default currency/country restrictions
+		WC_Checkoutcom_Utility::logger( '[FLOW VALID FOR USE] Gateway IS valid for use - all checks passed' );
+		return true;
 	}
 
 	/**
@@ -117,7 +215,10 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	public function payment_fields() {
 
 		$save_card = WC_Admin_Settings::get_option( 'ckocom_card_saved' );
-		$flow_saved_card = get_option( 'woocommerce_wc_checkout_com_flow_settings' )['flow_saved_payment'];
+		
+		// Safely get flow saved card setting with fallback
+		$flow_settings = get_option( 'woocommerce_wc_checkout_com_flow_settings', array() );
+		$flow_saved_card = isset( $flow_settings['flow_saved_payment'] ) ? $flow_settings['flow_saved_payment'] : 'saved_cards_first';
 
 		$order_pay_order_id = null;
 		$order_pay_order = null;
@@ -196,14 +297,6 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 							jQuery('#wc-wc_checkout_com_flow-new-payment-method').closest('p').hide();
 						</script>
 					<?php else : ?>
-<!-- Show Saved Payment Methods button is hidden when showing both Flow and saved cards together -->
-					<div class="button-container" style="display: none;">
-					<label class="wp-style-button" style="display: none;" id="show-saved-methods-btn">
-						<input type="radio" name="payment_method_selector" onclick="toggleRadio(this, handleShowSavedMethods)"/>
-						<?php esc_html_e( 'Show Saved Payment Methods', 'checkout-com-unified-payments-api' ); ?>
-					</label>
-					</div>
-
 					<script>
 						// Expose saved payment display order to JavaScript
 						window.saved_payment = '<?php echo esc_js( $flow_saved_card ); ?>';
@@ -379,7 +472,6 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 							});
 							
 							const $savedMethods = $('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods');
-							const $showSavedBtn = $('#show-saved-methods-btn');
 
 						const totalCount = $savedMethods.toArray().reduce((sum, el) => {
 							return sum + parseInt($(el).data('count') || 0, 10);
@@ -546,8 +638,18 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				
 				// CRITICAL: Re-wrap saved cards after WooCommerce updates checkout
 				// WooCommerce's updated_checkout event destroys and recreates the payment methods HTML
+				// Use a flag to prevent multiple simultaneous executions
+				let accordionRecreationInProgress = false;
 				jQuery(document.body).on('updated_checkout', function() {
+					// Prevent multiple simultaneous executions
+					if (accordionRecreationInProgress) {
+						console.log('[FLOW PHP] Accordion recreation already in progress, skipping...');
+						return;
+					}
+					
 					console.log('[FLOW PHP] updated_checkout fired - re-wrapping saved cards...');
+					accordionRecreationInProgress = true;
+					
 					setTimeout(function() {
 						// Check if accordion AND panel exist, and if saved methods are inside
 						const $existingAccordion = $('.saved-cards-accordion-container');
@@ -572,16 +674,15 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 						} else {
 							console.log('[FLOW PHP] Accordion complete after updated_checkout');
 						}
+						
+						// Reset flag after a delay to allow for any follow-up updates
+						setTimeout(function() {
+							accordionRecreationInProgress = false;
+						}, 500);
 					}, 100);
 				});
 
-						window.toggleRadio = function(radio, callback) {
-								radio.checked = false;
-								if (typeof callback === 'function') {
-									callback();
-								}
-							};
-						});
+					});
 
 						// Don't hide save card checkbox on page load - let Flow component control it
 
@@ -594,14 +695,6 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					</script>
 					<?php endif; ?>
 				<?php else : ?>
-<!-- Show Saved Payment Methods button is hidden when showing both Flow and saved cards together -->
-					<div class="button-container" style="display: none;">
-					<label class="wp-style-button" style="display: none;" id="show-saved-methods-btn">
-						<input type="radio" name="payment_method_selector" onclick="toggleRadio(this, handleShowSavedMethods)"/>
-						<?php esc_html_e( 'Show Saved Payment Methods', 'checkout-com-unified-payments-api' ); ?>
-					</label>
-					</div>
-
 				<script>
 					// Expose saved payment display order to JavaScript
 					window.saved_payment = '<?php echo esc_js( $flow_saved_card ); ?>';
@@ -754,7 +847,6 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 						});
 						
 						const $savedMethods = $('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods');
-						const $showSavedBtn = $('#show-saved-methods-btn');
 
 				const totalCount = $savedMethods.toArray().reduce((sum, el) => {
 					return sum + parseInt($(el).data('count') || 0, 10);
@@ -921,8 +1013,18 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				
 				// CRITICAL: Re-wrap saved cards after WooCommerce updates checkout
 				// WooCommerce's updated_checkout event destroys and recreates the payment methods HTML
+				// Use a flag to prevent multiple simultaneous executions
+				let accordionRecreationInProgress = false;
 				jQuery(document.body).on('updated_checkout', function() {
+					// Prevent multiple simultaneous executions
+					if (accordionRecreationInProgress) {
+						console.log('[FLOW PHP] Accordion recreation already in progress, skipping...');
+						return;
+					}
+					
 					console.log('[FLOW PHP] updated_checkout fired - re-wrapping saved cards...');
+					accordionRecreationInProgress = true;
+					
 					setTimeout(function() {
 						// Check if accordion AND panel exist, and if saved methods are inside
 						const $existingAccordion = $('.saved-cards-accordion-container');
@@ -947,15 +1049,14 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 						} else {
 							console.log('[FLOW PHP] Accordion complete after updated_checkout');
 						}
+						
+						// Reset flag after a delay to allow for any follow-up updates
+						setTimeout(function() {
+							accordionRecreationInProgress = false;
+						}, 500);
 					}, 100);
 				});
 
-				window.toggleRadio = function(radio, callback) {
-							radio.checked = false;
-							if (typeof callback === 'function') {
-								callback();
-							}
-						};
 					});
 
 					// Don't hide save card checkbox on page load - let Flow component control it
@@ -1042,18 +1143,23 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		
 		<input type="hidden" id="cko-flow-payment-id" name="cko-flow-payment-id" value="" />
 		<input type="hidden" id="cko-flow-payment-type" name="cko-flow-payment-type" value="" />
+		<input type="hidden" id="cko-flow-payment-session-id" name="cko-flow-payment-session-id" value="" />
 		<input type="hidden" id="cko-flow-3ds-status" name="cko-flow-3ds-status" value="" />
 		<input type="hidden" id="cko-flow-3ds-auth-id" name="cko-flow-3ds-auth-id" value="" />
+		<input type="hidden" id="cko-flow-save-card-persist" name="cko-flow-save-card-persist" value="" />
 		<?php 
 
 		if ( ! is_user_logged_in() ) :
 			?>
 			<script>
-				const targetNode = document.body;
+				// Use var instead of const to prevent redeclaration errors when updated_checkout fires
+				var targetNode = document.body;
 
 				// Hide Saved payment method for non logged in users.
 				// IMPORTANT: Hide the accordion container, not just the list inside
-				const observer = new MutationObserver((mutationsList, observer) => {
+				// Only create observer if it doesn't already exist to prevent duplicates
+				if (typeof window.flowGuestObserver === 'undefined') {
+					window.flowGuestObserver = new MutationObserver((mutationsList, observer) => {
 					// Hide the accordion container (which contains the saved cards)
 					const $accordion = jQuery('.saved-cards-accordion-container');
 					if ($accordion.length) {
@@ -1070,12 +1176,13 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					// Keep observer running to catch late additions
 				});
 
-				const config = {
-					childList: true,
-					subtree: true
-				};
+					const config = {
+						childList: true,
+						subtree: true
+					};
 
-				observer.observe(targetNode, config);
+					window.flowGuestObserver.observe(targetNode, config);
+				}
 
 				// Try to hide it immediately in case it's already present.
 				jQuery('.saved-cards-accordion-container').hide();
@@ -1086,15 +1193,8 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 		// check if saved card enable from module setting.
 		if ( $save_card ) {
-			// Migrate old saved cards for logged-in users (only once)
-			// Skip migration for MOTO orders (admin-created orders)
-			if ( is_user_logged_in() && ! $order_pay_order ) {
-				$user_id = get_current_user_id();
-				$this->migrate_old_saved_cards( $user_id );
-			}
-
-			// Only show Flow saved cards to avoid duplicates
-			// The classic cards gateway saved cards are now migrated to Flow
+			// Show saved cards from BOTH Flow and Classic Cards gateways
+			// No migration needed - backend already handles both token types
 			$this->saved_payment_methods();
 		}
 
@@ -1103,18 +1203,244 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	}
 
 	/**
+	 * Override saved_payment_methods to show tokens from BOTH Flow and Classic Cards gateways.
+	 * This allows merchants upgrading from Classic Cards to Flow to see their existing saved cards.
+	 * No migration needed - the backend already handles both token types seamlessly.
+	 *
+	 * @since 5.0.0
+	 * @return void
+	 */
+	public function saved_payment_methods() {
+		if ( ! is_user_logged_in() ) {
+			return;
+		}
+
+		$user_id = get_current_user_id();
+
+		// Get tokens from BOTH gateways
+		$flow_tokens = WC_Payment_Tokens::get_customer_tokens( $user_id, $this->id );
+		
+		$classic_gateway = new WC_Gateway_Checkout_Com_Cards();
+		$classic_tokens = WC_Payment_Tokens::get_customer_tokens( $user_id, $classic_gateway->id );
+
+		// Merge both token arrays
+		$all_tokens = array_merge( $flow_tokens, $classic_tokens );
+
+		// Log token retrieval for debugging
+		WC_Checkoutcom_Utility::logger( '=== MULTI-GATEWAY TOKEN RETRIEVAL ===' );
+		WC_Checkoutcom_Utility::logger( 'User ID: ' . $user_id );
+		WC_Checkoutcom_Utility::logger( 'Flow tokens found: ' . count( $flow_tokens ) );
+		WC_Checkoutcom_Utility::logger( 'Classic Cards tokens found: ' . count( $classic_tokens ) );
+		WC_Checkoutcom_Utility::logger( 'Total tokens (before dedup): ' . count( $all_tokens ) );
+
+		if ( empty( $all_tokens ) ) {
+			WC_Checkoutcom_Utility::logger( 'No saved cards found - skipping display' );
+			return;
+		}
+
+		// Remove duplicates based on token value (source ID)
+		$unique_tokens = array();
+		$seen_tokens = array();
+		foreach ( $all_tokens as $token ) {
+			$token_value = $token->get_token();
+			if ( ! in_array( $token_value, $seen_tokens, true ) ) {
+				$unique_tokens[] = $token;
+				$seen_tokens[] = $token_value;
+			}
+		}
+		
+		WC_Checkoutcom_Utility::logger( 'Unique tokens (after dedup): ' . count( $unique_tokens ) );
+		WC_Checkoutcom_Utility::logger( '=== END MULTI-GATEWAY TOKEN RETRIEVAL ===' );
+
+		// Display saved payment methods (without extra label - already handled by accordion)
+		?>
+		<ul class="woocommerce-SavedPaymentMethods wc-saved-payment-methods" data-count="<?php echo count( $unique_tokens ); ?>">
+			<?php
+			$default_token_id = WC_Payment_Tokens::get_customer_default_token( $user_id );
+			foreach ( $unique_tokens as $token ) {
+				$is_default = ( $token->get_id() == $default_token_id );
+				$gateway_source = ( $token->get_gateway_id() === $this->id ) ? 'Flow' : 'Classic';
+				?>
+				<li class="woocommerce-SavedPaymentMethods-token">
+					<input id="wc-<?php echo esc_attr( $this->id ); ?>-payment-token-<?php echo esc_attr( $token->get_id() ); ?>" 
+						type="radio" 
+						name="wc-<?php echo esc_attr( $this->id ); ?>-payment-token" 
+						value="<?php echo esc_attr( $token->get_id() ); ?>" 
+						<?php checked( $is_default, true ); ?> 
+						class="woocommerce-SavedPaymentMethods-tokenInput" 
+						data-gateway-source="<?php echo esc_attr( $gateway_source ); ?>" />
+					<label for="wc-<?php echo esc_attr( $this->id ); ?>-payment-token-<?php echo esc_attr( $token->get_id() ); ?>">
+						<?php echo esc_html( sprintf( __( '%s ending in %s (expires %s/%s)', 'checkout-com-unified-payments-api' ), $token->get_card_type(), $token->get_last4(), $token->get_expiry_month(), $token->get_expiry_year() ) ); ?>
+						<?php if ( $is_default ) : ?>
+							<span class="woocommerce-SavedPaymentMethods-token-default"><?php esc_html_e( '(default)', 'checkout-com-unified-payments-api' ); ?></span>
+						<?php endif; ?>
+					</label>
+				</li>
+				<?php
+			}
+			?>
+			<li class="woocommerce-SavedPaymentMethods-new">
+				<input id="wc-<?php echo esc_attr( $this->id ); ?>-payment-token-new" 
+					type="radio" 
+					name="wc-<?php echo esc_attr( $this->id ); ?>-payment-token" 
+					value="new" 
+					<?php checked( empty( $default_token_id ), true ); ?> />
+				<label for="wc-<?php echo esc_attr( $this->id ); ?>-payment-token-new">
+					<?php esc_html_e( 'Use a new payment method', 'checkout-com-unified-payments-api' ); ?>
+				</label>
+			</li>
+		</ul>
+		<?php
+	}
+
+	/**
 	 * Process payment with card payment.
 	 *
 	 * @param int $order_id Order ID.
 	 * @return array|void
 	 */
+
 	public function process_payment( $order_id ) {
 
 		if ( ! session_id() ) {
 			session_start();
 		}
 
-		$order = new WC_Order( $order_id );
+		WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] ========== ENTRY POINT ==========' );
+		WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Order ID: ' . $order_id );
+		
+		if ( empty( $order_id ) ) {
+			WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] ERROR: No order ID provided' );
+			WC_Checkoutcom_Utility::wc_add_notice_self( __( 'Order not found. Please try again.', 'checkout-com-unified-payments-api' ), 'error' );
+			return;
+		}
+
+		$order = wc_get_order( $order_id );
+		
+		if ( ! $order ) {
+			WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] ERROR: Order ' . $order_id . ' does not exist' );
+			WC_Checkoutcom_Utility::wc_add_notice_self( __( 'Order not found. Please try again.', 'checkout-com-unified-payments-api' ), 'error' );
+			return;
+		}
+		
+		WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Order found - ID: ' . $order->get_id() . ', Status: ' . $order->get_status() . ', Payment Method: ' . $order->get_payment_method() );
+		
+		// CRITICAL: Ensure billing and shipping addresses are set from checkout form POST data
+		// WooCommerce should set these during order creation, but we ensure they're set here as well
+		// This is especially important if addresses weren't set during order creation
+		// Priority: 1) POST data, 2) WC()->customer, 3) Keep existing order data
+		
+		// Check if POST data has address fields (indicates form submission)
+		$has_post_addresses = ! empty( $_POST['billing_first_name'] ) || ! empty( $_POST['billing_address_1'] );
+		
+		if ( $has_post_addresses ) {
+			// Set billing address from POST data
+			if ( isset( $_POST['billing_first_name'] ) ) {
+				$order->set_billing_first_name( sanitize_text_field( $_POST['billing_first_name'] ) );
+			}
+			if ( isset( $_POST['billing_last_name'] ) ) {
+				$order->set_billing_last_name( sanitize_text_field( $_POST['billing_last_name'] ) );
+			}
+			if ( isset( $_POST['billing_company'] ) ) {
+				$order->set_billing_company( sanitize_text_field( $_POST['billing_company'] ) );
+			}
+			if ( isset( $_POST['billing_address_1'] ) ) {
+				$order->set_billing_address_1( sanitize_text_field( $_POST['billing_address_1'] ) );
+			}
+			if ( isset( $_POST['billing_address_2'] ) ) {
+				$order->set_billing_address_2( sanitize_text_field( $_POST['billing_address_2'] ) );
+			}
+			if ( isset( $_POST['billing_city'] ) ) {
+				$order->set_billing_city( sanitize_text_field( $_POST['billing_city'] ) );
+			}
+			if ( isset( $_POST['billing_state'] ) ) {
+				$order->set_billing_state( sanitize_text_field( $_POST['billing_state'] ) );
+			}
+			if ( isset( $_POST['billing_postcode'] ) ) {
+				$order->set_billing_postcode( sanitize_text_field( $_POST['billing_postcode'] ) );
+			}
+			if ( isset( $_POST['billing_country'] ) ) {
+				$order->set_billing_country( sanitize_text_field( $_POST['billing_country'] ) );
+			}
+			if ( isset( $_POST['billing_phone'] ) ) {
+				$order->set_billing_phone( sanitize_text_field( $_POST['billing_phone'] ) );
+			}
+			if ( isset( $_POST['billing_email'] ) ) {
+				$order->set_billing_email( sanitize_email( $_POST['billing_email'] ) );
+			}
+			
+			// Set shipping address - check if ship_to_different_address is set
+			$ship_to_different_address = isset( $_POST['ship_to_different_address'] ) ? (bool) $_POST['ship_to_different_address'] : false;
+			
+			if ( $ship_to_different_address ) {
+				// Different shipping address from POST
+				if ( isset( $_POST['shipping_first_name'] ) ) {
+					$order->set_shipping_first_name( sanitize_text_field( $_POST['shipping_first_name'] ) );
+				}
+				if ( isset( $_POST['shipping_last_name'] ) ) {
+					$order->set_shipping_last_name( sanitize_text_field( $_POST['shipping_last_name'] ) );
+				}
+				if ( isset( $_POST['shipping_company'] ) ) {
+					$order->set_shipping_company( sanitize_text_field( $_POST['shipping_company'] ) );
+				}
+				if ( isset( $_POST['shipping_address_1'] ) ) {
+					$order->set_shipping_address_1( sanitize_text_field( $_POST['shipping_address_1'] ) );
+				}
+				if ( isset( $_POST['shipping_address_2'] ) ) {
+					$order->set_shipping_address_2( sanitize_text_field( $_POST['shipping_address_2'] ) );
+				}
+				if ( isset( $_POST['shipping_city'] ) ) {
+					$order->set_shipping_city( sanitize_text_field( $_POST['shipping_city'] ) );
+				}
+				if ( isset( $_POST['shipping_state'] ) ) {
+					$order->set_shipping_state( sanitize_text_field( $_POST['shipping_state'] ) );
+				}
+				if ( isset( $_POST['shipping_postcode'] ) ) {
+					$order->set_shipping_postcode( sanitize_text_field( $_POST['shipping_postcode'] ) );
+				}
+				if ( isset( $_POST['shipping_country'] ) ) {
+					$order->set_shipping_country( sanitize_text_field( $_POST['shipping_country'] ) );
+				}
+			} else {
+				// Shipping address same as billing
+				$order->set_shipping_first_name( $order->get_billing_first_name() );
+				$order->set_shipping_last_name( $order->get_billing_last_name() );
+				$order->set_shipping_company( $order->get_billing_company() );
+				$order->set_shipping_address_1( $order->get_billing_address_1() );
+				$order->set_shipping_address_2( $order->get_billing_address_2() );
+				$order->set_shipping_city( $order->get_billing_city() );
+				$order->set_shipping_state( $order->get_billing_state() );
+				$order->set_shipping_postcode( $order->get_billing_postcode() );
+				$order->set_shipping_country( $order->get_billing_country() );
+			}
+		} elseif ( WC()->customer ) {
+			// Fallback: Get addresses from WC()->customer if POST data not available
+			$order->set_billing_first_name( WC()->customer->get_billing_first_name() );
+			$order->set_billing_last_name( WC()->customer->get_billing_last_name() );
+			$order->set_billing_company( WC()->customer->get_billing_company() );
+			$order->set_billing_address_1( WC()->customer->get_billing_address_1() );
+			$order->set_billing_address_2( WC()->customer->get_billing_address_2() );
+			$order->set_billing_city( WC()->customer->get_billing_city() );
+			$order->set_billing_state( WC()->customer->get_billing_state() );
+			$order->set_billing_postcode( WC()->customer->get_billing_postcode() );
+			$order->set_billing_country( WC()->customer->get_billing_country() );
+			$order->set_billing_phone( WC()->customer->get_billing_phone() );
+			$order->set_billing_email( WC()->customer->get_billing_email() );
+			
+			$order->set_shipping_first_name( WC()->customer->get_shipping_first_name() );
+			$order->set_shipping_last_name( WC()->customer->get_shipping_last_name() );
+			$order->set_shipping_company( WC()->customer->get_shipping_company() );
+			$order->set_shipping_address_1( WC()->customer->get_shipping_address_1() );
+			$order->set_shipping_address_2( WC()->customer->get_shipping_address_2() );
+			$order->set_shipping_city( WC()->customer->get_shipping_city() );
+			$order->set_shipping_state( WC()->customer->get_shipping_state() );
+			$order->set_shipping_postcode( WC()->customer->get_shipping_postcode() );
+			$order->set_shipping_country( WC()->customer->get_shipping_country() );
+		}
+		
+		// Save addresses immediately to ensure they persist
+		$order->save();
+		WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Set and saved billing and shipping addresses from POST data - Order ID: ' . $order_id );
 		
 		// DUPLICATE PREVENTION: Check if this order has already been processed
 		$existing_transaction_id = $order->get_transaction_id();
@@ -1144,24 +1470,98 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			}
 		}
 		
-		WC_Checkoutcom_Utility::logger( 'Processing payment for order: ' . $order_id );
+	$flow_result = null;
 
-		$flow_result = null;
+	$subs_payment_type = null;
 
-		$subs_payment_type = null;
-
-		WC_Checkoutcom_Utility::logger(print_r($_POST,true));
+	// 3DS RETURN HANDLER: If we already have a payment ID from Flow (after 3DS redirect),
+	// don't create a new payment - just fetch the payment details and complete the order
+	if ( ! empty( $flow_payment_id ) && isset( $_POST['cko-flow-payment-type'] ) ) {
 		
-		// Debug: Check if Flow payment ID is present
-		$flow_pay_id_debug = isset( $_POST['cko-flow-payment-id'] ) ? $_POST['cko-flow-payment-id'] : 'NOT SET';
-		WC_Checkoutcom_Utility::logger( 'Flow Payment ID in POST: ' . $flow_pay_id_debug );
+	// Fetch the payment details from Checkout.com to verify and get status
+		try {
+		$checkout = new Checkout_SDK();
+		$builder = $checkout->get_builder();
 		
-		// Debug: Check if using saved payment method
-		$is_using_saved = WC_Checkoutcom_Api_Request::is_using_saved_payment_method();
-		WC_Checkoutcom_Utility::logger( 'Is using saved payment method: ' . ( $is_using_saved ? 'YES' : 'NO' ) );
-
-		if ( WC_Checkoutcom_Api_Request::is_using_saved_payment_method() ) {
-			$token = 'wc-wc_checkout_com_flow-payment-token';
+		// Check if SDK was properly initialized
+		if ( ! $builder ) {
+			WC_Checkoutcom_Utility::logger( 'Checkout.com SDK not initialized - cannot fetch payment details for: ' . $flow_payment_id );
+			throw new Exception( 'Payment gateway not properly configured. Please contact support.' );
+		}
+		
+		$payment_details = $builder->getPaymentsClient()->getPaymentDetails( $flow_payment_id );
+		
+		// Convert to result format expected by the rest of the code
+			$result = array(
+				'id' => $payment_details['id'],
+				'action_id' => isset( $payment_details['actions'][0]['id'] ) ? $payment_details['actions'][0]['id'] : '',
+				'status' => $payment_details['status'],
+				'approved' => isset( $payment_details['approved'] ) ? $payment_details['approved'] : false,
+				'response_code' => isset( $payment_details['response_code'] ) ? $payment_details['response_code'] : '',
+				'response_summary' => isset( $payment_details['response_summary'] ) ? $payment_details['response_summary'] : '',
+			'3d' => null, // No 3DS redirect needed, we're returning from 3DS
+		);
+		
+		// Set transaction ID and payment ID in order meta
+			$order->set_transaction_id( $result['action_id'] );
+			$order->update_meta_data( '_cko_payment_id', $flow_payment_id );
+			$order->update_meta_data( '_cko_flow_payment_id', $flow_payment_id );
+			$flow_payment_type = isset( $_POST['cko-flow-payment-type'] ) ? sanitize_text_field( $_POST['cko-flow-payment-type'] ) : 'card';
+			$order->update_meta_data( '_cko_flow_payment_type', $flow_payment_type );
+			// Store order number/reference for webhook lookup (works with Sequential Order Numbers plugins)
+			$order->update_meta_data( '_cko_order_reference', $order->get_order_number() );
+			
+			// CRITICAL: Save order immediately so webhooks can find it (especially for fast APM payments)
+			$order->save();
+			WC_Checkoutcom_Utility::logger( 'Order meta saved immediately for webhook lookup (3DS return) - Order ID: ' . $order_id . ', Payment ID: ' . $flow_payment_id );
+			
+		// Process any pending webhooks for this order
+		if ( class_exists( 'WC_Checkout_Com_Webhook_Queue' ) ) {
+			WC_Checkout_Com_Webhook_Queue::process_pending_webhooks_for_order( $order );
+		}
+		
+	// Set variables for card saving logic below
+	$flow_pay_id = $flow_payment_id;
+	
+	// Check if payment is already captured (webhook may have arrived first)
+	$already_captured = $order->get_meta( 'cko_payment_captured' );
+	$action_id = isset( $result['action_id'] ) ? $result['action_id'] : '';
+	
+	// Set status and message for the order (was missing!)
+	// Only set to 'on-hold' if payment is not already captured
+	if ( ! $already_captured ) {
+		$status = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
+		$message = sprintf( esc_html__( 'Checkout.com Payment Authorised - using FLOW (3DS return): %s - Payment ID: %s', 'checkout-com-unified-payments-api' ), $flow_payment_type, $flow_payment_id );
+		
+		// Check if payment was flagged
+		if ( isset( $result['risk']['flagged'] ) && $result['risk']['flagged'] ) {
+			$status = WC_Admin_Settings::get_option( 'ckocom_order_flagged', 'flagged' );
+			$message = sprintf( esc_html__( 'Checkout.com Payment Flagged (3DS return) - Payment ID: %s', 'checkout-com-unified-payments-api' ), $flow_payment_id );
+		}
+	} else {
+		// Payment already captured - just add note, don't change status
+		$message = sprintf( esc_html__( 'Checkout.com Payment Authorised - using FLOW (3DS return): %s - Payment ID: %s', 'checkout-com-unified-payments-api' ), $flow_payment_type, $flow_payment_id );
+		// Status should remain as set by capture webhook (Processing)
+		$status = null; // Signal to skip status update
+	}
+		
+		// Mark as authorized for APM payments
+		if ( ! in_array( $flow_payment_type, array( 'card', 'googlepay', 'applepay' ), true ) ) {
+			$order->update_meta_data( 'cko_payment_authorized', true );
+		}
+		
+		// Continue with card saving logic after this if/elseif/else structure
+			
+	} catch ( Exception $e ) {
+		WC_Checkoutcom_Utility::logger( '3DS return error: ' . $e->getMessage() );
+		WC_Checkoutcom_Utility::wc_add_notice_self( __( 'An error occurred while processing your payment. Please try again.', 'checkout-com-unified-payments-api' ) );
+		return;
+	}
+	
+	// Skip saved card and normal Flow payment logic since we're returning from 3DS
+	// Jump directly to card saving logic below
+	} elseif ( WC_Checkoutcom_Api_Request::is_using_saved_payment_method() ) {
+		$token = 'wc-wc_checkout_com_flow-payment-token';
 
 			if ( ! isset( $_POST[ $token ] ) ) {
 				$token = 'wc-wc_checkout_com_cards-payment-token';
@@ -1207,9 +1607,11 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					WC()->session->set( 'wc-wc_checkout_com_cards-new-payment-method', 'no' );
 				}
 
+				$payment_id = isset( $result['id'] ) ? $result['id'] : '';
 				$order->add_order_note(
 					sprintf(
-						esc_html__( 'Checkout.com 3d Redirect waiting. URL : %s', 'checkout-com-unified-payments-api' ),
+						esc_html__( 'Checkout.com 3d Redirect waiting - Payment ID: %1$s, URL: %2$s', 'checkout-com-unified-payments-api' ),
+						$payment_id,
 						$result['3d']
 					)
 				);
@@ -1225,19 +1627,33 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			$order->set_transaction_id( $result['action_id'] );
 			$order->update_meta_data( '_cko_payment_id', $result['id'] );
 
+			// Check if payment is already captured (webhook may have arrived first)
+			$already_captured = $order->get_meta( 'cko_payment_captured' );
+			$payment_id = isset( $result['id'] ) ? $result['id'] : '';
+			$action_id = isset( $result['action_id'] ) ? $result['action_id'] : '';
+
 			// Get cko auth status configured in admin.
-			$status = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
+			// Only set to 'on-hold' if payment is not already captured
+			if ( ! $already_captured ) {
+				$status = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
 
-			/* translators: %s: Action ID. */
-			$message = sprintf( esc_html__( 'Checkout.com Payment Authorised - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
+				/* translators: %1$s: Payment ID, %2$s: Action ID. */
+				$message = sprintf( esc_html__( 'Checkout.com Payment Authorised - Payment ID: %1$s, Action ID: %2$s', 'checkout-com-unified-payments-api' ), $payment_id, $action_id );
 
-			// Check if payment was flagged.
-			if ( $result['risk']['flagged'] ) {
-				// Get cko auth status configured in admin.
-				$status = WC_Admin_Settings::get_option( 'ckocom_order_flagged', 'flagged' );
+				// Check if payment was flagged.
+				if ( $result['risk']['flagged'] ) {
+					// Get cko auth status configured in admin.
+					$status = WC_Admin_Settings::get_option( 'ckocom_order_flagged', 'flagged' );
 
-				/* translators: %s: Action ID. */
-				$message = sprintf( esc_html__( 'Checkout.com Payment Flagged - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
+					/* translators: %1$s: Payment ID, %2$s: Action ID. */
+					$message = sprintf( esc_html__( 'Checkout.com Payment Flagged - Payment ID: %1$s, Action ID: %2$s', 'checkout-com-unified-payments-api' ), $payment_id, $action_id );
+				}
+			} else {
+				// Payment already captured - just add note, don't change status
+				/* translators: %1$s: Payment ID, %2$s: Action ID. */
+				$message = sprintf( esc_html__( 'Checkout.com Payment Authorised - Payment ID: %1$s, Action ID: %2$s', 'checkout-com-unified-payments-api' ), $payment_id, $action_id );
+				// Status should remain as set by capture webhook (Processing)
+				$status = null; // Signal to skip status update
 			}
 
 			$order_status = $order->get_status();
@@ -1246,55 +1662,121 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				$order->update_meta_data( 'cko_payment_authorized', true );
 			}
 		}
-		else {
+	else {
+		$flow_pay_id = isset( $_POST['cko-flow-payment-id'] ) ? sanitize_text_field( $_POST['cko-flow-payment-id'] ) : '';
 
-			$flow_pay_id = isset( $_POST['cko-flow-payment-id'] ) ? sanitize_text_field( $_POST['cko-flow-payment-id'] ) : '';
+		// Check if $flow_pay_id is not empty.
+		if ( empty( $flow_pay_id ) ) {
+			WC_Checkoutcom_Utility::wc_add_notice_self( __( 'There was an issue completing the payment. Please complete the payment.', 'checkout-com-unified-payments-api' ), 'error' );
 
-			// Check if $flow_pay_id is not empty.
-			if ( empty( $flow_pay_id ) ) {
-				// Enhanced debugging for missing payment ID
-				WC_Checkoutcom_Utility::logger( '=== MISSING PAYMENT ID DEBUG ===' );
-				WC_Checkoutcom_Utility::logger( 'POST data keys: ' . print_r( array_keys( $_POST ), true ) );
-				WC_Checkoutcom_Utility::logger( 'cko-flow-payment-id value: ' . ( isset( $_POST['cko-flow-payment-id'] ) ? $_POST['cko-flow-payment-id'] : 'NOT SET' ) );
-				WC_Checkoutcom_Utility::logger( 'cko-flow-payment-type value: ' . ( isset( $_POST['cko-flow-payment-type'] ) ? $_POST['cko-flow-payment-type'] : 'NOT SET' ) );
-				WC_Checkoutcom_Utility::logger( 'User agent: ' . ( isset( $_SERVER['HTTP_USER_AGENT'] ) ? $_SERVER['HTTP_USER_AGENT'] : 'NOT SET' ) );
-				WC_Checkoutcom_Utility::logger( 'Referer: ' . ( isset( $_SERVER['HTTP_REFERER'] ) ? $_SERVER['HTTP_REFERER'] : 'NOT SET' ) );
-				WC_Checkoutcom_Utility::logger( '=== END MISSING PAYMENT ID DEBUG ===' );
-				
-				WC_Checkoutcom_Utility::wc_add_notice_self( __( 'There was an issue completing the payment. Please complete the payment.', 'checkout-com-unified-payments-api' ), 'error' );
+			return;
+		}
 
-				return;
+	$flow_payment_type = isset( $_POST['cko-flow-payment-type'] ) ? sanitize_text_field( $_POST['cko-flow-payment-type'] ) : '';
+
+	if ( "card" === $flow_payment_type ) {
+		$subs_payment_type = $flow_payment_type;
+	}
+
+	$order->update_meta_data( '_cko_payment_id', $flow_pay_id );
+	$order->update_meta_data( '_cko_flow_payment_id', $flow_pay_id );
+	$order->update_meta_data( '_cko_flow_payment_type', $flow_payment_type );
+	// Store order number/reference for webhook lookup (works with Sequential Order Numbers plugins)
+	$order->update_meta_data( '_cko_order_reference', $order->get_order_number() );
+	
+	// Store payment session ID for 3DS return lookup
+	// Priority: 1) POST data (from form), 2) Payment metadata (if payment already exists)
+	$payment_session_id = isset( $_POST['cko-flow-payment-session-id'] ) ? sanitize_text_field( $_POST['cko-flow-payment-session-id'] ) : '';
+	WC_Checkoutcom_Utility::logger( 'Payment session ID from POST: ' . ( ! empty( $payment_session_id ) ? $payment_session_id : 'EMPTY' ) );
+	
+	if ( empty( $payment_session_id ) && ! empty( $flow_pay_id ) ) {
+		// Try to get payment session ID from payment metadata
+		WC_Checkoutcom_Utility::logger( 'Payment session ID not in POST, fetching from payment details...' );
+		try {
+			$checkout = new Checkout_SDK();
+			$builder = $checkout->get_builder();
+			if ( $builder ) {
+				$payment_details = $builder->getPaymentsClient()->getPaymentDetails( $flow_pay_id );
+				$payment_session_id = isset( $payment_details['metadata']['cko_payment_session_id'] ) ? $payment_details['metadata']['cko_payment_session_id'] : '';
+				WC_Checkoutcom_Utility::logger( 'Payment session ID from payment metadata: ' . ( ! empty( $payment_session_id ) ? $payment_session_id : 'EMPTY' ) );
 			}
+		} catch ( Exception $e ) {
+			WC_Checkoutcom_Utility::logger( 'Could not fetch payment session ID from payment details: ' . $e->getMessage() );
+		}
+	}
+	
+	// Always save payment session ID if we have it (even if empty, log it)
+	if ( ! empty( $payment_session_id ) ) {
+		$order->update_meta_data( '_cko_payment_session_id', $payment_session_id );
+		WC_Checkoutcom_Utility::logger( '✅ Saved payment session ID to order - Order ID: ' . $order_id . ', Payment Session ID: ' . $payment_session_id );
+	} else {
+		WC_Checkoutcom_Utility::logger( '⚠️ WARNING: Payment session ID is empty - Order ID: ' . $order_id . ', Payment ID: ' . $flow_pay_id );
+		WC_Checkoutcom_Utility::logger( '⚠️ This may cause issues with 3DS return order lookup' );
+	}
+	
+	// Save session+cart identifier for duplicate prevention (if cart is still available)
+	if ( WC()->cart && ! WC()->cart->is_empty() && WC()->session ) {
+		// Get WooCommerce session identifier
+		$session_customer_id = WC()->session->get_customer_id();
+		$session_key = WC()->session->get_customer_unique_id();
+		
+		// Generate cart hash from cart items
+		$cart_items = array();
+		foreach ( WC()->cart->get_cart() as $cart_item_key => $cart_item ) {
+			$cart_items[] = array(
+				'product_id' => $cart_item['product_id'],
+				'variation_id' => $cart_item['variation_id'],
+				'quantity' => $cart_item['quantity'],
+			);
+		}
+		$cart_hash = md5( wp_json_encode( $cart_items ) . WC()->cart->get_total( 'edit' ) );
+		
+		// Combine session ID + cart hash = unique identifier
+		$session_cart_identifier = null;
+		if ( $session_customer_id > 0 ) {
+			$session_cart_identifier = 'customer_' . $session_customer_id . '_' . $cart_hash;
+		} elseif ( ! empty( $session_key ) ) {
+			$session_cart_identifier = 'session_' . $session_key . '_' . $cart_hash;
+		}
+		
+		// Save session+cart identifier if we have it
+		if ( ! empty( $session_cart_identifier ) ) {
+			$order->update_meta_data( '_cko_session_cart_id', $session_cart_identifier );
+			WC_Checkoutcom_Utility::logger( '✅ Saved session+cart identifier to order - Order ID: ' . $order_id . ', Identifier: ' . substr( $session_cart_identifier, 0, 50 ) . '...' );
+		}
+	}
+	
+	// CRITICAL: Save order immediately so webhooks can find it (especially for fast APM payments)
+	$order->save();
+	WC_Checkoutcom_Utility::logger( 'Order meta saved immediately for webhook lookup - Order ID: ' . $order_id . ', Payment ID: ' . $flow_pay_id );
+	
+	// Process any pending webhooks for this order
+	if ( class_exists( 'WC_Checkout_Com_Webhook_Queue' ) ) {
+		WC_Checkout_Com_Webhook_Queue::process_pending_webhooks_for_order( $order );
+	}
 
-			$flow_payment_type = isset( $_POST['cko-flow-payment-type'] ) ? sanitize_text_field( $_POST['cko-flow-payment-type'] ) : '';
-
-			if ( "card" === $flow_payment_type ) {
-				$subs_payment_type = $flow_payment_type;
-			}
-
-			$save_card_checkbox = isset( $_POST['wc-wc_checkout_com_flow-new-payment-method'] ) && $_POST['wc-wc_checkout_com_flow-new-payment-method'] === 'true';
-
-			if ( 'card' === $flow_payment_type && $save_card_checkbox ) {
-				$this->flow_save_cards( $order, $flow_pay_id );
-			}
-
-			$order->update_meta_data( '_cko_payment_id', $flow_pay_id );
-			$order->update_meta_data( '_cko_flow_payment_id', $flow_pay_id );
-			$order->update_meta_data( '_cko_flow_payment_type', $flow_payment_type );
-
-			if ( ! in_array( $flow_payment_type, array( 'card', 'googlepay', 'applepay' ), true ) ) {
+		if ( ! in_array( $flow_payment_type, array( 'card', 'googlepay', 'applepay' ), true ) ) {
 				$order->update_meta_data( 'cko_payment_authorized', true );
 			}
 
-			// translators: %s: payment type (e.g., card, applepay).
-			$message = sprintf( esc_html__( 'Checkout.com Payment Authorised - using FLOW : %s', 'checkout-com-unified-payments-api' ), $flow_payment_type );
+			// Check if payment is already captured (webhook may have arrived first)
+			$already_captured = $order->get_meta( 'cko_payment_captured' );
+
+			// translators: %1$s: payment type (e.g., card, applepay), %2$s: Payment ID.
+			$message = sprintf( esc_html__( 'Checkout.com Payment Authorised - using FLOW : %1$s - Payment ID: %2$s', 'checkout-com-unified-payments-api' ), $flow_payment_type, $flow_pay_id );
 
 			// Get cko auth status configured in admin.
-			$status = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
+			// Only set to 'on-hold' if payment is not already captured
+			if ( ! $already_captured ) {
+				$status = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
+			} else {
+				// Payment already captured - just add note, don't change status
+				// Status should remain as set by capture webhook (Processing)
+				$status = null; // Signal to skip status update
+			}
 
 			// Get source ID for the payment id for subscription product.
 			if ( function_exists( 'wcs_order_contains_subscription' ) && wcs_order_contains_subscription( $order->get_id() ) ) {
-				error_log('hereu7');
 				$request  = new \WP_REST_Request( 'GET', '/ckoplugin/v1/payment-status' );
 				$request->set_query_params( [ 'paymentId' => $flow_pay_id ] );
 				$result = rest_do_request( $request );
@@ -1304,12 +1786,46 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					WC_Checkoutcom_Utility::logger( "There was an error in saving cards: $error_message" ); // phpcs:ignore
 				} else {
 					$flow_result = $result->get_data();
-					error_log(print_r($flow_result,true));
 				}
-			}
 		}
+	}
 
-		if ( class_exists( 'WC_Subscriptions_Order' ) && $flow_result !== null ) {
+	// Card saving logic (runs for both normal Flow payments and 3DS returns)
+	// Check if $flow_pay_id is set (it's set in both the 3DS return handler and normal Flow payment)
+	if ( isset( $flow_pay_id ) && ! empty( $flow_pay_id ) ) {
+		$flow_payment_type_for_save = isset( $flow_payment_type ) ? $flow_payment_type : ( isset( $_POST['cko-flow-payment-type'] ) ? sanitize_text_field( $_POST['cko-flow-payment-type'] ) : '' );
+		
+		// Check if customer wants to save card
+		// Priority: 1. Hidden field (survives 3DS), 2. POST data, 3. Session
+		$save_card_enabled = WC_Admin_Settings::get_option( 'ckocom_card_saved' );
+		
+		// Check hidden field first (persists across 3DS redirects)
+		$save_card_hidden = isset( $_POST['cko-flow-save-card-persist'] ) ? sanitize_text_field( $_POST['cko-flow-save-card-persist'] ) : '';
+		
+		// Fallback to POST checkbox
+		$save_card_post = isset( $_POST['wc-wc_checkout_com_flow-new-payment-method'] ) ? sanitize_text_field( $_POST['wc-wc_checkout_com_flow-new-payment-method'] ) : '';
+		
+		// Fallback to session
+		$save_card_session = WC()->session->get( 'wc-wc_checkout_com_flow-new-payment-method' );
+		
+		// Determine if checkbox was checked (priority: hidden field > POST > session)
+		$save_card_checkbox = false;
+		if ( 'yes' === $save_card_hidden ) {
+			$save_card_checkbox = true;
+		} elseif ( 'true' === $save_card_post || 'yes' === $save_card_post ) {
+			$save_card_checkbox = true;
+		} elseif ( 'yes' === $save_card_session ) {
+			$save_card_checkbox = true;
+	}
+
+	if ( 'card' === $flow_payment_type_for_save && $save_card_enabled && $save_card_checkbox ) {
+		$this->flow_save_cards( $order, $flow_pay_id );
+		// Clear the session variable after processing
+		WC()->session->__unset( 'wc-wc_checkout_com_flow-new-payment-method' );
+	}
+}
+
+	if ( class_exists( 'WC_Subscriptions_Order' ) && $flow_result !== null ) {
 			// Save source id for subscription.
 			WC_Checkoutcom_Subscription::save_source_id( $order_id, $order, $flow_result['source']['id'] );
 
@@ -1320,7 +1836,19 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 		// add notes for the order and update status.
 		$order->add_order_note( $message );
-		$order->update_status( $status );
+		// Only update status if not null (null means payment already captured, keep existing status)
+		if ( null !== $status ) {
+			$order->update_status( $status );
+		}
+
+		// CRITICAL: Only proceed with success flow if order status is NOT failed
+		// If status is failed, don't clear cart or redirect to success page
+		$final_order_status = $order->get_status();
+		if ( 'failed' === $final_order_status ) {
+			WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Payment failed - Order status is failed. NOT clearing cart or redirecting to success page.' );
+			WC_Checkoutcom_Utility::wc_add_notice_self( __( 'Payment failed. Please try again.', 'checkout-com-unified-payments-api' ), 'error' );
+			return; // Return early - don't clear cart or redirect
+		}
 
 		// Reduce stock levels.
 		wc_reduce_stock_levels( $order_id );
@@ -1339,7 +1867,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		WC_Checkoutcom_Utility::logger( 'Order status updated to: ' . $status . ', Order ID: ' . $order_id );
 		WC_Checkoutcom_Utility::logger( 'Transaction ID set to: ' . $order->get_transaction_id() );
 
-		// Remove cart.
+		// Remove cart - only clear if payment succeeded (order status is not failed)
 		WC()->cart->empty_cart();
 
 		// Return thank you page.
@@ -1348,9 +1876,798 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			'redirect' => $return_url,
 		);
 		
-		WC_Checkoutcom_Utility::logger( 'Returning redirect result: ' . print_r( $redirect_result, true ) );
-		
 		return $redirect_result;
+	}
+
+	
+	/**
+	 * Detect 3DS return parameters on checkout page and process server-side.
+	 * This prevents JavaScript form submission issues in slow environments.
+	 *
+	 * @return void
+	 */
+	public function detect_and_process_3ds_return_on_checkout() {
+		// Check if 3DS return parameters are present FIRST (before checking is_checkout)
+		// This ensures we catch it even if is_checkout() hasn't loaded yet in slow environments
+		$payment_id = isset( $_GET['cko-payment-id'] ) ? sanitize_text_field( $_GET['cko-payment-id'] ) : '';
+		$session_id = isset( $_GET['cko-session-id'] ) ? sanitize_text_field( $_GET['cko-session-id'] ) : '';
+		$payment_session_id = isset( $_GET['cko-payment-session-id'] ) ? sanitize_text_field( $_GET['cko-payment-session-id'] ) : '';
+		
+		// If we have payment ID or session ID, it's a 3DS return
+		if ( empty( $payment_id ) && empty( $session_id ) && empty( $payment_session_id ) ) {
+			return;
+		}
+		
+		// Only process on checkout page or order-pay page
+		$is_checkout_page = is_checkout() || ( isset( $_GET['order_id'] ) && isset( $_GET['key'] ) );
+		if ( ! $is_checkout_page ) {
+			return;
+		}
+		
+		WC_Checkoutcom_Utility::logger( '[FLOW 3DS CHECKOUT] 3DS return detected on checkout page - Processing server-side' );
+		WC_Checkoutcom_Utility::logger( '[FLOW 3DS CHECKOUT] Payment ID: ' . $payment_id . ', Session ID: ' . $session_id . ', Payment Session ID: ' . $payment_session_id );
+		WC_Checkoutcom_Utility::logger( '[FLOW 3DS CHECKOUT] Request URI: ' . ( isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : 'N/A' ) );
+		
+		// Process the 3DS return (this will redirect to success page)
+		try {
+			$this->handle_3ds_return();
+			// If handle_3ds_return doesn't exit/redirect, exit here
+			exit;
+		} catch ( Exception $e ) {
+			WC_Checkoutcom_Utility::logger( '[FLOW 3DS CHECKOUT] Error processing 3DS return: ' . $e->getMessage() );
+			error_log( '[FLOW 3DS CHECKOUT] Exception: ' . $e->getMessage() );
+			
+			// Try to find order by payment ID as fallback
+			if ( ! empty( $payment_id ) ) {
+				$orders = wc_get_orders( array(
+					'meta_key'   => '_cko_payment_id',
+					'meta_value' => $payment_id,
+					'limit'      => 1,
+					'orderby'    => 'date',
+					'order'      => 'DESC',
+				) );
+				
+				if ( ! empty( $orders ) ) {
+					$order = $orders[0];
+					$redirect_url = $order->get_checkout_order_received_url();
+					WC_Checkoutcom_Utility::logger( '[FLOW 3DS CHECKOUT] Found order by payment ID, redirecting to: ' . $redirect_url );
+					wp_safe_redirect( $redirect_url );
+					exit;
+				}
+			}
+			
+			// If we can't find order, show error but don't die - let JavaScript handle it as fallback
+			WC_Checkoutcom_Utility::wc_add_notice_self( __( 'There was an error processing your order. Please check your order history.', 'checkout-com-unified-payments-api' ), 'error' );
+			// Don't exit - let the page load so JavaScript can handle it as fallback
+			return;
+		}
+	}
+
+	/**
+	 * Handle 3DS return via WC API endpoint (similar to PayPal approach).
+	 * Processes payment and redirects directly to order-received page.
+	 * 
+	 * @return void
+	 */
+	public function handle_3ds_return() {
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended
+		
+		WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ========== ENTRY POINT ==========' );
+		WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Request URI: ' . ( isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : 'N/A' ) );
+		WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] GET params: ' . print_r( $_GET, true ) );
+		WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] POST params: ' . print_r( $_POST, true ) );
+		
+		$payment_id = isset( $_GET['cko-payment-id'] ) ? sanitize_text_field( $_GET['cko-payment-id'] ) : '';
+		$payment_session_id_from_url = isset( $_GET['cko-payment-session-id'] ) ? sanitize_text_field( $_GET['cko-payment-session-id'] ) : '';
+		$order_id   = isset( $_GET['order_id'] ) ? absint( $_GET['order_id'] ) : 0;
+		$order_key  = isset( $_GET['key'] ) ? sanitize_text_field( $_GET['key'] ) : '';
+		
+		WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Extracted values - Payment ID: ' . $payment_id . ', Payment Session ID (from URL): ' . $payment_session_id_from_url . ', Order ID: ' . $order_id . ', Order Key: ' . ( ! empty( $order_key ) ? 'SET' : 'EMPTY' ) );
+		
+		if ( empty( $payment_id ) ) {
+			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ERROR: Missing payment ID' );
+			error_log( '[FLOW 3DS API] ERROR: Missing payment ID in GET params' );
+			wp_die( esc_html__( 'Missing payment ID', 'checkout-com-unified-payments-api' ), esc_html__( 'Payment Error', 'checkout-com-unified-payments-api' ), array( 'response' => 400 ) );
+		}
+		
+		$order = null;
+		
+		// If order_id and order_key are provided (order-pay page), use them
+		if ( ! empty( $order_id ) && ! empty( $order_key ) ) {
+			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order ID and key provided - loading order: ' . $order_id );
+			$order = wc_get_order( $order_id );
+			
+			if ( ! $order ) {
+				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ERROR: Order not found - Order ID: ' . $order_id );
+				error_log( '[FLOW 3DS API] ERROR: Order not found' );
+				wp_die( esc_html__( 'Order not found', 'checkout-com-unified-payments-api' ), esc_html__( 'Payment Error', 'checkout-com-unified-payments-api' ), array( 'response' => 400 ) );
+			}
+			
+			$order_key_from_order = $order->get_order_key();
+			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order found - Order Key from order: ' . $order_key_from_order . ', Order Key from URL: ' . $order_key );
+			
+			if ( $order_key_from_order !== $order_key ) {
+				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ERROR: Order key mismatch' );
+				error_log( '[FLOW 3DS API] ERROR: Order key mismatch' );
+				wp_die( esc_html__( 'Invalid order key', 'checkout-com-unified-payments-api' ), esc_html__( 'Payment Error', 'checkout-com-unified-payments-api' ), array( 'response' => 400 ) );
+			}
+		} else {
+			// For regular checkout, look up order by payment session ID
+			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order ID/key not provided - will look up order by payment session ID' );
+			
+			try {
+				// Get payment session ID from URL first (faster), then from payment metadata if needed
+				$payment_session_id = $payment_session_id_from_url;
+				$payment_details = null;
+				
+				if ( empty( $payment_session_id ) ) {
+					// Fallback: fetch payment details to get the payment session ID
+					WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment session ID not in URL, fetching from payment details...' );
+					$checkout = new Checkout_SDK();
+					$builder = $checkout->get_builder();
+					
+					if ( ! $builder ) {
+						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ERROR: SDK builder not initialized for order lookup' );
+						error_log( '[FLOW 3DS API] ERROR: SDK builder not initialized' );
+						wp_die( esc_html__( 'Payment processing error', 'checkout-com-unified-payments-api' ), esc_html__( 'Payment Error', 'checkout-com-unified-payments-api' ), array( 'response' => 500 ) );
+					}
+					
+					WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Fetching payment details to get payment session ID...' );
+					$payment_details = $builder->getPaymentsClient()->getPaymentDetails( $payment_id );
+					
+					// Get payment session ID from metadata
+					$payment_session_id = isset( $payment_details['metadata']['cko_payment_session_id'] ) ? $payment_details['metadata']['cko_payment_session_id'] : '';
+					
+					WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment session ID from payment metadata: ' . $payment_session_id );
+				} else {
+					WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Using payment session ID from URL: ' . $payment_session_id );
+					// Still fetch payment details for fallback lookup methods
+					$checkout = new Checkout_SDK();
+					$builder = $checkout->get_builder();
+					if ( $builder ) {
+						$payment_details = $builder->getPaymentsClient()->getPaymentDetails( $payment_id );
+					}
+				}
+				
+				if ( empty( $payment_session_id ) ) {
+					WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ERROR: Payment session ID not found in URL or payment metadata' );
+					error_log( '[FLOW 3DS API] ERROR: Payment session ID not found' );
+					// Don't die yet - try fallback methods
+				} else {
+					
+					// Look up order by payment session ID
+					// In slow environments, order might not be created yet, so retry with delays
+					// In fast environments, order is usually found on first try (no delay)
+					WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Looking up order by payment session ID: ' . $payment_session_id );
+					$orders = null;
+					$max_retries = 2; // Reduced to 2 retries (still handles slow envs, faster for normal envs)
+					$retry_delay = 0.5; // Reduced to 0.5 seconds (faster retries)
+					
+					for ( $retry = 0; $retry < $max_retries; $retry++ ) {
+						// First attempt: no delay (fast environments find order immediately)
+						// Subsequent attempts: short delay (for slow environments)
+						if ( $retry > 0 ) {
+							WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Retry ' . $retry . ' - Waiting ' . $retry_delay . ' seconds before retrying order lookup...' );
+							usleep( $retry_delay * 1000000 ); // Use usleep for microsecond precision
+						}
+						
+						$orders = wc_get_orders( array(
+							'meta_key'   => '_cko_payment_session_id',
+							'meta_value' => $payment_session_id,
+							'limit'      => 1,
+							'orderby'    => 'date',
+							'order'      => 'DESC',
+						) );
+						
+						if ( ! empty( $orders ) ) {
+							break; // Order found, exit retry loop immediately (no delay in fast environments)
+						}
+					}
+					
+					if ( ! empty( $orders ) ) {
+						$found_order = $orders[0];
+						$found_order_status = $found_order->get_status();
+						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order found by payment session ID - Order ID: ' . $found_order->get_id() . ', Status: ' . $found_order_status . ' (after ' . ($retry + 1) . ' attempt(s))' );
+						
+						// Only use this order if it's in pending or failed status (reusable)
+						if ( in_array( $found_order_status, array( 'pending', 'failed' ), true ) ) {
+							$order = $found_order;
+							$order_id = $order->get_id();
+							WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ✅ Using order found by payment session ID (status: ' . $found_order_status . ') - Order ID: ' . $order_id );
+						} else {
+							WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order found by payment session ID has status ' . $found_order_status . ' (not reusable) - will check for duplicate or create new order' );
+						}
+					} else {
+						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order not found by payment session ID after ' . $max_retries . ' attempts (slow environment?)' );
+					}
+					
+					// If order not found or not reusable, try fallback methods
+					if ( ! $order ) {
+						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order not found by payment session ID or not reusable, trying fallback methods...' );
+						
+						// Fallback 1: Try to find order by payment ID (in case payment was already processed)
+						// Also retry for slow environments (but optimized for fast environments)
+						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Fallback: Looking for order by payment ID: ' . $payment_id );
+						$orders_by_payment = null;
+						
+						for ( $retry_payment = 0; $retry_payment < $max_retries; $retry_payment++ ) {
+							// First attempt: no delay (fast environments find order immediately)
+							if ( $retry_payment > 0 ) {
+								WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Fallback retry ' . $retry_payment . ' - Waiting ' . $retry_delay . ' seconds...' );
+								usleep( $retry_delay * 1000000 ); // Use usleep for microsecond precision
+							}
+							
+							$orders_by_payment = wc_get_orders( array(
+								'meta_key'   => '_cko_payment_id',
+								'meta_value' => $payment_id,
+								'limit'      => 1,
+								'orderby'    => 'date',
+								'order'      => 'DESC',
+							) );
+							
+							if ( ! empty( $orders_by_payment ) ) {
+								break; // Order found, exit immediately (no delay in fast environments)
+							}
+						}
+						
+						if ( ! empty( $orders_by_payment ) ) {
+							$found_order_by_payment = $orders_by_payment[0];
+							$found_order_by_payment_status = $found_order_by_payment->get_status();
+							WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order found by payment ID - Order ID: ' . $found_order_by_payment->get_id() . ', Status: ' . $found_order_by_payment_status . ' (after ' . ($retry_payment + 1) . ' attempt(s))' );
+							
+							// CRITICAL: Check if order already has a transaction ID (means it was already fully processed)
+							$existing_transaction_id = $found_order_by_payment->get_transaction_id();
+							if ( ! empty( $existing_transaction_id ) ) {
+								WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ⚠️ Order found by payment ID already has transaction ID: ' . $existing_transaction_id . ' - NOT reusing (already processed)' );
+							} elseif ( in_array( $found_order_by_payment_status, array( 'pending', 'failed' ), true ) ) {
+								// Only use this order if it's in pending or failed status AND has no transaction ID (reusable)
+								$order = $found_order_by_payment;
+								$order_id = $order->get_id();
+								WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ✅ Using order found by payment ID (status: ' . $found_order_by_payment_status . ', no transaction ID) - Order ID: ' . $order_id );
+							} else {
+								WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order found by payment ID has status ' . $found_order_by_payment_status . ' (not reusable) - will check for duplicate or create new order' );
+							}
+						}
+						
+						if ( ! $order ) {
+							// Fallback 2: Try to find most recent pending/failed order for this customer
+							// IMPORTANT: Apply same duplicate prevention logic as pre-order creation check
+							WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Fallback: Looking for most recent pending/failed order...' );
+							if ( $payment_details && isset( $payment_details['customer']['email'] ) ) {
+								$customer_email = $payment_details['customer']['email'];
+								if ( ! empty( $customer_email ) ) {
+									// Use date_query to only check recent orders (same time windows as pre-order creation check)
+									$date_after_failed = date( 'Y-m-d H:i:s', strtotime( '-2 days' ) );
+									$date_after_pending = date( 'Y-m-d H:i:s', strtotime( '-7 days' ) );
+									
+									// First, check for pending orders (longer window)
+									$orders_by_email = wc_get_orders( array(
+										'billing_email' => $customer_email,
+										'status'        => array( 'pending' ),
+										'date_query'    => array(
+											array(
+												'after' => $date_after_pending,
+												'inclusive' => true,
+											),
+										),
+										'limit'         => 5,
+										'orderby'       => 'date',
+										'order'         => 'DESC',
+									) );
+									
+									// If no pending orders found, check for failed orders (shorter window)
+									if ( empty( $orders_by_email ) ) {
+										$orders_by_email = wc_get_orders( array(
+											'billing_email' => $customer_email,
+											'status'        => array( 'failed' ),
+											'date_query'    => array(
+												array(
+													'after' => $date_after_failed,
+													'inclusive' => true,
+												),
+											),
+											'limit'         => 5,
+											'orderby'       => 'date',
+											'order'         => 'DESC',
+										) );
+									}
+									
+									WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Found ' . count( $orders_by_email ) . ' pending/failed orders for email: ' . $customer_email . ' (within time windows: pending=7 days, failed=2 days)' );
+									
+									// Check if any of these orders match the payment amount AND are reusable
+									$payment_amount = isset( $payment_details['amount'] ) ? $payment_details['amount'] : 0;
+									foreach ( $orders_by_email as $potential_order ) {
+										$potential_order_status = $potential_order->get_status();
+										// Double-check status (should already be filtered, but be safe)
+										if ( ! in_array( $potential_order_status, array( 'pending', 'failed' ), true ) ) {
+											continue;
+										}
+										
+										// CRITICAL: Check if order already has a transaction ID or payment ID
+										// If it does, it was already processed (even if failed), so don't reuse it
+										$existing_transaction_id = $potential_order->get_transaction_id();
+										$existing_payment_id = $potential_order->get_meta( '_cko_payment_id' );
+										$existing_flow_payment_id = $potential_order->get_meta( '_cko_flow_payment_id' );
+										
+										if ( ! empty( $existing_transaction_id ) || ! empty( $existing_payment_id ) || ! empty( $existing_flow_payment_id ) ) {
+											WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ⚠️ Order ' . $potential_order->get_id() . ' already has payment ID/transaction ID - NOT reusing (Transaction ID: ' . ( $existing_transaction_id ? $existing_transaction_id : 'NONE' ) . ', Payment ID: ' . ( $existing_payment_id ? $existing_payment_id : 'NONE' ) . ', Flow Payment ID: ' . ( $existing_flow_payment_id ? $existing_flow_payment_id : 'NONE' ) . ')' );
+											continue; // Skip this order, check next one
+										}
+										
+										$order_amount = (int) round( $potential_order->get_total() * 100 ); // Convert to cents
+										if ( $order_amount === $payment_amount ) {
+											$order = $potential_order;
+											$order_id = $order->get_id();
+											$order_date = $order->get_date_created();
+											$order_age_days = ( time() - $order_date->getTimestamp() ) / DAY_IN_SECONDS;
+											WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ✅ Order found by email and amount match (fallback) - Order ID: ' . $order_id . ', Status: ' . $potential_order_status . ', Age: ' . round( $order_age_days, 1 ) . ' days, No payment ID (reusable)' );
+											break;
+										}
+									}
+									
+									if ( empty( $order ) ) {
+										WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] No reusable order found by email/amount match (all orders either have payment IDs or are outside time windows)' );
+									}
+								}
+							}
+							
+							if ( ! $order ) {
+								// Last resort: Create order from cart and payment details
+								// This happens when 3DS redirect occurs before form submission
+								WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order not found - checking for existing order with same session+cart hash before creating new one' );
+								
+								if ( ! WC()->cart || WC()->cart->is_empty() ) {
+									WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ERROR: Cannot create order - cart is empty' );
+									error_log( '[FLOW 3DS API] ERROR: Cart is empty, cannot create order' );
+									wp_die( esc_html__( 'Order not found and cart is empty. Please contact support.', 'checkout-com-unified-payments-api' ), esc_html__( 'Payment Error', 'checkout-com-unified-payments-api' ), array( 'response' => 400 ) );
+								}
+								
+								// Get customer info from payment details
+								$customer_email = '';
+								$customer_id = 0;
+								
+								if ( $payment_details && isset( $payment_details['customer']['email'] ) ) {
+									$customer_email = $payment_details['customer']['email'];
+									// Try to find customer by email
+									$user = get_user_by( 'email', $customer_email );
+									if ( $user ) {
+										$customer_id = $user->ID;
+									}
+								}
+								
+								// Generate session+cart hash to check for duplicate orders
+								$session_cart_identifier = null;
+								if ( WC()->session && WC()->cart && ! WC()->cart->is_empty() ) {
+									// Get WooCommerce session identifier
+									$session_customer_id = WC()->session->get_customer_id();
+									$session_key = WC()->session->get_customer_unique_id();
+									
+									// Generate cart hash from cart items
+									$cart_items = array();
+									foreach ( WC()->cart->get_cart() as $cart_item_key => $cart_item ) {
+										$cart_items[] = array(
+											'product_id' => $cart_item['product_id'],
+											'variation_id' => $cart_item['variation_id'],
+											'quantity' => $cart_item['quantity'],
+										);
+									}
+									$cart_hash = md5( wp_json_encode( $cart_items ) . WC()->cart->get_total( 'edit' ) );
+									
+									// Combine session ID + cart hash = unique identifier
+									if ( $session_customer_id > 0 ) {
+										$session_cart_identifier = 'customer_' . $session_customer_id . '_' . $cart_hash;
+									} elseif ( ! empty( $session_key ) ) {
+										$session_cart_identifier = 'session_' . $session_key . '_' . $cart_hash;
+									}
+									
+									WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Generated session+cart identifier: ' . ( $session_cart_identifier ? substr( $session_cart_identifier, 0, 50 ) . '...' : 'NULL' ) );
+								}
+								
+								// Check for existing order with same session+cart hash
+								if ( ! empty( $session_cart_identifier ) ) {
+									WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Checking for existing order with session+cart hash: ' . substr( $session_cart_identifier, 0, 50 ) . '...' );
+									
+									$existing_orders = wc_get_orders( array(
+										'meta_query' => array(
+											array(
+												'key'   => '_cko_session_cart_id',
+												'value' => $session_cart_identifier,
+											),
+										),
+										'limit'      => 1,
+										'orderby'    => 'date',
+										'order'      => 'DESC',
+									) );
+									
+									if ( ! empty( $existing_orders ) ) {
+										$existing_order = $existing_orders[0];
+										$existing_order_status = $existing_order->get_status();
+										
+										WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Found existing order with same session+cart hash - Order ID: ' . $existing_order->get_id() . ', Status: ' . $existing_order_status );
+										
+										// Check if order has payment ID/transaction ID (already processed, even if failed)
+										$existing_transaction_id = $existing_order->get_transaction_id();
+										$existing_payment_id = $existing_order->get_meta( '_cko_payment_id' );
+										$existing_flow_payment_id = $existing_order->get_meta( '_cko_flow_payment_id' );
+										
+										// CRITICAL: Don't reuse order if it already has a payment ID/transaction ID
+										// This means the order was already processed (even if failed), and we shouldn't reuse it
+										if ( ! empty( $existing_transaction_id ) || ! empty( $existing_payment_id ) || ! empty( $existing_flow_payment_id ) ) {
+											WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ⚠️ Existing order already has payment ID/transaction ID - NOT reusing. Will create NEW order instead.' );
+											WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Reason: Order was already processed (even if failed), reusing would cause payment conflicts' );
+											// Continue to create new order below
+										} elseif ( 'pending' === $existing_order_status ) {
+											// Only reuse pending orders (never reuse failed orders)
+											$order = $existing_order;
+											$order_id = $order->get_id();
+											WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ✅ Reusing existing order (status: ' . $existing_order_status . ', no payment ID) - Order ID: ' . $order_id );
+											WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] This order has never been processed, safe to reuse' );
+											$order = $existing_order;
+											$order_id = $order->get_id();
+											WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ✅ Reusing existing order (status: ' . $existing_order_status . ') - Order ID: ' . $order_id );
+											
+											// Clear existing order items to refresh with current cart
+											foreach ( $order->get_items() as $item_id => $item ) {
+												$order->remove_item( $item_id );
+											}
+											
+											// Clear existing shipping items
+											foreach ( $order->get_items( 'shipping' ) as $item_id => $item ) {
+												$order->remove_item( $item_id );
+											}
+											
+											// Set customer email
+											if ( ! empty( $customer_email ) ) {
+												$order->set_billing_email( $customer_email );
+											}
+											
+											// Set billing address from payment details if available
+											if ( $payment_details && isset( $payment_details['billing_address'] ) ) {
+												$billing = $payment_details['billing_address'];
+												if ( isset( $billing['address_line1'] ) ) $order->set_billing_address_1( $billing['address_line1'] );
+												if ( isset( $billing['address_line2'] ) ) $order->set_billing_address_2( $billing['address_line2'] );
+												if ( isset( $billing['city'] ) ) $order->set_billing_city( $billing['city'] );
+												if ( isset( $billing['state'] ) ) $order->set_billing_state( $billing['state'] );
+												if ( isset( $billing['zip'] ) ) $order->set_billing_postcode( $billing['zip'] );
+												if ( isset( $billing['country'] ) ) $order->set_billing_country( $billing['country'] );
+												if ( isset( $payment_details['customer']['name'] ) ) {
+													$name_parts = explode( ' ', $payment_details['customer']['name'], 2 );
+													$order->set_billing_first_name( $name_parts[0] ?? '' );
+													$order->set_billing_last_name( $name_parts[1] ?? '' );
+												}
+											}
+											
+											// Add current cart items
+											if ( WC()->cart && ! WC()->cart->is_empty() ) {
+												foreach ( WC()->cart->get_cart() as $cart_item_key => $cart_item ) {
+													$product = $cart_item['data'];
+													$order->add_product( $product, $cart_item['quantity'], array(
+														'subtotal' => $cart_item['line_subtotal'],
+														'total'    => $cart_item['line_total'],
+													) );
+												}
+											}
+											
+											// Set shipping method if available
+											$chosen_shipping_methods = WC()->session->get( 'chosen_shipping_methods' );
+											if ( ! empty( $chosen_shipping_methods ) ) {
+												$shipping_packages = WC()->shipping->get_packages();
+												foreach ( $chosen_shipping_methods as $package_key => $method ) {
+													if ( isset( $shipping_packages[ $package_key ] ) ) {
+														$package = $shipping_packages[ $package_key ];
+														if ( isset( $package['rates'][ $method ] ) ) {
+															$shipping_rate = $package['rates'][ $method ];
+															$item = new WC_Order_Item_Shipping();
+															$item->set_props( array(
+																'method_title' => $shipping_rate->get_label(),
+																'method_id'    => $shipping_rate->get_id(),
+																'total'        => wc_format_decimal( $shipping_rate->get_cost() ),
+																'taxes'        => $shipping_rate->get_taxes(),
+															) );
+															$order->add_item( $item );
+														}
+													}
+												}
+											}
+											
+											// Recalculate totals
+											$order->calculate_totals();
+											
+											// Set payment method
+											$order->set_payment_method( $this->id );
+											$order->set_payment_method_title( $this->get_title() );
+											
+											// Update order with payment session ID if available
+											if ( ! empty( $payment_session_id ) ) {
+												$order->update_meta_data( '_cko_payment_session_id', $payment_session_id );
+											}
+											
+											// Update order with payment ID if available
+											if ( ! empty( $payment_id ) ) {
+												$order->update_meta_data( '_cko_payment_id', $payment_id );
+												$order->update_meta_data( '_cko_flow_payment_id', $payment_id );
+											}
+											
+											// Ensure session+cart identifier is saved
+											$order->update_meta_data( '_cko_session_cart_id', $session_cart_identifier );
+											
+											// Order status should already be pending (we only reuse pending orders)
+											// Don't reset status - it's already pending
+											
+											$order->save();
+											WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Existing order refreshed with current cart items and ready for processing - Order ID: ' . $order_id );
+											
+											// Process any pending webhooks for this order
+											if ( class_exists( 'WC_Checkout_Com_Webhook_Queue' ) ) {
+												WC_Checkout_Com_Webhook_Queue::process_pending_webhooks_for_order( $order );
+											}
+										} else {
+											WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Existing order status is ' . $existing_order_status . ' (not pending/failed) - will create NEW order' );
+										}
+									} else {
+										WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] No existing order found with same session+cart hash - will create new order' );
+									}
+								}
+								
+								// Create new order if no reusable order found
+								if ( ! $order ) {
+									WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Creating new order - Customer ID: ' . $customer_id . ', Email: ' . $customer_email );
+									$order = wc_create_order( array( 'customer_id' => $customer_id ) );
+								
+									if ( ! $order || is_wp_error( $order ) ) {
+										WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ERROR: Failed to create order' );
+										error_log( '[FLOW 3DS API] ERROR: Failed to create order' );
+										wp_die( esc_html__( 'Failed to create order. Please contact support.', 'checkout-com-unified-payments-api' ), esc_html__( 'Payment Error', 'checkout-com-unified-payments-api' ), array( 'response' => 500 ) );
+									}
+									
+									// Set customer email
+									if ( ! empty( $customer_email ) ) {
+										$order->set_billing_email( $customer_email );
+									}
+									
+									// Set billing address from payment details if available
+									if ( $payment_details && isset( $payment_details['billing_address'] ) ) {
+										$billing = $payment_details['billing_address'];
+										if ( isset( $billing['address_line1'] ) ) $order->set_billing_address_1( $billing['address_line1'] );
+										if ( isset( $billing['address_line2'] ) ) $order->set_billing_address_2( $billing['address_line2'] );
+										if ( isset( $billing['city'] ) ) $order->set_billing_city( $billing['city'] );
+										if ( isset( $billing['state'] ) ) $order->set_billing_state( $billing['state'] );
+										if ( isset( $billing['zip'] ) ) $order->set_billing_postcode( $billing['zip'] );
+										if ( isset( $billing['country'] ) ) $order->set_billing_country( $billing['country'] );
+										if ( isset( $payment_details['customer']['name'] ) ) {
+											$name_parts = explode( ' ', $payment_details['customer']['name'], 2 );
+											$order->set_billing_first_name( $name_parts[0] ?? '' );
+											$order->set_billing_last_name( $name_parts[1] ?? '' );
+										}
+									}
+									
+									// Add cart items
+									foreach ( WC()->cart->get_cart() as $cart_item_key => $cart_item ) {
+										$product = $cart_item['data'];
+										$order->add_product( $product, $cart_item['quantity'], array(
+											'subtotal' => $cart_item['line_subtotal'],
+											'total'    => $cart_item['line_total'],
+										) );
+									}
+									
+									// Set shipping method if available
+									$chosen_shipping_methods = WC()->session->get( 'chosen_shipping_methods' );
+									if ( ! empty( $chosen_shipping_methods ) ) {
+										$shipping_packages = WC()->shipping->get_packages();
+										foreach ( $chosen_shipping_methods as $package_key => $method ) {
+											if ( isset( $shipping_packages[ $package_key ] ) ) {
+												$package = $shipping_packages[ $package_key ];
+												if ( isset( $package['rates'][ $method ] ) ) {
+													$shipping_rate = $package['rates'][ $method ];
+													$item = new WC_Order_Item_Shipping();
+													$item->set_props( array(
+														'method_title' => $shipping_rate->get_label(),
+														'method_id'    => $shipping_rate->get_id(),
+														'total'        => wc_format_decimal( $shipping_rate->get_cost() ),
+														'taxes'        => $shipping_rate->get_taxes(),
+													) );
+													$order->add_item( $item );
+												}
+											}
+										}
+									}
+									
+									// Calculate totals
+									$order->calculate_totals();
+									
+									// Set payment method
+									$order->set_payment_method( $this->id );
+									$order->set_payment_method_title( $this->get_title() );
+									
+									// Save payment session ID
+									if ( ! empty( $payment_session_id ) ) {
+										$order->update_meta_data( '_cko_payment_session_id', $payment_session_id );
+									}
+									
+									// Save session+cart identifier for duplicate prevention
+									if ( ! empty( $session_cart_identifier ) ) {
+										$order->update_meta_data( '_cko_session_cart_id', $session_cart_identifier );
+										WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Saved session+cart identifier to order: ' . substr( $session_cart_identifier, 0, 50 ) . '...' );
+									}
+									
+									// Set status to pending
+									$order->set_status( 'pending' );
+									$order->save();
+									
+									$order_id = $order->get_id();
+									WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order created successfully - Order ID: ' . $order_id );
+									
+									// Process any pending webhooks for this order
+									if ( class_exists( 'WC_Checkout_Com_Webhook_Queue' ) ) {
+										WC_Checkout_Com_Webhook_Queue::process_pending_webhooks_for_order( $order );
+									}
+								}
+							}
+						}
+					}
+				}
+			} catch ( Exception $e ) {
+				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Exception during order lookup: ' . $e->getMessage() );
+				error_log( '[FLOW 3DS API] EXCEPTION during order lookup: ' . $e->getMessage() );
+				wp_die( esc_html__( 'An error occurred while processing your payment. Please try again.', 'checkout-com-unified-payments-api' ), esc_html__( 'Payment Error', 'checkout-com-unified-payments-api' ), array( 'response' => 500 ) );
+			}
+		}
+		
+		// Check if payment is already processed
+		$existing_payment = $order->get_meta( '_cko_payment_id' );
+		WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Checking existing payment - Existing: ' . $existing_payment . ', New: ' . $payment_id );
+		
+		if ( $existing_payment === $payment_id ) {
+			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment already processed, redirecting to order-received' );
+			$return_url = $this->get_return_url( $order );
+			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Redirect URL: ' . $return_url );
+			wp_safe_redirect( $return_url );
+			exit;
+		}
+		
+		// Fetch payment details from Checkout.com
+		WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Fetching payment details from Checkout.com - Payment ID: ' . $payment_id );
+		try {
+			$checkout = new Checkout_SDK();
+			$builder = $checkout->get_builder();
+			
+			if ( ! $builder ) {
+				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ERROR: SDK builder not initialized' );
+				error_log( '[FLOW 3DS API] ERROR: SDK builder not initialized' );
+				throw new Exception( 'Checkout.com SDK not initialized' );
+			}
+			
+			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] SDK initialized, fetching payment details...' );
+			$payment_details = $builder->getPaymentsClient()->getPaymentDetails( $payment_id );
+			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment details received: ' . print_r( $payment_details, true ) );
+			
+			// Check if payment is approved
+			$is_approved = isset( $payment_details['approved'] ) ? $payment_details['approved'] : false;
+			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment approved status: ' . ( $is_approved ? 'YES' : 'NO' ) );
+			
+			if ( ! $is_approved ) {
+				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment not approved: ' . print_r( $payment_details, true ) );
+				error_log( '[FLOW 3DS API] Payment not approved' );
+				
+				// Get error message from payment details if available
+				$error_message = __( 'Payment was not approved. Please try again.', 'checkout-com-unified-payments-api' );
+				if ( isset( $payment_details['response_summary'] ) ) {
+					$error_message = $payment_details['response_summary'];
+				} elseif ( isset( $payment_details['status'] ) ) {
+					$error_message = sprintf( __( 'Payment failed with status: %s', 'checkout-com-unified-payments-api' ), $payment_details['status'] );
+				}
+				
+				// If we have an order, update it and redirect to checkout/order-pay with error
+				if ( $order ) {
+					// Update order status to failed
+					$order->update_status( 'failed', __( 'Payment was not approved by Checkout.com', 'checkout-com-unified-payments-api' ) );
+					
+					// Save payment ID to order for reference
+					if ( ! empty( $payment_id ) ) {
+						$order->update_meta_data( '_cko_payment_id', $payment_id );
+						$order->update_meta_data( '_cko_flow_payment_id', $payment_id );
+						$order->save();
+					}
+					
+					// Add error notice
+					WC_Checkoutcom_Utility::wc_add_notice_self( $error_message, 'error' );
+					
+					// Determine redirect URL based on context
+					if ( ! empty( $order_id ) && ! empty( $order_key ) ) {
+						// Order-pay page: redirect back to order-pay page
+						$redirect_url = wc_get_endpoint_url( 'order-pay', $order_id, wc_get_checkout_url() );
+						$redirect_url = add_query_arg( array(
+							'pay_for_order' => 'true',
+							'key' => $order_key,
+							'payment_failed' => '1',
+						), $redirect_url );
+						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment failed, redirecting to order-pay page: ' . $redirect_url );
+					} else {
+						// Regular checkout: redirect to checkout page
+						$redirect_url = add_query_arg( 'payment_failed', '1', wc_get_checkout_url() );
+						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment failed, redirecting to checkout page: ' . $redirect_url );
+					}
+					
+					wp_safe_redirect( $redirect_url );
+					exit;
+				} else {
+					// No order found, show error
+					wp_die( esc_html( $error_message ), esc_html__( 'Payment Failed', 'checkout-com-unified-payments-api' ), array( 'response' => 400 ) );
+				}
+			}
+			
+			// Process the payment by simulating POST data and calling process_payment
+			$payment_type = isset( $payment_details['source']['type'] ) ? $payment_details['source']['type'] : 'card';
+			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Setting POST data - Payment ID: ' . $payment_id . ', Payment Type: ' . $payment_type );
+			
+			// Set POST data for process_payment method
+			$_POST['cko-flow-payment-id'] = $payment_id;
+			$_POST['cko-flow-payment-type'] = $payment_type;
+			
+			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Calling process_payment for order: ' . $order_id );
+			// Process the payment
+			$result = $this->process_payment( $order_id );
+			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] process_payment result: ' . print_r( $result, true ) );
+			
+			if ( isset( $result['result'] ) && 'success' === $result['result'] && isset( $result['redirect'] ) ) {
+				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment processed successfully, redirecting to: ' . $result['redirect'] );
+				error_log( '[FLOW 3DS API] SUCCESS - Redirecting to: ' . $result['redirect'] );
+				
+				// Ensure headers are sent and redirect happens
+				if ( ! headers_sent() ) {
+					wp_safe_redirect( $result['redirect'] );
+					exit;
+				} else {
+					// Headers already sent, use JavaScript redirect as fallback
+					WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] WARNING: Headers already sent, using JavaScript redirect' );
+					echo '<script>window.location.href = "' . esc_js( $result['redirect'] ) . '";</script>';
+					exit;
+				}
+			} else {
+				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment processing failed: ' . print_r( $result, true ) );
+				
+				// Payment failed - don't redirect to order received page
+				// Instead, redirect back to checkout with error message
+				if ( $order && $order->get_id() ) {
+					// Update order status to failed if not already
+					if ( 'failed' !== $order->get_status() ) {
+						$order->update_status( 'failed', __( 'Payment processing failed', 'checkout-com-unified-payments-api' ) );
+					}
+					
+					// Get error message from result if available
+					$error_message = __( 'Payment processing failed. Please try again.', 'checkout-com-unified-payments-api' );
+					if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {
+						$error_message = $result['error'];
+					}
+					
+					// Add error notice
+					WC_Checkoutcom_Utility::wc_add_notice_self( $error_message, 'error' );
+					
+					// Redirect to checkout page with error
+					$redirect_url = add_query_arg( 'payment_failed', '1', wc_get_checkout_url() );
+					WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment failed, redirecting to checkout page: ' . $redirect_url );
+					if ( ! headers_sent() ) {
+						wp_safe_redirect( $redirect_url );
+						exit;
+					} else {
+						echo '<script>window.location.href = "' . esc_js( $redirect_url ) . '";</script>';
+						exit;
+					}
+				}
+				error_log( '[FLOW 3DS API] ERROR - Payment processing failed: ' . print_r( $result, true ) );
+				wp_die( esc_html__( 'Payment processing failed. Please contact support.', 'checkout-com-unified-payments-api' ), esc_html__( 'Payment Error', 'checkout-com-unified-payments-api' ), array( 'response' => 500 ) );
+			}
+			
+		} catch ( Exception $e ) {
+			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Exception: ' . $e->getMessage() );
+			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Exception trace: ' . $e->getTraceAsString() );
+			error_log( '[FLOW 3DS API] EXCEPTION: ' . $e->getMessage() );
+			error_log( '[FLOW 3DS API] Exception trace: ' . $e->getTraceAsString() );
+			wp_die( esc_html__( 'An error occurred while processing your payment. Please try again.', 'checkout-com-unified-payments-api' ), esc_html__( 'Payment Error', 'checkout-com-unified-payments-api' ), array( 'response' => 500 ) );
+		}
+		
+		WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ========== EXIT POINT ==========' );
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 	}
 
 	/**
@@ -1361,13 +2678,22 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	 */
 	public function flow_save_cards( $order, $pay_id ) {
 
+		WC_Checkoutcom_Utility::logger( '=== FLOW_SAVE_CARDS METHOD START ===' );
+		WC_Checkoutcom_Utility::logger( 'Order ID: ' . $order->get_id() );
+		WC_Checkoutcom_Utility::logger( 'Payment ID: ' . $pay_id );
+		WC_Checkoutcom_Utility::logger( 'User ID: ' . $order->get_user_id() );
+
 		$save_card = WC_Admin_Settings::get_option( 'ckocom_card_saved' );
+		WC_Checkoutcom_Utility::logger( 'Admin Save Card Setting: ' . ( $save_card ? 'ENABLED' : 'DISABLED' ) );
 
 		// Check if save card is enable and customer select to save card.
 		if ( ! $save_card ) {
+			WC_Checkoutcom_Utility::logger( 'Save card disabled in admin - exiting' );
+			WC_Checkoutcom_Utility::logger( '=== FLOW_SAVE_CARDS METHOD END ===' );
 			return;
 		}
 
+		WC_Checkoutcom_Utility::logger( 'Fetching payment details from Checkout.com API...' );
 		$request  = new \WP_REST_Request( 'GET', '/ckoplugin/v1/payment-status' );
 		$request->set_query_params( [ 'paymentId' => $pay_id ] );
 
@@ -1375,12 +2701,17 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 		if ( is_wp_error( $result ) ) {
 			$error_message = $result->get_error_message();
-			WC_Checkoutcom_Utility::logger( "There was an error in saving cards: $error_message" ); // phpcs:ignore
+			WC_Checkoutcom_Utility::logger( "ERROR in saving cards: $error_message" ); // phpcs:ignore
+			WC_Checkoutcom_Utility::logger( '=== FLOW_SAVE_CARDS METHOD END (ERROR) ===' );
 		} else {
 			$data = $result->get_data();
+			WC_Checkoutcom_Utility::logger( 'Payment data retrieved successfully' );
+			WC_Checkoutcom_Utility::logger( 'Payment data: ' . print_r( $data, true ) );
 		}
 		
+		WC_Checkoutcom_Utility::logger( 'Calling save_token method...' );
 		$this->save_token( $order->get_user_id(), $data );
+		WC_Checkoutcom_Utility::logger( '=== FLOW_SAVE_CARDS METHOD END ===' );
 	}
 
 	/**
@@ -1406,78 +2737,22 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	}
 
 	/**
-	 * Migrate old saved cards to be compatible with Flow integration.
-	 * This function helps users with saved cards from previous plugin versions.
+	 * DEPRECATED: Migrate old saved cards to be compatible with Flow integration.
+	 * 
+	 * This function is no longer needed as of version 5.0.0.
+	 * The saved_payment_methods() function now automatically displays tokens from BOTH
+	 * Flow and Classic Cards gateways, and the backend payment processing already
+	 * handles both token types seamlessly. No migration is required.
 	 *
+	 * @deprecated 5.0.0 No longer needed - tokens from both gateways are shown automatically
 	 * @param int $user_id User ID.
 	 * @return void
 	 */
 	public function migrate_old_saved_cards( $user_id ) {
-		// Check if migration has already been done for this user
-		$migration_done = get_user_meta( $user_id, '_cko_flow_migration_done', true );
-		if ( $migration_done ) {
-			return; // Migration already completed
-		}
-
-		// Get all tokens for this user from the classic cards gateway
-		$classic_gateway = new WC_Gateway_Checkout_Com_Cards();
-		$tokens = WC_Payment_Tokens::get_tokens( array(
-			'user_id'    => $user_id,
-			'gateway_id' => $classic_gateway->id,
-			'limit'      => 100,
-		) );
-
-		if ( empty( $tokens ) ) {
-			// No old tokens to migrate, mark as done
-			update_user_meta( $user_id, '_cko_flow_migration_done', true );
-			return;
-		}
-
-		// Get existing Flow tokens to avoid duplicates
-		$flow_tokens = WC_Payment_Tokens::get_tokens( array(
-			'user_id'    => $user_id,
-			'gateway_id' => $this->id,
-			'limit'      => 100,
-		) );
-
-		$existing_flow_tokens = array();
-		foreach ( $flow_tokens as $flow_token ) {
-			$existing_flow_tokens[] = $flow_token->get_token();
-		}
-
-		$migrated_count = 0;
-		foreach ( $tokens as $token ) {
-			// Skip if token already exists in Flow gateway
-			if ( in_array( $token->get_token(), $existing_flow_tokens, true ) ) {
-				continue;
-			}
-
-			// Create new token for Flow gateway
-			$new_token = new WC_Payment_Token_CC();
-			$new_token->set_token( $token->get_token() );
-			$new_token->set_gateway_id( $this->id );
-			$new_token->set_card_type( $token->get_card_type() );
-			$new_token->set_last4( $token->get_last4() );
-			$new_token->set_expiry_month( $token->get_expiry_month() );
-			$new_token->set_expiry_year( $token->get_expiry_year() );
-			$new_token->set_user_id( $user_id );
-
-			// Copy metadata from old token
-			$old_meta = $token->get_meta_data();
-			foreach ( $old_meta as $meta ) {
-				$new_token->add_meta_data( $meta->key, $meta->value, true );
-			}
-
-			$new_token->save();
-			$migrated_count++;
-		}
-
-		// Mark migration as completed
-		update_user_meta( $user_id, '_cko_flow_migration_done', true );
-		
-		if ( $migrated_count > 0 ) {
-			WC_Checkoutcom_Utility::logger( 'Migrated ' . $migrated_count . ' old saved cards to Flow gateway for user: ' . $user_id );
-		}
+		// This function is deprecated and no longer performs any action.
+		// Kept for backward compatibility in case it's called by other code.
+		WC_Checkoutcom_Utility::logger( 'migrate_old_saved_cards() called but is deprecated - no action taken. Tokens from both gateways are now shown automatically.' );
+		return;
 	}
 
 	/**
@@ -1489,8 +2764,16 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	 * @return void
 	 */
 	public function save_token( $user_id, $payment_response ) {
+		WC_Checkoutcom_Utility::logger( '=== SAVE_TOKEN METHOD START ===' );
+		WC_Checkoutcom_Utility::logger( 'User ID: ' . $user_id );
+		WC_Checkoutcom_Utility::logger( 'Payment Response is null: ' . ( is_null( $payment_response ) ? 'YES' : 'NO' ) );
+		
 		// Check if payment response is not null.
 		if ( ! is_null( $payment_response ) ) {
+			WC_Checkoutcom_Utility::logger( 'Payment response received, checking for duplicates...' );
+			WC_Checkoutcom_Utility::logger( 'Source ID: ' . ( isset( $payment_response['source']['id'] ) ? $payment_response['source']['id'] : 'NOT SET' ) );
+			WC_Checkoutcom_Utility::logger( 'Fingerprint: ' . ( isset( $payment_response['source']['fingerprint'] ) ? $payment_response['source']['fingerprint'] : 'NOT SET' ) );
+			
 			// argument to check token.
 			$arg = array(
 				'user_id'    => $user_id,
@@ -1500,11 +2783,14 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 			// Query token by userid and gateway id.
 			$token = WC_Payment_Tokens::get_tokens( $arg );
+			WC_Checkoutcom_Utility::logger( 'Found ' . count( $token ) . ' existing Flow tokens for this user' );
 
 			foreach ( $token as $tok ) {
 				$fingerprint = $tok->get_meta( 'fingerprint', true );
 				// do not save source if it already exists in db.
 				if ( $fingerprint === $payment_response['source']['fingerprint'] ) {
+					WC_Checkoutcom_Utility::logger( 'Card already exists in Flow tokens (fingerprint match) - NOT saving' );
+					WC_Checkoutcom_Utility::logger( '=== SAVE_TOKEN METHOD END (DUPLICATE FLOW) ===' );
 					return;
 				}
 			}
@@ -1521,15 +2807,20 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 			// Query token by userid and gateway id.
 			$token_classic = WC_Payment_Tokens::get_tokens( $arg_classic );
+			WC_Checkoutcom_Utility::logger( 'Found ' . count( $token_classic ) . ' existing Classic Cards tokens for this user' );
 
 			foreach ( $token_classic as $tokc ) {
 				$token_data = $tokc->get_data();
 				// do not save source if it already exists in db.
 				if ( $token_data['token'] === $payment_response['source']['id'] ) {
+					WC_Checkoutcom_Utility::logger( 'Card already exists in Classic Cards tokens (source ID match) - NOT saving' );
+					WC_Checkoutcom_Utility::logger( '=== SAVE_TOKEN METHOD END (DUPLICATE CLASSIC) ===' );
 					return;
 				}
 			}
 
+			WC_Checkoutcom_Utility::logger( 'No duplicates found - saving new token...' );
+			
 			// Save source_id in db.
 			$token = new WC_Payment_Token_CC();
 			$token->set_token( (string) $payment_response['source']['id'] );
@@ -1543,7 +2834,13 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			// Add the `fingerprint` metadata.
 			$token->add_meta_data( 'fingerprint', $payment_response['source']['fingerprint'], true );
 
-			$token->save();
+			$save_result = $token->save();
+			WC_Checkoutcom_Utility::logger( 'Token save result: ' . ( $save_result ? 'SUCCESS' : 'FAILED' ) );
+			WC_Checkoutcom_Utility::logger( 'Token ID: ' . $token->get_id() );
+			WC_Checkoutcom_Utility::logger( '=== SAVE_TOKEN METHOD END (SAVED) ===' );
+		} else {
+			WC_Checkoutcom_Utility::logger( 'Payment response is NULL - cannot save token' );
+			WC_Checkoutcom_Utility::logger( '=== SAVE_TOKEN METHOD END (NULL RESPONSE) ===' );
 		}
 	}
 
@@ -1639,15 +2936,15 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	 */
 	public static function flow_enabled() {
 
-		$flow_settings = get_option( 'woocommerce_wc_checkout_com_flow_settings' );
+		$flow_settings = get_option( 'woocommerce_wc_checkout_com_flow_settings', array() );
 
-		$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
-		$checkout_mode    = $checkout_setting['ckocom_checkout_mode'];
+		$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		$checkout_mode    = isset( $checkout_setting['ckocom_checkout_mode'] ) ? $checkout_setting['ckocom_checkout_mode'] : 'classic';
 	
-		$apm_settings      = get_option( 'woocommerce_wc_checkout_com_alternative_payments_settings' );
-		$gpay_settings     = get_option( 'woocommerce_wc_checkout_com_google_pay_settings' );
-		$applepay_settings = get_option( 'woocommerce_wc_checkout_com_apple_pay_settings' );
-		$paypal_settings   = get_option( 'woocommerce_wc_checkout_com_paypal_settings' );
+		$apm_settings      = get_option( 'woocommerce_wc_checkout_com_alternative_payments_settings', array() );
+		$gpay_settings     = get_option( 'woocommerce_wc_checkout_com_google_pay_settings', array() );
+		$applepay_settings = get_option( 'woocommerce_wc_checkout_com_apple_pay_settings', array() );
+		$paypal_settings   = get_option( 'woocommerce_wc_checkout_com_paypal_settings', array() );
 	
 		if ( 'flow' === $checkout_mode ) {
 			$flow_settings['enabled']     = 'yes';
@@ -1667,6 +2964,17 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		update_option( 'woocommerce_wc_checkout_com_google_pay_settings', $gpay_settings );
 		update_option( 'woocommerce_wc_checkout_com_apple_pay_settings', $applepay_settings );
 		update_option( 'woocommerce_wc_checkout_com_paypal_settings', $paypal_settings );
+		
+		// Log for debugging
+		WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] ========== FLOW ENABLED CHECK ==========' );
+		WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] Checkout mode: ' . $checkout_mode );
+		WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] Flow gateway enabled: ' . ( isset( $flow_settings['enabled'] ) ? $flow_settings['enabled'] : 'not set' ) );
+		WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] Cards gateway enabled: ' . ( isset( $checkout_setting['enabled'] ) ? $checkout_setting['enabled'] : 'not set' ) );
+		WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] APM gateway enabled: ' . ( isset( $apm_settings['enabled'] ) ? $apm_settings['enabled'] : 'not set' ) );
+		WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] Google Pay enabled: ' . ( isset( $gpay_settings['enabled'] ) ? $gpay_settings['enabled'] : 'not set' ) );
+		WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] Apple Pay enabled: ' . ( isset( $applepay_settings['enabled'] ) ? $applepay_settings['enabled'] : 'not set' ) );
+		WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] PayPal enabled: ' . ( isset( $paypal_settings['enabled'] ) ? $paypal_settings['enabled'] : 'not set' ) );
+		WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] ========================================' );
 	}
 
 	/**
@@ -1678,46 +2986,65 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	public function webhook_handler() {
 		// webhook_url_format = http://example.com/?wc-api=wc_checkoutcom_webhook .
 		
-		WC_Checkoutcom_Utility::logger( '=== WEBHOOK DEBUG: Flow webhook handler started ===' );
-		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Request method: ' . $_SERVER['REQUEST_METHOD'] );
-		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Request URI: ' . $_SERVER['REQUEST_URI'] );
-		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: User agent: ' . ($_SERVER['HTTP_USER_AGENT'] ?? 'Not set') );
-		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Content type: ' . ($_SERVER['CONTENT_TYPE'] ?? 'Not set') );
-		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Content length: ' . ($_SERVER['CONTENT_LENGTH'] ?? 'Not set') );
+		// Check if detailed webhook logging is enabled (use existing gateway responses setting)
+		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$webhook_debug_enabled = ( isset( $core_settings['cko_gateway_responses'] ) && $core_settings['cko_gateway_responses'] === 'yes' );
+		
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( '=== WEBHOOK DEBUG: Flow webhook handler started ===' );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Request method: ' . $_SERVER['REQUEST_METHOD'] );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Request URI: ' . $_SERVER['REQUEST_URI'] );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: User agent: ' . ($_SERVER['HTTP_USER_AGENT'] ?? 'Not set') );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Content type: ' . ($_SERVER['CONTENT_TYPE'] ?? 'Not set') );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Content length: ' . ($_SERVER['CONTENT_LENGTH'] ?? 'Not set') );
+		}
 
 		// Check if Flow mode is enabled - if not, let Cards handler process the webhook
-		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
 		$checkout_mode = $core_settings['ckocom_checkout_mode'] ?? 'cards';
 		
-		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Core settings retrieved: ' . print_r($core_settings, true) );
-		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Checkout mode: ' . $checkout_mode );
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Core settings retrieved: ' . print_r($core_settings, true) );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Checkout mode: ' . $checkout_mode );
+		}
 		
 		if ( 'flow' !== $checkout_mode ) {
 			// Flow mode is not enabled, don't process webhook in Flow handler
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Flow mode not enabled, exiting webhook handler' );
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Flow mode not enabled, exiting webhook handler' );
+			}
 			return;
 		}
 		
-		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Flow mode confirmed, continuing webhook processing' );
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Flow mode confirmed, continuing webhook processing' );
+		}
 
 		try {
 			// Get webhook data.
 			$raw_input = file_get_contents( 'php://input' );
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Raw input received: ' . $raw_input );
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Raw input length: ' . strlen($raw_input) );
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Raw input received: ' . $raw_input );
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Raw input length: ' . strlen($raw_input) );
+			}
 			
 			$data = json_decode( $raw_input );
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: JSON decode result: ' . print_r($data, true) );
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: JSON last error: ' . json_last_error_msg() );
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: JSON decode result: ' . print_r($data, true) );
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: JSON last error: ' . json_last_error_msg() );
+			}
 
 		// Return to home page if empty data.
 		if ( empty( $data ) ) {
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Empty data received, redirecting to home' );
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Empty data received, redirecting to home' );
+			}
 			wp_redirect( get_home_url() );
 			exit();
 		}
 		
-		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Data validation passed, continuing processing' );
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Data validation passed, continuing processing' );
+		}
 
 		// Create apache function if not exist to get header authorization.
 		if ( ! function_exists( 'apache_request_headers' ) ) {
@@ -1748,67 +3075,212 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		}
 
 		$header           = array_change_key_case( apache_request_headers(), CASE_LOWER );
-		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: All headers: ' . print_r($header, true) );
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: All headers: ' . print_r($header, true) );
+		}
 		
 		$header_signature = $header['cko-signature'] ?? null;
-		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: CKO signature from header: ' . ($header_signature ?? 'NOT FOUND') );
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: CKO signature from header: ' . ($header_signature ?? 'NOT FOUND') );
+		}
 
 		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
 		$raw_event     = file_get_contents( 'php://input' );
-		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Raw event for signature verification: ' . $raw_event );
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Raw event for signature verification: ' . $raw_event );
+		}
 
 		// For webhook signature verification, use the same logic as the working version
 		$core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
 		$secret_key = $core_settings['ckocom_sk'];
-		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Secret key (masked): ' . substr($secret_key, 0, 10) . '...' );
-		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Is NAS account: ' . (cko_is_nas_account() ? 'YES' : 'NO') );
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Secret key (masked): ' . substr($secret_key, 0, 10) . '...' );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Is NAS account: ' . (cko_is_nas_account() ? 'YES' : 'NO') );
+		}
 
 		$signature = WC_Checkoutcom_Utility::verify_signature( $raw_event, $secret_key, $header_signature );
-		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Signature verification result: ' . ($signature ? 'VALID' : 'INVALID') );
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Signature verification result: ' . ($signature ? 'VALID' : 'INVALID') );
+		}
 
 		// check if cko signature matches.
 		if ( false === $signature ) {
-			WC_Checkoutcom_Utility::logger('WEBHOOK DEBUG: Invalid signature - returning 401');
-			WC_Checkoutcom_Utility::logger('WEBHOOK DEBUG: Signature verification failed with:');
-			WC_Checkoutcom_Utility::logger('WEBHOOK DEBUG: - Raw event: ' . $raw_event);
-			WC_Checkoutcom_Utility::logger('WEBHOOK DEBUG: - Header signature: ' . ($header_signature ?? 'NULL'));
-			WC_Checkoutcom_Utility::logger('WEBHOOK DEBUG: - Secret key: ' . substr($secret_key, 0, 10) . '...');
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger('WEBHOOK DEBUG: Invalid signature - returning 401');
+				WC_Checkoutcom_Utility::logger('WEBHOOK DEBUG: Signature verification failed with:');
+				WC_Checkoutcom_Utility::logger('WEBHOOK DEBUG: - Raw event: ' . $raw_event);
+				WC_Checkoutcom_Utility::logger('WEBHOOK DEBUG: - Header signature: ' . ($header_signature ?? 'NULL'));
+				WC_Checkoutcom_Utility::logger('WEBHOOK DEBUG: - Secret key: ' . substr($secret_key, 0, 10) . '...');
+			}
         	$this->send_response(401, 'Unauthorized: Invalid signature');
 		}
 		
-		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Signature verification passed, continuing with order processing' );
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Signature verification passed, continuing with order processing' );
+		}
 
 		$order      = false;
 		$payment_id = null;
 
-		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Starting order lookup process' );
-		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Webhook data structure: ' . print_r($data, true) );
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Starting order lookup process' );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Webhook data structure: ' . print_r($data, true) );
+		}
 
+		// Method 1: Try order_id from metadata (order-pay page has this)
 		if ( ! empty( $data->data->metadata->order_id ) ) {
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Looking for order by metadata order_id: ' . $data->data->metadata->order_id );
-			$order = wc_get_order( $data->data->metadata->order_id );
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order found by metadata order_id: ' . ($order ? 'YES (ID: ' . $order->get_id() . ')' : 'NO') );
-		} elseif ( ! empty( $data->data->reference ) ) {
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Looking for order by reference: ' . $data->data->reference );
-			$order = wc_get_order( $data->data->reference );
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order found by reference: ' . ($order ? 'YES (ID: ' . $order->get_id() . ')' : 'NO') );
-
-			if ( isset( $data->data->metadata ) ) {
-				$data->data->metadata->order_id = $data->data->reference;
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Set metadata order_id to reference: ' . $data->data->reference );
-			} else {
-				$data->data->metadata           = new StdClass();
-				$data->data->metadata->order_id = $data->data->reference;
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Created metadata object with order_id: ' . $data->data->reference );
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Looking for order by metadata order_id: ' . $data->data->metadata->order_id );
 			}
-		} else {
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: No order_id in metadata and no reference found' );
+			$order = wc_get_order( $data->data->metadata->order_id );
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order found by metadata order_id: ' . ($order ? 'YES (ID: ' . $order->get_id() . ')' : 'NO') );
+			}
 		}
 		
-		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order lookup result: ' . ($order ? 'FOUND (ID: ' . $order->get_id() . ')' : 'NOT FOUND') );
+		// Method 2: Try payment session ID (works for regular checkout)
+		if ( ! $order && ! empty( $data->data->metadata->cko_payment_session_id ) ) {
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Looking for order by payment session ID: ' . $data->data->metadata->cko_payment_session_id );
+			}
+			
+			$orders = wc_get_orders( array(
+				'limit'      => 1,
+				'meta_key'   => '_cko_payment_session_id',
+				'meta_value' => $data->data->metadata->cko_payment_session_id,
+				'return'     => 'objects',
+			) );
+			
+			if ( ! empty( $orders ) ) {
+				$order = $orders[0];
+				if ( $webhook_debug_enabled ) {
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order found by payment session ID: YES (ID: ' . $order->get_id() . ')' );
+				}
+				
+				// Add order_id to metadata so processing functions can find it
+				if ( isset( $data->data->metadata ) && is_object( $data->data->metadata ) ) {
+					$data->data->metadata->order_id = $order->get_id();
+					if ( $webhook_debug_enabled ) {
+						WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Set metadata order_id to: ' . $order->get_id() . ' (from payment session ID lookup)' );
+					}
+				} else {
+					// If metadata is missing or not an object, create it.
+					$data->data->metadata = (object) array( 'order_id' => $order->get_id() );
+					if ( $webhook_debug_enabled ) {
+						WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Created metadata object with order_id: ' . $order->get_id() . ' (from payment session ID lookup)' );
+					}
+				}
+			} else {
+				if ( $webhook_debug_enabled ) {
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order found by payment session ID: NO' );
+				}
+			}
+		}
+	
+		// Method 3: Try reference (order number) via our stored meta
+		if ( ! $order && ! empty( $data->data->reference ) ) {
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Looking for order by reference: ' . $data->data->reference );
+			}
+			
+			// Try direct lookup first (works for numeric order IDs)
+			$order = wc_get_order( $data->data->reference );
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Direct lookup result: ' . ($order ? 'YES (ID: ' . $order->get_id() . ')' : 'NO') );
+			}
+			
+			// Try our stored reference meta (works with ANY order number format including Sequential Order Numbers)
+			if ( ! $order ) {
+				if ( $webhook_debug_enabled ) {
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Searching by _cko_order_reference meta: ' . $data->data->reference );
+				}
+				
+				$orders = wc_get_orders( array(
+					'limit'      => 1,
+					'meta_key'   => '_cko_order_reference',
+					'meta_value' => $data->data->reference,
+					'return'     => 'objects',
+				) );
+				
+				if ( ! empty( $orders ) ) {
+					$order = $orders[0];
+					if ( $webhook_debug_enabled ) {
+						WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order found by _cko_order_reference meta: YES (ID: ' . $order->get_id() . ')' );
+					}
+				} else {
+					if ( $webhook_debug_enabled ) {
+						WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order found by _cko_order_reference meta: NO' );
+					}
+				}
+			}
+			
+			// If still not found, try the Sequential Order Numbers plugin meta key
+			if ( ! $order ) {
+				if ( $webhook_debug_enabled ) {
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Searching by _order_number meta: ' . $data->data->reference );
+				}
+				
+				$orders = wc_get_orders( array(
+					'limit'      => 1,
+					'meta_key'   => '_order_number',
+					'meta_value' => $data->data->reference,
+					'return'     => 'objects',
+				) );
+				
+				if ( ! empty( $orders ) ) {
+					$order = $orders[0];
+					if ( $webhook_debug_enabled ) {
+						WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order found by _order_number meta: YES (ID: ' . $order->get_id() . ')' );
+					}
+				} else {
+					// Try searching by post name (order number might be stored there)
+					global $wpdb;
+					$post_id = $wpdb->get_var( $wpdb->prepare(
+						"SELECT ID FROM {$wpdb->posts} WHERE post_type IN ('shop_order', 'shop_order_placehold') AND post_name = %s LIMIT 1",
+						sanitize_title( $data->data->reference )
+					) );
+					
+					if ( $post_id ) {
+						$order = wc_get_order( $post_id );
+						if ( $webhook_debug_enabled ) {
+							WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order found by post_name: YES (ID: ' . $order->get_id() . ')' );
+						}
+					} else {
+						if ( $webhook_debug_enabled ) {
+							WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order NOT found by any method' );
+						}
+					}
+				}
+			}
 
-		// If order is still not found, try using _cko_flow_payment_id.
+			if ( $order && isset( $data->data->metadata ) ) {
+				$data->data->metadata->order_id = $order->get_id();
+				if ( $webhook_debug_enabled ) {
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Set metadata order_id to: ' . $order->get_id() );
+				}
+			} elseif ( $order ) {
+				$data->data->metadata           = new StdClass();
+				$data->data->metadata->order_id = $order->get_id();
+				if ( $webhook_debug_enabled ) {
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Created metadata object with order_id: ' . $order->get_id() );
+				}
+			}
+		} else {
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: No order_id in metadata and no reference found' );
+			}
+		}
+		
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order lookup result: ' . ($order ? 'FOUND (ID: ' . $order->get_id() . ')' : 'NOT FOUND') );
+		}
+
+		// Method 4: Try payment ID (works when order has been processed)
 		if ( ! $order && ! empty( $data->data->id ) ) {
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Looking for order by payment ID: ' . $data->data->id );
+			}
+			
 			$orders = wc_get_orders( array(
 				'limit'        => 1,
 				'meta_key'     => '_cko_flow_payment_id',
@@ -1818,6 +3290,9 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 			if ( ! empty( $orders ) ) {
 				$order = $orders[0];
+				if ( $webhook_debug_enabled ) {
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order found by payment ID: YES (ID: ' . $order->get_id() . ')' );
+				}
 
 				// Add order_id to $data->data->metadata.
 				if ( isset( $data->data->metadata ) && is_object( $data->data->metadata ) ) {
@@ -1827,29 +3302,40 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					$data->data->metadata = (object) array( 'order_id' => $order->get_id() );
 				}
 			} else {
-				WC_Checkoutcom_Utility::logger( 'Order not found.' );
+				if ( $webhook_debug_enabled ) {
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order found by payment ID: NO' );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: This is normal for webhooks that arrive before process_payment() completes' );
+				}
 			}
 		}
 
 		if ( $order ) {
 			$payment_id = $order->get_meta( '_cko_payment_id' ) ?? null;
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order found, getting payment ID from meta' );
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order ID: ' . $order->get_id() );
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order status: ' . $order->get_status() );
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order transaction ID: ' . $order->get_transaction_id() );
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: All order meta data: ' . print_r($order->get_meta_data(), true) );
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order found, getting payment ID from meta' );
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order ID: ' . $order->get_id() );
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order status: ' . $order->get_status() );
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order transaction ID: ' . $order->get_transaction_id() );
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: All order meta data: ' . print_r($order->get_meta_data(), true) );
+			}
 		} else {
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: No order found, cannot get payment ID' );
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: No order found, cannot get payment ID' );
+			}
 		}
 
-		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Payment ID from order: ' . ($payment_id ?? 'NULL') );
-		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Payment ID from webhook: ' . ($data->data->id ?? 'NULL') );
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Payment ID from order: ' . ($payment_id ?? 'NULL') );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Payment ID from webhook: ' . ($data->data->id ?? 'NULL') );
+		}
 
 		// For Flow payments, be more flexible with payment ID matching
 		// Flow payments might not have payment ID set yet, or might have different ID format
 		if ( $order && is_null( $payment_id ) ) {
 			// If no payment ID is set, try to set it from the webhook
-			WC_Checkoutcom_Utility::logger( 'Flow webhook: No payment ID found in order, setting from webhook: ' . $data->data->id );
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( 'Flow webhook: No payment ID found in order, setting from webhook: ' . $data->data->id );
+			}
 			$order->set_transaction_id( $data->data->id );
 			$order->update_meta_data( '_cko_payment_id', $data->data->id );
 			$order->update_meta_data( '_cko_flow_payment_id', $data->data->id );
@@ -1857,75 +3343,206 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			$payment_id = $data->data->id;
 		} elseif ( $order && $payment_id !== $data->data->id ) {
 			// Payment ID exists but doesn't match - log but don't fail for Flow payments
-			WC_Checkoutcom_Utility::logger( 'Flow webhook: Payment ID mismatch - Order: ' . $payment_id . ', Webhook: ' . $data->data->id . ' - Continuing processing' );
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( 'Flow webhook: Payment ID mismatch - Order: ' . $payment_id . ', Webhook: ' . $data->data->id . ' - Continuing processing' );
+			}
 		} elseif ( ! $order ) {
-			// No order found - this is a critical error for webhook processing
-			WC_Checkoutcom_Utility::logger( 'Flow webhook: CRITICAL - No order found for webhook processing. Payment ID: ' . ($data->data->id ?? 'NULL') );
-			http_response_code( 404 );
-			wp_die( 'Order not found', 'Webhook Error', array( 'response' => 404 ) );
+			// No order found - log but continue processing to allow queue system to handle it
+			// The queue system will catch webhooks for payment_approved and payment_captured events
+			// Other webhook types will return false and Checkout.com will retry
+			WC_Checkoutcom_Utility::logger( 'Flow webhook: No order found for webhook processing. Payment ID: ' . ($data->data->id ?? 'NULL') . ' - Will attempt to queue or process via webhook handlers' );
 		}
 
-		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Event Type Data' );
-		WC_Checkoutcom_Utility::logger(print_r($data,true));
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Event Type Data' );
+			WC_Checkoutcom_Utility::logger(print_r($data,true));
+		}
 
 		// Get webhook event type from data.
 		$event_type = $data->type;
-		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Processing event type: ' . $event_type );
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Processing event type: ' . $event_type );
+		}
 
 		switch ( $event_type ) {
 			case 'card_verified':
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Processing card_verified event' );
+				if ( $webhook_debug_enabled ) {
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Processing card_verified event' );
+				}
 				$response = WC_Checkout_Com_Webhook::card_verified( $data );
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: card_verified response: ' . print_r($response, true) );
+				if ( $webhook_debug_enabled ) {
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: card_verified response: ' . print_r($response, true) );
+				}
 				break;
 			case 'payment_approved':
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Processing payment_approved event' );
+				if ( $webhook_debug_enabled ) {
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Processing payment_approved event' );
+				}
 				$response = WC_Checkout_Com_Webhook::authorize_payment( $data );
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: payment_approved response: ' . print_r($response, true) );
+				if ( $webhook_debug_enabled ) {
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: payment_approved response: ' . print_r($response, true) );
+				}
+				
+				// If processing failed, queue the webhook for later processing
+				if ( false === $response ) {
+					$webhook_data = $data->data;
+					$payment_id = $webhook_data->id ?? null;
+					$order_id = isset($webhook_data->metadata->order_id) 
+						? $webhook_data->metadata->order_id 
+						: null;
+					$payment_session_id = isset($webhook_data->metadata->cko_payment_session_id)
+						? $webhook_data->metadata->cko_payment_session_id
+						: null;
+					
+					// Only queue if we have payment_id (required for matching)
+					if ( $payment_id && class_exists( 'WC_Checkout_Com_Webhook_Queue' ) ) {
+						$queued = WC_Checkout_Com_Webhook_Queue::save_pending_webhook(
+							$payment_id,
+							$order_id,
+							$payment_session_id,
+							'payment_approved',
+							$data
+						);
+						
+						if ( $queued ) {
+							WC_Checkoutcom_Utility::logger(
+								'WEBHOOK QUEUE: payment_approved webhook queued - ' .
+								'Payment ID: ' . $payment_id . ', ' .
+								'Order ID: ' . ($order_id ?? 'NULL') . ', ' .
+								'Session ID: ' . ($payment_session_id ?? 'NULL')
+							);
+							
+							// CRITICAL: Set response to true so HTTP 200 is sent
+							// This tells Checkout.com webhook was processed successfully
+							// Checkout.com will NOT retry
+							$response = true;
+						} else {
+							if ( $webhook_debug_enabled ) {
+								WC_Checkoutcom_Utility::logger( 'WEBHOOK QUEUE: Failed to queue payment_approved webhook' );
+							}
+						}
+					} else {
+						if ( $webhook_debug_enabled ) {
+							WC_Checkoutcom_Utility::logger( 'WEBHOOK QUEUE: Cannot queue payment_approved webhook - Payment ID missing or queue class not available' );
+						}
+					}
+				}
 				break;
 			case 'payment_captured':
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Processing payment_captured event' );
+				if ( $webhook_debug_enabled ) {
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Processing payment_captured event' );
+				}
 				$response = WC_Checkout_Com_Webhook::capture_payment( $data );
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: payment_captured response: ' . print_r($response, true) );
+				if ( $webhook_debug_enabled ) {
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: payment_captured response: ' . print_r($response, true) );
+				}
+				
+				// If processing failed, queue the webhook for later processing
+				if ( false === $response ) {
+					$webhook_data = $data->data;
+					$payment_id = $webhook_data->id ?? null;
+					$order_id = isset($webhook_data->metadata->order_id) 
+						? $webhook_data->metadata->order_id 
+						: null;
+					$payment_session_id = isset($webhook_data->metadata->cko_payment_session_id)
+						? $webhook_data->metadata->cko_payment_session_id
+						: null;
+					
+					// Only queue if we have payment_id (required for matching)
+					if ( $payment_id && class_exists( 'WC_Checkout_Com_Webhook_Queue' ) ) {
+						$queued = WC_Checkout_Com_Webhook_Queue::save_pending_webhook(
+							$payment_id,
+							$order_id,
+							$payment_session_id,
+							'payment_captured',
+							$data
+						);
+						
+						if ( $queued ) {
+							WC_Checkoutcom_Utility::logger(
+								'WEBHOOK QUEUE: payment_captured webhook queued - ' .
+								'Payment ID: ' . $payment_id . ', ' .
+								'Order ID: ' . ($order_id ?? 'NULL') . ', ' .
+								'Session ID: ' . ($payment_session_id ?? 'NULL')
+							);
+							
+							// CRITICAL: Set response to true so HTTP 200 is sent
+							// This tells Checkout.com webhook was processed successfully
+							// Checkout.com will NOT retry
+							$response = true;
+						} else {
+							if ( $webhook_debug_enabled ) {
+								WC_Checkoutcom_Utility::logger( 'WEBHOOK QUEUE: Failed to queue payment_captured webhook' );
+							}
+						}
+					} else {
+						if ( $webhook_debug_enabled ) {
+							WC_Checkoutcom_Utility::logger( 'WEBHOOK QUEUE: Cannot queue payment_captured webhook - Payment ID missing or queue class not available' );
+						}
+					}
+				}
 				break;
 			case 'payment_voided':
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Processing payment_voided event' );
+				if ( $webhook_debug_enabled ) {
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Processing payment_voided event' );
+				}
 				$response = WC_Checkout_Com_Webhook::void_payment( $data );
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: payment_voided response: ' . print_r($response, true) );
+				if ( $webhook_debug_enabled ) {
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: payment_voided response: ' . print_r($response, true) );
+				}
 				break;
 			case 'payment_capture_declined':
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Processing payment_capture_declined event' );
+				if ( $webhook_debug_enabled ) {
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Processing payment_capture_declined event' );
+				}
 				$response = WC_Checkout_Com_Webhook::capture_declined( $data );
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: payment_capture_declined response: ' . print_r($response, true) );
+				if ( $webhook_debug_enabled ) {
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: payment_capture_declined response: ' . print_r($response, true) );
+				}
 				break;
 			case 'payment_refunded':
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Processing payment_refunded event' );
+				if ( $webhook_debug_enabled ) {
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Processing payment_refunded event' );
+				}
 				$response = WC_Checkout_Com_Webhook::refund_payment( $data );
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: payment_refunded response: ' . print_r($response, true) );
+				if ( $webhook_debug_enabled ) {
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: payment_refunded response: ' . print_r($response, true) );
+				}
 				break;
 			case 'payment_canceled':
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Processing payment_canceled event' );
+				if ( $webhook_debug_enabled ) {
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Processing payment_canceled event' );
+				}
 				$response = WC_Checkout_Com_Webhook::cancel_payment( $data );
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: payment_canceled response: ' . print_r($response, true) );
+				if ( $webhook_debug_enabled ) {
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: payment_canceled response: ' . print_r($response, true) );
+				}
 				break;
 			case 'payment_declined':
 			case 'payment_authentication_failed':
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Processing ' . $event_type . ' event' );
+				if ( $webhook_debug_enabled ) {
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Processing ' . $event_type . ' event' );
+				}
 				$response = WC_Checkout_Com_Webhook::decline_payment( $data );
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: ' . $event_type . ' response: ' . print_r($response, true) );
+				if ( $webhook_debug_enabled ) {
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: ' . $event_type . ' response: ' . print_r($response, true) );
+				}
 				break;
 
 			default:
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Unknown event type: ' . $event_type . ', using default response' );
+				if ( $webhook_debug_enabled ) {
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Unknown event type: ' . $event_type . ', using default response' );
+				}
 				$response = true;
 				break;
 		}
 
 		$http_code = $response ? 200 : 400;
-		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Final response code: ' . $http_code );
-		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Final response value: ' . print_r($response, true) );
-
-		WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Sending response - Code: ' . $http_code . ', Message: ' . ($response ? 'OK' : 'Failed') );
+		if ( $webhook_debug_enabled ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Final response code: ' . $http_code );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Final response value: ' . print_r($response, true) );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Sending response - Code: ' . $http_code . ', Message: ' . ($response ? 'OK' : 'Failed') );
+		}
 		$this->send_response($http_code, $response ? 'OK' : 'Failed');
 		
 		} catch ( Exception $e ) {
@@ -1956,5 +3573,105 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		WC_Checkoutcom_Utility::logger("WEBHOOK DEBUG: Sent HTTP status: $status_code with message: $message");
 		WC_Checkoutcom_Utility::logger("=== WEBHOOK DEBUG: Flow webhook handler completed ===");
 		exit; // Prevent WP from sending 200.
+	}
+
+	/**
+	 * Secure AJAX handler for creating payment sessions.
+	 * This prevents the secret key from being exposed to the frontend.
+	 *
+	 * @return void
+	 */
+	public function ajax_create_payment_session() {
+		// Verify nonce for security
+		if ( ! isset( $_POST['nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ) ), 'cko_flow_payment_session' ) ) {
+			wp_send_json_error( array(
+				'message' => __( 'Security check failed. Please refresh the page and try again.', 'checkout-com-unified-payments-api' ),
+			) );
+			return;
+		}
+
+		// Get core settings
+		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+
+		// Verify secret key is configured
+		$secret_key = isset( $core_settings['ckocom_sk'] ) ? $core_settings['ckocom_sk'] : '';
+		if ( empty( $secret_key ) ) {
+			WC_Checkoutcom_Utility::logger( 'Error: Secret key not configured for payment session creation' );
+			wp_send_json_error( array(
+				'message' => __( 'Payment gateway not properly configured. Please contact support.', 'checkout-com-unified-payments-api' ),
+			) );
+			return;
+		}
+
+		// Get payment session request data from POST
+		if ( ! isset( $_POST['payment_session_request'] ) ) {
+			wp_send_json_error( array(
+				'message' => __( 'Invalid request data.', 'checkout-com-unified-payments-api' ),
+			) );
+			return;
+		}
+
+		// Decode and sanitize the payment session request
+		$payment_session_request = json_decode( wp_unslash( $_POST['payment_session_request'] ), true );
+		
+		if ( json_last_error() !== JSON_ERROR_NONE || ! is_array( $payment_session_request ) ) {
+			WC_Checkoutcom_Utility::logger( 'Error: Invalid JSON in payment session request: ' . json_last_error_msg() );
+			wp_send_json_error( array(
+				'message' => __( 'Invalid request format.', 'checkout-com-unified-payments-api' ),
+			) );
+			return;
+		}
+
+		// Determine API URL based on environment
+		$api_url = 'https://api.checkout.com/payment-sessions';
+		if ( isset( $core_settings['ckocom_environment'] ) && 'sandbox' === $core_settings['ckocom_environment'] ) {
+			$api_url = 'https://api.sandbox.checkout.com/payment-sessions';
+		}
+
+		// Prepare the API request
+		$request_args = array(
+			'method'  => 'POST',
+			'timeout' => 30,
+			'headers' => array(
+				'Authorization' => 'Bearer ' . $secret_key,
+				'Content-Type'  => 'application/json',
+			),
+			'body'    => wp_json_encode( $payment_session_request ),
+		);
+
+		// Make the API request
+		$response = wp_remote_request( $api_url, $request_args );
+
+		// Check for request errors
+		if ( is_wp_error( $response ) ) {
+			WC_Checkoutcom_Utility::logger( 'Error creating payment session: ' . $response->get_error_message() );
+			wp_send_json_error( array(
+				'message' => __( 'Failed to create payment session. Please try again.', 'checkout-com-unified-payments-api' ),
+				'error'   => $response->get_error_message(),
+			) );
+			return;
+		}
+
+		// Get response body
+		$response_code = wp_remote_retrieve_response_code( $response );
+		$response_body = wp_remote_retrieve_body( $response );
+		$payment_session = json_decode( $response_body, true );
+
+		// Check for API errors
+		if ( $response_code >= 400 || ( isset( $payment_session['error_type'] ) || isset( $payment_session['error_codes'] ) ) ) {
+			WC_Checkoutcom_Utility::logger( 'Payment Session API Error: ' . $response_body );
+			wp_send_json_error( array(
+				'message'     => isset( $payment_session['error_codes'] ) && is_array( $payment_session['error_codes'] ) 
+					? __( 'Payment session error: ', 'checkout-com-unified-payments-api' ) . implode( ', ', $payment_session['error_codes'] )
+					: __( 'Error creating payment session. Please try again.', 'checkout-com-unified-payments-api' ),
+				'error_type'  => isset( $payment_session['error_type'] ) ? $payment_session['error_type'] : null,
+				'error_codes' => isset( $payment_session['error_codes'] ) ? $payment_session['error_codes'] : null,
+				'request_id'  => isset( $payment_session['request_id'] ) ? $payment_session['request_id'] : null,
+			) );
+			return;
+		}
+
+		// Success - return payment session
+		wp_send_json_success( $payment_session );
 	}
 }

@@ -1,0 +1,739 @@
+/**
+ * Redesigned Apple Pay Settings - Modern UX
+ * 
+ * Features:
+ * - Card-based layout for better visual grouping
+ * - Progress indicators for multi-step processes
+ * - Status badges and completion tracking
+ * - Improved visual hierarchy
+ * - Better mobile responsiveness
+ *
+ * @package wc_checkout_com
+ */
+
+/* ============================================
+   GLOBAL STYLES & RESET
+   ============================================ */
+
+.woocommerce .form-table {
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+/* ============================================
+   CARD-BASED LAYOUT
+   ============================================ */
+
+.cko-settings-card {
+    background: #ffffff;
+    border: 1px solid #dcdcdc;
+    border-radius: 8px;
+    padding: 24px;
+    margin: 0 0 24px 0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.cko-settings-card:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    border-color: #c3c4c7;
+}
+
+.cko-settings-card.completed {
+    border-left: 4px solid #00a32a;
+    background: #f0f9f4;
+}
+
+.cko-settings-card.in-progress {
+    border-left: 4px solid #f0b849;
+    background: #fff8e5;
+}
+
+.cko-settings-card.required {
+    border-left: 4px solid #2271b1;
+}
+
+.cko-settings-card.error {
+    border-left: 4px solid #d63638;
+    background: #fcf0f1;
+}
+
+/* Card Header */
+.cko-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid #f0f0f1;
+}
+
+.cko-card-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1d2327;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.cko-card-title-icon {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f0f6fc;
+    border-radius: 6px;
+    font-size: 18px;
+}
+
+.cko-card-title-icon::before {
+    content: "🔐";
+}
+
+.cko-settings-card.completed .cko-card-title-icon {
+    background: #d1e7dd;
+}
+
+.cko-settings-card.completed .cko-card-title-icon::before {
+    content: "✓";
+    color: #00a32a;
+    font-weight: bold;
+}
+
+.cko-settings-card.in-progress .cko-card-title-icon {
+    background: #fff3cd;
+}
+
+.cko-settings-card.in-progress .cko-card-title-icon::before {
+    content: "⏳";
+}
+
+.cko-settings-card.error .cko-card-title-icon {
+    background: #f8d7da;
+}
+
+.cko-settings-card.error .cko-card-title-icon::before {
+    content: "⚠";
+    color: #d63638;
+}
+
+/* Status Badge */
+.cko-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.cko-status-badge.completed {
+    background: #d1e7dd;
+    color: #0f5132;
+}
+
+.cko-status-badge.in-progress {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.cko-status-badge.required {
+    background: #cfe2ff;
+    color: #084298;
+}
+
+.cko-status-badge.error {
+    background: #f8d7da;
+    color: #842029;
+}
+
+/* Card Description */
+.cko-card-description {
+    font-size: 14px;
+    color: #646970;
+    line-height: 1.6;
+    margin-bottom: 20px;
+}
+
+/* ============================================
+   PROGRESS INDICATORS
+   ============================================ */
+
+.cko-progress-steps {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 24px 0;
+    padding: 20px;
+    background: #f9f9f9;
+    border-radius: 6px;
+}
+
+.cko-progress-step {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+}
+
+.cko-progress-step::after {
+    content: "";
+    position: absolute;
+    top: 16px;
+    left: calc(50% + 20px);
+    width: calc(100% - 40px);
+    height: 2px;
+    background: #dcdcdc;
+    z-index: 0;
+}
+
+.cko-progress-step:last-child::after {
+    display: none;
+}
+
+.cko-progress-step.completed::after {
+    background: #00a32a;
+}
+
+.cko-progress-step-number {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #dcdcdc;
+    color: #646970;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 14px;
+    position: relative;
+    z-index: 1;
+    margin-bottom: 8px;
+}
+
+.cko-progress-step.completed .cko-progress-step-number {
+    background: #00a32a;
+    color: #ffffff;
+}
+
+.cko-progress-step.completed .cko-progress-step-number::before {
+    content: "✓";
+}
+
+.cko-progress-step.active .cko-progress-step-number {
+    background: #2271b1;
+    color: #ffffff;
+    box-shadow: 0 0 0 4px rgba(34, 113, 177, 0.1);
+}
+
+.cko-progress-step-label {
+    font-size: 12px;
+    color: #646970;
+    text-align: center;
+    font-weight: 500;
+}
+
+.cko-progress-step.completed .cko-progress-step-label,
+.cko-progress-step.active .cko-progress-step-label {
+    color: #1d2327;
+    font-weight: 600;
+}
+
+/* ============================================
+   SECTION HEADERS
+   ============================================ */
+
+.woocommerce .form-table th.titledesc {
+    padding: 0;
+    font-size: 0;
+    border: none;
+    background: transparent;
+}
+
+.woocommerce .form-table th.titledesc + td {
+    padding: 0;
+}
+
+/* Hide default section titles - we use cards instead */
+.woocommerce .form-table th.titledesc:has(+ td .cko-settings-card) {
+    display: none;
+}
+
+/* ============================================
+   INFO BOXES (REDESIGNED)
+   ============================================ */
+
+.cko-info-box {
+    background: #f0f6fc;
+    border-left: 4px solid #2271b1;
+    border-radius: 6px;
+    padding: 16px 20px;
+    margin: 16px 0;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.cko-info-box.warning {
+    background: #fff8e5;
+    border-left-color: #f0b849;
+}
+
+.cko-info-box.success {
+    background: #f0f9f4;
+    border-left-color: #00a32a;
+}
+
+.cko-info-box.error {
+    background: #fcf0f1;
+    border-left-color: #d63638;
+}
+
+.cko-info-box.info {
+    background: #e7f3ff;
+    border-left-color: #2271b1;
+}
+
+.cko-info-box h4 {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1d2327;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.cko-info-box p {
+    margin: 8px 0;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #50575e;
+}
+
+.cko-info-box ol,
+.cko-info-box ul {
+    margin: 12px 0 12px 20px;
+    padding-left: 20px;
+}
+
+.cko-info-box li {
+    margin: 6px 0;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #50575e;
+}
+
+/* ============================================
+   STEP INSTRUCTIONS (REDESIGNED)
+   ============================================ */
+
+.cko-step-instructions {
+    background: #ffffff;
+    border: 1px solid #dcdcdc;
+    border-left: 4px solid #2271b1;
+    border-radius: 6px;
+    padding: 20px;
+    margin: 20px 0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.cko-step-instructions h4 {
+    margin: 0 0 16px 0;
+    font-size: 15px;
+    font-weight: 600;
+    color: #1d2327;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.cko-step-instructions ol {
+    margin: 0;
+    padding-left: 25px;
+    counter-reset: step-counter;
+}
+
+.cko-step-instructions li {
+    margin: 12px 0;
+    font-size: 14px;
+    line-height: 1.7;
+    color: #50575e;
+    position: relative;
+    padding-left: 8px;
+}
+
+.cko-step-instructions li strong {
+    color: #1d2327;
+    font-weight: 600;
+}
+
+/* ============================================
+   BUTTONS (REDESIGNED)
+   ============================================ */
+
+.cko-action-button {
+    background: #2271b1;
+    color: #ffffff;
+    border: none;
+    padding: 12px 24px;
+    font-size: 14px;
+    font-weight: 500;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(34, 113, 177, 0.2);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.cko-action-button:hover {
+    background: #135e96;
+    box-shadow: 0 4px 8px rgba(34, 113, 177, 0.3);
+    transform: translateY(-1px);
+}
+
+.cko-action-button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(34, 113, 177, 0.2);
+}
+
+.cko-action-button:disabled {
+    background: #c3c4c7;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+    opacity: 0.6;
+}
+
+.cko-action-button::before {
+    content: "→";
+    font-size: 16px;
+}
+
+/* ============================================
+   FILE UPLOAD AREAS (REDESIGNED)
+   ============================================ */
+
+.cko-file-upload-area {
+    background: #f9f9f9;
+    border: 2px dashed #c3c4c7;
+    border-radius: 8px;
+    padding: 32px 20px;
+    margin: 20px 0;
+    text-align: center;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.cko-file-upload-area:hover {
+    border-color: #2271b1;
+    background: #f0f6fc;
+    border-style: solid;
+}
+
+.cko-file-upload-area.drag-over {
+    border-color: #2271b1;
+    background: #e7f3ff;
+    border-style: solid;
+    transform: scale(1.02);
+}
+
+.cko-file-upload-area::before {
+    content: "📁";
+    font-size: 48px;
+    display: block;
+    margin-bottom: 12px;
+    opacity: 0.5;
+}
+
+.cko-file-upload-area input[type="file"] {
+    margin: 16px auto;
+    padding: 10px;
+    border: 1px solid #c3c4c7;
+    border-radius: 6px;
+    width: 100%;
+    max-width: 500px;
+    background: #ffffff;
+    cursor: pointer;
+}
+
+/* ============================================
+   CERTIFICATE GENERATION (REDESIGNED)
+   ============================================ */
+
+.cko-certificate-generation {
+    background: #f9f9f9;
+    border: 1px solid #dcdcdc;
+    border-radius: 8px;
+    padding: 24px;
+    margin: 20px 0;
+    text-align: center;
+}
+
+.cko-certificate-generation .button {
+    margin-top: 16px;
+}
+
+/* ============================================
+   STATUS MESSAGES (REDESIGNED)
+   ============================================ */
+
+.cko-status-message {
+    margin-top: 16px;
+    padding: 14px 18px;
+    border-radius: 6px;
+    font-size: 13px;
+    line-height: 1.6;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.cko-status-message::before {
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+.cko-status-message.notice::before {
+    content: "ℹ️";
+}
+
+.cko-status-message.notice-success {
+    background: #f0f9f4;
+    border-left: 4px solid #00a32a;
+    color: #1d2327;
+}
+
+.cko-status-message.notice-success::before {
+    content: "✓";
+    color: #00a32a;
+    font-weight: bold;
+}
+
+.cko-status-message.notice-error {
+    background: #fcf0f1;
+    border-left: 4px solid #d63638;
+    color: #1d2327;
+}
+
+.cko-status-message.notice-error::before {
+    content: "✗";
+    color: #d63638;
+    font-weight: bold;
+}
+
+.cko-status-message.notice-warning {
+    background: #fff8e5;
+    border-left: 4px solid #f0b849;
+    color: #1d2327;
+}
+
+.cko-status-message.notice-warning::before {
+    content: "⚠";
+    color: #f0b849;
+}
+
+/* ============================================
+   FORM FIELDS (IMPROVED)
+   ============================================ */
+
+.woocommerce .form-table td input[type="text"],
+.woocommerce .form-table td input[type="email"],
+.woocommerce .form-table td select,
+.woocommerce .form-table td textarea {
+    width: 100%;
+    max-width: 600px;
+    padding: 10px 12px;
+    border: 1px solid #8c8f94;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: all 0.2s ease;
+}
+
+.woocommerce .form-table td input[type="text"]:focus,
+.woocommerce .form-table td input[type="email"]:focus,
+.woocommerce .form-table td select:focus,
+.woocommerce .form-table td textarea:focus {
+    border-color: #2271b1;
+    box-shadow: 0 0 0 1px #2271b1;
+    outline: none;
+}
+
+.woocommerce .form-table td .description {
+    display: block;
+    margin-top: 8px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #646970;
+    max-width: 800px;
+}
+
+.woocommerce .form-table th.titledesc label {
+    font-weight: 600;
+    color: #1d2327;
+    font-size: 14px;
+}
+
+/* ============================================
+   FIELD GROUPS
+   ============================================ */
+
+.cko-field-group {
+    margin: 20px 0;
+}
+
+.cko-field-group label {
+    display: block;
+    font-weight: 600;
+    color: #1d2327;
+    margin-bottom: 8px;
+    font-size: 14px;
+}
+
+.cko-field-group .description {
+    margin-top: 6px;
+    font-size: 13px;
+    color: #646970;
+}
+
+/* ============================================
+   QUICK ACTIONS BAR
+   ============================================ */
+
+.cko-quick-actions {
+    display: flex;
+    gap: 12px;
+    margin: 24px 0;
+    padding: 16px;
+    background: #f9f9f9;
+    border-radius: 6px;
+    flex-wrap: wrap;
+}
+
+.cko-quick-action {
+    padding: 8px 16px;
+    background: #ffffff;
+    border: 1px solid #dcdcdc;
+    border-radius: 4px;
+    text-decoration: none;
+    color: #2271b1;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.cko-quick-action:hover {
+    background: #f0f6fc;
+    border-color: #2271b1;
+    color: #135e96;
+}
+
+/* ============================================
+   RESPONSIVE DESIGN
+   ============================================ */
+
+@media (max-width: 782px) {
+    .cko-settings-card {
+        padding: 16px;
+        margin-bottom: 16px;
+    }
+
+    .cko-card-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .cko-progress-steps {
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .cko-progress-step::after {
+        display: none;
+    }
+
+    .cko-progress-step {
+        width: 100%;
+    }
+
+    .cko-file-upload-area {
+        padding: 24px 16px;
+    }
+
+    .cko-quick-actions {
+        flex-direction: column;
+    }
+
+    .cko-quick-action {
+        width: 100%;
+        text-align: center;
+    }
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.cko-settings-card {
+    animation: fadeIn 0.3s ease;
+}
+
+.cko-status-message {
+    animation: fadeIn 0.2s ease;
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+
+.cko-text-muted {
+    color: #646970;
+}
+
+.cko-text-success {
+    color: #00a32a;
+}
+
+.cko-text-error {
+    color: #d63638;
+}
+
+.cko-text-warning {
+    color: #f0b849;
+}
+
+.cko-mt-16 {
+    margin-top: 16px;
+}
+
+.cko-mb-16 {
+    margin-bottom: 16px;
+}
+
+.cko-mt-24 {
+    margin-top: 24px;
+}
+
+.cko-mb-24 {
+    margin-bottom: 24px;
+}

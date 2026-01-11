@@ -276,6 +276,160 @@ paypal.Buttons({
 }).render('#paypal-button-container');
 ```
 
+### 4.5. PayPal Express Checkout Settings
+
+#### Overview
+
+PayPal Express Checkout allows customers to complete purchases directly from product pages, shop/category pages, and cart pages without going through the traditional checkout flow. This provides a faster, more streamlined checkout experience.
+
+#### Configuration Settings
+
+**Location**: WooCommerce → Settings → Payments → Checkout.com → PayPal Settings
+
+**Settings Available**:
+
+1. **Enable PayPal Express** (Master Toggle)
+   - **Setting**: `paypal_express`
+   - **Type**: Checkbox
+   - **Default**: `no`
+   - **Description**: Master toggle to activate PayPal Express checkout. When enabled, use the location-specific options below to control where buttons appear.
+
+2. **Show on Product Page**
+   - **Setting**: `paypal_express_product_page`
+   - **Type**: Checkbox
+   - **Default**: `yes`
+   - **Description**: Display PayPal Express button on individual product detail pages.
+
+3. **Show on Shop/Category Pages**
+   - **Setting**: `paypal_express_shop_page`
+   - **Type**: Checkbox
+   - **Default**: `yes`
+   - **Description**: Display PayPal Express button on shop, category, tag, and archive listing pages.
+
+4. **Show on Cart Page**
+   - **Setting**: `paypal_express_cart_page`
+   - **Type**: Checkbox
+   - **Default**: `yes`
+   - **Description**: Display PayPal Express button on the cart page.
+
+#### Technical Implementation
+
+**PHP Settings (class-wc-checkoutcom-cards-settings.php)**:
+```php
+'paypal_express' => [
+    'title'       => __( 'PayPal Express', 'checkout-com-unified-payments-api' ),
+    'label'       => __( 'Enable PayPal Express', 'checkout-com-unified-payments-api' ),
+    'type'        => 'checkbox',
+    'description' => __( 'Master toggle to activate PayPal Express checkout. When enabled, use the options below to control where buttons appear.', 'checkout-com-unified-payments-api' ),
+    'desc_tip'    => true,
+    'default'     => 'no',
+],
+'paypal_express_product_page' => [
+    'title'       => __( 'Show on Product Page', 'checkout-com-unified-payments-api' ),
+    'label'       => __( 'Display PayPal Express button on product detail pages', 'checkout-com-unified-payments-api' ),
+    'type'        => 'checkbox',
+    'description' => __( 'Show PayPal Express button on individual product pages.', 'checkout-com-unified-payments-api' ),
+    'desc_tip'    => true,
+    'default'     => 'yes',
+],
+```
+
+**PHP Logic (class-paypal-express.php)**:
+```php
+// Constructor checks master toggle first
+public function __construct() {
+    $paypal_settings = get_option( 'woocommerce_wc_checkout_com_paypal_settings', array() );
+    
+    // Check if master toggle is enabled - must be explicitly 'yes'
+    $is_express_enable = isset( $paypal_settings['paypal_express'] ) 
+        && 'yes' === $paypal_settings['paypal_express']
+        && ! empty( $paypal_settings['paypal_express'] );
+    
+    // If Express is disabled, don't add any hooks
+    if ( ! $is_express_enable ) {
+        return;
+    }
+    
+    // Add hooks for different page locations
+    add_action( 'woocommerce_after_add_to_cart_form', [ $this, 'display_payment_request_button_html' ], 1 );
+    add_action( 'woocommerce_after_shop_loop_item', [ $this, 'display_shop_payment_request_button_html' ], 15 );
+    add_action( 'woocommerce_proceed_to_checkout', [ $this, 'display_cart_payment_request_button_html' ], 5 );
+    // ... more hooks
+}
+```
+
+**Display Method with Location Check**:
+```php
+public function display_payment_request_button_html() {
+    $paypal_settings = get_option( 'woocommerce_wc_checkout_com_paypal_settings', array() );
+    
+    // First check if master toggle is enabled
+    $is_express_enabled = isset( $paypal_settings['paypal_express'] ) 
+        && 'yes' === $paypal_settings['paypal_express']
+        && ! empty( $paypal_settings['paypal_express'] );
+    if ( ! $is_express_enabled ) {
+        return;
+    }
+    
+    // Check if PayPal Express is enabled for product pages
+    $show_on_product = ! isset( $paypal_settings['paypal_express_product_page'] ) 
+        || $paypal_settings['paypal_express_product_page'] !== 'no';
+    
+    if ( ! is_product() || ! WC_Checkoutcom_Utility::is_paypal_express_available() || ! $show_on_product ) {
+        return;
+    }
+    
+    // Display button
+}
+```
+
+#### Flow Sequence
+
+**Product Page Flow**:
+```
+1. User views product page
+2. PayPal Express button appears (if enabled)
+3. User clicks PayPal Express button
+4. PayPal popup/redirect opens
+5. User logs in and confirms
+6. Order created from cart
+7. Payment processed
+8. Redirect to order confirmation page
+```
+
+**Shop/Category Page Flow**:
+```
+1. User views shop/category page
+2. PayPal Express button appears on each product (if enabled)
+3. User clicks PayPal Express button for a product
+4. Product added to cart
+5. PayPal popup/redirect opens
+6. User logs in and confirms
+7. Order created
+8. Payment processed
+9. Redirect to order confirmation page
+```
+
+**Cart Page Flow**:
+```
+1. User views cart page
+2. PayPal Express button appears (if enabled)
+3. User clicks PayPal Express button
+4. PayPal popup/redirect opens
+5. User logs in and confirms
+6. Order created
+7. Payment processed
+8. Redirect to order confirmation page
+```
+
+#### Important Notes
+
+- **Master Toggle**: The `paypal_express` setting must be explicitly set to `'yes'` for any PayPal Express functionality to work. If disabled, no hooks are added and no buttons will appear.
+- **Location Controls**: Each location (product, shop, cart) can be independently enabled/disabled while the master toggle is on.
+- **Backward Compatibility**: If location settings are not set (first install), they default to `'yes'` (enabled).
+- **Email Handling**: For logged-in users, the account email is used. For guest users, email is extracted from PayPal response.
+- **Customer Association**: Orders created by logged-in users are associated with their customer account.
+
 ### 5. Alternative Payment Methods (APMs)
 
 #### Supported APMs

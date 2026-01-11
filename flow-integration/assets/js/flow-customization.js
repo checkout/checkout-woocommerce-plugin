@@ -115,9 +115,11 @@ document.addEventListener("DOMContentLoaded", function () {
 							given_name = parsedData.billing_address.given_name || "";
 							family_name = parsedData.billing_address.family_name || "";
 						}
-					} catch (e) {
-						console.error('[FLOW CARDHOLDER] Error parsing order data:', e);
+				} catch (e) {
+					if (typeof ckoLogger !== 'undefined') {
+						ckoLogger.error('Error parsing order data for cardholder name:', e);
 					}
+				}
 				}
 				
 				// Fallback: try to get from form fields (even if disabled)
@@ -146,7 +148,7 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 // Component name section.
-window.componentName = cko_flow_customization_vars.flow_component_name;
+window.componentName = cko_flow_customization_vars.flow_component_name || 'flow';
 
 // Locale and Translation section.
 window.locale = cko_flow_customization_vars.flow_component_locale;
@@ -159,9 +161,11 @@ function isValidJson(str) {
         JSON.parse(str);
         return true;
     } catch (error) {
-		console.warn('Failed to parse translation data:', error);
-		return false;
+	if (typeof ckoLogger !== 'undefined') {
+		ckoLogger.warn('Failed to parse translation data:', error);
 	}
+	return false;
+}
 }
 
 // Safely parse translation data with fallback
@@ -171,5 +175,7 @@ if (typeof cko_flow_customization_vars !== 'undefined' &&
     isValidJson(cko_flow_customization_vars.flow_component_translation)) {
     window.translations = JSON.parse(cko_flow_customization_vars.flow_component_translation);
 } else {
-    console.log('[FLOW] No valid translation data found, using empty translations object');
+    if (typeof ckoLogger !== 'undefined') {
+        ckoLogger.debug('No valid translation data found, using empty translations object');
+    }
 }

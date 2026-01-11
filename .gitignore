@@ -1,0 +1,75 @@
+# Build files
+*.zip
+
+# Backup directories
+backups/
+checkout-com-unified-payments-api-backup-*/
+
+# Temporary diagnostic files
+diagnose-flow-*.php
+terms-and-conditions-checkbox.php
+
+# Analysis and documentation files (temporary - now consolidated)
+DIAGNOSTIC_FINDINGS.md
+FLOW_DESIGN_ANALYSIS.md
+FLOW_DISAPPEARING_ANALYSIS.md
+FLOW_DISAPPEARING_DIAGNOSTIC.md
+FLOW_INITIALIZATION_ANALYSIS.md
+FLOW_SIMPLIFICATION_PLAN.md
+FLOW_SIMPLIFIED_APPROACH.md
+LOG_ANALYSIS.md
+PAYMENT_GATEWAY_FILTERING_EXPLANATION.md
+PLUGIN_ANALYSIS.md
+SIMPLIFICATION_SUMMARY.md
+VERIFY_DEPLOYMENT.md
+VERIFY_SERVER_FILE.md
+WHAT_TO_CHECK.md
+CHANGES_SUMMARY.md
+COMMIT_SUMMARY.md
+PRE_PUSH_CHECKLIST.md
+DOCUMENTATION_CONSOLIDATION_PLAN.md
+# Old fix documentation (now in FIXES_AND_CHANGELOG.md)
+CARD_SAVING_FIX_2025-10-13.md
+SAVED_CARDS_FIX_V2_CHANGES.md
+SAVED_CARDS_UPGRADE_SOLUTION.md
+WEBHOOK_ORDER_LOOKUP_FIX.md
+MIGRATION_NOT_NEEDED.md
+# Old logging docs (now in LOGGING.md)
+LOGGING_IMPROVEMENTS.md
+LOGGING_STRATEGY.md
+# Old AWS docs (now in TROUBLESHOOTING.md)
+AWS-FIX-INSTRUCTIONS.md
+AWS-WELL-KNOWN-TROUBLESHOOTING.md
+
+# Test files (if not part of repo)
+tests/
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Node modules (if any)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Composer
+/vendor/
+composer.lock
+
+# WordPress
+wp-config.php
+.htaccess
+
