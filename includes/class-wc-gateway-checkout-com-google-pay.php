@@ -7,14 +7,11 @@
 
 defined( 'ABSPATH' ) || exit;
 
-<<<<<<< HEAD
-=======
 require_once 'express/google-pay/class-google-pay-express.php';
 
 use Checkout\CheckoutApiException;
 use Checkout\Payments\PaymentType;
 
->>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 /**
  * Class WC_Gateway_Checkout_Com_Google_Pay for Google Pay payment method.
  */
@@ -26,7 +23,7 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 	 */
 	public function __construct() {
 		$this->id                 = 'wc_checkout_com_google_pay';
-		$this->method_title       = __( 'Checkout.com', 'checkout-com-unified-payments-api' );
+		$this->method_title       = __( 'Checkout.com - Google Pay', 'checkout-com-unified-payments-api' );
 		$this->method_description = __( 'The Checkout.com extension allows shop owners to process online payments through the <a href="https://www.checkout.com">Checkout.com Payment Gateway.</a>', 'checkout-com-unified-payments-api' );
 		$this->title              = __( 'Google Pay', 'checkout-com-unified-payments-api' );
 		$this->has_fields         = true;
@@ -52,8 +49,6 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 
 		// Payment scripts.
 		add_action( 'wp_enqueue_scripts', [ $this, 'payment_scripts' ] );
-<<<<<<< HEAD
-=======
 
 		add_action( 'woocommerce_api_' . strtolower( 'CKO_Google_Pay_Woocommerce' ), [ $this, 'handle_wc_api' ] );
 	}
@@ -922,7 +917,6 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 
 			wp_send_json_error( [ 'messages' => $error_message ] );
 		}
->>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 	}
 
 	/**
@@ -1043,11 +1037,7 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 
 		$order = new WC_Order( $order_id );
 
-<<<<<<< HEAD
-		// create google token from Google payment data.
-=======
 		// Create google token from Google payment data
->>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 		$google_token = WC_Checkoutcom_Api_Request::generate_google_token();
 
 		// Check if google token is not empty.

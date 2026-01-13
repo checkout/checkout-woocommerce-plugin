@@ -163,24 +163,18 @@ class WC_Checkoutcom_Webhook {
 		];
 
 		try {
-<<<<<<< HEAD
-=======
 			// Check if SDK classes are available
 			if ( ! class_exists( 'Checkout\Webhooks\Previous\WebhookRequest' ) ) {
 				WC_Checkoutcom_Utility::logger( 'Checkout.com SDK Webhook classes not found - cannot create webhook' );
 				return array( 'error' => 'Payment gateway not properly configured. Please contact support.' );
 			}
 			
->>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 			$webhook_request               = new WebhookRequest();
 			$webhook_request->url          = $url;
 			$webhook_request->content_type = 'json';
 			$webhook_request->event_types  = $event_types;
 			$webhook_request->active       = true;
 
-<<<<<<< HEAD
-			return $this->checkout->get_builder()->getWebhooksClient()->registerWebhook( $webhook_request );
-=======
 			$builder = $this->checkout->get_builder();
 			if ( ! $builder ) {
 				WC_Checkoutcom_Utility::logger( 'Checkout.com SDK not initialized - cannot register webhook' );
@@ -188,7 +182,6 @@ class WC_Checkoutcom_Webhook {
 			}
 
 			return $builder->getWebhooksClient()->registerWebhook( $webhook_request );
->>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 
 		} catch ( CheckoutApiException $ex ) {
 			$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
@@ -282,16 +275,12 @@ class WC_Checkoutcom_Webhook {
 		}
 
 		try {
-<<<<<<< HEAD
-			$webhooks = $this->checkout->get_builder()->getWebhooksClient()->retrieveWebhooks();
-=======
 			$builder = $this->checkout->get_builder();
 			if ( ! $builder ) {
 				WC_Checkoutcom_Utility::logger( 'Checkout.com SDK not initialized - cannot retrieve webhooks' );
 				return array();
 			}
 			$webhooks = $builder->getWebhooksClient()->retrieveWebhooks();
->>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 
 			if ( isset( $webhooks ) && ! empty( $webhooks['items'] ) ) {
 				$this->list = $webhooks['items'];

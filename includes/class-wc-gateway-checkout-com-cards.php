@@ -33,7 +33,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 	 */
 	public function __construct() {
 		$this->id                 = 'wc_checkout_com_cards';
-		$this->method_title       = __( 'Checkout.com', 'checkout-com-unified-payments-api' );
+		$this->method_title       = __( 'Checkout.com - Classic Payment', 'checkout-com-unified-payments-api' );
 		$this->method_description = __( 'The Checkout.com extension allows shop owners to process online payments through the <a href="https://www.checkout.com">Checkout.com Payment Gateway.</a>', 'checkout-com-unified-payments-api' );
 		$this->title              = __( 'Cards payment and general configuration', 'checkout-com-unified-payments-api' );
 		$this->has_fields         = true;
@@ -68,10 +68,6 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		// Redirection hook.
 		add_action( 'woocommerce_api_wc_checkoutcom_callback', [ $this, 'callback_handler' ] );
 
-<<<<<<< HEAD
-		// Webhook handler hook.
-		add_action( 'woocommerce_api_wc_checkoutcom_webhook', [ $this, 'webhook_handler' ] );
-=======
 		// Webhook handler hook - only register if not in Flow mode
 		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
 		$checkout_mode = $core_settings['ckocom_checkout_mode'] ?? 'classic';
@@ -79,7 +75,6 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		if ( 'flow' !== $checkout_mode ) {
 			add_action( 'woocommerce_api_wc_checkoutcom_webhook', [ $this, 'webhook_handler' ] );
 		}
->>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 
 		// Payment scripts.
 		add_action( 'wp_enqueue_scripts', [ $this, 'payment_scripts' ] );
@@ -242,8 +237,6 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 				echo '<table class="form-table">';
 				WC_Admin_Settings::output_fields( WC_Checkoutcom_Cards_Settings::webhook_settings() );
 				echo '</table>';
-<<<<<<< HEAD
-=======
 			} elseif ( 'webhook_queue' === $screen ) {
 				// Render webhook queue page
 				if ( class_exists( 'WC_Checkoutcom_Webhook_Queue_Admin' ) ) {
@@ -251,7 +244,6 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 				} else {
 					echo '<div class="notice notice-error"><p>' . esc_html__( 'Webhook Queue Admin class not found.', 'checkout-com-unified-payments-api' ) . '</p></div>';
 				}
->>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 			} else {
 
 				echo '<table class="form-table">';
@@ -351,11 +343,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 	 *
 	 * @return void
 	 */
-<<<<<<< HEAD
-	public function element_form( $iframe_style ) {
-=======
 	public function element_form( $iframe_style ) { 
->>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 		?>
 		<div class="cko-form" style="display: none; padding-top: 10px;padding-bottom: 5px;">
 			<input type="hidden" id="cko-card-token" name="cko-card-token" value="" />
@@ -567,10 +555,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		// Set action id as woo transaction id.
 		$order->set_transaction_id( $result['action_id'] );
 		$order->update_meta_data( '_cko_payment_id', $result['id'] );
-<<<<<<< HEAD
-=======
 		
->>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 
 		// Get cko auth status configured in admin.
 		$status = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
@@ -953,13 +938,6 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 	 * @return bool
 	 */
 	public function process_refund( $order_id, $amount = null, $reason = '' ) {
-<<<<<<< HEAD
-		$order  = wc_get_order( $order_id );
-		$result = (array) WC_Checkoutcom_Api_Request::refund_payment( $order_id, $order );
-
-		// check if result has error and return error message.
-		if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {
-=======
 		WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Cards gateway process_refund called for order $order_id, amount: $amount, reason: $reason" );
 		
 		$order  = wc_get_order( $order_id );
@@ -971,16 +949,12 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		// check if result has error and return error message.
 		if ( isset( $result['error'] ) && ! empty( $result['error'] ) ) {
 			WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Error in refund result: " . $result['error'] );
->>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 			WC_Checkoutcom_Utility::wc_add_notice_self( $result['error'] );
 			return false;
 		}
 
 		// Set action id as woo transaction id.
-<<<<<<< HEAD
-=======
 		WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Setting transaction ID: " . $result['action_id'] );
->>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 		$order->set_transaction_id( $result['action_id'] );
 		$order->update_meta_data( 'cko_payment_refunded', true );
 		$order->save();
@@ -990,10 +964,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 
 		if ( isset( $_SESSION['cko-refund-is-less'] ) ) {
 			if ( $_SESSION['cko-refund-is-less'] ) {
-<<<<<<< HEAD
-=======
 				WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Partial refund completed" );
->>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 				/* translators: %s: Action ID. */
 				$order->add_order_note( sprintf( esc_html__( 'Checkout.com Payment Partially refunded from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] ) );
 
@@ -1004,10 +975,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		}
 
 		// add note for order.
-<<<<<<< HEAD
-=======
 		WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Full refund completed" );
->>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 		$order->add_order_note( $message );
 
 		// when true is returned, status is changed to refunded automatically.

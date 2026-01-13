@@ -198,16 +198,6 @@ class WC_Checkoutcom_Utility {
 		// Get file logging from module setting.
 		$file_logging = 'yes' === WC_Admin_Settings::get_option( 'cko_file_logging', 'no' );
 
-<<<<<<< HEAD
-		// Check if file logging is enabled.
-		if ( $file_logging ) {
-			// Log error message with exception.
-			$logger->error( $error_message, $context );
-			$logger->error( wc_print_r( $exception, true ), $context );
-		} else {
-			// Log only error message.
-			$logger->error( $error_message, $context );
-=======
 		// Determine log level from message prefix
 		$log_level = 'error'; // Default to error for backward compatibility
 		
@@ -240,7 +230,6 @@ class WC_Checkoutcom_Utility {
 		} else {
 			// Log only message (still respect log level)
 			$logger->log( $log_level, $error_message, $context );
->>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 		}
 	}
 
@@ -549,8 +538,6 @@ class WC_Checkoutcom_Utility {
 		return false;
 	}
 
-<<<<<<< HEAD
-=======
 	/**
 	 * Track if unified express checkout container has been rendered.
 	 *
@@ -567,7 +554,6 @@ class WC_Checkoutcom_Utility {
 		return $rendered;
 	}
 
->>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 	public static function is_paypal_express_available() {
 		$paypal_settings = get_option( 'woocommerce_wc_checkout_com_paypal_settings' );
 
@@ -575,10 +561,6 @@ class WC_Checkoutcom_Utility {
 
 		$available_payment_methods = WC()->payment_gateways()->get_available_payment_gateways();
 
-<<<<<<< HEAD
-		if ( isset( $available_payment_methods['wc_checkout_com_paypal'] ) && $is_express_enable ) {
-			return true;
-=======
 		$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
 		$checkout_mode    = isset( $checkout_setting['ckocom_checkout_mode'] ) ? $checkout_setting['ckocom_checkout_mode'] : 'classic';
 
@@ -604,13 +586,10 @@ class WC_Checkoutcom_Utility {
 			if ( $is_express_enable ) {
 				return true;
 			}
->>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 		}
 
 		return false;
 	}
-<<<<<<< HEAD
-=======
 
 	/**
 	 * Check if Google Pay Express is available.
@@ -758,5 +737,4 @@ class WC_Checkoutcom_Utility {
 			'use_native' => false,
 		);
 	}
->>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 }
