@@ -385,15 +385,46 @@ body.flow-method-selected.flow-ready #place_order {
 	min-height: 50px !important;
 }
 
+/* Ensure payment method container uses flexbox for ordering children (label, accordion, payment_box) */
+.payment_method_wc_checkout_com_flow {
+	display: flex !important;
+	flex-direction: column !important;
+}
+
+/* Label should maintain its own flex layout */
+.payment_method_wc_checkout_com_flow > label {
+	order: 0 !important; /* Label always first */
+}
+
+/* Saved Cards First: Accordion appears before flow-container */
 body[data-saved-payment-order="saved_cards_first"] .saved-cards-accordion-container {
 	display: block !important;
 	opacity: 1 !important;
 	visibility: visible !important;
 	min-height: 50px !important;
+	order: 1 !important; /* Appears after label, before payment_box */
 }
 
+body[data-saved-payment-order="saved_cards_first"] .payment_method_wc_checkout_com_flow .payment_box {
+	order: 2 !important; /* Appears after accordion */
+}
+
+body[data-saved-payment-order="saved_cards_first"] .payment_method_wc_checkout_com_flow #flow-container {
+	order: 2 !important; /* Appears after accordion */
+}
+
+/* New Payment First: Flow-container appears before accordion */
 body[data-saved-payment-order="new_payment_first"] .saved-cards-accordion-container {
 	display: none !important;
+	order: 2 !important; /* Appears after payment_box */
+}
+
+body[data-saved-payment-order="new_payment_first"] .payment_method_wc_checkout_com_flow .payment_box {
+	order: 1 !important; /* Appears after label, before accordion */
+}
+
+body[data-saved-payment-order="new_payment_first"] .payment_method_wc_checkout_com_flow #flow-container {
+	order: 1 !important; /* Appears after label, before accordion */
 }
 
 body[data-saved-payment-order="new_payment_first"].flow-ready .saved-cards-accordion-container {
@@ -401,6 +432,7 @@ body[data-saved-payment-order="new_payment_first"].flow-ready .saved-cards-accor
 	opacity: 1 !important;
 	visibility: visible !important;
 	min-height: 50px !important;
+	order: 2 !important; /* Still appears after flow-container */
 }
 
 .saved-cards-accordion {

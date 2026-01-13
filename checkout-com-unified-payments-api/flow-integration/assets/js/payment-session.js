@@ -451,6 +451,7 @@ var ckoFlow = {
 			const paymentSessionRequest = {
 				amount: amount,
 				currency: currency,
+				reference: reference,
 				payment_type: payment_type,
 				description: description,
 				customer: {
@@ -573,9 +574,59 @@ var ckoFlow = {
 				// For regular checkout, redirect directly to PHP endpoint which processes payment and redirects to success page
 				// Use query string format (?wc-api=...) for WooCommerce API endpoints
 				// Include save card preference in URL for 3DS flow
-				paymentSessionRequest.success_url = window.location.origin + "/?wc-api=wc_checkoutcom_flow_process&cko-save-card=" + saveCardValue;
-				paymentSessionRequest.failure_url = window.location.origin + "/?wc-api=wc_checkoutcom_flow_process&cko-save-card=" + saveCardValue;
+				// CRITICAL: Include order_id and order_key if order already exists (created via AJAX)
+				// This ensures guest orders can access order received page after 3DS
+				// CRITICAL FIX: Validate order_id before using - only use if it matches current checkout session
+				const formOrderId = jQuery('input[name="order_id"]').val();
+				const sessionOrderId = sessionStorage.getItem('cko_flow_order_id');
+				const sessionOrderKey = sessionStorage.getItem('cko_flow_order_key');
+				
+				// CRITICAL: Only use order_id from sessionStorage if it matches form order_id
+				// This prevents reusing old order IDs from previous checkouts
+				let orderIdToInclude = null;
+				let orderKeyToInclude = '';
+				
+				if (formOrderId) {
+					// Form order_id takes priority (most reliable - from current checkout)
+					orderIdToInclude = formOrderId;
+					ckoLogger.debug('[PAYMENT SESSION] Using order_id from form: ' + orderIdToInclude);
+					
+					// Try to get matching order_key from sessionStorage
+					if (sessionOrderId === formOrderId && sessionOrderKey) {
+						orderKeyToInclude = sessionOrderKey;
+						ckoLogger.debug('[PAYMENT SESSION] Order key found in sessionStorage for matching order_id');
+					}
+				} else if (sessionOrderId) {
+					// Only use sessionStorage order_id if form doesn't have one
+					// This means order was created via AJAX but form hasn't been updated yet
+					orderIdToInclude = sessionOrderId;
+					orderKeyToInclude = sessionOrderKey || '';
+					ckoLogger.debug('[PAYMENT SESSION] Using order_id from sessionStorage (form order_id not available): ' + orderIdToInclude);
+				} else {
+					ckoLogger.debug('[PAYMENT SESSION] Order ID not found yet - will be created before payment');
+				}
+				
+				let successUrl = window.location.origin + "/?wc-api=wc_checkoutcom_flow_process&cko-save-card=" + saveCardValue;
+				let failureUrl = window.location.origin + "/?wc-api=wc_checkoutcom_flow_process&cko-save-card=" + saveCardValue;
+				
+				if (orderIdToInclude) {
+					successUrl += '&order_id=' + orderIdToInclude;
+					failureUrl += '&order_id=' + orderIdToInclude;
+					ckoLogger.debug('[PAYMENT SESSION] Order ID found, including in success_url: ' + orderIdToInclude);
+					
+					if (orderKeyToInclude) {
+						successUrl += '&key=' + encodeURIComponent(orderKeyToInclude);
+						failureUrl += '&key=' + encodeURIComponent(orderKeyToInclude);
+						ckoLogger.debug('[PAYMENT SESSION] Order key found, including in success_url');
+					} else {
+						ckoLogger.warn('[PAYMENT SESSION] ⚠️ Order ID found but order key NOT found - guest orders may not display correctly');
+					}
+				}
+				
+				paymentSessionRequest.success_url = successUrl;
+				paymentSessionRequest.failure_url = failureUrl;
 				ckoLogger.debug('Regular checkout - using PHP endpoint for direct redirect to success page, save card preference: ' + saveCardValue);
+				ckoLogger.debug('[PAYMENT SESSION] Final success_url: ' + successUrl);
 			}
 			
 			// Add enabled_payment_methods if specified by merchant
@@ -639,8 +690,49 @@ var ckoFlow = {
 					paymentSessionRequest.failure_url = window.location.origin + "/?wc-api=wc_checkoutcom_flow_process&cko-save-card=" + currentSaveCardValue;
 				}
 			} else {
-				paymentSessionRequest.success_url = window.location.origin + "/?wc-api=wc_checkoutcom_flow_process&cko-save-card=" + currentSaveCardValue;
-				paymentSessionRequest.failure_url = window.location.origin + "/?wc-api=wc_checkoutcom_flow_process&cko-save-card=" + currentSaveCardValue;
+				// For regular checkout, include order_id and order_key if order already exists (created via AJAX)
+				// CRITICAL: This ensures guest orders can access order received page after 3DS
+				// CRITICAL FIX: Validate order_id before using - only use if it matches current checkout session
+				const formOrderId = jQuery('input[name="order_id"]').val();
+				const sessionOrderId = sessionStorage.getItem('cko_flow_order_id');
+				const sessionOrderKey = sessionStorage.getItem('cko_flow_order_key');
+				
+				// CRITICAL: Only use order_id from sessionStorage if it matches form order_id
+				// This prevents reusing old order IDs from previous checkouts
+				let orderIdToInclude = null;
+				let orderKeyToInclude = '';
+				
+				if (formOrderId) {
+					// Form order_id takes priority (most reliable - from current checkout)
+					orderIdToInclude = formOrderId;
+					// Try to get matching order_key from sessionStorage
+					if (sessionOrderId === formOrderId && sessionOrderKey) {
+						orderKeyToInclude = sessionOrderKey;
+					}
+				} else if (sessionOrderId) {
+					// Only use sessionStorage order_id if form doesn't have one
+					orderIdToInclude = sessionOrderId;
+					orderKeyToInclude = sessionOrderKey || '';
+				}
+				
+				let successUrl = window.location.origin + "/?wc-api=wc_checkoutcom_flow_process&cko-save-card=" + currentSaveCardValue;
+				let failureUrl = window.location.origin + "/?wc-api=wc_checkoutcom_flow_process&cko-save-card=" + currentSaveCardValue;
+				
+				if (orderIdToInclude && orderKeyToInclude) {
+					successUrl += "&order_id=" + orderIdToInclude + "&key=" + encodeURIComponent(orderKeyToInclude);
+					failureUrl += "&order_id=" + orderIdToInclude + "&key=" + encodeURIComponent(orderKeyToInclude);
+					ckoLogger.debug('[PAYMENT SESSION UPDATE] Order ID and key found, including in success_url: ' + orderIdToInclude);
+				} else if (orderIdToInclude) {
+					successUrl += "&order_id=" + orderIdToInclude;
+					failureUrl += "&order_id=" + orderIdToInclude;
+					ckoLogger.debug('[PAYMENT SESSION UPDATE] Order ID found (no key), including in success_url: ' + orderIdToInclude);
+				} else {
+					ckoLogger.debug('[PAYMENT SESSION UPDATE] Order ID not found yet - will be created before payment');
+				}
+				
+				paymentSessionRequest.success_url = successUrl;
+				paymentSessionRequest.failure_url = failureUrl;
+				ckoLogger.debug('[PAYMENT SESSION UPDATE] Final success_url: ' + successUrl);
 			}
 			
 			ckoLogger.debug('[SAVE CARD DEBUG] Final URLs set:', {
@@ -1223,11 +1315,32 @@ var ckoFlow = {
 							ckoLogger.error('ERROR: form#order_review not found!');
 						}
 					} else {
-						// For regular checkout with card payments, redirect to process payment endpoint with order ID and payment ID
+						// For regular checkout with card payments, redirect to process payment endpoint with order ID, order key, and payment ID
 						// This ensures process_payment() is called with the existing order
 						// CRITICAL: handle_3ds_return() requires cko-payment-id in GET params
-						const redirectUrl = window.location.origin + '/?wc-api=wc_checkoutcom_flow_process&order_id=' + orderIdToUse + '&cko-payment-id=' + paymentResponse.id;
-						ckoLogger.debug('[PAYMENT COMPLETED] Redirecting to process payment endpoint: ' + redirectUrl);
+						// CRITICAL: Order key is required for guest orders to access order received page
+						ckoLogger.debug('[PAYMENT COMPLETED] ========== ORDER KEY RETRIEVAL DEBUG ==========');
+						ckoLogger.debug('[PAYMENT COMPLETED] Order ID to use:', orderIdToUse);
+						ckoLogger.debug('[PAYMENT COMPLETED] Checking sessionStorage for order key...');
+						const orderKey = sessionStorage.getItem('cko_flow_order_key') || '';
+						ckoLogger.debug('[PAYMENT COMPLETED] Order key from sessionStorage:', orderKey || 'NOT FOUND');
+						ckoLogger.debug('[PAYMENT COMPLETED] Order key type:', typeof orderKey);
+						ckoLogger.debug('[PAYMENT COMPLETED] Order key length:', orderKey ? orderKey.length : 0);
+						ckoLogger.debug('[PAYMENT COMPLETED] All sessionStorage keys:', Object.keys(sessionStorage));
+						ckoLogger.debug('[PAYMENT COMPLETED] SessionStorage cko_flow_order_id:', sessionStorage.getItem('cko_flow_order_id'));
+						ckoLogger.debug('[PAYMENT COMPLETED] SessionStorage cko_flow_order_key:', sessionStorage.getItem('cko_flow_order_key'));
+						
+						let redirectUrl = window.location.origin + '/?wc-api=wc_checkoutcom_flow_process&order_id=' + orderIdToUse + '&cko-payment-id=' + paymentResponse.id;
+						if (orderKey) {
+							redirectUrl += '&key=' + encodeURIComponent(orderKey);
+							ckoLogger.debug('[PAYMENT COMPLETED] ✅ Order key found in session storage, including in redirect URL');
+							ckoLogger.debug('[PAYMENT COMPLETED] Order key (encoded):', encodeURIComponent(orderKey));
+						} else {
+							ckoLogger.error('[PAYMENT COMPLETED] ❌ Order key not found in session storage - guest order may not display correctly');
+							ckoLogger.error('[PAYMENT COMPLETED] This will cause "Please log in" message on order received page');
+						}
+						ckoLogger.debug('[PAYMENT COMPLETED] Final redirect URL:', redirectUrl);
+						ckoLogger.debug('[PAYMENT COMPLETED] ========== END ORDER KEY DEBUG ==========');
 						window.location.href = redirectUrl;
 					}
 				}
@@ -2638,6 +2751,27 @@ function debouncedCheckFlowReload(fieldName, newValue) {
  * 4. All required fields are filled (NEW)
  */
 function initializeFlowIfNeeded() {
+	// CRITICAL FIX: Clear old order data from sessionStorage when starting a new checkout
+	// This prevents reusing old order IDs from previous checkouts
+	// BUT: Only clear if we're NOT on a checkout page with an active order (to prevent clearing during payment processing)
+	const currentOrderId = sessionStorage.getItem('cko_flow_order_id');
+	const isCheckoutPage = window.location.pathname.includes('/checkout/') || window.location.pathname.includes('/order-pay/');
+	const hasPaymentIdInUrl = new URLSearchParams(window.location.search).has('cko-payment-id');
+	const hasOrderIdInUrl = new URLSearchParams(window.location.search).has('order_id');
+	
+	// Only clear if:
+	// 1. We have an old order ID in sessionStorage
+	// 2. We're NOT on a checkout/order-pay page with payment processing in progress
+	// 3. We're NOT on a 3DS return (has payment ID or order_id in URL)
+	if (currentOrderId && !(isCheckoutPage && (hasPaymentIdInUrl || hasOrderIdInUrl))) {
+		ckoLogger.debug('[SESSION CLEANUP] Clearing old order data from sessionStorage - Order ID: ' + currentOrderId);
+		sessionStorage.removeItem('cko_flow_order_id');
+		sessionStorage.removeItem('cko_flow_order_key');
+		ckoLogger.debug('[SESSION CLEANUP] ✅ Old order data cleared - new checkout will create fresh order');
+	} else if (currentOrderId) {
+		ckoLogger.debug('[SESSION CLEANUP] ⏭️ Skipping cleanup - Payment processing in progress (Order ID: ' + currentOrderId + ')');
+	}
+	
 	// Track initialization attempts
 	if (!window.ckoInitAttemptCount) {
 		window.ckoInitAttemptCount = 0;
@@ -3809,10 +3943,17 @@ document.addEventListener("DOMContentLoaded", function () {
 			
 			if (response && response.success && response.data && response.data.order_id) {
 				const orderId = response.data.order_id;
+				const orderKey = response.data.order_key || '';
 				ckoLogger.debug('[CREATE ORDER] ========== ORDER CREATED SUCCESSFULLY ==========');
 				ckoLogger.debug('[CREATE ORDER] ✅✅✅ Order created successfully - Order ID: ' + orderId + ' ✅✅✅');
 				ckoLogger.debug('[CREATE ORDER] Order ID type:', typeof orderId);
 				ckoLogger.debug('[CREATE ORDER] Order ID value:', orderId);
+				ckoLogger.debug('[CREATE ORDER] ========== ORDER KEY DEBUG ==========');
+				ckoLogger.debug('[CREATE ORDER] Response.data.order_key:', response.data.order_key);
+				ckoLogger.debug('[CREATE ORDER] Order key (extracted):', orderKey);
+				ckoLogger.debug('[CREATE ORDER] Order key type:', typeof orderKey);
+				ckoLogger.debug('[CREATE ORDER] Order key length:', orderKey ? orderKey.length : 0);
+				ckoLogger.debug('[CREATE ORDER] Order key empty?:', !orderKey);
 				
 				// Store order ID in form for process_payment()
 				if (!orderIdField.length) {
@@ -3823,6 +3964,18 @@ document.addEventListener("DOMContentLoaded", function () {
 				
 				// Store in session for fallback
 				sessionStorage.setItem('cko_flow_order_id', orderId);
+				ckoLogger.debug('[CREATE ORDER] Stored order ID in sessionStorage:', orderId);
+				if (orderKey) {
+					sessionStorage.setItem('cko_flow_order_key', orderKey);
+					ckoLogger.debug('[CREATE ORDER] ✅ Stored order key in sessionStorage:', orderKey);
+					// Verify it was stored
+					const storedKey = sessionStorage.getItem('cko_flow_order_key');
+					ckoLogger.debug('[CREATE ORDER] Verification - Retrieved order key from sessionStorage:', storedKey);
+					ckoLogger.debug('[CREATE ORDER] Verification - Keys match?:', storedKey === orderKey);
+				} else {
+					ckoLogger.error('[CREATE ORDER] ❌ Order key is empty - NOT storing in sessionStorage');
+					ckoLogger.error('[CREATE ORDER] Full response.data:', JSON.stringify(response.data, null, 2));
+				}
 				
 				// Clear lock flag on success
 				FlowState.set('orderCreationInProgress', false);

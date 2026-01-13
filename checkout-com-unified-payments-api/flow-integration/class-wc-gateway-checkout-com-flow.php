@@ -13,6 +13,9 @@ require_once __DIR__ . '/../includes/subscription/class-wc-checkoutcom-subscript
 
 /**
  * Class WC_Gateway_Checkout_Com_Flow for FLOW.
+ *
+ * @package wc_checkout_com
+ * @since 5.0.0
  */
 #[AllowDynamicProperties]
 class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
@@ -27,7 +30,9 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		$this->id                 = 'wc_checkout_com_flow';
 		$this->method_title       = __( 'Checkout.com', 'checkout-com-unified-payments-api' );
 		$this->method_description = __( 'The Checkout.com extension allows shop owners to process online payments through the <a href="https://www.checkout.com">Checkout.com Payment Gateway.</a>', 'checkout-com-unified-payments-api' );
-		$this->title              = !empty( $core_settings['title'] ) ? trim( __( $core_settings['title'], 'checkout-com-unified-payments-api' ) ) : __( 'Checkout.com', 'checkout-com-unified-payments-api' );
+		// Get title from settings - sanitize user input before using
+		$title_setting = ! empty( $core_settings['title'] ) ? trim( sanitize_text_field( $core_settings['title'] ) ) : '';
+		$this->title  = ! empty( $title_setting ) ? $title_setting : __( 'Checkout.com', 'checkout-com-unified-payments-api' );
 		$this->has_fields         = true;
 		$this->supports           = array(
 			'products',
@@ -71,6 +76,12 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// Store save card preference in order metadata when order is created (before 3DS redirect)
 		add_action( 'woocommerce_checkout_create_order', [ $this, 'store_save_card_preference_in_order' ], 10, 2 );
 
+		// Preserve payment method title after order status changes (webhooks may overwrite it)
+		add_action( 'woocommerce_order_status_changed', [ $this, 'preserve_payment_method_title' ], 20, 4 );
+		
+		// Filter order notes to use correct payment method title instead of gateway default
+		add_filter( 'woocommerce_new_order_note_data', [ $this, 'filter_order_note_payment_method_title' ], 10, 2 );
+
 		// Secure AJAX handler for creating payment sessions (prevents secret key exposure to frontend)
 		add_action( 'wp_ajax_cko_flow_create_payment_session', [ $this, 'ajax_create_payment_session' ] );
 		add_action( 'wp_ajax_nopriv_cko_flow_create_payment_session', [ $this, 'ajax_create_payment_session' ] );
@@ -90,6 +101,393 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// AJAX handler for saving payment session ID to order immediately after payment session creation
 		add_action( 'wp_ajax_cko_flow_save_payment_session_id', [ $this, 'ajax_save_payment_session_id' ] );
 		add_action( 'wp_ajax_nopriv_cko_flow_save_payment_session_id', [ $this, 'ajax_save_payment_session_id' ] );
+	}
+
+	/**
+	 * Get payment method title based on payment type.
+	 * 
+	 * Returns the appropriate payment method title based on the actual payment type used
+	 * (Google Pay, Apple Pay, PayPal, etc.) instead of always showing Flow's default title.
+	 *
+	 * @param WC_Order|null $order Order object (optional, for retrieving payment type from meta).
+	 * @param array|null    $payment_details Payment details array (optional, for retrieving payment type from API response).
+	 *
+	 * @return string Payment method title.
+	 */
+	private function get_payment_method_title_by_type( $order = null, $payment_details = null ) {
+		// Prevent infinite recursion
+		static $in_progress = array();
+		$order_id = $order ? $order->get_id() : 0;
+		if ( isset( $in_progress[ $order_id ] ) ) {
+			// Already processing this order, return default title to break recursion
+			return $this->get_title();
+		}
+		$in_progress[ $order_id ] = true;
+		
+		$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
+		
+		if ( $gateway_debug ) {
+			WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE] ========== STARTING PAYMENT METHOD TITLE DETECTION ==========' );
+			WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE] Order ID: ' . ( $order ? $order->get_id() : 'NULL' ) );
+		}
+		
+		$payment_type = '';
+		$payment_type_source = '';
+		
+		// Try to get payment type from multiple sources (priority order)
+		WC_Checkoutcom_Utility::logger( '[GET PAYMENT METHOD TITLE] ========== CHECKING PAYMENT TYPE SOURCES ==========' );
+		WC_Checkoutcom_Utility::logger( '[GET PAYMENT METHOD TITLE] POST[cko-flow-payment-type]: ' . ( isset( $_POST['cko-flow-payment-type'] ) ? $_POST['cko-flow-payment-type'] : 'NOT SET' ) );
+		WC_Checkoutcom_Utility::logger( '[GET PAYMENT METHOD TITLE] GET[cko-payment-type]: ' . ( isset( $_GET['cko-payment-type'] ) ? $_GET['cko-payment-type'] : 'NOT SET' ) );
+		if ( ! empty( $payment_details ) ) {
+			WC_Checkoutcom_Utility::logger( '[GET PAYMENT METHOD TITLE] payment_details[payment_type]: ' . ( isset( $payment_details['payment_type'] ) ? $payment_details['payment_type'] : 'NOT SET' ) );
+			if ( isset( $payment_details['source'] ) && is_array( $payment_details['source'] ) ) {
+				WC_Checkoutcom_Utility::logger( '[GET PAYMENT METHOD TITLE] payment_details[source][type]: ' . ( isset( $payment_details['source']['type'] ) ? $payment_details['source']['type'] : 'NOT SET' ) );
+			}
+		} else {
+			WC_Checkoutcom_Utility::logger( '[GET PAYMENT METHOD TITLE] payment_details: EMPTY or NULL' );
+		}
+		if ( $order ) {
+			$order_meta_payment_type = $order->get_meta( '_cko_flow_payment_type' );
+			WC_Checkoutcom_Utility::logger( '[GET PAYMENT METHOD TITLE] order meta _cko_flow_payment_type: ' . ( $order_meta_payment_type ?: 'NOT SET' ) );
+		}
+		
+		// 1. POST data (from form submission)
+		if ( isset( $_POST['cko-flow-payment-type'] ) ) {
+			$payment_type = sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-type'] ) );
+			$payment_type_source = 'POST[cko-flow-payment-type]';
+			WC_Checkoutcom_Utility::logger( '[GET PAYMENT METHOD TITLE] ✅ Using POST[cko-flow-payment-type]: ' . $payment_type );
+		}
+		// 2. GET data (from URL parameters)
+		elseif ( isset( $_GET['cko-payment-type'] ) ) {
+			$payment_type = sanitize_text_field( wp_unslash( $_GET['cko-payment-type'] ) );
+			$payment_type_source = 'GET[cko-payment-type]';
+			WC_Checkoutcom_Utility::logger( '[GET PAYMENT METHOD TITLE] ✅ Using GET[cko-payment-type]: ' . $payment_type );
+		}
+		// 3. Payment details from API response - check card_wallet_type FIRST (for Google Pay, Apple Pay)
+		// CRITICAL: Google Pay/Apple Pay have payment_type="Regular" but card_wallet_type="GooglePay"/"ApplePay"
+		elseif ( ! empty( $payment_details ) && isset( $payment_details['source']['card_wallet_type'] ) ) {
+			$card_wallet_type = strtolower( $payment_details['source']['card_wallet_type'] );
+			if ( $card_wallet_type === 'googlepay' ) {
+				$payment_type = 'googlepay';
+				$payment_type_source = 'payment_details[source][card_wallet_type]';
+				WC_Checkoutcom_Utility::logger( '[GET PAYMENT METHOD TITLE] ✅ Detected Google Pay via card_wallet_type: ' . $payment_details['source']['card_wallet_type'] );
+			} elseif ( $card_wallet_type === 'applepay' ) {
+				$payment_type = 'applepay';
+				$payment_type_source = 'payment_details[source][card_wallet_type]';
+				WC_Checkoutcom_Utility::logger( '[GET PAYMENT METHOD TITLE] ✅ Detected Apple Pay via card_wallet_type: ' . $payment_details['source']['card_wallet_type'] );
+			} else {
+				// Unknown wallet type, fall through to payment_type check
+				WC_Checkoutcom_Utility::logger( '[GET PAYMENT METHOD TITLE] ⚠️ Unknown card_wallet_type: ' . $payment_details['source']['card_wallet_type'] . ' - checking payment_type' );
+			}
+		}
+		// 4. Payment details from API response - check payment_type (for Google Pay, Apple Pay, etc.)
+		if ( empty( $payment_type ) && ! empty( $payment_details ) && isset( $payment_details['payment_type'] ) ) {
+			$payment_type_raw = $payment_details['payment_type'];
+			// CRITICAL FIX: When payment_type is "Regular", check source.type FIRST before normalizing to "card"
+			// For APMs (Alma, PayPal, etc.), payment_type="Regular" but source.type="alma"/"paypal"/etc.
+			if ( strtolower( $payment_type_raw ) === 'regular' ) {
+				// Check if source.type exists and is NOT "card" (i.e., it's an APM)
+				if ( isset( $payment_details['source']['type'] ) && strtolower( $payment_details['source']['type'] ) !== 'card' ) {
+					$payment_type = strtolower( $payment_details['source']['type'] );
+					$payment_type_source = 'payment_details[source][type]';
+					WC_Checkoutcom_Utility::logger( '[GET PAYMENT METHOD TITLE] ✅ Found APM via source.type: ' . $payment_type . ' (payment_type was "Regular")' );
+				} else {
+					// No source.type or source.type is "card" - normalize to "card"
+					$payment_type = 'card';
+					WC_Checkoutcom_Utility::logger( '[GET PAYMENT METHOD TITLE] ⚠️ Normalized payment_details[payment_type] from "Regular" to "card"' );
+				}
+			} else {
+				$payment_type = $payment_type_raw;
+				WC_Checkoutcom_Utility::logger( '[GET PAYMENT METHOD TITLE] ✅ Using payment_details[payment_type]: ' . $payment_type );
+			}
+			if ( empty( $payment_type_source ) ) {
+				$payment_type_source = 'payment_details[payment_type]';
+			}
+		}
+		// 5. Payment details from API response - check source type (fallback for card payments)
+		elseif ( empty( $payment_type ) && ! empty( $payment_details ) && isset( $payment_details['source']['type'] ) ) {
+			$payment_type = $payment_details['source']['type'];
+			$payment_type_source = 'payment_details[source][type]';
+			WC_Checkoutcom_Utility::logger( '[GET PAYMENT METHOD TITLE] ⚠️ Using payment_details[source][type] (fallback): ' . $payment_type );
+		}
+		// 5. Order metadata
+		elseif ( $order ) {
+			$payment_type = $order->get_meta( '_cko_flow_payment_type' );
+			$payment_type_source = 'order_meta[_cko_flow_payment_type]';
+			WC_Checkoutcom_Utility::logger( '[GET PAYMENT METHOD TITLE] ✅ Using order meta _cko_flow_payment_type: ' . ( $payment_type ?: 'NOT SET' ) );
+		} else {
+			WC_Checkoutcom_Utility::logger( '[GET PAYMENT METHOD TITLE] ⚠️ Order object not available for meta check' );
+		}
+		
+		WC_Checkoutcom_Utility::logger( '[GET PAYMENT METHOD TITLE] Final payment_type: ' . ( $payment_type ?: 'EMPTY' ) );
+		WC_Checkoutcom_Utility::logger( '[GET PAYMENT METHOD TITLE] Payment type source: ' . ( $payment_type_source ?: 'NONE' ) );
+		WC_Checkoutcom_Utility::logger( '[GET PAYMENT METHOD TITLE] ========== END CHECKING PAYMENT TYPE SOURCES ==========' );
+		
+		if ( $gateway_debug ) {
+			WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE] Payment type (raw): ' . ( $payment_type ?: 'EMPTY' ) );
+			WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE] Payment type source: ' . ( $payment_type_source ?: 'NONE' ) );
+			if ( ! empty( $payment_details ) ) {
+				WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE] Payment details available: YES' );
+				WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE] Payment details keys: ' . implode( ', ', array_keys( $payment_details ) ) );
+				if ( isset( $payment_details['source'] ) ) {
+					WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE] Payment details[source] keys: ' . ( is_array( $payment_details['source'] ) ? implode( ', ', array_keys( $payment_details['source'] ) ) : 'NOT ARRAY' ) );
+					if ( isset( $payment_details['source']['type'] ) ) {
+						WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE] Payment details[source][type]: ' . $payment_details['source']['type'] );
+					}
+				}
+			} else {
+				WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE] Payment details available: NO' );
+			}
+		}
+		
+		// Normalize payment type (lowercase, remove spaces)
+		$payment_type_normalized = strtolower( trim( $payment_type ) );
+		
+		if ( $gateway_debug ) {
+			WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE] Payment type (normalized): ' . ( $payment_type_normalized ?: 'EMPTY' ) );
+		}
+		
+		// Dynamically get payment method titles from WooCommerce gateways and settings
+		// This avoids hardcoding APM titles and makes the code maintainable
+		$payment_type_titles = array();
+		
+		// Special cases for wallet payments (not separate gateways)
+		$payment_type_titles['googlepay'] = __( 'Google Pay', 'checkout-com-unified-payments-api' );
+		$payment_type_titles['applepay']  = __( 'Apple Pay', 'checkout-com-unified-payments-api' );
+		$payment_type_titles['paypal']    = __( 'PayPal', 'checkout-com-unified-payments-api' );
+		$payment_type_titles['card']      = $this->get_title(); // Use Flow's default title for card payments
+		
+		// Get APM titles from settings mapping (same source as admin settings)
+		// This is the single source of truth for APM names
+		$apm_options = array(
+			'alipay'     => __( 'Alipay', 'checkout-com-unified-payments-api' ),
+			'boleto'     => __( 'Boleto', 'checkout-com-unified-payments-api' ),
+			'ideal'      => __( 'iDEAL', 'checkout-com-unified-payments-api' ),
+			'klarna'     => __( 'Klarna', 'checkout-com-unified-payments-api' ),
+			'poli'       => __( 'Poli', 'checkout-com-unified-payments-api' ),
+			'sepa'       => __( 'Sepa Direct Debit', 'checkout-com-unified-payments-api' ),
+			'sofort'     => __( 'Sofort', 'checkout-com-unified-payments-api' ),
+			'eps'        => __( 'EPS', 'checkout-com-unified-payments-api' ),
+			'bancontact' => __( 'Bancontact', 'checkout-com-unified-payments-api' ),
+			'knet'       => __( 'KNET', 'checkout-com-unified-payments-api' ),
+			'fawry'      => __( 'Fawry', 'checkout-com-unified-payments-api' ),
+			'qpay'       => __( 'QPay', 'checkout-com-unified-payments-api' ),
+			'multibanco' => __( 'Multibanco', 'checkout-com-unified-payments-api' ),
+			'alma'       => __( 'Alma', 'checkout-com-unified-payments-api' ),
+		);
+		
+		// Merge APM options into payment type titles
+		$payment_type_titles = array_merge( $payment_type_titles, $apm_options );
+		
+		// Try to get APM titles from WooCommerce gateway registry (if available and not already set)
+		// This allows custom APM titles if merchants have customized them
+		if ( function_exists( 'WC' ) && WC()->payment_gateways() ) {
+			$available_gateways = WC()->payment_gateways()->get_available_payment_gateways();
+			foreach ( $available_gateways as $gateway_id => $gateway ) {
+				// Check if this is an APM gateway (e.g., wc_checkout_com_alternative_payments_alipay)
+				if ( strpos( $gateway_id, 'wc_checkout_com_alternative_payments_' ) === 0 ) {
+					// Extract APM type from gateway ID (e.g., 'alipay' from 'wc_checkout_com_alternative_payments_alipay')
+					$apm_type = str_replace( 'wc_checkout_com_alternative_payments_', '', $gateway_id );
+					if ( ! empty( $apm_type ) && method_exists( $gateway, 'get_title' ) ) {
+						// Use gateway title if it's been customized, otherwise keep default from settings
+						$gateway_title = $gateway->get_title();
+						if ( isset( $apm_options[ $apm_type ] ) && $gateway_title !== $apm_options[ $apm_type ] ) {
+							$payment_type_titles[ $apm_type ] = $gateway_title;
+							WC_Checkoutcom_Utility::logger( '[GET PAYMENT METHOD TITLE] ✅ Using customized APM gateway title for ' . $apm_type . ': ' . $gateway_title );
+						}
+					}
+				}
+			}
+		}
+		
+		// Final fallback: if payment type not found in any mapping, capitalize it
+		if ( ! empty( $payment_type_normalized ) && ! isset( $payment_type_titles[ $payment_type_normalized ] ) && $payment_type_normalized !== 'card' ) {
+			$payment_type_titles[ $payment_type_normalized ] = ucfirst( $payment_type_normalized );
+			WC_Checkoutcom_Utility::logger( '[GET PAYMENT METHOD TITLE] ⚠️ APM not found in mappings, using capitalized name: ' . ucfirst( $payment_type_normalized ) );
+		}
+		
+		// Return mapped title if found, otherwise default to Flow's title
+		WC_Checkoutcom_Utility::logger( '[GET PAYMENT METHOD TITLE] Checking payment_type_titles for: ' . $payment_type_normalized );
+		WC_Checkoutcom_Utility::logger( '[GET PAYMENT METHOD TITLE] Available payment types in map: ' . implode( ', ', array_keys( $payment_type_titles ) ) );
+		if ( ! empty( $payment_type_normalized ) && isset( $payment_type_titles[ $payment_type_normalized ] ) ) {
+			$final_title = $payment_type_titles[ $payment_type_normalized ];
+			WC_Checkoutcom_Utility::logger( '[GET PAYMENT METHOD TITLE] ✅ MATCH FOUND - Payment type: ' . $payment_type_normalized . ', Title: ' . $final_title );
+			if ( $gateway_debug ) {
+				WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE] ✅ MATCH FOUND - Payment type: ' . $payment_type_normalized . ', Title: ' . $final_title );
+			}
+			unset( $in_progress[ $order_id ] );
+			return $final_title;
+		}
+		
+		// Default fallback to Flow's title
+		$default_title = $this->get_title();
+		WC_Checkoutcom_Utility::logger( '[GET PAYMENT METHOD TITLE] ❌ NO MATCH - Using default title: ' . $default_title );
+		WC_Checkoutcom_Utility::logger( '[GET PAYMENT METHOD TITLE] Payment type normalized was: ' . ( $payment_type_normalized ?: 'EMPTY' ) );
+		if ( $gateway_debug ) {
+			WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE] ❌ NO MATCH - Using default title: ' . $default_title );
+			WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE] Available payment types: ' . implode( ', ', array_keys( $payment_type_titles ) ) );
+		}
+		unset( $in_progress[ $order_id ] );
+		return $default_title;
+	}
+
+	/**
+	 * Preserve payment method title after order status changes.
+	 * 
+	 * This ensures that when webhooks update order status, the correct payment method title
+	 * (e.g., "Google Pay" instead of "Pay by Card with Checkout.com") is preserved.
+	 *
+	 * @param int    $order_id Order ID.
+	 * @param string $old_status Old order status.
+	 * @param string $new_status New order status.
+	 * @param WC_Order $order Order object.
+	 */
+	public function preserve_payment_method_title( $order_id, $old_status, $new_status, $order ) {
+		$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
+		
+		if ( $gateway_debug ) {
+			WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE PRESERVE] ========== HOOK TRIGGERED ==========' );
+			WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE PRESERVE] Order ID: ' . $order_id );
+			WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE PRESERVE] Old status: ' . $old_status . ', New status: ' . $new_status );
+			WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE PRESERVE] Order payment method: ' . $order->get_payment_method() );
+			WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE PRESERVE] Gateway ID: ' . $this->id );
+		}
+		
+		// Only process orders for this gateway
+		if ( $order->get_payment_method() !== $this->id ) {
+			if ( $gateway_debug ) {
+				WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE PRESERVE] ❌ Skipping - Not a Flow gateway order' );
+			}
+			return;
+		}
+
+		// Get payment type from order metadata
+		$payment_type = $order->get_meta( '_cko_flow_payment_type' );
+		$current_title = $order->get_payment_method_title();
+		
+		if ( $gateway_debug ) {
+			WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE PRESERVE] Payment type from meta: ' . ( $payment_type ?: 'EMPTY' ) );
+			WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE PRESERVE] Current payment method title: ' . $current_title );
+		}
+		
+		// If we have a payment type stored, ensure the title matches
+		if ( ! empty( $payment_type ) ) {
+			// Get the correct title for this payment type
+			$correct_title = $this->get_payment_method_title_by_type( $order, null );
+			
+			if ( $gateway_debug ) {
+				WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE PRESERVE] Correct title from helper: ' . $correct_title );
+				WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE PRESERVE] Titles match: ' . ( $correct_title === $current_title ? 'YES' : 'NO' ) );
+			}
+			
+			// Only update if the title doesn't match
+			if ( $correct_title !== $current_title ) {
+				if ( $gateway_debug ) {
+					WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE PRESERVE] ✅ UPDATING - Old title: ' . $current_title . ', New title: ' . $correct_title );
+				}
+				$order->set_payment_method_title( $correct_title );
+				$order->save();
+				
+				if ( $gateway_debug ) {
+					WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE PRESERVE] ✅ Title updated and saved - Order ID: ' . $order_id );
+					// Reload to verify
+					$reloaded_order = wc_get_order( $order_id );
+					if ( $reloaded_order ) {
+						WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE PRESERVE] ✅ Verified after reload: ' . $reloaded_order->get_payment_method_title() );
+					}
+				}
+			} else {
+				if ( $gateway_debug ) {
+					WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE PRESERVE] ⏭️ Skipping - Title already correct' );
+				}
+			}
+		} else {
+			if ( $gateway_debug ) {
+				WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE PRESERVE] ❌ No payment type metadata found - Cannot determine correct title' );
+			}
+		}
+		
+		if ( $gateway_debug ) {
+			WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE PRESERVE] ========== HOOK COMPLETE ==========' );
+		}
+	}
+
+	/**
+	 * Filter order note data to use correct payment method title.
+	 * 
+	 * WooCommerce generates "Payment via [gateway title]" notes when order status changes.
+	 * This filter ensures the correct payment method title (e.g., "Google Pay") is used
+	 * instead of the gateway's default title.
+	 *
+	 * @param array $note_data Order note data.
+	 * @param array $args Note arguments.
+	 * @return array Filtered note data.
+	 */
+	public function filter_order_note_payment_method_title( $note_data, $args ) {
+		// Always log to see if filter is being called at all
+		WC_Checkoutcom_Utility::logger( '[ORDER NOTE FILTER] ========== FILTER CALLED ==========' );
+		WC_Checkoutcom_Utility::logger( '[ORDER NOTE FILTER] Note data keys: ' . ( is_array( $note_data ) ? implode( ', ', array_keys( $note_data ) ) : 'NOT ARRAY' ) );
+		WC_Checkoutcom_Utility::logger( '[ORDER NOTE FILTER] Args keys: ' . ( is_array( $args ) ? implode( ', ', array_keys( $args ) ) : 'NOT ARRAY' ) );
+		WC_Checkoutcom_Utility::logger( '[ORDER NOTE FILTER] Note content: ' . ( isset( $note_data['comment_content'] ) ? $note_data['comment_content'] : 'NOT SET' ) );
+		
+		$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
+		
+		// Only process if note content contains "Payment via"
+		if ( ! isset( $note_data['comment_content'] ) || strpos( $note_data['comment_content'], 'Payment via' ) === false ) {
+			WC_Checkoutcom_Utility::logger( '[ORDER NOTE FILTER] ⏭️ Skipping - Note does not contain "Payment via"' );
+			return $note_data;
+		}
+		
+		// Get order ID from args or note data
+		$order_id = isset( $args['order_id'] ) ? $args['order_id'] : ( isset( $note_data['comment_post_ID'] ) ? $note_data['comment_post_ID'] : 0 );
+		
+		if ( ! $order_id ) {
+			return $note_data;
+		}
+		
+		$order = wc_get_order( $order_id );
+		if ( ! $order || $order->get_payment_method() !== $this->id ) {
+			return $note_data;
+		}
+		
+		// Get payment type from order metadata
+		$payment_type = $order->get_meta( '_cko_flow_payment_type' );
+		$current_title = $order->get_payment_method_title();
+		$gateway_default_title = $this->get_title();
+		
+		if ( $gateway_debug ) {
+			WC_Checkoutcom_Utility::logger( '[ORDER NOTE FILTER] ========== FILTERING ORDER NOTE ==========' );
+			WC_Checkoutcom_Utility::logger( '[ORDER NOTE FILTER] Order ID: ' . $order_id );
+			WC_Checkoutcom_Utility::logger( '[ORDER NOTE FILTER] Payment type: ' . ( $payment_type ?: 'EMPTY' ) );
+			WC_Checkoutcom_Utility::logger( '[ORDER NOTE FILTER] Current title: ' . $current_title );
+			WC_Checkoutcom_Utility::logger( '[ORDER NOTE FILTER] Gateway default title: ' . $gateway_default_title );
+			WC_Checkoutcom_Utility::logger( '[ORDER NOTE FILTER] Original note: ' . $note_data['comment_content'] );
+		}
+		
+		// Only replace if we have a payment type and the note contains the gateway default title
+		if ( ! empty( $payment_type ) && ! empty( $current_title ) && $current_title !== $gateway_default_title ) {
+			// Replace gateway default title with correct title in the note
+			$note_data['comment_content'] = str_replace( 
+				'Payment via ' . $gateway_default_title,
+				'Payment via ' . $current_title,
+				$note_data['comment_content']
+			);
+			
+			if ( $gateway_debug ) {
+				WC_Checkoutcom_Utility::logger( '[ORDER NOTE FILTER] ✅ Replaced title in note' );
+				WC_Checkoutcom_Utility::logger( '[ORDER NOTE FILTER] Updated note: ' . $note_data['comment_content'] );
+			}
+		} else {
+			if ( $gateway_debug ) {
+				WC_Checkoutcom_Utility::logger( '[ORDER NOTE FILTER] ⏭️ Skipping - No payment type or title already correct' );
+			}
+		}
+		
+		if ( $gateway_debug ) {
+			WC_Checkoutcom_Utility::logger( '[ORDER NOTE FILTER] ========== FILTER COMPLETE ==========' );
+		}
+		
+		return $note_data;
 	}
 
 	/**
@@ -1268,12 +1666,12 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 						// Use Case 2: new_payment_first - Hide Place Order button until Flow is ready
 						if (displayOrder === 'saved_cards_first' && hasSavedCards) {
 							// Keep button visible (saved cards are already visible)
-							console.log('[FLOW BUTTON] Keeping Place Order button visible - saved_cards_first mode with saved cards');
+							if (flowDebugLogging) console.log('[FLOW BUTTON] Keeping Place Order button visible - saved_cards_first mode with saved cards');
 						} else {
 							// Hide button until Flow is ready
 							placeOrderBtn.style.opacity = '0';
 							placeOrderBtn.style.visibility = 'hidden';
-							console.log('[FLOW BUTTON] Hiding Place Order button - Display order:', displayOrder, 'Has saved cards:', hasSavedCards);
+							if (flowDebugLogging) console.log('[FLOW BUTTON] Hiding Place Order button - Display order:', displayOrder, 'Has saved cards:', hasSavedCards);
 						}
 					}
 				}
@@ -1449,7 +1847,6 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	 */
 
 	public function process_payment( $order_id ) {
-		// CRITICAL TEST LOG - First line of function
 		WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Order ID: ' . $order_id );
 
 		if ( ! session_id() ) {
@@ -1954,10 +2351,56 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			
 			// Use the payment type we already retrieved for the 3DS check (from POST, GET, or order meta)
 			$flow_payment_type = $flow_payment_type_for_3ds_check;
+			// Fallback: Get payment type from payment_details if not found elsewhere
+			// CRITICAL: Check card_wallet_type FIRST before checking payment_type
+			// Google Pay/Apple Pay have payment_type="Regular" but card_wallet_type="GooglePay"/"ApplePay"
+			if ( empty( $flow_payment_type ) && ! empty( $payment_details ) ) {
+				if ( isset( $payment_details['source']['card_wallet_type'] ) ) {
+					$card_wallet_type = strtolower( $payment_details['source']['card_wallet_type'] );
+					if ( $card_wallet_type === 'googlepay' ) {
+						$flow_payment_type = 'googlepay';
+					} elseif ( $card_wallet_type === 'applepay' ) {
+						$flow_payment_type = 'applepay';
+					}
+				}
+				// If card_wallet_type didn't identify it, check payment_type
+				if ( empty( $flow_payment_type ) && isset( $payment_details['payment_type'] ) ) {
+					$payment_type_raw = $payment_details['payment_type'];
+					// CRITICAL FIX: When payment_type is "Regular", check source.type FIRST before normalizing to "card"
+					// For APMs (Alma, PayPal, etc.), payment_type="Regular" but source.type="alma"/"paypal"/etc.
+					if ( strtolower( $payment_type_raw ) === 'regular' ) {
+						// Check if source.type exists and is NOT "card" (i.e., it's an APM)
+						if ( isset( $payment_details['source']['type'] ) && strtolower( $payment_details['source']['type'] ) !== 'card' ) {
+							$flow_payment_type = strtolower( $payment_details['source']['type'] );
+						} else {
+							// No source.type or source.type is "card" - normalize to "card"
+							$flow_payment_type = 'card';
+						}
+					} else {
+						$flow_payment_type = $payment_type_raw;
+					}
+				} elseif ( empty( $flow_payment_type ) && isset( $payment_details['source']['type'] ) ) {
+					$flow_payment_type = $payment_details['source']['type'];
+				}
+			}
 			if ( empty( $flow_payment_type ) ) {
 				$flow_payment_type = 'card'; // Default fallback
 			}
 			$order->update_meta_data( '_cko_flow_payment_type', $flow_payment_type );
+			
+			// Set payment method title based on actual payment type used
+			$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
+			if ( $gateway_debug ) {
+				WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE] Setting payment method title - Location: process_payment() successful payment path around line 2054' );
+				WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE] Order ID: ' . $order->get_id() );
+			}
+			$payment_method_title = $this->get_payment_method_title_by_type( $order, $payment_details );
+			$order->set_payment_method_title( $payment_method_title );
+			if ( $gateway_debug ) {
+				WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE] ✅ Title set to: ' . $payment_method_title );
+				WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE] Order payment method title after setting: ' . $order->get_payment_method_title() );
+			}
+			
 			// Store order number/reference for webhook lookup (works with Sequential Order Numbers plugins)
 			$order->update_meta_data( '_cko_order_reference', $order->get_order_number() );
 			
@@ -2892,6 +3335,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		$is_moto_order = $order->is_created_via( 'admin' );
 		$is_guest = $order->get_customer_id() == 0;
 		$order_key_in_url = strpos( $return_url, 'key=' ) !== false;
+		$order_key_from_order = $order->get_order_key();
 		
 		if ( $is_moto_order ) {
 			WC_Checkoutcom_Utility::logger( 'MOTO order detected - Order ID: ' . $order_id . ', Created via: ' . $order->get_created_via() );
@@ -2906,6 +3350,16 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			$order_key_in_url ? 'YES' : 'NO',
 			$order_id
 		) );
+		WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] ========== RETURN URL DEBUG ==========' );
+		WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Order ID: ' . $order_id );
+		WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Is guest order?: ' . ( $is_guest ? 'YES' : 'NO' ) );
+		WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Order key from order object: ' . $order_key_from_order );
+		WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Return URL: ' . $return_url );
+		WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Order key in URL?: ' . ( $order_key_in_url ? 'YES' : 'NO' ) );
+		if ( $is_guest && ! $order_key_in_url ) {
+			WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] ⚠️ WARNING: Guest order but order key NOT in return URL!' );
+		}
+		WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] ========== END RETURN URL DEBUG ==========' );
 		WC_Checkoutcom_Utility::logger( 'Order status updated to: ' . $status . ', Order ID: ' . $order_id );
 		WC_Checkoutcom_Utility::logger( 'Transaction ID set to: ' . $order->get_transaction_id() );
 
@@ -3313,7 +3767,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 										}
 									} else {
 										WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ERROR: Cart is empty, cannot create order' );
-										wp_die( esc_html__( 'Order not found and cart is empty. Please contact support.', 'checkout-com-unified-payments-api' ), esc_html__( 'Payment Error', 'Payment Error', 'checkout-com-unified-payments-api' ), array( 'response' => 400 ) );
+										wp_die( esc_html__( 'Order not found and cart is empty. Please contact support.', 'checkout-com-unified-payments-api' ), esc_html__( 'Payment Error', 'checkout-com-unified-payments-api' ), array( 'response' => 400 ) );
 									}
 								}
 								
@@ -3424,7 +3878,96 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 									
 									// Set payment method
 									$order->set_payment_method( $this->id );
-									$order->set_payment_method_title( $this->get_title() );
+									
+									// CRITICAL: Save payment type to order meta BEFORE getting title (so helper method can find it)
+									// Check payment_type first (for Google Pay, Apple Pay, etc.) before checking source type
+									WC_Checkoutcom_Utility::logger( '[HANDLE 3DS RETURN] ========== PAYMENT TYPE DETECTION FOR TITLE ==========' );
+									WC_Checkoutcom_Utility::logger( '[HANDLE 3DS RETURN] Order ID: ' . $order->get_id() );
+									WC_Checkoutcom_Utility::logger( '[HANDLE 3DS RETURN] Payment details available?: ' . ( ! empty( $payment_details ) ? 'YES' : 'NO' ) );
+									if ( ! empty( $payment_details ) ) {
+										WC_Checkoutcom_Utility::logger( '[HANDLE 3DS RETURN] Payment details keys: ' . implode( ', ', array_keys( $payment_details ) ) );
+										WC_Checkoutcom_Utility::logger( '[HANDLE 3DS RETURN] payment_details[payment_type]: ' . ( isset( $payment_details['payment_type'] ) ? $payment_details['payment_type'] : 'NOT SET' ) );
+										if ( isset( $payment_details['source'] ) && is_array( $payment_details['source'] ) ) {
+											WC_Checkoutcom_Utility::logger( '[HANDLE 3DS RETURN] payment_details[source] keys: ' . implode( ', ', array_keys( $payment_details['source'] ) ) );
+											WC_Checkoutcom_Utility::logger( '[HANDLE 3DS RETURN] payment_details[source][type]: ' . ( isset( $payment_details['source']['type'] ) ? $payment_details['source']['type'] : 'NOT SET' ) );
+											WC_Checkoutcom_Utility::logger( '[HANDLE 3DS RETURN] payment_details[source][card_wallet_type]: ' . ( isset( $payment_details['source']['card_wallet_type'] ) ? $payment_details['source']['card_wallet_type'] : 'NOT SET' ) );
+										}
+									}
+									$existing_payment_type_meta = $order->get_meta( '_cko_flow_payment_type' );
+									WC_Checkoutcom_Utility::logger( '[HANDLE 3DS RETURN] Existing payment_type in order meta: ' . ( $existing_payment_type_meta ?: 'NOT SET' ) );
+									
+									$flow_payment_type_for_title = '';
+									if ( ! empty( $payment_details ) ) {
+										// CRITICAL FIX: Check card_wallet_type FIRST before checking payment_type
+										// Google Pay/Apple Pay have payment_type="Regular" but card_wallet_type="GooglePay"/"ApplePay"
+										if ( isset( $payment_details['source']['card_wallet_type'] ) ) {
+											$card_wallet_type = strtolower( $payment_details['source']['card_wallet_type'] );
+											if ( $card_wallet_type === 'googlepay' ) {
+												$flow_payment_type_for_title = 'googlepay';
+												WC_Checkoutcom_Utility::logger( '[HANDLE 3DS RETURN] ✅ Detected Google Pay via card_wallet_type: ' . $payment_details['source']['card_wallet_type'] );
+											} elseif ( $card_wallet_type === 'applepay' ) {
+												$flow_payment_type_for_title = 'applepay';
+												WC_Checkoutcom_Utility::logger( '[HANDLE 3DS RETURN] ✅ Detected Apple Pay via card_wallet_type: ' . $payment_details['source']['card_wallet_type'] );
+											}
+										}
+										// If card_wallet_type didn't identify it, check payment_type
+										if ( empty( $flow_payment_type_for_title ) && isset( $payment_details['payment_type'] ) ) {
+											$payment_type_raw = $payment_details['payment_type'];
+											// CRITICAL FIX: When payment_type is "Regular", check source.type FIRST before normalizing to "card"
+											// For APMs (Alma, PayPal, etc.), payment_type="Regular" but source.type="alma"/"paypal"/etc.
+											if ( strtolower( $payment_type_raw ) === 'regular' ) {
+												// Check if source.type exists and is NOT "card" (i.e., it's an APM)
+												if ( isset( $payment_details['source']['type'] ) && strtolower( $payment_details['source']['type'] ) !== 'card' ) {
+													$flow_payment_type_for_title = strtolower( $payment_details['source']['type'] );
+													WC_Checkoutcom_Utility::logger( '[HANDLE 3DS RETURN] ✅ Found APM via source.type: ' . $flow_payment_type_for_title . ' (payment_type was "Regular")' );
+												} else {
+													// No source.type or source.type is "card" - normalize to "card"
+													$flow_payment_type_for_title = 'card';
+													WC_Checkoutcom_Utility::logger( '[HANDLE 3DS RETURN] ⚠️ Normalized payment_type from "Regular" to "card"' );
+												}
+											} else {
+												$flow_payment_type_for_title = $payment_type_raw;
+												WC_Checkoutcom_Utility::logger( '[HANDLE 3DS RETURN] ✅ Found payment_type in payment_details: ' . $flow_payment_type_for_title );
+											}
+										} elseif ( empty( $flow_payment_type_for_title ) && isset( $payment_details['source']['type'] ) ) {
+											$flow_payment_type_for_title = $payment_details['source']['type'];
+											WC_Checkoutcom_Utility::logger( '[HANDLE 3DS RETURN] ⚠️ Found source.type in payment_details (fallback): ' . $flow_payment_type_for_title );
+										}
+									}
+									// Fallback to order meta if payment_details doesn't have it
+									if ( empty( $flow_payment_type_for_title ) ) {
+										$flow_payment_type_for_title = $order->get_meta( '_cko_flow_payment_type' );
+										WC_Checkoutcom_Utility::logger( '[HANDLE 3DS RETURN] ⚠️ Using payment_type from order meta (fallback): ' . ( $flow_payment_type_for_title ?: 'NOT SET' ) );
+									}
+									// Save to order meta if we found it
+									if ( ! empty( $flow_payment_type_for_title ) ) {
+										$order->update_meta_data( '_cko_flow_payment_type', $flow_payment_type_for_title );
+										WC_Checkoutcom_Utility::logger( '[HANDLE 3DS RETURN] ✅ Saving payment_type to order meta: ' . $flow_payment_type_for_title );
+									} else {
+										WC_Checkoutcom_Utility::logger( '[HANDLE 3DS RETURN] ❌ ERROR: No payment_type found anywhere!' );
+									}
+									WC_Checkoutcom_Utility::logger( '[HANDLE 3DS RETURN] Final flow_payment_type_for_title: ' . ( $flow_payment_type_for_title ?: 'EMPTY' ) );
+									WC_Checkoutcom_Utility::logger( '[HANDLE 3DS RETURN] ========== END PAYMENT TYPE DETECTION FOR TITLE ==========' );
+									
+									// Get payment method title based on actual payment type used
+									$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
+									if ( $gateway_debug ) {
+										WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE] Setting payment method title - Location: handle_3ds_return() around line 3477' );
+										WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE] Order ID: ' . $order->get_id() );
+										WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE] Payment type saved to meta: ' . ( $flow_payment_type_for_title ?: 'EMPTY' ) );
+									}
+									WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE] Calling get_payment_method_title_by_type() with order ID: ' . $order->get_id() );
+									$payment_method_title = $this->get_payment_method_title_by_type( $order, $payment_details );
+									WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE] Title returned from helper: ' . $payment_method_title );
+									$order->set_payment_method_title( $payment_method_title );
+									if ( $gateway_debug ) {
+										WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE] ✅ Title set to: ' . $payment_method_title );
+										WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE] Order payment method title after setting: ' . $order->get_payment_method_title() );
+									}
+									// Verify after save
+									$order->save();
+									$reloaded_order = wc_get_order( $order->get_id() );
+									WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE] After save and reload - Title: ' . ( $reloaded_order ? $reloaded_order->get_payment_method_title() : 'ORDER NOT FOUND' ) );
 									
 									// Save payment session ID (only if not already set)
 									if ( ! empty( $payment_session_id ) ) {
@@ -3446,6 +3989,14 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 									// Set status to pending
 									$order->set_status( 'pending' );
 									$order->save();
+									if ( $gateway_debug ) {
+										WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE] Order saved - Title after save: ' . $order->get_payment_method_title() );
+										// Reload order to check if title persisted
+										$reloaded_order = wc_get_order( $order->get_id() );
+										if ( $reloaded_order ) {
+											WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE] Order reloaded - Title after reload: ' . $reloaded_order->get_payment_method_title() );
+										}
+									}
 									
 									$order_id = $order->get_id();
 									
@@ -3541,9 +4092,9 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				// Get error message from payment details if available
 				$error_message = __( 'Payment was not approved. Please try again.', 'checkout-com-unified-payments-api' );
 				if ( isset( $payment_details['response_summary'] ) ) {
-					$error_message = $payment_details['response_summary'];
+					$error_message = sanitize_text_field( $payment_details['response_summary'] );
 				} elseif ( isset( $payment_details['status'] ) ) {
-					$error_message = sprintf( __( 'Payment failed with status: %s', 'checkout-com-unified-payments-api' ), $payment_details['status'] );
+					$error_message = sprintf( __( 'Payment failed with status: %s', 'checkout-com-unified-payments-api' ), esc_html( $payment_details['status'] ) );
 				}
 				
 				// If we have an order, update it and redirect to checkout/order-pay with error
@@ -3724,8 +4275,67 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		}
 		
 		// Process the payment by storing payment data in order meta (WordPress-compliant approach)
-		$payment_type = isset( $payment_details['source']['type'] ) ? $payment_details['source']['type'] : 'card';
-		WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Storing payment data in order meta - Payment ID: ' . $payment_id . ', Payment Type: ' . $payment_type );
+		// CRITICAL: Prioritize payment_type over source.type for tokenized payments (Google Pay, Apple Pay, etc.)
+		// For tokenized payments, source.type is 'card' but payment_type correctly identifies the payment method
+		WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ========== PAYMENT TYPE DETECTION DEBUG ==========' );
+		WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment ID: ' . $payment_id );
+		WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment details available?: ' . ( ! empty( $payment_details ) ? 'YES' : 'NO' ) );
+		if ( ! empty( $payment_details ) ) {
+			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment details keys: ' . implode( ', ', array_keys( $payment_details ) ) );
+			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] payment_details[payment_type]: ' . ( isset( $payment_details['payment_type'] ) ? $payment_details['payment_type'] : 'NOT SET' ) );
+			if ( isset( $payment_details['source'] ) && is_array( $payment_details['source'] ) ) {
+				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] payment_details[source] keys: ' . implode( ', ', array_keys( $payment_details['source'] ) ) );
+				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] payment_details[source][type]: ' . ( isset( $payment_details['source']['type'] ) ? $payment_details['source']['type'] : 'NOT SET' ) );
+				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] payment_details[source][card_wallet_type]: ' . ( isset( $payment_details['source']['card_wallet_type'] ) ? $payment_details['source']['card_wallet_type'] : 'NOT SET' ) );
+			} else {
+				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] payment_details[source]: NOT SET or NOT ARRAY' );
+			}
+		}
+		
+		// CRITICAL FIX: Check card_wallet_type FIRST before normalizing "Regular" to "card"
+		// Google Pay and Apple Pay payments have payment_type="Regular" but card_wallet_type="GooglePay"/"ApplePay"
+		if ( ! empty( $payment_details ) && isset( $payment_details['source']['card_wallet_type'] ) ) {
+			$card_wallet_type = strtolower( $payment_details['source']['card_wallet_type'] );
+			if ( $card_wallet_type === 'googlepay' ) {
+				$payment_type = 'googlepay';
+				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ✅ Detected Google Pay via card_wallet_type: ' . $payment_details['source']['card_wallet_type'] );
+			} elseif ( $card_wallet_type === 'applepay' ) {
+				$payment_type = 'applepay';
+				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ✅ Detected Apple Pay via card_wallet_type: ' . $payment_details['source']['card_wallet_type'] );
+			} else {
+				// Unknown wallet type, fall through to payment_type check
+				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ⚠️ Unknown card_wallet_type: ' . $payment_details['source']['card_wallet_type'] . ' - checking payment_type' );
+			}
+		}
+		
+		// If card_wallet_type didn't identify the payment method, check payment_type
+		if ( empty( $payment_type ) && ! empty( $payment_details ) && isset( $payment_details['payment_type'] ) ) {
+			$payment_type_raw = $payment_details['payment_type'];
+			// CRITICAL FIX: When payment_type is "Regular", check source.type FIRST before normalizing to "card"
+			// For APMs (Alma, PayPal, etc.), payment_type="Regular" but source.type="alma"/"paypal"/etc.
+			if ( strtolower( $payment_type_raw ) === 'regular' ) {
+				// Check if source.type exists and is NOT "card" (i.e., it's an APM)
+				if ( isset( $payment_details['source']['type'] ) && strtolower( $payment_details['source']['type'] ) !== 'card' ) {
+					$payment_type = strtolower( $payment_details['source']['type'] );
+					WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ✅ Found APM via source.type: ' . $payment_type . ' (payment_type was "Regular")' );
+				} else {
+					// No source.type or source.type is "card" - normalize to "card"
+					$payment_type = 'card';
+					WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ⚠️ Normalized payment_type from "Regular" to "card"' );
+				}
+			} else {
+				$payment_type = $payment_type_raw;
+				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ✅ Using payment_type: ' . $payment_type );
+			}
+		} elseif ( empty( $payment_type ) && isset( $payment_details['source']['type'] ) ) {
+			$payment_type = $payment_details['source']['type'];
+			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ⚠️ Using source.type (fallback): ' . $payment_type );
+		} elseif ( empty( $payment_type ) ) {
+			$payment_type = 'card';
+			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ⚠️ Using default: card' );
+		}
+		WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Final payment_type to store: ' . $payment_type );
+		WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ========== END PAYMENT TYPE DETECTION DEBUG ==========' );
 		
 		// Store payment data in order meta instead of modifying $_POST (WordPress coding standards compliant)
 		// process_payment() will check order meta as fallback if $_POST is not available
@@ -3734,6 +4344,12 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			$order->update_meta_data( '_cko_flow_payment_id', $payment_id );
 			$order->update_meta_data( '_cko_flow_payment_type', $payment_type );
 			$order->save();
+			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ✅ Stored payment_type in order meta: ' . $payment_type );
+			// Verify it was stored
+			$stored_payment_type = $order->get_meta( '_cko_flow_payment_type' );
+			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Verification - Retrieved payment_type from order meta: ' . $stored_payment_type );
+		} else {
+			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ⚠️ WARNING: Order object not available - cannot store payment_type' );
 		}
 		
 		if ( $is_debug ) {
@@ -3826,7 +4442,67 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// Redirect after card saving logic completes
 			if ( isset( $result['result'] ) && 'success' === $result['result'] && isset( $result['redirect'] ) ) {
 				$redirect_url = $result['redirect'];
+				
+				// CRITICAL FIX: Ensure order key is always in redirect URL, even for logged-in users
+				// WooCommerce may require the order key for validation even for logged-in users
+				if ( $order ) {
+					$order_key = $order->get_order_key();
+					$order_id = $order->get_id();
+					
+					// Check if order key is already in URL
+					$order_key_in_url = strpos( $redirect_url, 'key=' ) !== false;
+					
+					if ( ! $order_key_in_url && ! empty( $order_key ) ) {
+						// Order key not in URL - add it explicitly
+						$separator = strpos( $redirect_url, '?' ) !== false ? '&' : '?';
+						$redirect_url = $redirect_url . $separator . 'key=' . urlencode( $order_key );
+						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ⚠️ Order key was missing from redirect URL - added explicitly' );
+					}
+					
+					// Also ensure order_id is in URL if missing
+					$order_id_in_url = strpos( $redirect_url, 'order-received/' . $order_id ) !== false || strpos( $redirect_url, 'order_id=' . $order_id ) !== false;
+					if ( ! $order_id_in_url ) {
+						$separator = strpos( $redirect_url, '?' ) !== false ? '&' : '?';
+						$redirect_url = $redirect_url . $separator . 'order_id=' . $order_id;
+						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ⚠️ Order ID was missing from redirect URL - added explicitly' );
+					}
+				}
+				
+				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ========== FINAL REDIRECT DEBUG ==========' );
 				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment processed successfully, redirecting to: ' . $redirect_url );
+				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order ID from GET: ' . ( isset( $_GET['order_id'] ) ? $_GET['order_id'] : 'NOT SET' ) );
+				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order key from GET: ' . ( isset( $_GET['key'] ) ? $_GET['key'] : 'NOT SET' ) );
+				if ( $order ) {
+					$order_customer_id = $order->get_customer_id();
+					$current_user_id = get_current_user_id();
+					WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order ID from order object: ' . $order->get_id() );
+					WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order key from order object: ' . $order->get_order_key() );
+					WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order customer ID: ' . $order_customer_id );
+					WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Current logged-in user ID: ' . $current_user_id );
+					WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Customer IDs match?: ' . ( $order_customer_id == $current_user_id ? 'YES' : 'NO' ) );
+					WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Is guest order?: ' . ( $order_customer_id == 0 ? 'YES' : 'NO' ) );
+					$order_key_in_redirect = strpos( $redirect_url, 'key=' ) !== false;
+					WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order key in redirect URL?: ' . ( $order_key_in_redirect ? 'YES' : 'NO' ) );
+					if ( $order_customer_id == 0 && ! $order_key_in_redirect ) {
+						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ❌ ERROR: Guest order but order key NOT in redirect URL!' );
+					}
+					if ( $order_customer_id > 0 && $order_customer_id != $current_user_id ) {
+						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ⚠️ WARNING: Order customer ID (' . $order_customer_id . ') does NOT match current user ID (' . $current_user_id . ')' );
+						
+						// CRITICAL FIX: If user is not logged in but order has customer_id, set order to guest
+						// This allows WooCommerce to validate by order key instead of customer_id
+						// This happens when user session is lost during 3DS redirect
+						if ( $current_user_id == 0 && $order_key_in_redirect ) {
+							WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] 🔧 FIXING: User session lost during 3DS - setting order customer_id to 0 (guest) to allow order key validation' );
+							$order->set_customer_id( 0 );
+							$order->save();
+							WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ✅ Order customer_id set to 0 - WooCommerce will validate by order key' );
+						} elseif ( $current_user_id == 0 && ! $order_key_in_redirect ) {
+							WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ❌ ERROR: User session lost AND order key missing - user will NOT be able to view order!' );
+						}
+					}
+				}
+				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ========== END FINAL REDIRECT DEBUG ==========' );
 				
 				// Ensure headers are sent and redirect happens
 				if ( ! headers_sent() ) {
@@ -3839,7 +4515,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					exit;
 				}
 			} else {
-				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment processing failed: ' . print_r( $result, true ) );
+				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment processing failed: ' . wp_json_encode( $result ) );
 				
 				// Payment failed - don't redirect to order received page
 				// Instead, redirect back to checkout with error message
@@ -4326,7 +5002,18 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			
 			// Set payment method
 			$order->set_payment_method( $this->id );
-			$order->set_payment_method_title( $this->get_title() );
+			// Get payment method title based on actual payment type used
+			$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
+			if ( $gateway_debug ) {
+				WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE] Setting payment method title - Location: create_minimal_order_from_payment_details() around line 4381' );
+				WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE] Order ID: ' . $order->get_id() );
+			}
+			$payment_method_title = $this->get_payment_method_title_by_type( $order, $payment_details );
+			$order->set_payment_method_title( $payment_method_title );
+			if ( $gateway_debug ) {
+				WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE] ✅ Title set to: ' . $payment_method_title );
+				WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE] Order payment method title after setting: ' . $order->get_payment_method_title() );
+			}
 			
 			// Save payment IDs
 			$order->update_meta_data( '_cko_payment_id', $payment_id );
@@ -4346,6 +5033,14 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			// Set status to failed (since we're creating this due to a failure)
 			$order->set_status( 'failed' );
 			$order->save();
+			if ( $gateway_debug ) {
+				WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE] Order saved - Title after save: ' . $order->get_payment_method_title() );
+				// Reload order to check if title persisted
+				$reloaded_order = wc_get_order( $order->get_id() );
+				if ( $reloaded_order ) {
+					WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE] Order reloaded - Title after reload: ' . $reloaded_order->get_payment_method_title() );
+				}
+			}
 			
 			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Minimal order created successfully - Order ID: ' . $order->get_id() );
 			
@@ -4393,7 +5088,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		} else {
 			$data = $result->get_data();
 			WC_Checkoutcom_Utility::logger( 'Payment data retrieved successfully' );
-			WC_Checkoutcom_Utility::logger( 'Payment data: ' . print_r( $data, true ) );
+			WC_Checkoutcom_Utility::logger( 'Payment data: ' . wp_json_encode( $data ) );
 		}
 		
 		WC_Checkoutcom_Utility::logger( 'Calling save_token method...' );
@@ -4697,7 +5392,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		$checkout_mode = $core_settings['ckocom_checkout_mode'] ?? 'cards';
 		
 		if ( $webhook_debug_enabled ) {
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Core settings retrieved: ' . print_r($core_settings, true) );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Core settings retrieved: ' . wp_json_encode( $core_settings ) );
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Checkout mode: ' . $checkout_mode );
 		}
 		
@@ -4723,7 +5418,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			
 			$data = json_decode( $raw_input );
 			if ( $webhook_debug_enabled ) {
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: JSON decode result: ' . print_r($data, true) );
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: JSON decode result: ' . wp_json_encode( $data ) );
 				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: JSON last error: ' . json_last_error_msg() );
 			}
 
@@ -4733,7 +5428,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Empty data received, redirecting to home' );
 			}
 			wp_redirect( get_home_url() );
-			exit();
+			exit;
 		}
 		
 		if ( $webhook_debug_enabled ) {
@@ -4770,7 +5465,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 		$header           = array_change_key_case( apache_request_headers(), CASE_LOWER );
 		if ( $webhook_debug_enabled ) {
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: All headers: ' . print_r($header, true) );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: All headers: ' . wp_json_encode( $header ) );
 		}
 		
 		$header_signature = $header['cko-signature'] ?? null;
@@ -4830,7 +5525,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Starting order lookup process' );
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Webhook data structure: ' . print_r($data, true) );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Webhook data structure: ' . wp_json_encode( $data ) );
 		}
 
 		// Method 1: Try order_id from metadata (order-pay page has this)
@@ -5126,7 +5821,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Event Type Data' );
-			WC_Checkoutcom_Utility::logger(print_r($data,true));
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Event Type Data: ' . wp_json_encode( $data ) );
 		}
 
 		// Get webhook event type from data.
@@ -5142,7 +5837,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				}
 				$response = WC_Checkout_Com_Webhook::card_verified( $data );
 				if ( $webhook_debug_enabled ) {
-					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: card_verified response: ' . print_r($response, true) );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: card_verified response: ' . wp_json_encode( $response ) );
 				}
 				break;
 			case 'payment_approved':
@@ -5151,7 +5846,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				}
 				$response = WC_Checkout_Com_Webhook::authorize_payment( $data );
 				if ( $webhook_debug_enabled ) {
-					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: payment_approved response: ' . print_r($response, true) );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: payment_approved response: ' . wp_json_encode( $response ) );
 				}
 				
 				// If processing failed, queue the webhook for later processing
@@ -5205,7 +5900,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				}
 				$response = WC_Checkout_Com_Webhook::capture_payment( $data );
 				if ( $webhook_debug_enabled ) {
-					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: payment_captured response: ' . print_r($response, true) );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: payment_captured response: ' . wp_json_encode( $response ) );
 				}
 				
 				// If processing failed, queue the webhook for later processing
@@ -5259,7 +5954,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				}
 				$response = WC_Checkout_Com_Webhook::void_payment( $data );
 				if ( $webhook_debug_enabled ) {
-					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: payment_voided response: ' . print_r($response, true) );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: payment_voided response: ' . wp_json_encode( $response ) );
 				}
 				break;
 			case 'payment_capture_declined':
@@ -5268,7 +5963,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				}
 				$response = WC_Checkout_Com_Webhook::capture_declined( $data );
 				if ( $webhook_debug_enabled ) {
-					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: payment_capture_declined response: ' . print_r($response, true) );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: payment_capture_declined response: ' . wp_json_encode( $response ) );
 				}
 				break;
 			case 'payment_refunded':
@@ -5277,7 +5972,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				}
 				$response = WC_Checkout_Com_Webhook::refund_payment( $data );
 				if ( $webhook_debug_enabled ) {
-					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: payment_refunded response: ' . print_r($response, true) );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: payment_refunded response: ' . wp_json_encode( $response ) );
 				}
 				break;
 			case 'payment_canceled':
@@ -5286,7 +5981,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				}
 				$response = WC_Checkout_Com_Webhook::cancel_payment( $data );
 				if ( $webhook_debug_enabled ) {
-					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: payment_canceled response: ' . print_r($response, true) );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: payment_canceled response: ' . wp_json_encode( $response ) );
 				}
 				break;
 			case 'payment_declined':
@@ -5296,7 +5991,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				}
 				$response = WC_Checkout_Com_Webhook::decline_payment( $data );
 				if ( $webhook_debug_enabled ) {
-					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: ' . $event_type . ' response: ' . print_r($response, true) );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: ' . $event_type . ' response: ' . wp_json_encode( $response ) );
 				}
 				break;
 
@@ -5331,7 +6026,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		$http_code = $response ? 200 : 400;
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Final response code: ' . $http_code );
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Final response value: ' . print_r($response, true) );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Final response value: ' . wp_json_encode( $response ) );
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Sending response - Code: ' . $http_code . ', Message: ' . ($response ? 'OK' : 'Failed') );
 		}
 		$this->send_response($http_code, $response ? 'OK' : 'Failed');
@@ -5351,7 +6046,9 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		WC_Checkoutcom_Utility::logger("WEBHOOK DEBUG: Preparing to send response - Status: $status_code, Message: $message");
 		
 		status_header($status_code);
-		header('Content-Type: application/json; charset=utf-8');
+		if ( ! headers_sent() ) {
+			header('Content-Type: application/json; charset=utf-8');
+		}
 		
 		$response_data = [
 			'status'  => $status_code,
@@ -5473,8 +6170,10 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	 * @return void
 	 */
 	public function ajax_create_order() {
-		// Set proper headers for JSON response
-		header( 'Content-Type: application/json' );
+		// Set proper headers for JSON response (only if not already sent)
+		if ( ! headers_sent() ) {
+			header( 'Content-Type: application/json' );
+		}
 		
 		// Log entry point
 		if ( function_exists( 'WC_Checkoutcom_Utility' ) && method_exists( 'WC_Checkoutcom_Utility', 'logger' ) ) {
@@ -5686,7 +6385,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			if ( ! empty( $errors->errors ) ) {
 				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ❌❌❌ VALIDATION ERRORS FOUND - BLOCKING ORDER CREATION ❌❌❌' );
 				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Validation errors count: ' . count( $errors->errors ) );
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Validation errors array: ' . print_r( $errors->errors, true ) );
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Validation errors array: ' . wp_json_encode( $errors->errors ) );
 				$messages = array();
 				foreach ( $errors->errors as $code => $msgs ) {
 					foreach ( $msgs as $msg ) {
@@ -5715,13 +6414,13 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			$create_order_method->setAccessible( true );
 			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Invoking create_order() method...' );
 			$order_id = $create_order_method->invoke( $checkout, $posted_data );
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] create_order() returned: ' . print_r( $order_id, true ) );
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] create_order() returned: ' . wp_json_encode( $order_id ) );
 			
 			if ( is_wp_error( $order_id ) ) {
 				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ❌❌❌ ERROR: Failed to create order ❌❌❌' );
 				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Error message: ' . $order_id->get_error_message() );
 				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Error code: ' . $order_id->get_error_code() );
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Error data: ' . print_r( $order_id->get_error_data(), true ) );
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Error data: ' . wp_json_encode( $order_id->get_error_data() ) );
 				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ❌ Order creation failed - returning error response' );
 				wp_send_json_error( array(
 					'message' => __( 'Failed to create order. Please try again.', 'checkout-com-unified-payments-api' ),
@@ -5732,7 +6431,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			
 			if ( empty( $order_id ) || ! is_numeric( $order_id ) ) {
 				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ❌❌❌ ERROR: Invalid order ID returned ❌❌❌' );
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Order ID value: ' . print_r( $order_id, true ) );
+				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Order ID value: ' . wp_json_encode( $order_id ) );
 				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Order ID type: ' . gettype( $order_id ) );
 				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Order ID is empty?: ' . ( empty( $order_id ) ? 'YES' : 'NO' ) );
 				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Order ID is numeric?: ' . ( is_numeric( $order_id ) ? 'YES' : 'NO' ) );
@@ -5810,11 +6509,28 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			
 			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Order saved successfully - Order ID: ' . $order_id . ', Status: pending' );
 			
-			// Return success with order ID
-			wp_send_json_success( array(
+			// Get order key for guest order redirect URLs
+			$order_key = $order->get_order_key();
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ========== ORDER KEY DEBUG ==========' );
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Order ID: ' . $order_id );
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Order key retrieved: ' . $order_key );
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Order key type: ' . gettype( $order_key ) );
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Order key empty?: ' . ( empty( $order_key ) ? 'YES' : 'NO' ) );
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Order key length: ' . strlen( $order_key ) );
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Customer ID: ' . $order->get_customer_id() );
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Is guest order?: ' . ( $order->get_customer_id() == 0 ? 'YES' : 'NO' ) );
+			
+			// Return success with order ID and order key
+			$response_data = array(
 				'order_id' => $order_id,
+				'order_key' => $order_key,
 				'message' => __( 'Order created successfully.', 'checkout-com-unified-payments-api' ),
-			) );
+			);
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Response data being sent:' );
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] - order_id: ' . $response_data['order_id'] );
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] - order_key: ' . $response_data['order_key'] );
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ========== END ORDER KEY DEBUG ==========' );
+			wp_send_json_success( $response_data );
 			
 		} catch ( Exception $e ) {
 			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] EXCEPTION: ' . $e->getMessage() );
@@ -5979,7 +6695,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			}
 			
 			if ( empty( $order_id ) || ! is_numeric( $order_id ) ) {
-				WC_Checkoutcom_Utility::logger( '[CREATE FAILED ORDER] ERROR: Invalid order ID returned: ' . print_r( $order_id, true ) );
+				WC_Checkoutcom_Utility::logger( '[CREATE FAILED ORDER] ERROR: Invalid order ID returned: ' . wp_json_encode( $order_id ) );
 				wp_send_json_error( array(
 					'message' => __( 'Failed to create order. Invalid order ID returned.', 'checkout-com-unified-payments-api' ),
 				) );

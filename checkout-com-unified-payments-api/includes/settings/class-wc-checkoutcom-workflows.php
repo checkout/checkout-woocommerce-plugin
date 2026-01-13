@@ -117,9 +117,8 @@ class WC_Checkoutcom_Workflows {
 		// Log for debugging
 		$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
 		if ( $gateway_debug ) {
-			WC_Checkoutcom_Utility::logger( '[WORKFLOW IS_REGISTERED] Looking for URL: ' . $url );
-			WC_Checkoutcom_Utility::logger( '[WORKFLOW IS_REGISTERED] Domain: ' . $url_domain );
-			WC_Checkoutcom_Utility::logger( '[WORKFLOW IS_REGISTERED] Found ' . count( $webhooks ) . ' workflows' );
+			WC_Checkoutcom_Utility::logger( '[WORKFLOW IS_REGISTERED] Looking for URL: ' . $url . ' (Domain: ' . $url_domain_clean . ')' );
+			WC_Checkoutcom_Utility::logger( '[WORKFLOW IS_REGISTERED] Total workflows found: ' . count( $webhooks ) );
 		}
 
 		foreach ( $webhooks as $item ) {
@@ -128,16 +127,13 @@ class WC_Checkoutcom_Workflows {
 				continue;
 			}
 
-			if ( $gateway_debug ) {
-				WC_Checkoutcom_Utility::logger( '[WORKFLOW IS_REGISTERED] Checking workflow name: ' . $item_name );
-			}
-
 			// For workflows, the name contains the full webhook URL
 			// Check if workflow name contains the webhook endpoint
 			if ( false !== strpos( $item_name, 'wc-api=wc_checkoutcom_webhook' ) || false !== strpos( $item_name, 'wc_checkoutcom_webhook' ) ) {
 				// Also verify domain matches
 				$item_domain = parse_url( $item_name, PHP_URL_HOST );
 				$item_domain_clean = str_replace( 'www.', '', $item_domain ?? '' );
+				
 				if ( $item_domain_clean === $url_domain_clean ) {
 					if ( $gateway_debug ) {
 						WC_Checkoutcom_Utility::logger( '[WORKFLOW IS_REGISTERED] ✅ MATCH FOUND: ' . $item_name );
@@ -224,6 +220,10 @@ class WC_Checkoutcom_Workflows {
 
 		if ( isset( $data['data'] ) && ! empty( $data['data'] ) ) {
 			$this->list = $data['data'];
+			$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
+			if ( $gateway_debug ) {
+				WC_Checkoutcom_Utility::logger( '[WORKFLOW GET_LIST] Retrieved ' . count( $this->list ) . ' workflows' );
+			}
 			return $this->list;
 		}
 
