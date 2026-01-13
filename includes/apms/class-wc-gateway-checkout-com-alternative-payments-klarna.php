@@ -6,10 +6,7 @@
  */
 
 use Checkout\CheckoutApiException;
-<<<<<<< HEAD
-=======
 use Checkout\CheckoutUtils;
->>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 
 /**
  * Class WC_Gateway_Checkout_Com_Alternative_Payments_Klarna
@@ -139,11 +136,6 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Klarna extends WC_Gateway_Che
 		try {
 			$checkout = new Checkout_SDK();
 
-<<<<<<< HEAD
-			$payment_request_param                     = $checkout->get_payment_request();
-			$payment_request_param->payment_context_id = $payment_context_id;
-			$payment_request_param->reference          = $order->get_order_number();
-=======
 			// Build metadata for Klarna payment
 			global $wp_version;
 			$woocommerce = WC();
@@ -167,7 +159,6 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Klarna extends WC_Gateway_Che
 			$payment_request_param->payment_context_id = $payment_context_id;
 			$payment_request_param->reference          = $order->get_order_number();
 			$payment_request_param->metadata           = $metadata;
->>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 
 			$response      = $checkout->get_builder()->getPaymentsClient()->requestPayment( $payment_request_param );
 			$response_code = $response['http_metadata']->getStatusCode();

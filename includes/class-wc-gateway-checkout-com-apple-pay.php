@@ -8,10 +8,7 @@
 defined( 'ABSPATH' ) || exit;
 
 require_once 'settings/class-wc-checkoutcom-cards-settings.php';
-<<<<<<< HEAD
-=======
 require_once 'express/apple-pay/class-apple-pay-express.php';
->>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 
 /**
  * Class WC_Gateway_Checkout_Com_Apple_Pay for Apple Pay method.
@@ -24,7 +21,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 	 */
 	public function __construct() {
 		$this->id                 = 'wc_checkout_com_apple_pay';
-		$this->method_title       = __( 'Checkout.com', 'checkout-com-unified-payments-api' );
+		$this->method_title       = __( 'Checkout.com - Apple Pay', 'checkout-com-unified-payments-api' );
 		$this->method_description = __( 'The Checkout.com extension allows shop owners to process online payments through the <a href="https://www.checkout.com">Checkout.com Payment Gateway.</a>', 'checkout-com-unified-payments-api' );
 		$this->title              = __( 'Apple Pay', 'checkout-com-unified-payments-api' );
 		$this->has_fields         = true;
@@ -52,8 +49,6 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		add_action( 'woocommerce_api_wc_checkoutcom_session', [ $this, 'applepay_sesion' ] );
 
 		add_action( 'woocommerce_api_wc_checkoutcom_generate_token', [ $this, 'applepay_token' ] );
-<<<<<<< HEAD
-=======
 
 		add_action( 'woocommerce_api_' . strtolower( 'CKO_Apple_Pay_Woocommerce' ), [ $this, 'handle_wc_api' ] );
 
@@ -101,7 +96,6 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			'detected' => $is_detected,
 			'details' => $detected_fields,
 		];
->>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 	}
 
 	/**
@@ -110,24 +104,15 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 	 * @return string|void
 	 */
 	public function init_form_fields() {
-<<<<<<< HEAD
-		$this->form_fields = WC_Checkoutcom_Cards_Settings::apple_settings();
-		$this->form_fields = array_merge(
-			$this->form_fields,
-=======
 		$settings = WC_Checkoutcom_Cards_Settings::apple_settings();
 		// Add navigation links at the beginning, right after the first title section
 		$this->form_fields = array_merge(
->>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 			[
 				'screen_button' => [
 					'id'    => 'screen_button',
 					'type'  => 'screen_button',
 					'title' => __( 'Other Settings', 'checkout-com-unified-payments-api' ),
 				],
-<<<<<<< HEAD
-			]
-=======
 				'existing_config_banner' => [
 					'id'    => 'existing_config_banner',
 					'type'  => 'existing_config_banner',
@@ -140,7 +125,6 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 				],
 			],
 			$settings
->>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 		);
 	}
 
@@ -155,8 +139,6 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 	}
 
 	/**
-<<<<<<< HEAD
-=======
 	 * Generate existing configuration banner HTML.
 	 *
 	 * @param string $key The key.
@@ -723,7 +705,6 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 	}
 
 	/**
->>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 	 * Show frames js on checkout page.
 	 */
 	public function payment_fields() {
@@ -796,12 +777,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			// Display the button and remove the default place order.
 			checkoutInitialiseApplePay = function () {
 				jQuery( '#payment' ) . append(
-<<<<<<< HEAD
-					'<apple-pay-button id="' + applePayButtonId + '" onclick="onApplePayButtonClicked()" type="' 
-					+ "<?php echo esc_js( $this->get_option( 'ckocom_apple_type' ) ); ?>" + '" buttonstyle="' 
-=======
 					'<apple-pay-button id="' + applePayButtonId + '" onclick="onApplePayButtonClicked()" type="plain" buttonstyle="' 
->>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 					+ "<?php echo esc_js( $this->get_option( 'ckocom_apple_theme' ) ); ?>" + '" locale="' 
 					+ "<?php echo esc_js( $this->get_option( 'ckocom_apple_language' ) ); ?>" + '"></apple-pay-button>'
 				);
@@ -1160,8 +1136,6 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 	}
 
 	/**
-<<<<<<< HEAD
-=======
 	 * Handle Apple Pay method API requests.
 	 *
 	 * @return void
@@ -1564,7 +1538,6 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 	}
 
 	/**
->>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 	 * Apple pay session.
 	 *
 	 * @return void
@@ -1744,8 +1717,6 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		// when true is returned, status is changed to refunded automatically.
 		return true;
 	}
-<<<<<<< HEAD
-=======
 
 	/**
 	 * Enqueue scripts for CSR generation.
@@ -3320,5 +3291,4 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			}
 		}
 	}
->>>>>>> upstream/feature/flow-integration-v5.0.0-beta
 }

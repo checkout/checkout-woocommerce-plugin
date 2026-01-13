@@ -1,34 +1,33 @@
 <?php
 /**
- * Ideal APM class.
+ * Giropay APM class.
  *
  * @package wc_checkout_com
  */
 
 /**
- * Class WC_Gateway_Checkout_Com_Alternative_Payments_Ideal
+ * Class WC_Gateway_Checkout_Com_Alternative_Payments_Giropay
  *
- * @class   WC_Gateway_Checkout_Com_Alternative_Payments_Ideal
+ * @class   WC_Gateway_Checkout_Com_Alternative_Payments_Giropay
  * @extends WC_Gateway_Checkout_Com_Alternative_Payments
  */
-class WC_Gateway_Checkout_Com_Alternative_Payments_Ideal extends WC_Gateway_Checkout_Com_Alternative_Payments {
+class WC_Gateway_Checkout_Com_Alternative_Payments_Giropay extends WC_Gateway_Checkout_Com_Alternative_Payments {
 
-	const PAYMENT_METHOD = 'ideal';
+	const PAYMENT_METHOD = 'giropay';
 
 	/**
 	 * Construct method.
 	 */
 	public function __construct() {
-		$this->id                 = 'wc_checkout_com_alternative_payments_ideal';
-		$this->method_title       = __( 'Checkout.com', 'checkout-com-unified-payments-api' );
-		$this->method_description = __( 'The Checkout.com extension allows shop owners to process online payments through the <a href="https://www.checkout.com">Checkout.com Payment Gateway.</a>', 'checkout-com-unified-payments-api' );
-		$this->title              = __( 'Ideal', 'checkout-com-unified-payments-api' );
-		$this->has_fields         = true;
-		$this->supports           = [ 'products', 'refunds' ];
+		$this->id         = 'wc_checkout_com_alternative_payments_giropay';
+		$this->title      = __( 'Giropay', 'checkout-com-unified-payments-api' );
+		$this->has_fields = true;
+		$this->supports   = [ 'products', 'refunds' ];
 
 		$this->init_form_fields();
 
 		add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, [ $this, 'process_admin_options' ] );
+
 	}
 
 	/**
@@ -37,23 +36,24 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Ideal extends WC_Gateway_Chec
 	public function payment_fields() {
 		// get available apms depending on currency.
 		$apm_available = WC_Checkoutcom_Utility::get_alternative_payment_methods();
-		$message       = __( 'Pay with iDEAL. You will be redirected upon place order', 'checkout-com-unified-payments-api' );
+		$message       = __( 'Pay with Giropay. You will be redirected upon place order', 'checkout-com-unified-payments-api' );
 
 		?>
-			<p style="margin-bottom: 0;"> <?php echo esc_html( $message ); ?> </p>
+			<p style="margin-bottom: 0;"> <?php echo $message; ?> </p>
 		<?php
 
 		if ( ! in_array( self::PAYMENT_METHOD, $apm_available, true ) ) {
 			?>
 				<script>
-					jQuery('.payment_method_wc_checkout_com_alternative_payments_ideal').hide();
+					jQuery('.payment_method_wc_checkout_com_alternative_payments_giropay').hide();
 				</script>
 			<?php
 		}
+
 	}
 
 	/**
-	 * Process Ideal APM payment.
+	 * Process Giropay APM payment.
 	 *
 	 * @global $woocommerce
 	 * @param int $order_id Order ID.
@@ -99,5 +99,6 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Ideal extends WC_Gateway_Chec
 	public function process_refund( $order_id, $amount = null, $reason = '' ) {
 
 		return parent::process_refund( $order_id, $amount, $reason );
+
 	}
 }
