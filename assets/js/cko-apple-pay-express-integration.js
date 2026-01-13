@@ -639,15 +639,23 @@ jQuery( function ( $ ) {
                     merchantCapabilities = merchantCapabilities.filter(cap => cap !== 'supportsEMV');
                 }
 
+                // Format amount based on currency decimal places
+                // Zero-decimal currencies (JPY, KRW, etc.) should be rounded to integers
+                // Two-decimal currencies (USD, EUR, etc.) use 2 decimal places
+                const currencyCode = cko_apple_pay_vars.currency_code || 'USD';
+                const zeroDecimalCurrencies = ['JPY', 'KRW', 'VND', 'CLP', 'ISK', 'UGX', 'XAF', 'XOF', 'XPF', 'BIF', 'DJF', 'GNF', 'KMF', 'PYG', 'RWF', 'VUV'];
+                const isZeroDecimal = zeroDecimalCurrencies.includes(currencyCode.toUpperCase());
+                const formattedAmount = isZeroDecimal ? Math.round(cartTotal).toString() : cartTotal.toFixed(2);
+                
                 // Create Apple Pay payment request
                 const paymentRequest = {
                     countryCode: countryCode,
-                    currencyCode: cko_apple_pay_vars.currency_code || 'USD',
+                    currencyCode: currencyCode,
                     supportedNetworks: supportedNetworks,
                     merchantCapabilities: merchantCapabilities,
                     total: {
                         label: window.location.host,
-                        amount: cartTotal.toFixed(2),
+                        amount: formattedAmount,
                         type: 'final'
                     },
                     // REQUIRED: Request shipping contact fields (MANDATORY for express checkout)
@@ -667,11 +675,16 @@ jQuery( function ( $ ) {
 
                 // Add line items if available
                 if (displayItems && displayItems.length > 0) {
-                    paymentRequest.lineItems = displayItems.map(item => ({
-                        label: item.label,
-                        amount: item.price,
-                        type: 'final'
-                    }));
+                    paymentRequest.lineItems = displayItems.map(item => {
+                        // Format line item amount based on currency
+                        const itemAmount = parseFloat(item.price) || 0;
+                        const formattedItemAmount = isZeroDecimal ? Math.round(itemAmount).toString() : itemAmount.toFixed(2);
+                        return {
+                            label: item.label,
+                            amount: formattedItemAmount,
+                            type: 'final'
+                        };
+                    });
                 }
 
                 // Create Apple Pay session

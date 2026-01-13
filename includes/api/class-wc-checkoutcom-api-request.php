@@ -23,6 +23,7 @@ use Checkout\Payments\Previous\Source\Apm\RequestPayPalSource;
 use Checkout\Payments\Request\Source\Contexts\PaymentContextsKlarnaSource;
 use Checkout\Payments\Request\Source\RequestIdSource;
 use Checkout\Payments\Request\Source\RequestTokenSource;
+
 use Checkout\Payments\Request\Source\RequestNetworkTokenSource;
 use Checkout\Payments\ThreeDsRequest;
 use Checkout\Payments\VoidRequest;
@@ -40,6 +41,7 @@ require 'class-wc-checkoutcom-apm-method.php';
 class WC_Checkoutcom_Api_Request {
 
 	/**
+
 	 * Helper function to safely get SDK builder with null check
 	 *
 	 * @param Checkout_SDK $checkout SDK instance
@@ -95,6 +97,7 @@ class WC_Checkoutcom_Api_Request {
 			if ( true === $retry_idempotency_key ) {
 				$cko_idempotency_key .= '-' . gmdate( 'Y-m-d h:i:s' );
 			}
+
 
 		// Call to create charge.
 		$builder = $checkout->get_builder();
@@ -213,6 +216,7 @@ class WC_Checkoutcom_Api_Request {
 			$card_scheme = $arg['preferred_scheme'];
 		}
 
+
 		// For express checkout, if POST data doesn't have address info, get it from order
 		$customer_address = WC_Checkoutcom_Api_Request::customer_address( $post_data, $order );
 
@@ -258,6 +262,7 @@ class WC_Checkoutcom_Api_Request {
 			$payment_option = 'PayPal';
 
 			$method = new RequestPayPalSource();
+
 
 		} elseif ( 'wc_checkout_com_flow' === $post_data['payment_method'] ) {
 			$payment_option = 'Flow';
@@ -324,6 +329,7 @@ class WC_Checkoutcom_Api_Request {
 			$method->id = $arg['source_id'];
 		}
 
+
 		// Safety check to prevent null method error
 		if ( null === $method ) {
 			WC_Checkoutcom_Utility::logger( 'Error: Payment method is null in get_request_param' );
@@ -359,6 +365,7 @@ class WC_Checkoutcom_Api_Request {
 
 		$payment->source = $method;
 
+
 		// Get email and name from POST data or order (for express checkout)
 		$email = isset( $post_data['billing_email'] ) ? $post_data['billing_email'] : '';
 		$name  = isset( $post_data['billing_first_name'] ) && isset( $post_data['billing_last_name'] ) 
@@ -367,6 +374,7 @@ class WC_Checkoutcom_Api_Request {
 
 		// Pay Order Page.
 		$is_pay_order = ! empty( $get_data['pay_for_order'] ) && (bool) $get_data['pay_for_order'];
+
 
 		// Check if this is express checkout (POST data doesn't have address info)
 		$is_express_checkout = empty( $customer_address['billing_address_1'] ) && empty( $customer_address['billing_city'] ) && ! empty( $order );
@@ -382,6 +390,7 @@ class WC_Checkoutcom_Api_Request {
 
 			$email = $order->get_billing_email();
 			$name  = $order->get_billing_first_name() . ' ' . $order->get_billing_last_name();
+
 		} elseif ( $is_express_checkout && ! empty( $order ) ) {
 			// Express checkout: Get email and name from order when POST data is empty
 			$email = $order->get_billing_email();
@@ -546,6 +555,7 @@ class WC_Checkoutcom_Api_Request {
 			}
 		}
 
+
 		// If this is MOTO order (Admin-created order + Order-pay page + Guest customer).
 		$is_order_pay_page = ! empty( $_GET['pay_for_order'] ) && (bool) $_GET['pay_for_order'];
 		$is_guest_customer = $order->get_customer_id() == 0; // Guest customer = no customer account
@@ -573,6 +583,7 @@ class WC_Checkoutcom_Api_Request {
 	/**
 	 * Return customer address.
 	 *
+
 	 * @param array    $data Post data.
 	 * @param WC_Order $order Order object (optional, used for express checkout when POST data is empty).
 	 *
@@ -590,6 +601,7 @@ class WC_Checkoutcom_Api_Request {
 		$billing_state      = empty( $data['billing_state'] ) ? '' : wc_clean( $data['billing_state'] );
 		$billing_postcode   = empty( $data['billing_postcode'] ) ? '' : wc_clean( $data['billing_postcode'] );
 		$billing_country    = empty( $data['billing_country'] ) ? '' : wc_clean( $data['billing_country'] );
+
 
 		// Check if POST data is empty (express checkout scenario) and we have an order
 		$is_express_checkout = empty( $billing_address_1 ) && empty( $billing_city ) && ! empty( $order );
@@ -632,6 +644,7 @@ class WC_Checkoutcom_Api_Request {
 			$shipping_state      = $order->get_shipping_state();
 			$shipping_postcode   = $order->get_shipping_postcode();
 			$shipping_country    = $order->get_shipping_country();
+
 
 		} elseif ( $is_express_checkout && ! empty( $order ) ) {
 			// Express checkout: Get billing and shipping details from order when POST data is empty
@@ -697,6 +710,7 @@ class WC_Checkoutcom_Api_Request {
 		$checkout = new Checkout_SDK();
 
 		try {
+
 
 		// Get payment response.
 		$builder = $checkout->get_builder();
@@ -770,6 +784,7 @@ class WC_Checkoutcom_Api_Request {
 	 * @return mixed
 	 */
 	public static function generate_google_token() {
+
 		// Protocol version is safe to sanitize
 		$protocol_version = sanitize_text_field( $_POST['cko-google-protocolVersion'] );
 		
@@ -818,6 +833,7 @@ class WC_Checkoutcom_Api_Request {
 			$google_pay_token_request             = new GooglePayTokenRequest();
 			$google_pay_token_request->token_data = $google_pay;
 
+
 			$builder = $checkout->get_builder();
 		if ( ! $builder ) {
 			WC_Checkoutcom_Utility::logger( 'Checkout.com SDK not initialized - cannot request Google Pay token' );
@@ -832,6 +848,7 @@ class WC_Checkoutcom_Api_Request {
 		} catch ( CheckoutApiException $ex ) {
 			$error_message = __( 'An error has occurred while processing your Google pay payment.', 'checkout-com-unified-payments-api' );
 			WC_Checkoutcom_Utility::logger( $error_message, $ex );
+
 			return array( 'error' => $error_message . ' ' . $ex->getMessage() );
 		}
 	}
@@ -1356,11 +1373,13 @@ class WC_Checkoutcom_Api_Request {
 	 *
 	 * @return array
 	 */
+
 	public static function get_cart_info( $flow = false ) {
 
 		if ( ! WC()->cart ) {
 			return [];
 		}
+
 
 	$items    = WC()->cart->get_cart();
 	$products = [];
@@ -1392,6 +1411,7 @@ class WC_Checkoutcom_Api_Request {
 				$tax       = WC_Tax::get_rates();
 				$reset_tax = reset( $tax )['rate'];
 				$tax_rate  = round( $reset_tax );
+
 
 		} else {
 			$tax_rate               = 0;
@@ -1499,6 +1519,7 @@ class WC_Checkoutcom_Api_Request {
 					$total_tax_amount_cents = 0;
 				}
 
+
 				// Only add total_tax_amount and total_discount_amount if flow is false.
 				if ( ! $flow ) {
 					$products[] = [
@@ -1530,6 +1551,7 @@ class WC_Checkoutcom_Api_Request {
 		$locale                 = substr( $woo_locale, 0, 5 );
 		$total_tax_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( WC()->cart->get_total_tax(), get_woocommerce_currency() );
 
+
 		// Determine payment type based on subscription detection
 		$payment_type = $regular_payment_type;
 		if ( $contains_subscription_product ) {
@@ -1555,6 +1577,7 @@ class WC_Checkoutcom_Api_Request {
 			'order_amount'      => $amount_cents,
 			'order_tax_amount'  => $total_tax_amount_cents,
 			'order_lines'       => $products,
+
 			'contains_virtual_product' => $contains_virtual_product,
 		];
 
@@ -1785,6 +1808,7 @@ class WC_Checkoutcom_Api_Request {
 	 * @return array
 	 */
 	public static function get_paypal_products( $order ) {
+
 		$cart_info = WC_Checkoutcom_Api_Request::get_cart_info(false);
 		$products  = [];
 

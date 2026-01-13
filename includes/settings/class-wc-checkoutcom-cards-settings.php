@@ -38,11 +38,10 @@ class WC_Checkoutcom_Cards_Settings {
 			<td class="forminp forminp-checkoutcom_webhook_settings">
 				<p>
 					<button type="button" class="button button-primary" id="checkoutcom-is-register-webhook"><?php esc_html_e( 'Run Webhook check', 'checkout-com-unified-payments-api' ); ?></button>
-					<span class="dashicons dashicons-yes hidden" style="font-size: 30px;height: 30px;width: 30px;color: #008000;"></span>
-					<span class="spinner" style="float: none;"></span>
-					<p><?php esc_html_e( 'This action will check if webhook is configured for current site.', 'checkout-com-unified-payments-api' ); ?></p>
+					<span class="spinner" style="float: none; margin-left: 10px;"></span>
+					<span class="dashicons dashicons-yes hidden" style="font-size: 20px;height: 20px;width: 20px;color: #008000;vertical-align: middle;margin-left: 10px;"></span>
 				</p>
-				<p class="checkoutcom-is-register-webhook-text"></p>
+				<p class="checkoutcom-is-register-webhook-text" style="margin-top: 15px;font-size: 14px;"></p>
 			</td>
 		</tr>
 
@@ -67,6 +66,225 @@ class WC_Checkoutcom_Cards_Settings {
 		</tr>
 
 		<?php
+	}
+
+	/**
+	 * CKO admin quick settings fields (minimum required settings)
+	 *
+	 * @return mixed
+	 */
+	public static function quick_settings() {
+		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$nas_docs      = 'https://www.checkout.com/docs/four/resources/api-authentication/api-keys';
+		$abc_docs      = 'https://www.checkout.com/docs/the-hub/update-your-hub-settings#Manage_the_API_keys';
+		$docs_link     = $nas_docs; // Default to NAS docs since account type is NAS
+
+		$checkout_mode = isset( $core_settings['ckocom_checkout_mode'] ) ? $core_settings['ckocom_checkout_mode'] : 'flow';
+
+		// Always define Flow enabled payment methods options (for JavaScript toggle)
+		$flow_enabled_methods_options = array(
+			// Card payments
+			'card'        => __( '💳 Card (Credit/Debit) - Global', 'checkout-com-unified-payments-api' ),
+			'stored_card' => __( '🔐 Stored Card (Checkout.com Network) - Global', 'checkout-com-unified-payments-api' ),
+			
+			// Global / Multi-Region
+			'googlepay'   => __( '🟢 Google Pay - Global', 'checkout-com-unified-payments-api' ),
+			'applepay'    => __( '🍎 Apple Pay - Global', 'checkout-com-unified-payments-api' ),
+			'paypal'      => __( '🅿️ PayPal - Global', 'checkout-com-unified-payments-api' ),
+			
+			// Europe
+			'ideal'       => __( '🇳🇱 iDEAL - Netherlands', 'checkout-com-unified-payments-api' ),
+			'eps'         => __( '🇦🇹 EPS - Austria', 'checkout-com-unified-payments-api' ),
+			'bancontact'  => __( '🇧🇪 Bancontact - Belgium', 'checkout-com-unified-payments-api' ),
+			'p24'         => __( '🇵🇱 Przelewy24 - Poland', 'checkout-com-unified-payments-api' ),
+			'multibanco'  => __( '🇵🇹 Multibanco - Portugal', 'checkout-com-unified-payments-api' ),
+			'mbway'       => __( '🇵🇹 MB WAY - Portugal', 'checkout-com-unified-payments-api' ),
+			'klarna'      => __( '🇪🇺 Klarna - EU/Nordics/UK', 'checkout-com-unified-payments-api' ),
+			'sepa'        => __( '🇪🇺 SEPA Direct Debit - EU', 'checkout-com-unified-payments-api' ),
+			'alma'        => __( '🇫🇷 Alma (Installments) - France', 'checkout-com-unified-payments-api' ),
+			
+			// Middle East
+			'knet'        => __( '🇰🇼 KNET - Kuwait', 'checkout-com-unified-payments-api' ),
+			'benefit'     => __( '🇧🇭 BenefitPay - Bahrain', 'checkout-com-unified-payments-api' ),
+			'stcpay'      => __( '🇸🇦 STC Pay - Saudi Arabia', 'checkout-com-unified-payments-api' ),
+			'tabby'       => __( '🇦🇪 Tabby - UAE/Saudi Arabia', 'checkout-com-unified-payments-api' ),
+			'tamara'      => __( '🇦🇪 Tamara - UAE/Saudi Arabia', 'checkout-com-unified-payments-api' ),
+			'qpay'        => __( '🇶🇦 QPay - Qatar', 'checkout-com-unified-payments-api' ),
+			
+			// Asia
+			'tng'         => __( '🇲🇾 Touch n Go - Malaysia', 'checkout-com-unified-payments-api' ),
+			'truemoney'   => __( '🇹🇭 TrueMoney - Thailand', 'checkout-com-unified-payments-api' ),
+			'dana'        => __( '🇮🇩 DANA - Indonesia', 'checkout-com-unified-payments-api' ),
+			'gcash'       => __( '🇵🇭 GCash - Philippines', 'checkout-com-unified-payments-api' ),
+			'kakaopay'    => __( '🇰🇷 KakaoPay - South Korea', 'checkout-com-unified-payments-api' ),
+			
+			// China / Hong Kong
+			'alipay_cn'   => __( '🇨🇳 Alipay CN - China', 'checkout-com-unified-payments-api' ),
+			'alipay_hk'   => __( '🇭🇰 Alipay HK - Hong Kong', 'checkout-com-unified-payments-api' ),
+		);
+
+		// Load existing values from saved settings
+		$existing_checkout_mode = isset( $core_settings['ckocom_checkout_mode'] ) ? $core_settings['ckocom_checkout_mode'] : 'flow';
+		$existing_environment = isset( $core_settings['ckocom_environment'] ) ? $core_settings['ckocom_environment'] : 'sandbox';
+		$existing_account_type = isset( $core_settings['ckocom_account_type'] ) ? $core_settings['ckocom_account_type'] : 'NAS';
+		// Ensure account type is NAS (cannot be changed)
+		if ( 'NAS' !== $existing_account_type ) {
+			$existing_account_type = 'NAS';
+		}
+		$existing_sk = isset( $core_settings['ckocom_sk'] ) ? $core_settings['ckocom_sk'] : '';
+		$existing_pk = isset( $core_settings['ckocom_pk'] ) ? $core_settings['ckocom_pk'] : '';
+		$existing_title = isset( $core_settings['title'] ) ? $core_settings['title'] : 'Pay by Card with Checkout.com';
+
+		$settings = [
+			'quick_setting'        => [
+				'title'       => __( 'Quick Settings', 'checkout-com-unified-payments-api' ),
+				'type'        => 'title',
+				'description' => __( 'Configure the essential settings to get started with Checkout.com payments.', 'checkout-com-unified-payments-api' ),
+			],
+			'ckocom_checkout_mode' => [
+				'id'          => 'ckocom_checkout_mode',
+				'title'       => __( 'Checkout Mode', 'checkout-com-unified-payments-api' ),
+				'type'        => 'select',
+				'description' => __( 'Select the checkout mode for payment processing. Flow is the modern, recommended option.', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => true,
+				'options'     => [
+					'flow'    => __( 'Flow', 'checkout-com-unified-payments-api' ),
+					'classic' => __( 'Classic', 'checkout-com-unified-payments-api' ),
+				],
+				'default'     => 'flow',
+				'value'       => $existing_checkout_mode, // Load existing value
+			],
+			'ckocom_environment'  => [
+				'id'          => 'ckocom_environment',
+				'title'       => __( 'Environment', 'checkout-com-unified-payments-api' ),
+				'type'        => 'select',
+				'description' => __( 'When going to production, make sure to set this to Live', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => true,
+				'options'     => [
+					'sandbox' => __( 'SandBox', 'checkout-com-unified-payments-api' ),
+					'live'    => __( 'Live', 'checkout-com-unified-payments-api' ),
+				],
+				'default'     => 'sandbox',
+				'value'       => $existing_environment, // Load existing value
+			],
+			'ckocom_account_type' => [
+				'id'          => 'ckocom_account_type',
+				'title'       => __( 'Account Type', 'checkout-com-unified-payments-api' ),
+				'type'        => 'select',
+				'description' => __( 'Your account type is set to NAS by default and cannot be changed.', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => true,
+				'options'     => [
+					'NAS' => __( 'NAS', 'checkout-com-unified-payments-api' ),
+					'ABC' => __( 'ABC', 'checkout-com-unified-payments-api' ),
+				],
+				'default'     => 'NAS',
+				'value'       => 'NAS', // Always NAS, cannot be changed
+				'custom_attributes' => [
+					'disabled' => 'disabled',
+				],
+			],
+			'ckocom_sk'           => [
+				'id'          => 'ckocom_sk',
+				'title'       => __( 'Secret Key', 'checkout-com-unified-payments-api' ),
+				'type'        => 'password',
+				/* translators: 1: HTML anchor opening tag, 2: HTML anchor closing tag. */
+				'description' => sprintf( __( 'You can %1$s find your secret key %2$s in the Checkout.com Hub', 'checkout-com-unified-payments-api' ), '<a class="checkoutcom-key-docs" target="_blank" href="' . esc_url( $docs_link ) . '">', '</a>' ),
+				'placeholder' => 'sk_xxx',
+				'value'       => $existing_sk, // Load existing value
+				'custom_attributes' => [
+					'autocomplete' => 'current-password',
+				],
+			],
+			'ckocom_pk'           => [
+				'id'          => 'ckocom_pk',
+				'title'       => __( 'Public Key', 'checkout-com-unified-payments-api' ),
+				'type'        => 'text',
+				/* translators: 1: HTML anchor opening tag, 2: HTML anchor closing tag. */
+				'description' => sprintf( __( 'You can %1$s find your public key %2$s in the Checkout.com Hub', 'checkout-com-unified-payments-api' ), '<a class="checkoutcom-key-docs" target="_blank" href="' . esc_url( $docs_link ) . '">', '</a>' ),
+				'placeholder' => 'pk_xxx',
+				'value'       => $existing_pk, // Load existing value
+			],
+			'title'               => [
+				'id'          => 'title',
+				'title'       => __( 'Payment Method Title', 'checkout-com-unified-payments-api' ),
+				'type'        => 'text',
+				'description' => __( 'The title displayed to customers at checkout (e.g., "Pay by Card with Checkout.com" or "Checkout.com Payment")', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => true,
+				'default'     => 'Pay by Card with Checkout.com',
+				'value'       => $existing_title, // Load existing value
+			],
+			'checkoutcom_webhook_status' => [
+				'id'    => 'checkoutcom_webhook_status',
+				'type'  => 'checkoutcom_webhook_settings',
+				'title' => '',
+			],
+		];
+
+		// Always add Enabled Payment Methods field (will be shown/hidden by JavaScript based on checkout mode)
+		$flow_com_link = 'https://www.checkout.com/docs/payments/accept-payments/accept-a-payment-on-your-website/flow-library-reference/checkoutwebcomponents#Methods';
+		// Load existing value from Flow settings
+		$flow_settings = get_option( 'woocommerce_wc_checkout_com_flow_settings', array() );
+		$existing_flow_value = isset( $flow_settings['flow_enabled_payment_methods'] ) ? $flow_settings['flow_enabled_payment_methods'] : array();
+		
+		// Determine initial visibility based on saved checkout mode
+		$flow_field_visible = ( 'flow' === $checkout_mode );
+		$apm_field_visible = ( 'classic' === $checkout_mode );
+		
+		$settings['flow_enabled_payment_methods'] = array(
+			'id'          => 'flow_enabled_payment_methods',
+			'title'       => __( 'Enabled Payment Methods', 'checkout-com-unified-payments-api' ),
+			'type'        => 'multiselect',
+			'class'       => 'wc-enhanced-select cko-flow-payment-methods',
+			'css'         => 'width: 400px;',
+			/* translators: 1: HTML anchor opening tag, 2: HTML anchor closing tag. */
+			'description' => sprintf( __( 'Select which payment methods to enable at checkout. Leave empty to enable all available methods. %1$s Learn more about payment methods %2$s', 'checkout-com-unified-payments-api' ), '<a class="checkoutcom-key-docs" target="_blank" href="' . esc_url( $flow_com_link ) . '">', '</a>' ),
+			'desc_tip'    => true,
+			'options'     => $flow_enabled_methods_options,
+			'default'     => array(),
+			'value'       => $existing_flow_value, // Override default value loading
+			'custom_attributes' => array(
+				'data-checkout-mode' => 'flow',
+				'data-field-type' => 'flow-enabled-methods'
+			),
+		);
+
+		// Always add Alternative Payment Methods field (will be shown/hidden by JavaScript based on checkout mode)
+		// Load existing value from Alternative Payments settings
+		$apm_settings = get_option( 'woocommerce_wc_checkout_com_alternative_payments_settings', array() );
+		$existing_apm_value = isset( $apm_settings['ckocom_apms_selector'] ) ? $apm_settings['ckocom_apms_selector'] : array();
+		
+		$settings['ckocom_apms_selector'] = array(
+			'id'          => 'ckocom_apms_selector',
+			'title'       => __( 'Alternative Payment Methods', 'checkout-com-unified-payments-api' ),
+			'type'        => 'multiselect',
+			'class'       => 'wc-enhanced-select cko-classic-payment-methods',
+			'css'         => 'width: 400px;',
+			'description' => __( 'Select which alternative payment methods to enable at checkout.', 'checkout-com-unified-payments-api' ),
+			'desc_tip'    => true,
+			'options'     => array(
+				'alipay'     => __( 'Alipay', 'checkout-com-unified-payments-api' ),
+				'boleto'     => __( 'Boleto', 'checkout-com-unified-payments-api' ),
+				'ideal'      => __( 'iDEAL', 'checkout-com-unified-payments-api' ),
+				'klarna'     => __( 'Klarna', 'checkout-com-unified-payments-api' ),
+				'poli'       => __( 'Poli', 'checkout-com-unified-payments-api' ),
+				'sepa'       => __( 'Sepa Direct Debit', 'checkout-com-unified-payments-api' ),
+				'sofort'     => __( 'Sofort', 'checkout-com-unified-payments-api' ),
+				'eps'        => __( 'EPS', 'checkout-com-unified-payments-api' ),
+				'bancontact' => __( 'Bancontact', 'checkout-com-unified-payments-api' ),
+				'knet'       => __( 'KNET', 'checkout-com-unified-payments-api' ),
+				'fawry'      => __( 'Fawry', 'checkout-com-unified-payments-api' ),
+				'qpay'       => __( 'QPay', 'checkout-com-unified-payments-api' ),
+				'multibanco' => __( 'Multibanco', 'checkout-com-unified-payments-api' ),
+			),
+			'default'     => array(),
+			'value'       => $existing_apm_value, // Load existing value
+			'custom_attributes' => array(
+				'data-checkout-mode' => 'classic',
+				'data-field-type' => 'alternative-payment-methods'
+			),
+		);
+
+		return apply_filters( 'wc_checkout_com_quick_settings', $settings );
 	}
 
 	/**
@@ -110,13 +328,13 @@ class WC_Checkoutcom_Cards_Settings {
 			'ckocom_checkout_mode' => [
 				'title'       => __( 'Checkout Mode', 'checkout-com-unified-payments-api' ),
 				'type'        => 'select',
-				'description' => __( 'Select the checkout mode for payment processing.', 'checkout-com-unified-payments-api' ),
+				'description' => __( 'Select the checkout mode for payment processing. Flow is the modern, recommended option.', 'checkout-com-unified-payments-api' ),
 				'desc_tip'    => true,
 				'options'     => [
-					'classic' => __( 'Classic', 'checkout-com-unified-payments-api' ),
 					'flow'    => __( 'Flow', 'checkout-com-unified-payments-api' ),
+					'classic' => __( 'Classic', 'checkout-com-unified-payments-api' ),
 				],
-				'default'     => 'classic',
+				'default'     => 'flow',
 			],
 			'ckocom_region' => [
 				'title'       => __( 'Region', 'checkout-com-unified-payments-api' ),
@@ -1258,6 +1476,14 @@ class WC_Checkoutcom_Cards_Settings {
 				'default'  => 'no',
 				'desc'     => __( 'Check to show gateway response.', 'checkout-com-unified-payments-api' ),
 			],
+			'cko_performance_logging' => [
+				'id'       => 'cko_performance_logging',
+				'title'    => __( 'Performance Logging', 'checkout-com-unified-payments-api' ),
+				'type'     => 'checkbox',
+				'desc_tip' => true,
+				'default'  => 'no',
+				'desc'     => __( 'Check to enable performance monitoring and logging. Track and log performance metrics for debugging and optimization.', 'checkout-com-unified-payments-api' ),
+			],
 		];
 
 		return apply_filters( 'wc_checkout_com_cards', $settings );
@@ -1696,8 +1922,9 @@ class WC_Checkoutcom_Cards_Settings {
 					'title'       => __( 'Locale', 'checkout-com-unified-payments-api' ),
 					'type'        => 'text',
 					/* translators: 1: HTML anchor opening tag, 2: HTML anchor closing tag. */
-					'description' => sprintf( __( 'You can %1$s check out locales here %2$s in the Checkout.com Hub', 'checkout-com-unified-payments-api' ), '<a class="checkoutcom-key-docs" target="_blank" href="' . esc_url( $locale_link ) . '">', '</a>' ),
-					'default'     => 'en',
+					'description' => sprintf( __( 'Flow component language. Defaults to WordPress site language if empty. You can %1$s check out locales here %2$s in the Checkout.com Hub', 'checkout-com-unified-payments-api' ), '<a class="checkoutcom-key-docs" target="_blank" href="' . esc_url( $locale_link ) . '">', '</a>' ),
+					'desc_tip'    => __( 'Leave empty to automatically use your WordPress site language, or enter a specific locale code (e.g., "fr", "de", "es") to override.', 'checkout-com-unified-payments-api' ),
+					'default'     => '',
 				),
 				'flow_component_translation'                 => array(
 					'id'          => 'flow_component_translation',
@@ -1723,65 +1950,6 @@ class WC_Checkoutcom_Cards_Settings {
 					/* translators: 1: HTML anchor opening tag, 2: HTML anchor closing tag. */
 					'description' => sprintf( __( 'You can %1$s read more about flow component name here %2$s in the Checkout.com Hub. "flow" option will render all the available payment methods.', 'checkout-com-unified-payments-api' ), '<a class="checkoutcom-key-docs" target="_blank" href="' . esc_url( $flow_com_link ) . '">', '</a>' ),
 					'default'     => 'flow',
-				),
-				'flow_enabled_payment_methods'               => array(
-					'id'          => 'flow_enabled_payment_methods',
-					'title'       => __( 'Enabled Payment Methods', 'checkout-com-unified-payments-api' ),
-					'type'        => 'multiselect',
-					'class'       => 'wc-enhanced-select',
-					'css'         => 'width: 400px;',
-					'description' => __( 'Select which payment methods to enable at checkout. Leave empty to enable all available methods. Select "Card" if you want only specific methods to show. Note: MOTO orders (admin-created orders) will always allow all payment methods regardless of this setting.', 'checkout-com-unified-payments-api' ),
-					'desc_tip'    => true,
-					'options'     => array(
-						// Card payments
-						'card'        => __( '💳 Card (Credit/Debit) - Global', 'checkout-com-unified-payments-api' ),
-						'stored_card' => __( '🔐 Stored Card (Checkout.com Network) - Global', 'checkout-com-unified-payments-api' ),
-						
-						// Global / Multi-Region
-						'googlepay'   => __( '🟢 Google Pay - Global', 'checkout-com-unified-payments-api' ),
-						'applepay'    => __( '🍎 Apple Pay - Global', 'checkout-com-unified-payments-api' ),
-						'paypal'      => __( '🅿️ PayPal - Global', 'checkout-com-unified-payments-api' ),
-						
-						// Europe
-						'ideal'       => __( '🇳🇱 iDEAL - Netherlands', 'checkout-com-unified-payments-api' ),
-						'eps'         => __( '🇦🇹 EPS - Austria', 'checkout-com-unified-payments-api' ),
-						'bancontact'  => __( '🇧🇪 Bancontact - Belgium', 'checkout-com-unified-payments-api' ),
-						'p24'         => __( '🇵🇱 Przelewy24 - Poland', 'checkout-com-unified-payments-api' ),
-						'multibanco'  => __( '🇵🇹 Multibanco - Portugal', 'checkout-com-unified-payments-api' ),
-						'mbway'       => __( '🇵🇹 MB WAY - Portugal', 'checkout-com-unified-payments-api' ),
-						'klarna'      => __( '🇪🇺 Klarna - EU/Nordics/UK', 'checkout-com-unified-payments-api' ),
-						'sepa'        => __( '🇪🇺 SEPA Direct Debit - EU', 'checkout-com-unified-payments-api' ),
-						'alma'        => __( '🇫🇷 Alma (Installments) - France', 'checkout-com-unified-payments-api' ),
-						
-						// Middle East
-						'knet'        => __( '🇰🇼 KNET - Kuwait', 'checkout-com-unified-payments-api' ),
-						'benefit'     => __( '🇧🇭 BenefitPay - Bahrain', 'checkout-com-unified-payments-api' ),
-						'stcpay'      => __( '🇸🇦 STC Pay - Saudi Arabia', 'checkout-com-unified-payments-api' ),
-						'tabby'       => __( '🇦🇪 Tabby - UAE/Saudi Arabia', 'checkout-com-unified-payments-api' ),
-						'tamara'      => __( '🇦🇪 Tamara - UAE/Saudi Arabia', 'checkout-com-unified-payments-api' ),
-						'qpay'        => __( '🇶🇦 QPay - Qatar', 'checkout-com-unified-payments-api' ),
-						
-						// Asia
-						'tng'         => __( '🇲🇾 Touch n Go - Malaysia', 'checkout-com-unified-payments-api' ),
-						'truemoney'   => __( '🇹🇭 TrueMoney - Thailand', 'checkout-com-unified-payments-api' ),
-						'dana'        => __( '🇮🇩 DANA - Indonesia', 'checkout-com-unified-payments-api' ),
-						'gcash'       => __( '🇵🇭 GCash - Philippines', 'checkout-com-unified-payments-api' ),
-						'kakaopay'    => __( '🇰🇷 KakaoPay - South Korea', 'checkout-com-unified-payments-api' ),
-						
-						// China / Hong Kong
-						'alipay_cn'   => __( '🇨🇳 Alipay CN - China', 'checkout-com-unified-payments-api' ),
-						'alipay_hk'   => __( '🇭🇰 Alipay HK - Hong Kong', 'checkout-com-unified-payments-api' ),
-					),
-					'default'     => array(), // Empty by default - shows all available methods including cards
-				),
-			'flow_debug_logging'                   => array(
-				'id'          => 'flow_debug_logging',
-				'title'       => __( 'Debug Logging', 'checkout-com-unified-payments-api' ),
-				'type'        => 'checkbox',
-				'label'       => __( 'Enable detailed console logging for debugging', 'checkout-com-unified-payments-api' ),
-				'description' => __( 'When enabled, logs detailed debugging information to browser console including initialization, form submissions, and card saving. Shows performance metrics, 3DS flows, and payment processing steps. <strong>Disable in production</strong> to reduce console output. Critical errors, warnings, webhooks, and 3DS authentication will always be visible.', 'checkout-com-unified-payments-api' ),
-					'desc_tip'    => true,
-					'default'     => 'yes',
 				),
 			)
 		);

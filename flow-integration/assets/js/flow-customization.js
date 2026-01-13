@@ -151,7 +151,14 @@ document.addEventListener("DOMContentLoaded", function () {
 window.componentName = cko_flow_customization_vars.flow_component_name || 'flow';
 
 // Locale and Translation section.
-window.locale = cko_flow_customization_vars.flow_component_locale;
+// Use Flow locale setting if provided, otherwise fallback to WordPress locale
+// WordPress locale is passed as wp_locale (full locale like 'fr_FR') or can be extracted from browser
+const flowLocale = cko_flow_customization_vars.flow_component_locale;
+const wpLocale = cko_flow_customization_vars.wp_locale ? 
+	cko_flow_customization_vars.wp_locale.substring(0, 2) : // Extract language code (e.g., 'fr_FR' -> 'fr')
+	(navigator.language || navigator.userLanguage || 'en').substring(0, 2);
+
+window.locale = flowLocale || wpLocale || 'en';
 
 function isValidJson(str) {
     try {
