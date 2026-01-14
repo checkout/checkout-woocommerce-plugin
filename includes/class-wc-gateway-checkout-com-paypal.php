@@ -811,6 +811,16 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 
 				$order->set_transaction_id( $response['id'] );
 				$order->update_meta_data( '_cko_payment_id', $response['id'] );
+				
+				// CRITICAL: Save order immediately so webhooks can find it by payment ID
+				// Webhooks may arrive very quickly after payment, so payment ID must be saved before status update
+				$order->save();
+				WC_Checkoutcom_Utility::logger( 'PayPal Express: Payment ID saved to order immediately - Order ID: ' . $order->get_id() . ', Payment ID: ' . $response['id'] );
+				
+				// Process any pending webhooks for this order (webhooks may have arrived before payment ID was saved)
+				if ( class_exists( 'WC_Checkout_Com_Webhook_Queue' ) ) {
+					WC_Checkout_Com_Webhook_Queue::process_pending_webhooks_for_order( $order );
+				}
 
 				if ( class_exists( 'WC_Subscriptions_Order' ) && isset( $response['source'] ) ) {
 					// Save source id for subscription.

@@ -5674,12 +5674,13 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// Method 3: Try payment ID alone (fallback if combined match failed)
 		// CRITICAL: Only match orders that need updating (pending, failed, on-hold, processing)
 		// This ensures webhook updates correct order and prevents matching completed orders
+		// IMPORTANT: Check BOTH _cko_flow_payment_id (Flow payments) AND _cko_payment_id (PayPal Express/other payments)
 		if ( ! $order && ! empty( $data->data->id ) ) {
 			if ( $webhook_debug_enabled ) {
 				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Looking for order by payment ID: ' . $data->data->id );
 			}
 			
-			// First try to match orders that need updating (pending, failed, on-hold, processing)
+			// First try _cko_flow_payment_id (Flow payments) in active statuses
 			$orders = wc_get_orders( array(
 				'limit'        => 1,
 				'meta_key'     => '_cko_flow_payment_id',
@@ -5688,18 +5689,44 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				'return'       => 'objects',
 			) );
 			
+			// If not found, try _cko_payment_id (PayPal Express and other non-Flow payments) in active statuses
+			if ( empty( $orders ) ) {
+				if ( $webhook_debug_enabled ) {
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Not found in _cko_flow_payment_id, trying _cko_payment_id...' );
+				}
+				$orders = wc_get_orders( array(
+					'limit'        => 1,
+					'meta_key'     => '_cko_payment_id',
+					'meta_value'   => $data->data->id,
+					'status'       => array( 'pending', 'failed', 'on-hold', 'processing' ), // ✅ Only match orders that need updating
+					'return'       => 'objects',
+				) );
+			}
+			
 			// If not found in active orders, try all orders (fallback for edge cases)
 			if ( empty( $orders ) ) {
 				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Order not found in active statuses, trying all orders (fallback)...' );
 				if ( $webhook_debug_enabled ) {
 					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order not found in active statuses, trying all orders...' );
 				}
+				// Try Flow payment ID first
 				$orders = wc_get_orders( array(
 					'limit'        => 1,
 					'meta_key'     => '_cko_flow_payment_id',
 					'meta_value'   => $data->data->id,
 					'return'       => 'objects',
 				) );
+				
+				// If still not found, try regular payment ID
+				if ( empty( $orders ) ) {
+					$orders = wc_get_orders( array(
+						'limit'        => 1,
+						'meta_key'     => '_cko_payment_id',
+						'meta_value'   => $data->data->id,
+						'return'       => 'objects',
+					) );
+				}
+				
 				if ( ! empty( $orders ) ) {
 					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ⚠️ Found order in fallback search (all statuses) - Order ID: ' . $orders[0]->get_id() );
 				}
@@ -5721,7 +5748,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					$data->data->metadata = (object) array( 'order_id' => $order->get_id() );
 				}
 			} else {
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ❌ METHOD 3 FAILED - No order found by payment ID: ' . $webhook_payment_id );
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ❌ METHOD 3 FAILED - No order found by payment ID: ' . $data->data->id );
 				if ( $webhook_debug_enabled ) {
 					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order found by payment ID: NO' );
 					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: This is normal for webhooks that arrive before process_payment() completes' );
@@ -5780,7 +5807,15 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			$expected_payment_id = ! empty( $order_payment_id ) ? $order_payment_id : $order_payment_id_alt;
 			
 			// CRITICAL: If order has a payment ID, it MUST match the webhook payment ID
-			if ( ! empty( $expected_payment_id ) && $expected_payment_id !== $webhook_payment_id ) {
+			// Check both meta keys to ensure we match correctly (Flow uses _cko_flow_payment_id, PayPal Express uses _cko_payment_id)
+			$payment_id_matches = false;
+			if ( ! empty( $order_payment_id ) && $order_payment_id === $webhook_payment_id ) {
+				$payment_id_matches = true;
+			} elseif ( ! empty( $order_payment_id_alt ) && $order_payment_id_alt === $webhook_payment_id ) {
+				$payment_id_matches = true;
+			}
+			
+			if ( ! empty( $expected_payment_id ) && ! $payment_id_matches ) {
 				// Payment ID mismatch - reject webhook BEFORE processing
 				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ❌ CRITICAL ERROR - Payment ID mismatch in Flow webhook handler!' );
 				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Order ID: ' . $order->get_id() );
@@ -5802,6 +5837,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					WC_Checkoutcom_Utility::logger( 'Flow webhook: No payment ID found in order, setting from webhook: ' . $webhook_payment_id );
 				}
 				$order->set_transaction_id( $webhook_payment_id );
+				// Set both meta keys for compatibility
 				$order->update_meta_data( '_cko_payment_id', $webhook_payment_id );
 				$order->update_meta_data( '_cko_flow_payment_id', $webhook_payment_id );
 				$order->save();
