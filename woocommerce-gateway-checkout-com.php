@@ -38,13 +38,20 @@ if ( ! defined( 'ABSPATH' ) ) {
 $autoloader_path = __DIR__ . '/vendor/autoload.php';
 if ( file_exists( $autoloader_path ) ) {
 	require_once $autoloader_path;
-	// Verify SDK classes are available
-	if ( ! class_exists( 'Checkout\CheckoutSdk' ) ) {
-		error_log( 'Checkout.com SDK classes not loaded after autoloader inclusion. Path: ' . $autoloader_path );
+	// Verify SDK classes are available (only log if WP_DEBUG is enabled)
+	if ( ! class_exists( 'Checkout\CheckoutSdk' ) && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+		error_log( 'Checkout.com SDK classes not loaded after autoloader inclusion. Path: ' . esc_html( $autoloader_path ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
 	}
-} else {
-	error_log( 'Checkout.com SDK autoloader not found at: ' . $autoloader_path );
+} elseif ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+	error_log( 'Checkout.com SDK autoloader not found at: ' . esc_html( $autoloader_path ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
 }
+
+// Load utility class early (needed for logging in early hooks)
+$utility_path = __DIR__ . '/includes/api/class-wc-checkoutcom-utility.php';
+if ( file_exists( $utility_path ) ) {
+	require_once $utility_path;
+}
+
 add_filter( 'woocommerce_checkout_registration_enabled', '__return_true' );
 
 /**
@@ -1314,21 +1321,23 @@ function callback_for_setting_up_scripts() {
 		$exemption = WC_Admin_Settings::get_option( 'ckocom_card_3ds_exemption', '' );
 		$allow_upgrade = 'yes' === WC_Admin_Settings::get_option( 'ckocom_card_3ds_allow_upgrade', 'yes' );
 		
-		// Debug: Log 3DS settings for troubleshooting
-		$allow_upgrade_raw = WC_Admin_Settings::get_option( 'ckocom_card_3ds_allow_upgrade', 'yes' );
-		error_log('[FLOW] 3DS Settings Debug: ' . print_r([
-			'three_d_enabled_raw' => WC_Admin_Settings::get_option( 'ckocom_card_threed', '0' ),
-			'three_d_enabled' => $three_d_enabled,
-			'attempt_no_three_d_raw' => WC_Admin_Settings::get_option( 'ckocom_card_notheed', '0' ),
-			'attempt_no_three_d' => $attempt_no_three_d,
-			'challenge_indicator' => $challenge_indicator,
-			'exemption' => $exemption,
-			'allow_upgrade_raw' => $allow_upgrade_raw,
-			'allow_upgrade_raw_type' => gettype($allow_upgrade_raw),
-			'allow_upgrade_comparison' => ($allow_upgrade_raw === 'yes'),
-			'allow_upgrade' => $allow_upgrade,
-			'settings_source' => 'card_settings'
-		], true));
+		// Debug: Log 3DS settings for troubleshooting (only if WP_DEBUG is enabled)
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			$allow_upgrade_raw = WC_Admin_Settings::get_option( 'ckocom_card_3ds_allow_upgrade', 'yes' );
+			error_log( '[FLOW] 3DS Settings Debug: ' . print_r( array( // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+				'three_d_enabled_raw' => WC_Admin_Settings::get_option( 'ckocom_card_threed', '0' ),
+				'three_d_enabled' => $three_d_enabled,
+				'attempt_no_three_d_raw' => WC_Admin_Settings::get_option( 'ckocom_card_notheed', '0' ),
+				'attempt_no_three_d' => $attempt_no_three_d,
+				'challenge_indicator' => $challenge_indicator,
+				'exemption' => $exemption,
+				'allow_upgrade_raw' => $allow_upgrade_raw,
+				'allow_upgrade_raw_type' => gettype( $allow_upgrade_raw ),
+				'allow_upgrade_comparison' => ( $allow_upgrade_raw === 'yes' ),
+				'allow_upgrade' => $allow_upgrade,
+				'settings_source' => 'card_settings',
+			), true ) );
+		}
 		
 		// Validate 3DS values according to Checkout.com API requirements
 		$valid_challenge_indicators = ['no_preference', 'no_challenge_requested', 'challenge_requested', 'challenge_requested_mandate'];
@@ -1340,14 +1349,18 @@ function callback_for_setting_up_scripts() {
 		];
 		
 		// Ensure challenge indicator is valid
-		if (!in_array($challenge_indicator, $valid_challenge_indicators)) {
-			error_log('[FLOW] Invalid challenge_indicator: ' . $challenge_indicator . ', using default: no_preference');
+		if ( ! in_array( $challenge_indicator, $valid_challenge_indicators, true ) ) {
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				error_log( '[FLOW] Invalid challenge_indicator: ' . esc_html( $challenge_indicator ) . ', using default: no_preference' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			}
 			$challenge_indicator = 'no_preference';
 		}
 		
 		// Ensure exemption is valid - use empty string if not valid (no exemption)
-		if (empty($exemption) || !in_array($exemption, $valid_exemptions)) {
-			error_log('[FLOW] Invalid or empty exemption: ' . $exemption . ', using empty string (no exemption)');
+		if ( empty( $exemption ) || ! in_array( $exemption, $valid_exemptions, true ) ) {
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				error_log( '[FLOW] Invalid or empty exemption: ' . esc_html( $exemption ) . ', using empty string (no exemption)' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			}
 			$exemption = '';
 		}
 		
@@ -1777,15 +1790,9 @@ if ( ! function_exists( 'cko_ajax_flow_create_payment_session' ) ) {
  * AJAX handler wrapper for Flow order creation.
  * This ensures the handler is always available, even if the gateway class isn't fully instantiated.
  */
-if ( ! function_exists( 'cko_ajax_flow_create_order' ) ) {
+	if ( ! function_exists( 'cko_ajax_flow_create_order' ) ) {
 	function cko_ajax_flow_create_order() {
-		// Log immediately to verify function is being called
-		error_log( '[WRAPPER] cko_ajax_flow_create_order called' );
-		error_log( '[WRAPPER] POST action: ' . ( isset( $_POST['action'] ) ? $_POST['action'] : 'NOT SET' ) );
-		error_log( '[WRAPPER] POST keys: ' . implode( ', ', array_keys( $_POST ) ) );
-		
 		if ( ! class_exists( 'WC_Gateway_Checkout_Com_Flow' ) ) {
-			error_log( '[WRAPPER] ERROR: Flow gateway class not found' );
 			wp_send_json_error( array(
 				'message' => __( 'Flow gateway class not found.', 'checkout-com-unified-payments-api' ),
 			) );
@@ -1795,10 +1802,8 @@ if ( ! function_exists( 'cko_ajax_flow_create_order' ) ) {
 		// Get the gateway instance
 		$gateways = WC()->payment_gateways()->payment_gateways();
 		if ( isset( $gateways['wc_checkout_com_flow'] ) ) {
-			error_log( '[WRAPPER] Using existing gateway instance' );
 			$gateways['wc_checkout_com_flow']->ajax_create_order();
 		} else {
-			error_log( '[WRAPPER] Creating new gateway instance' );
 			// Fallback: create a temporary instance
 			$gateway = new WC_Gateway_Checkout_Com_Flow();
 			$gateway->ajax_create_order();

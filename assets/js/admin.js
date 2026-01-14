@@ -3,39 +3,44 @@ jQuery( function ( $ ) {
 	var admin_functions = {
 
 		hidePaymentMethods: function () {
-			const classicCheckout = $( '[data-gateway_id="wc_checkout_com_cards"]' );
-			const applePay = $( '[data-gateway_id="wc_checkout_com_apple_pay"]' );
-			const googlePay = $( '[data-gateway_id="wc_checkout_com_google_pay"]' );
-			const payPal = $( '[data-gateway_id="wc_checkout_com_paypal"]' );
-			const flowPay = $( '[data-gateway_id="wc_checkout_com_flow"]' );
-			const alternativePay = $( '[data-gateway_id*="wc_checkout_com_alternative_payments"]' );
+			const observer = new MutationObserver(() => {
+				const classicCheckout = $( '#wc_checkout_com_cards' );
+				const applePay = $( '#wc_checkout_com_apple_pay' );
+				const googlePay = $( '#wc_checkout_com_google_pay' );
+				const payPal = $( '#wc_checkout_com_paypal' );
+				const flowPay = $( '#wc_checkout_com_flow' );
+				const alternativePay = $( '#wc_checkout_com_alternative_payments' );
 
-			if ( applePay.length > 0 ) {
-				applePay.hide();
-			}
-			// Google Pay is now available in Flow mode - don't hide it
-			// Only hide Google Pay in classic mode, show it in Flow mode
-			if ( googlePay.length > 0 && ! cko_admin_vars.flow_enabled ) {
-				googlePay.hide();
-			}
-
-			if ( flowPay.length > 0 ) {
-				flowPay.hide();
-			}
-
-			if ( alternativePay.length > 0 ) {
-				alternativePay.hide();
-			}
-
-			if( cko_admin_vars.flow_enabled ) {
-				classicCheckout.hide();
-				payPal.hide();
-				flowPay.show();
-				// Show Google Pay when Flow mode is enabled
-				if ( googlePay.length > 0 ) {
-					googlePay.show();
+				if (applePay.length && googlePay.length && flowPay.length && alternativePay.length) {
+					observer.disconnect();
 				}
-			}
+
+				if ( applePay.length > 0 ) {
+					applePay.hide();
+				}
+				if ( googlePay.length > 0 ) {
+					googlePay.hide();
+				}
+				if ( payPal.length > 0 ) {
+					payPal.hide()
+				}
+	
+				if ( flowPay.length > 0 ) {
+					flowPay.hide();
+				}
+	
+				if ( alternativePay.length > 0 ) {
+					alternativePay.hide();
+				}
+	
+				if( cko_admin_vars.flow_enabled ) {
+					classicCheckout.hide();
+					payPal.hide();
+					flowPay.show();
+				}
+			});
+
+			observer.observe(document.body, { childList: true, subtree: true });
 		},
 
 		disableRefundForZero: function () {

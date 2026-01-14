@@ -5,3 +5,4 @@ node_modules/
 **/**.mp4
 vendor/
 checkout-com-unified-payments-api.zip
+composer.phar

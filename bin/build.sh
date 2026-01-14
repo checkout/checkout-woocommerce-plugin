@@ -81,6 +81,8 @@ rsync -av \
   --exclude='verify-and-fix-zip.py' \
   --exclude='diagnose-header-error.py' \
   --exclude='php-uploads.ini' \
+  --exclude='composer.phar' \
+  --exclude='vendor/wp-cli' \
   "${PLUGIN_SOURCE_DIR}/" "${PLUGIN_DIR}/" > /dev/null 2>&1
 
 # Verify structure
