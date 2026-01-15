@@ -92,6 +92,151 @@ class WC_Checkoutcom_Workflows {
 	}
 
 	/**
+	 * Normalize a webhook URL for comparison.
+	 *
+	 * @param string $url Webhook URL.
+	 *
+	 * @return string
+	 */
+	private function normalize_webhook_url( $url ): string {
+		$url = trim( (string) $url );
+		if ( '' === $url ) {
+			return '';
+		}
+
+		$parsed = wp_parse_url( $url );
+		if ( false === $parsed ) {
+			return $url;
+		}
+
+		$host   = isset( $parsed['host'] ) ? strtolower( $parsed['host'] ) : '';
+		$host   = str_replace( 'www.', '', $host );
+		$path   = isset( $parsed['path'] ) ? $parsed['path'] : '/';
+		$query  = isset( $parsed['query'] ) ? $parsed['query'] : '';
+
+		$path = '/' . ltrim( $path, '/' );
+		if ( '/' !== $path ) {
+			$path = untrailingslashit( $path );
+		}
+
+		$normalized = $host . $path;
+		if ( '' !== $query ) {
+			$normalized .= '?' . $query;
+		}
+
+		return $normalized;
+	}
+
+	/**
+	 * Generate a short workflow name for the webhook.
+	 *
+	 * @param string $url Webhook URL.
+	 *
+	 * @return string
+	 */
+	private function generate_workflow_name( $url ): string {
+		$parsed = wp_parse_url( $url );
+		$host   = isset( $parsed['host'] ) ? strtolower( $parsed['host'] ) : '';
+		$host   = str_replace( 'www.', '', $host );
+
+		return $host ? sprintf( 'WC-CKO %s', $host ) : 'WC-CKO';
+	}
+
+	/**
+	 * Extract action URLs from a workflow item.
+	 *
+	 * @param array $item Workflow item.
+	 *
+	 * @return array
+	 */
+	private function extract_action_urls( array $item ): array {
+		$urls    = [];
+		$actions = isset( $item['actions'] ) && is_array( $item['actions'] ) ? $item['actions'] : [];
+
+		foreach ( $actions as $action ) {
+			if ( isset( $action['url'] ) ) {
+				$urls[] = $action['url'];
+				continue;
+			}
+			if ( isset( $action['configuration']['url'] ) ) {
+				$urls[] = $action['configuration']['url'];
+				continue;
+			}
+			if ( isset( $action['configuration']['destination']['url'] ) ) {
+				$urls[] = $action['configuration']['destination']['url'];
+			}
+		}
+
+		return $urls;
+	}
+
+	/**
+	 * Find matching workflows by webhook URL.
+	 *
+	 * @param string $url Webhook URL.
+	 *
+	 * @return array
+	 */
+	public function get_matching_workflows( $url ): array {
+		$matches    = [];
+		$workflows  = $this->get_list();
+		$target_url = $this->normalize_webhook_url( $url );
+		$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
+
+		if ( $gateway_debug ) {
+			WC_Checkoutcom_Utility::logger( '[WORKFLOW MATCH] Target URL: ' . $target_url );
+			WC_Checkoutcom_Utility::logger( '[WORKFLOW MATCH] Total workflows returned: ' . count( $workflows ) );
+		}
+
+		if ( empty( $target_url ) || empty( $workflows ) ) {
+			return [];
+		}
+
+		foreach ( $workflows as $item ) {
+			$action_urls = $this->extract_action_urls( $item );
+			if ( $gateway_debug ) {
+				$action_count = is_array( $item['actions'] ?? null ) ? count( $item['actions'] ) : 0;
+				WC_Checkoutcom_Utility::logger( '[WORKFLOW MATCH] Workflow ID: ' . ( $item['id'] ?? 'N/A' ) . ' Name: ' . ( $item['name'] ?? 'N/A' ) . ' Actions: ' . $action_count );
+			}
+			foreach ( $action_urls as $action_url ) {
+				$action_url = $this->normalize_webhook_url( $action_url );
+				if ( $gateway_debug ) {
+					WC_Checkoutcom_Utility::logger( '[WORKFLOW MATCH] Compare action URL: ' . $action_url );
+				}
+				if ( '' !== $action_url && $action_url === $target_url ) {
+					$matches[] = [
+						'id'   => $item['id'] ?? '',
+						'name' => $item['name'] ?? '',
+						'url'  => $action_url,
+					];
+					break;
+				}
+			}
+
+			// Fallback: some older workflows store the URL in the name field.
+			if ( empty( $action_urls ) && ! empty( $item['name'] ) ) {
+				$name_url = $this->normalize_webhook_url( $item['name'] );
+				if ( $gateway_debug ) {
+					WC_Checkoutcom_Utility::logger( '[WORKFLOW MATCH] Compare name URL: ' . $name_url );
+				}
+				if ( '' !== $name_url && $name_url === $target_url ) {
+					$matches[] = [
+						'id'   => $item['id'] ?? '',
+						'name' => $item['name'] ?? '',
+						'url'  => $name_url,
+					];
+				}
+			}
+		}
+
+		if ( $gateway_debug ) {
+			WC_Checkoutcom_Utility::logger( '[WORKFLOW MATCH] Matches found: ' . count( $matches ) );
+		}
+
+		return $matches;
+	}
+
+	/**
 	 * Get singleton instance of class
 	 *
 	 * @return WC_Checkoutcom_Workflows
@@ -112,58 +257,14 @@ class WC_Checkoutcom_Workflows {
 	 * @return string|null
 	 */
 	public function is_registered( $url = '' ): string {
-		$webhooks = $this->get_list();
-
 		if ( empty( $url ) ) {
-			// Use the actual webhook URL format, not just home_url
 			$url = WC_Checkoutcom_Webhook::get_instance()->generate_current_webhook_url();
 		}
 
-		// Extract domain from webhook URL for comparison
-		$url_domain = parse_url( $url, PHP_URL_HOST );
-		$url_domain_clean = str_replace( 'www.', '', $url_domain ?? '' );
-
-		// Log for debugging
-		$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
-		if ( $gateway_debug ) {
-			WC_Checkoutcom_Utility::logger( '[WORKFLOW IS_REGISTERED] Looking for URL: ' . $url . ' (Domain: ' . $url_domain_clean . ')' );
-			WC_Checkoutcom_Utility::logger( '[WORKFLOW IS_REGISTERED] Total workflows found: ' . count( $webhooks ) );
-		}
-
-		foreach ( $webhooks as $item ) {
-			$item_name = $item['name'] ?? '';
-			if ( empty( $item_name ) ) {
-				continue;
-			}
-
-			// For workflows, the name contains the full webhook URL
-			// Check if workflow name contains the webhook endpoint
-			if ( false !== strpos( $item_name, 'wc-api=wc_checkoutcom_webhook' ) || false !== strpos( $item_name, 'wc_checkoutcom_webhook' ) ) {
-				// Also verify domain matches
-				$item_domain = parse_url( $item_name, PHP_URL_HOST );
-				$item_domain_clean = str_replace( 'www.', '', $item_domain ?? '' );
-				
-				if ( $item_domain_clean === $url_domain_clean ) {
-					if ( $gateway_debug ) {
-						WC_Checkoutcom_Utility::logger( '[WORKFLOW IS_REGISTERED] ✅ MATCH FOUND: ' . $item_name );
-					}
-					$this->url_is_registered = $item_name;
-					return $this->url_is_registered;
-				}
-			}
-			
-			// Fallback: Check if name contains the site domain (more lenient match)
-			if ( false !== strpos( $item_name, $url_domain_clean ) && false !== strpos( $item_name, 'wc-api' ) ) {
-				if ( $gateway_debug ) {
-					WC_Checkoutcom_Utility::logger( '[WORKFLOW IS_REGISTERED] ✅ PARTIAL MATCH FOUND: ' . $item_name );
-				}
-				$this->url_is_registered = $item_name;
-				return $this->url_is_registered;
-			}
-		}
-
-		if ( $gateway_debug ) {
-			WC_Checkoutcom_Utility::logger( '[WORKFLOW IS_REGISTERED] ❌ NO MATCH FOUND' );
+		$matches = $this->get_matching_workflows( $url );
+		if ( 1 === count( $matches ) && ! empty( $matches[0]['name'] ) ) {
+			$this->url_is_registered = $matches[0]['name'];
+			return $this->url_is_registered;
 		}
 
 		return $this->url_is_registered;
@@ -339,7 +440,7 @@ class WC_Checkoutcom_Workflows {
 		$workflow_request             = new CreateWorkflowRequest();
 		$workflow_request->actions    = [ $action_request ];
 		$workflow_request->conditions = [ $event_workflow_condition_request ];
-		$workflow_request->name       = $url;
+		$workflow_request->name       = $this->generate_workflow_name( $url );
 		$workflow_request->active     = true;
 
 		$workflows = [];

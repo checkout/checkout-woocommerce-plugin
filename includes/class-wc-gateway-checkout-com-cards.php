@@ -349,6 +349,12 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 	 */
 	public function process_admin_options() {
 		$screen = ! empty( $_GET['screen'] ) ? sanitize_text_field( $_GET['screen'] ) : 'quick_settings';
+		$subtab = ! empty( $_GET['subtab'] ) ? sanitize_text_field( $_GET['subtab'] ) : '';
+		$should_save_debug_settings = isset( $_POST['flow_terms_prevention_enabled'] )
+			|| isset( $_POST['cko_file_logging'] )
+			|| isset( $_POST['cko_console_logging'] )
+			|| isset( $_POST['cko_gateway_responses'] )
+			|| isset( $_POST['cko_performance_logging'] );
 
 		if ( 'quick_settings' === $screen ) {
 			// CRITICAL FIX: Manually extract values from POST before save_fields()
@@ -444,10 +450,15 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 			WC_Admin_Settings::save_fields( WC_Checkoutcom_Cards_Settings::cards_settings() );
 		} elseif ( 'orders_settings' === $screen ) {
 			WC_Admin_Settings::save_fields( WC_Checkoutcom_Cards_Settings::order_settings() );
-		} elseif ( 'debug_settings' === $screen ) {
+		} elseif ( 'debug_settings' === $screen || ( 'advanced' === $screen && 'debug_settings' === $subtab ) ) {
 			WC_Admin_Settings::save_fields( WC_Checkoutcom_Cards_Settings::debug_settings() );
 		} else {
 			WC_Admin_Settings::save_fields( WC_Checkoutcom_Cards_Settings::core_settings() );
+		}
+
+		// Fallback: if debug fields were posted from a screen that doesn't set the expected params.
+		if ( $should_save_debug_settings && ! ( 'debug_settings' === $screen || ( 'advanced' === $screen && 'debug_settings' === $subtab ) ) ) {
+			WC_Admin_Settings::save_fields( WC_Checkoutcom_Cards_Settings::debug_settings() );
 		}
 		
 		do_action( 'woocommerce_update_options_' . $this->id );

@@ -55,9 +55,11 @@ mkdir -p "${PLUGIN_DIR}"
 echo "📁 Creating plugin folder structure..."
 
 # Copy files from plugin source directory (excluding unwanted ones)
-rsync -av \
+# Use --inplace to avoid temporary file creation issues in sandbox environments
+rsync -av --inplace \
   --exclude='.git' \
   --exclude='.gitignore' \
+  --exclude='.tmp' \
   --exclude='*.zip' \
   --exclude='*.md' \
   --exclude='tests' \

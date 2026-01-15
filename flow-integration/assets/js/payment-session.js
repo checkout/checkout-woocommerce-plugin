@@ -32,8 +32,9 @@ if (typeof window.ckoLogger === 'undefined') {
 }
 
 /*
- * CRITICAL: Early 3DS Detection - MUST run before any other code
- * This prevents Flow from initializing during 3DS returns
+ * REFACTORED: Early 3DS detection extracted to modules/flow-3ds-detection.js
+ *
+ * This module runs before payment-session.js to flag 3DS returns.
  */
 
 /*
@@ -65,31 +66,6 @@ if (typeof window.isTermsCheckbox === 'undefined') {
 		       name.includes('terms') || name.includes('agree');
 	};
 }
-(function() {
-	// Check URL parameters immediately (before any other code runs)
-	const urlParams = new URLSearchParams(window.location.search);
-	const paymentId = urlParams.get("cko-payment-id");
-	const sessionId = urlParams.get("cko-session-id");
-	const paymentSessionId = urlParams.get("cko-payment-session-id");
-	
-	if (paymentId || sessionId || paymentSessionId) {
-		// Set flag IMMEDIATELY - this prevents ALL Flow initialization
-		// Use FlowState if available (should be loaded before this file), otherwise fallback to window property
-		if (typeof window.FlowState !== 'undefined') {
-			window.FlowState.set('is3DSReturn', true);
-		} else {
-			window.ckoFlow3DSReturn = true; // Fallback for early detection before FlowState loads
-		}
-		
-		// Log using console.log (always available, even before ckoLogger is defined)
-		ckoLogger.threeDS('⚠️⚠️⚠️ EARLY DETECTION: 3DS return detected, preventing ALL Flow initialization', {
-			paymentId: paymentId,
-			sessionId: sessionId,
-			paymentSessionId: paymentSessionId,
-			timestamp: new Date().toISOString()
-		});
-	}
-})();
 
 /*
  * The main object managing the Checkout.com flow payment integration.
@@ -3039,280 +3015,39 @@ function handleFlowPaymentSelection() {
 
 
 /**
- * SIMPLIFIED: Protect Flow from updated_checkout destruction
- * When WooCommerce updates checkout, it replaces the HTML which can destroy Flow component
- * This handler checks if Flow was destroyed AFTER DOM update and re-initializes only if needed
+ * REFACTORED: updated_checkout guard extracted to modules/flow-updated-checkout-guard.js
  */
-// Track previous cart total for change detection
-let previousCartTotal = typeof cko_flow_vars !== 'undefined' && cko_flow_vars.cart_total ? parseFloat(cko_flow_vars.cart_total) : 0;
-
-// CRITICAL: Attach updated_checkout handler IMMEDIATELY with HIGHEST PRIORITY
-// This must run BEFORE WooCommerce attaches its handlers
-// Use immediate execution (IIFE) to attach handler as early as possible
-(function() {
-	if (typeof jQuery !== 'undefined') {
-		// Remove any existing handler first
-		jQuery(document).off("updated_checkout.cko-terms-prevention");
-		
-		// Attach handler immediately (before DOM ready) with capture-like behavior
-		// Use body instead of document to catch events earlier
-		jQuery('body').on("updated_checkout.cko-terms-prevention", function (event) {
-		// Track updated_checkout events to detect multiple reloads
-		if (!window.ckoUpdatedCheckoutCount) {
-			window.ckoUpdatedCheckoutCount = 0;
-			window.ckoUpdatedCheckoutTimestamps = [];
-		}
-		window.ckoUpdatedCheckoutCount++;
-		const now = Date.now();
-		window.ckoUpdatedCheckoutTimestamps.push(now);
-		
-		// Keep only last 10 timestamps
-		if (window.ckoUpdatedCheckoutTimestamps.length > 10) {
-			window.ckoUpdatedCheckoutTimestamps.shift();
-		}
-		
-		// Check for rapid-fire events (multiple within 500ms)
-		const recentEvents = window.ckoUpdatedCheckoutTimestamps.filter(ts => (now - ts) < 500);
-		if (recentEvents.length > 1) {
-			ckoLogger.warn(`⚠️ MULTIPLE updated_checkout events detected: ${recentEvents.length} events in last 500ms (Total: ${window.ckoUpdatedCheckoutCount})`);
-		}
-		
-		// ALWAYS log (not just debug) so we can see reloads even when debug is off
-		ckoLogger.debug(`updated_checkout EVENT #${window.ckoUpdatedCheckoutCount} fired at ${new Date().toLocaleTimeString()}`);
-		ckoLogger.debug(`===== updated_checkout EVENT FIRED (#${window.ckoUpdatedCheckoutCount}) =====`);
-	
-	// CRITICAL: Prevent update_checkout if it was triggered by a terms checkbox
-	// Check prevention flag first (set by jQuery trigger interception)
-	// Also check if the last clicked/changed element was a terms checkbox (backup check)
-	const activeElement = document.activeElement;
-	const lastClicked = window.ckoTermsCheckboxLastClicked;
-	const timeSinceLastClick = Date.now() - window.ckoTermsCheckboxLastClickTime;
-	const isTermsTriggered = 
-		window.ckoPreventUpdateCheckout ||
-		((lastClicked && isTermsCheckbox(lastClicked)) && timeSinceLastClick < 2000) ||
-		(activeElement && isTermsCheckbox(activeElement));
-	
-	if (isTermsTriggered) {
-		ckoLogger.debug('🚫🚫🚫 updated_checkout triggered by terms checkbox - BLOCKING page reload', {
-			preventionFlag: window.ckoPreventUpdateCheckout,
-			lastClickedId: lastClicked ? (lastClicked.id || 'no-id') : 'none',
-			activeElementId: activeElement ? (activeElement.id || 'no-id') : 'none',
-			timeSinceClick: timeSinceLastClick + 'ms'
-		});
-		
-		// CRITICAL: Stop ALL event propagation immediately
-		event.stopImmediatePropagation();
-		event.stopPropagation();
-		event.preventDefault();
-		
-		// Also prevent default behavior on the document
-		if (event.originalEvent) {
-			event.originalEvent.stopImmediatePropagation();
-			event.originalEvent.stopPropagation();
-			event.originalEvent.preventDefault();
-		}
-		
-		// Clear tracking after a delay (keep flag active longer to catch async triggers)
-		setTimeout(function() {
-			window.ckoPreventUpdateCheckout = false;
-			window.ckoTermsCheckboxLastClicked = null;
-		}, 3000);
-		
-		// Exit early - don't process updated_checkout
-		return false;
-	}
-	
-	// Log field values BEFORE DOM update
-	const emailBefore = getCheckoutFieldValue("billing_email");
-	const addressBefore = getCheckoutFieldValue("billing_address_1");
-	const cityBefore = getCheckoutFieldValue("billing_city");
-	const countryBefore = getCheckoutFieldValue("billing_country");
-	const flowPaymentBefore = document.getElementById("payment_method_wc_checkout_com_flow");
-	
-	ckoLogger.debug('State BEFORE updated_checkout:', {
-		email: emailBefore || 'EMPTY',
-		address1: addressBefore || 'EMPTY',
-		city: cityBefore || 'EMPTY',
-		country: countryBefore || 'EMPTY',
-		flowPaymentChecked: flowPaymentBefore?.checked || false,
-		flowInitialized: ckoFlowInitialized
-	});
-	
-	// CRITICAL: Skip if we're handling a 3DS return (don't re-initialize Flow)
-	// Check both the flag and URL parameters
-	if (window.ckoFlow3DSReturn) {
-		ckoLogger.threeDS('Skipping updated_checkout handler - 3DS return flag is set');
-		return;
-	}
-	
-	// Also check URL parameters as fallback
-	const urlParams = new URLSearchParams(window.location.search);
-	const paymentId = urlParams.get("cko-payment-id");
-	const sessionId = urlParams.get("cko-session-id");
-	const paymentSessionId = urlParams.get("cko-payment-session-id");
-	
-	if (paymentId || sessionId || paymentSessionId) {
-		ckoLogger.threeDS('Skipping updated_checkout handler - 3DS return detected in URL');
-		FlowState.set('is3DSReturn', true);
-		return;
-	}
-	
-	// Check if cart total changed
-	if (typeof cko_flow_vars !== 'undefined' && cko_flow_vars.cart_total) {
-		const currentCartTotal = parseFloat(cko_flow_vars.cart_total) || 0;
-		
-		// Check if cart total changed significantly (> 0.01 to avoid floating point issues)
-		if (Math.abs(currentCartTotal - previousCartTotal) > 0.01) {
-			ckoLogger.debug('Cart total changed - will reload Flow', {
-				previous: previousCartTotal,
-				current: currentCartTotal
-			});
-			
-			// Update stored total
-			previousCartTotal = currentCartTotal;
-			
-			// Reload Flow if initialized (after a small delay to let checkout update complete)
-			setTimeout(() => {
-				if (ckoFlowInitialized && ckoFlow.flowComponent && canInitializeFlow()) {
-					reloadFlowComponent();
-				}
-			}, 300);
-		}
-	}
-	
-	ckoLogger.debug('updated_checkout event fired');
-	ckoLogger.debug('Flow state BEFORE updated_checkout:', {
-		flowInitialized: ckoFlowInitialized,
-		flowComponentExists: !!ckoFlow.flowComponent,
-		flowComponentRootExists: !!document.querySelector('[data-testid="checkout-web-component-root"]'),
-		flowContainerExists: !!document.getElementById("flow-container"),
-		flowPaymentChecked: document.getElementById("payment_method_wc_checkout_com_flow")?.checked || false
-	});
-	
-	// EVENT-DRIVEN: Flow remounting is now handled by cko:flow-container-ready event listener
-	// No need for setTimeout delays - flow-container.js will emit event when container is ready
-	});
-	}
-})(); // Close IIFE - handler attached immediately
+if (window.FlowUpdatedCheckoutGuard && window.FlowUpdatedCheckoutGuard.init) {
+	window.FlowUpdatedCheckoutGuard.init();
+} else if (typeof window.ckoLogger !== 'undefined') {
+	window.ckoLogger.warn('FlowUpdatedCheckoutGuard module not loaded - updated_checkout protection missing');
+}
 
 // EVENT-DRIVEN DESIGN: Listen for container-ready events from flow-container.js
 // This eliminates timing race conditions - Flow remounts immediately when container is ready
-document.addEventListener('cko:flow-container-ready', function(event) {
-	// CRITICAL: Check for 3DS return
-	if (window.ckoFlow3DSReturn) {
-		ckoLogger.threeDS('Skipping container-ready handler - 3DS return in progress');
-		return;
-	}
-	
-	// Check URL parameters as fallback
-	const urlParams = new URLSearchParams(window.location.search);
-	if (urlParams.get("cko-payment-id") || urlParams.get("cko-session-id") || urlParams.get("cko-payment-session-id")) {
-		ckoLogger.threeDS('Skipping container-ready handler - 3DS return detected in URL');
-		FlowState.set('is3DSReturn', true);
-		return;
-	}
-	
-	const flowContainer = event.detail?.container || document.getElementById("flow-container");
-	const flowPayment = document.getElementById("payment_method_wc_checkout_com_flow");
-	const flowComponentRoot = document.querySelector('[data-testid="checkout-web-component-root"]');
-	
-	// Check if Flow component is actually mounted
-	const flowComponentActuallyMounted = flowComponentRoot && flowComponentRoot.isConnected;
-	const flowWasInitializedBefore = ckoFlowInitialized && ckoFlow.flowComponent && !flowComponentActuallyMounted;
-	
-	ckoLogger.debug('🔔 Container-ready event received - checking if Flow needs remounting', {
-		flowPaymentChecked: flowPayment?.checked || false,
-		flowContainerExists: !!flowContainer,
-		flowComponentRootExists: !!flowComponentRoot,
-		flowComponentMounted: flowComponentActuallyMounted,
-		flowInitialized: ckoFlowInitialized,
-		flowComponentExists: !!ckoFlow.flowComponent,
-		flowWasInitializedBefore: flowWasInitializedBefore
-	});
-	
-	// Only remount if:
-	// 1. Flow payment method is selected
-	// 2. Container exists
-	// 3. Flow component is NOT mounted (was destroyed by updated_checkout)
-	// 4. Flow is NOT currently initializing
-	if (flowPayment && flowPayment.checked && flowContainer) {
-		if (!flowComponentActuallyMounted || flowWasInitializedBefore) {
-			// Component was destroyed by updated_checkout
-			if (ckoFlowInitializing) {
-				ckoLogger.debug('Flow component not mounted but initialization already in progress, skipping');
-				return;
-			}
-			
-			ckoLogger.debug('🔄 Flow component needs remounting - container is ready, re-initializing...');
-			
-			// Reset flag so Flow can be re-initialized
-			ckoFlowInitialized = false;
-			if (ckoFlow.flowComponent) {
-				// Component exists but was unmounted - destroy it so we can create a new one
-				try {
-					ckoFlow.flowComponent.destroy();
-				} catch (e) {
-					ckoLogger.debug('Error destroying Flow component:', e);
-				}
-				ckoFlow.flowComponent = null;
-			}
-			// Re-initialize
-			initializeFlowIfNeeded();
-		} else {
-			ckoLogger.debug('✅ Flow component still mounted, no remounting needed');
-		}
-	}
-});
+if (window.FlowContainerReadyHandler && window.FlowContainerReadyHandler.init) {
+	window.FlowContainerReadyHandler.init();
+} else if (typeof window.ckoLogger !== 'undefined') {
+	window.ckoLogger.warn('FlowContainerReadyHandler module not loaded - container-ready handler missing');
+}
 
 /**
- * Global handler for saved card selection (works in both new_payment_first and saved_cards_first modes)
- * When a saved card is selected, show the Place Order button
- * When new payment method is selected, ensure Flow container is visible and interactive
+ * REFACTORED: Field change handlers extracted to modules/flow-field-change-handler.js
  */
-jQuery(document).on(
-	"change",
-	'input[name="wc-wc_checkout_com_flow-payment-token"]',
-	function () {
-		const selectedToken = jQuery('input[name="wc-wc_checkout_com_flow-payment-token"]:checked');
-		const flowContainer = document.getElementById("flow-container");
-		const selectedId = selectedToken.attr('id');
-		
-		// If "Use new payment method" is selected
-		if (selectedId === 'wc-wc_checkout_com_flow-payment-token-new') {
-			ckoLogger.debug('New payment method selected - showing Flow container');
-			
-			// Show Flow container
-			if (flowContainer) {
-				flowContainer.style.display = "block";
-			}
-			
-			// Mark as ready when Flow component is valid
-			if (ckoFlow.flowComponent) {
-				document.body.classList.add("flow-ready");
-			} else {
-				// Flow not initialized yet, wait for it
-				document.body.classList.remove("flow-ready");
-			}
-			
-			// Scroll to Flow container
-			setTimeout(() => {
-				if (flowContainer) {
-					flowContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-				}
-			}, 100);
-		}
-		// If a saved card is selected
-		else if (selectedToken.length > 0) {
-			ckoLogger.debug('Saved card selected - making Place Order button visible');
-			document.body.classList.add("flow-ready");
-			
-			// Keep Flow container visible
-			if (flowContainer) {
-				flowContainer.style.display = "block";
-			}
-		}
-	}
-);
+if (window.FlowFieldChangeHandler && window.FlowFieldChangeHandler.init) {
+	window.FlowFieldChangeHandler.init();
+} else if (typeof window.ckoLogger !== 'undefined') {
+	window.ckoLogger.warn('FlowFieldChangeHandler module not loaded - field change handling missing');
+}
+
+/**
+ * REFACTORED: Saved card selection handler extracted to modules/flow-saved-card-handler.js
+ */
+if (window.FlowSavedCardHandler && window.FlowSavedCardHandler.init) {
+	window.FlowSavedCardHandler.init();
+} else if (typeof window.ckoLogger !== 'undefined') {
+	window.ckoLogger.warn('FlowSavedCardHandler module not loaded - saved card handling missing');
+}
 
 /**
  * Listen for changes in the payment method selection and handle the Flow payment method.
@@ -3381,13 +3116,17 @@ document.addEventListener("DOMContentLoaded", function () {
 		window.ckoPageLoadTimestamps.shift();
 	}
 	
+	const debugEnabled = typeof ckoLogger !== 'undefined' && ckoLogger.debugEnabled;
+	
 	// Check for rapid page loads (multiple within 2 seconds)
 	const recentLoads = window.ckoPageLoadTimestamps.filter(ts => (loadTime - ts) < 2000);
-	if (recentLoads.length > 1) {
-		console.warn(`⚠️ [FLOW RELOAD] MULTIPLE page loads detected: ${recentLoads.length} loads in last 2 seconds (Total: ${window.ckoPageLoadCount})`);
+	if (recentLoads.length > 1 && debugEnabled) {
+		ckoLogger.warn(`⚠️ [FLOW RELOAD] MULTIPLE page loads detected: ${recentLoads.length} loads in last 2 seconds (Total: ${window.ckoPageLoadCount})`);
 	}
 	
-	ckoLogger.debug(`Page load #${window.ckoPageLoadCount} at ${new Date().toLocaleTimeString()}`);
+	if (debugEnabled) {
+		ckoLogger.debug(`Page load #${window.ckoPageLoadCount} at ${new Date().toLocaleTimeString()}`);
+	}
 	
 	// CRITICAL: Check for 3DS return FIRST - before any other checks
 	// This must be the very first thing we check
@@ -4334,225 +4073,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
 // Removed complex 3DS redirect handling - keeping it simple like the working version
 
-let virtual = false;
 /**
- * Handle checkout flow-container rendering on various field changes.
- * Attaches debounced event listeners to checkout inputs to update flow state and cart info dynamically.
+ * REFACTORED: Field change handlers extracted to modules/flow-field-change-handler.js
  */
-jQuery(function ($) {
-
-	/**
-	 * Main handler function triggered on input/change events.
-	 * It performs field checks and updates the checkout flow and cart info accordingly.
-	 *
-	 * @param {Event} event - The input or change event.
-	 */
-	const handleTyping = (event) => {
-
-		let isShippingField = false;
-
-		// Check if the changed field belongs to shipping info.
-		if (event) {
-			const $target = jQuery(event.target);
-			isShippingField = $target.is('[id^="shipping"]');
-		}
-
-		// If the field is a shipping-related field, trigger WooCommerce checkout update and exit early.
-		if (isShippingField) {
-			ckoLogger.debug("Triggered by a shipping field, skipping...");
-			// Debounce to prevent rapid triggers
-			if (!window.ckoUpdateCheckoutDebounce) {
-				window.ckoUpdateCheckoutDebounce = null;
-			}
-			if (window.ckoUpdateCheckoutDebounce) {
-				clearTimeout(window.ckoUpdateCheckoutDebounce);
-			}
-			window.ckoUpdateCheckoutDebounce = setTimeout(function() {
-				$("body").trigger("update_checkout");
-				window.ckoUpdateCheckoutDebounce = null;
-			}, 100);
-			return;
-		}
-
-		// Check if this is a critical field that requires Flow reload
-		const criticalFields = [
-			'billing_email',
-			'billing_country',
-			'billing_address_1',
-			'billing_city',
-			'billing_postcode',
-			'billing_state'
-		];
-		
-		const fieldName = event.target.name || event.target.id || '';
-		const fieldId = event.target.id || '';
-		const isCriticalField = criticalFields.some(field => 
-			fieldName.includes(field.replace('billing_', '')) || 
-			fieldId.includes(field.replace('billing_', ''))
-		);
-		
-		// Store previous values to detect changes
-		if (isCriticalField && ckoFlowInitialized) {
-			const currentValue = event.target.value || '';
-			const fieldKey = fieldId || fieldName;
-			const previousValue = window.ckoFlowFieldValues?.[fieldKey] || '';
-			
-			// If value actually changed (not just typing)
-			if (currentValue !== previousValue) {
-				// Update stored value
-				if (!window.ckoFlowFieldValues) {
-					window.ckoFlowFieldValues = {};
-				}
-				window.ckoFlowFieldValues[fieldKey] = currentValue;
-				
-				// Debounce the reload check
-				debouncedCheckFlowReload(fieldKey, currentValue);
-			}
-		}
-		
-		// Only proceed if all required fields are filled.
-		if (requiredFieldsFilled()) {
-			// Debounce update_checkout triggers to prevent cascading reloads
-			if (!window.ckoUpdateCheckoutDebounce) {
-				window.ckoUpdateCheckoutDebounce = null;
-			}
-			
-			// Clear existing debounce
-			if (window.ckoUpdateCheckoutDebounce) {
-				clearTimeout(window.ckoUpdateCheckoutDebounce);
-			}
-			
-			// Debounce the trigger by 100ms to batch rapid field changes
-			window.ckoUpdateCheckoutDebounce = setTimeout(function() {
-				ckoLogger.debug('Triggering update_checkout after debounce', {
-					fieldName: event.target.name || 'unknown',
-					fieldId: event.target.id || 'unknown'
-				});
-				$("body").trigger("update_checkout");
-				window.ckoUpdateCheckoutDebounce = null;
-			}, 100);
-
-			// If the event is from checking 'ship to different address' or 'create account', return early.
-			if (
-				jQuery(event.target).is(
-					"#ship-to-different-address-checkbox, #createaccount"
-				) &&
-				jQuery(event.target).is(":checked")
-			) {
-				ckoLogger.debug("User just checked the checkbox. Returning early...");
-				return;
-			}
-
-			var targetName = event.target.name || "";
-
-			// If the event is not from billing fields or key checkboxes, exit early.
-			if (
-				!targetName.startsWith("billing") &&
-				!jQuery(event.target).is(
-					"#ship-to-different-address-checkbox, #terms, #createaccount, #coupon_code"
-				)
-			) {
-				let cartData = $("#cart-info").data("cart");
-				if ( !cartData || !cartData["contains_virtual_product"] ) {
-					ckoLogger.debug("Neither billing nor the shipping checkbox. Returning early...");
-					return;
-				}
-				ckoLogger.debug("Virtual Product found. Triggering FLOW...");
-			}
-
-			// Check required fields status (for initialization/reload)
-			checkRequiredFieldsStatus();
-		} else {
-			// Required fields not filled - check status anyway
-			// This ensures Flow initializes when fields become filled
-			checkRequiredFieldsStatus();
-		}
-		
-		// Always check field status on any field change (for initialization)
-		// This ensures Flow initializes as soon as all fields are filled
-		if (!ckoFlowInitialized) {
-			checkRequiredFieldsStatus();
-			
-			// Also directly check if we can initialize now
-			if (canInitializeFlow()) {
-				ckoLogger.debug('Field change detected - all fields now valid, initializing Flow');
-				initializeFlowIfNeeded();
-			}
-		}
-	};
-
-	// Debounce the handler to limit how often it's triggered during typing.
-	const debouncedTyping = debounce(handleTyping, 2000);
-
-	// Attach debounced handler to key billing fields.
-	$(
-		"#billing_first_name, #billing_last_name, #billing_email, #billing_phone"
-	).on("input", function (e) {
-		debouncedTyping(e);
-	});
-
-	// Attach to all other inputs/selects, excluding the key billing fields above.
-	// EXCLUDE CHECKBOXES - they don't need to trigger Flow updates and cause form reload issues
-	$(
-		"input:not(#billing_first_name, #billing_last_name, #billing_email, #billing_phone):not([type='checkbox']), select"
-	).on("input change", function (e) {
-		debouncedTyping(e);
-	});
-
-	// Attach handler to all input/selects, but ignore payment method fields.
-	// EXCLUDE CHECKBOXES - they don't need to trigger Flow updates and cause form reload issues
-	$(document).on("input change", "input:not([type='checkbox']), select", function (e) {
-		if ($(this).closest(".wc_payment_method").length === 0) {
-			
-			debouncedTyping(e);
-
-		}
-
-		let cartData = $("#cart-info").data("cart");
-		if ( !virtual && cartData && cartData["contains_virtual_product"] && $('#ship-to-different-address-checkbox').length === 0 ) {
-			debouncedTyping(e);
-			virtual = true;
-		}
-	});
-	
-	// Handle checkboxes that legitimately need to trigger update_checkout
-	// These checkboxes change the checkout form structure (shipping fields, account creation)
-	// Note: Terms checkboxes are handled separately above and do NOT trigger update_checkout
-	jQuery(document).on('change', '#ship-to-different-address-checkbox, #createaccount', function() {
-		ckoLogger.debug('Checkbox change detected - triggering update_checkout', {
-			checkboxId: this.id,
-			checked: this.checked
-		});
-		// These checkboxes legitimately need to trigger update_checkout
-		// They show/hide form fields that require checkout refresh
-		jQuery('body').trigger('update_checkout');
-	});
-	
-	// Watch country field specifically for Flow reload
-	jQuery('#billing_country').on('change.flow-reload', function() {
-		ckoLogger.debug('Billing country changed - will reload Flow after checkout update');
-		
-		// Wait for WooCommerce to update fields
-		jQuery(document).one('updated_checkout', function() {
-			// Small delay to ensure fields are updated
-			setTimeout(() => {
-				if (ckoFlowInitialized && ckoFlow.flowComponent) {
-					// Store country value
-					const countryValue = jQuery('#billing_country').val();
-					if (!window.ckoFlowFieldValues) {
-						window.ckoFlowFieldValues = {};
-					}
-					window.ckoFlowFieldValues['billing_country'] = countryValue;
-					
-					// Reload Flow
-					reloadFlowComponent();
-				} else if (canInitializeFlow()) {
-					initializeFlowIfNeeded();
-				}
-			}, 500);
-		});
-	});
-});
 
 /**
  * 

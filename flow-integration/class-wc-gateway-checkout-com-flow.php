@@ -683,8 +683,10 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		$save_card = WC_Admin_Settings::get_option( 'ckocom_card_saved' );
 		
 		// Safely get flow saved card setting with fallback
+		// Check Card settings first (new location), then Flow settings (backward compatibility)
+		$card_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$flow_settings = get_option( 'woocommerce_wc_checkout_com_flow_settings', array() );
-		$flow_saved_card = isset( $flow_settings['flow_saved_payment'] ) ? $flow_settings['flow_saved_payment'] : 'saved_cards_first';
+		$flow_saved_card = isset( $card_settings['flow_saved_payment'] ) ? $card_settings['flow_saved_payment'] : ( isset( $flow_settings['flow_saved_payment'] ) ? $flow_settings['flow_saved_payment'] : 'saved_cards_first' );
 		$flow_debug_logging = isset( $flow_settings['flow_debug_logging'] ) && 'yes' === $flow_settings['flow_debug_logging'];
 
 		$order_pay_order_id = null;

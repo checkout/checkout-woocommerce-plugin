@@ -422,8 +422,8 @@ class WC_Checkoutcom_Cards_Settings {
 	 * @return mixed|void
 	 */
 	public static function cards_settings() {
-		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
-		$checkout_mode = $core_settings['ckocom_checkout_mode'];
+		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		$checkout_mode = isset( $core_settings['ckocom_checkout_mode'] ) ? $core_settings['ckocom_checkout_mode'] : 'classic';
 		$should_disable_flow_incompatible = false;
 				
 		if ( 'flow' === $checkout_mode ) {
@@ -550,6 +550,43 @@ class WC_Checkoutcom_Cards_Settings {
 				],
 				'default'  => 0,
 				'desc'     => 'Allow customers to save cards for future payments',
+			],
+			'flow_show_card_holder_name'            => [
+				'id'       => 'flow_show_card_holder_name',
+				'title'    => __( 'Card Holder Name', 'checkout-com-unified-payments-api' ),
+				'type'     => 'checkbox',
+				'label'    => '', // Empty label as text is now in 'desc'
+				'description' => __( 'Show Card holder name from their account', 'checkout-com-unified-payments-api' ),
+				'desc'     => __( 'Copy card holder name from billing address', 'checkout-com-unified-payments-api' ),
+				'desc_tip' => false,
+				'default'  => 'yes',
+			],
+			'flow_component_cardholder_name_position' => [
+				'id'          => 'flow_component_cardholder_name_position',
+				'title'       => __( 'Cardholder Name Position', 'checkout-com-unified-payments-api' ),
+				'type'        => 'select',
+				'options'     => [
+					'top'    => __( 'Top', 'checkout-com-unified-payments-api' ),
+					'bottom' => __( 'Bottom', 'checkout-com-unified-payments-api' ),
+					'hidden' => __( 'Hidden', 'checkout-com-unified-payments-api' ),
+				],
+				'description' => __( 'Choose the position of the cardholder name field.', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => true,
+				'default'     => 'top',
+			],
+			'flow_saved_payment'                    => [
+				'id'          => 'flow_saved_payment',
+				'title'       => __( 'Saved Payment Display Order', 'checkout-com-unified-payments-api' ),
+				'type'        => 'select',
+				'description' => __( "Choose how to display payment options at checkout: 
+					- **Saved Cards First**: Show saved payment methods first and expand them by default when available. 
+					- **New Payment Methods First**: Show new payment options first and expand them by default.", 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => true,
+				'default'     => 'saved_cards_first',
+				'options'     => [
+					'saved_cards_first' => __( 'Saved Cards First (default expanded)', 'checkout-com-unified-payments-api' ),
+					'new_payment_first' => __( 'New Payment Methods First (default expanded)', 'checkout-com-unified-payments-api' ),
+				],
 			],
 			'ckocom_card_desctiptor'                => [
 				'id'       => 'ckocom_card_desctiptor',
@@ -1484,6 +1521,14 @@ class WC_Checkoutcom_Cards_Settings {
 				'default'  => 'no',
 				'desc'     => __( 'Check to enable performance monitoring and logging. Track and log performance metrics for debugging and optimization.', 'checkout-com-unified-payments-api' ),
 			],
+			'flow_terms_prevention_enabled' => [
+				'id'          => 'flow_terms_prevention_enabled',
+				'title'       => __( 'Terms Checkbox Guard', 'checkout-com-unified-payments-api' ),
+				'type'        => 'checkbox',
+				'desc'        => __( 'Enable only if your checkout refreshes when the terms checkbox is toggled. Otherwise keep this disabled.', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => true,
+				'default'     => 'no',
+			],
 		];
 
 		return apply_filters( 'wc_checkout_com_cards', $settings );
@@ -1880,42 +1925,6 @@ class WC_Checkoutcom_Cards_Settings {
 					'description' => __( 'Automatically expand the first available payment method if multiple methods exist.', 'checkout-com-unified-payments-api' ),
 					'desc_tip'    => true,
 					'default'     => 'yes',
-				),
-				'flow_show_card_holder_name'                 => array(
-					'id'          => 'flow_show_card_holder_name',
-					'title'       => __( 'Card Holder Name', 'checkout-com-unified-payments-api' ),
-					'type'        => 'checkbox',
-					'label'       => __( 'Show/Hide Card Holder Name', 'checkout-com-unified-payments-api' ),
-					'description' => __( 'Show Card holder name from their account', 'checkout-com-unified-payments-api' ),
-					'desc_tip'    => true,
-					'default'     => 'yes',
-				),
-				'flow_saved_payment'                 		 => array(
-					'id'          => 'flow_saved_payment',
-					'title'       => __( 'Saved Payment Display Order', 'checkout-com-unified-payments-api' ),
-					'type'        => 'select',
-					'description' => __( "Choose how to display payment options at checkout: 
-						- **Saved Cards First**: Show saved payment methods first and expand them by default when available. 
-						- **New Payment Methods First**: Show new payment options first and expand them by default.", 'checkout-com-unified-payments-api' ),
-					'desc_tip'    => true,
-					'default'     => 'saved_cards_first',
-					'options'     => array(
-						'saved_cards_first' => __( 'Saved Cards First (default expanded)', 'checkout-com-unified-payments-api' ),
-						'new_payment_first' => __( 'New Payment Methods First (default expanded)', 'checkout-com-unified-payments-api' ),
-					),
-				),
-				'flow_component_cardholder_name_position'    => array(
-					'id'          => 'flow_component_cardholder_name_position',
-					'title'       => __( 'Cardholder Name Position', 'checkout-com-unified-payments-api' ),
-					'type'        => 'select',
-					'options'     => array(
-						'top'    => __( 'Top', 'checkout-com-unified-payments-api' ),
-						'bottom' => __( 'Bottom', 'checkout-com-unified-payments-api' ),
-						'hidden' => __( 'Hidden', 'checkout-com-unified-payments-api' ),
-					),
-					'description' => __( 'Choose the position of the cardholder name field.', 'checkout-com-unified-payments-api' ),
-					'desc_tip'    => true,
-					'default'     => 'top',
 				),
 				'flow_component_locale'                      => array(
 					'id'          => 'flow_component_locale',

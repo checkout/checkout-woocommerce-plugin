@@ -1083,8 +1083,8 @@ add_action( 'admin_enqueue_scripts', 'cko_admin_enqueue_scripts' );
  */
 function cko_admin_enqueue_scripts() {
 
-	$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
-	$checkout_mode = $core_settings['ckocom_checkout_mode'];
+	$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+	$checkout_mode = isset( $core_settings['ckocom_checkout_mode'] ) ? $core_settings['ckocom_checkout_mode'] : 'classic';
 	$flow_enabled  = false;
 
 	if( $checkout_mode === 'flow' ) {
@@ -1134,7 +1134,7 @@ function callback_for_setting_up_scripts() {
 	// Register adn enqueue checkout css.
 	wp_register_style( 'checkoutcom-style', WC_CHECKOUTCOM_PLUGIN_URL . '/assets/css/checkoutcom-styles.css', [], WC_CHECKOUTCOM_PLUGIN_VERSION );
 	wp_register_style( 'normalize', WC_CHECKOUTCOM_PLUGIN_URL . '/assets/css/normalize.css', [], WC_CHECKOUTCOM_PLUGIN_VERSION );
-	wp_enqueue_style( 'checkoutcom-style' );
+	// Don't enqueue checkoutcom-style here - will be enqueued after flow.css to ensure overrides work
 	wp_enqueue_style( 'normalize' );
 
 	// load cko apm settings.
@@ -1150,9 +1150,21 @@ function callback_for_setting_up_scripts() {
 	}
 
 	// Enqueue FLOW scripts.
-	$core_settings      = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
-	$checkout_mode      = $core_settings['ckocom_checkout_mode'];
+	$core_settings      = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+	$checkout_mode      = isset( $core_settings['ckocom_checkout_mode'] ) ? $core_settings['ckocom_checkout_mode'] : 'classic';
 	$flow_customization = get_option( 'woocommerce_wc_checkout_com_flow_settings', array() );
+	
+	// Merge Card settings into Flow customization vars (for Card Holder Name, Position, and Saved Payment Display Order)
+	// These settings were moved from Flow settings to Card settings
+	if ( isset( $core_settings['flow_show_card_holder_name'] ) ) {
+		$flow_customization['flow_show_card_holder_name'] = $core_settings['flow_show_card_holder_name'];
+	}
+	if ( isset( $core_settings['flow_component_cardholder_name_position'] ) ) {
+		$flow_customization['flow_component_cardholder_name_position'] = $core_settings['flow_component_cardholder_name_position'];
+	}
+	if ( isset( $core_settings['flow_saved_payment'] ) ) {
+		$flow_customization['flow_saved_payment'] = $core_settings['flow_saved_payment'];
+	}
 	
 	// Ensure flow_component_name is always set with a default value
 	if ( empty( $flow_customization['flow_component_name'] ) ) {
@@ -1187,6 +1199,8 @@ function callback_for_setting_up_scripts() {
 
 		wp_register_style( 'cko-flow-style', WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/css/flow.css', array(), WC_CHECKOUTCOM_PLUGIN_VERSION );
 		wp_enqueue_style( 'cko-flow-style' );
+		// Enqueue checkoutcom-styles.css after flow.css to ensure spacing overrides work
+		wp_enqueue_style( 'checkoutcom-style' );
 
 		// REFACTORED: Enqueue logger module FIRST (before other Flow scripts)
 		// Logger module has no dependencies - must load before payment-session.js
@@ -1196,16 +1210,6 @@ function callback_for_setting_up_scripts() {
 			array(), // No dependencies - must load first
 			WC_CHECKOUTCOM_PLUGIN_VERSION,
 			false // Load in header to ensure it's available early
-		);
-
-		// REFACTORED: Enqueue terms prevention module (needs jQuery and logger)
-		// Must load before payment-session.js to intercept events early
-		wp_enqueue_script(
-			'checkout-com-flow-terms-prevention-script', 
-			WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/js/modules/flow-terms-prevention.js', 
-			array( 'jquery', 'checkout-com-flow-logger-script' ), // jQuery and logger are dependencies
-			WC_CHECKOUTCOM_PLUGIN_VERSION,
-			false // Load in header to intercept events early
 		);
 
 		// REFACTORED: Enqueue validation module (needs jQuery and logger)
@@ -1224,6 +1228,56 @@ function callback_for_setting_up_scripts() {
 			'checkout-com-flow-state-script', 
 			WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/js/modules/flow-state.js', 
 			array( 'checkout-com-flow-logger-script' ), // Logger is dependency
+			WC_CHECKOUTCOM_PLUGIN_VERSION,
+			false // Load in header
+		);
+
+		// REFACTORED: Enqueue early 3DS detection module (needs logger, state)
+		// Must load before payment-session.js to prevent 3DS return initialization
+		wp_enqueue_script(
+			'checkout-com-flow-3ds-detection-script',
+			WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/js/modules/flow-3ds-detection.js',
+			array( 'checkout-com-flow-logger-script', 'checkout-com-flow-state-script' ), // Logger and state are dependencies
+			WC_CHECKOUTCOM_PLUGIN_VERSION,
+			false // Load in header
+		);
+
+		// REFACTORED: Enqueue updated_checkout guard module (needs jQuery, logger, state)
+		// Must load before payment-session.js to protect Flow component lifecycle
+		wp_enqueue_script(
+			'checkout-com-flow-updated-checkout-guard-script',
+			WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/js/modules/flow-updated-checkout-guard.js',
+			array( 'jquery', 'checkout-com-flow-logger-script', 'checkout-com-flow-state-script' ), // jQuery, logger, and state are dependencies
+			WC_CHECKOUTCOM_PLUGIN_VERSION,
+			false // Load in header
+		);
+
+		// REFACTORED: Enqueue container-ready handler (needs logger, state)
+		// Must load before payment-session.js to react to container lifecycle events
+		wp_enqueue_script(
+			'checkout-com-flow-container-ready-handler-script',
+			WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/js/modules/flow-container-ready-handler.js',
+			array( 'checkout-com-flow-logger-script', 'checkout-com-flow-state-script' ), // Logger and state are dependencies
+			WC_CHECKOUTCOM_PLUGIN_VERSION,
+			false // Load in header
+		);
+
+		// REFACTORED: Enqueue field change handler (needs jQuery, logger, state)
+		// Must load before payment-session.js to wire input listeners
+		wp_enqueue_script(
+			'checkout-com-flow-field-change-handler-script',
+			WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/js/modules/flow-field-change-handler.js',
+			array( 'jquery', 'checkout-com-flow-logger-script', 'checkout-com-flow-state-script' ), // jQuery, logger, and state are dependencies
+			WC_CHECKOUTCOM_PLUGIN_VERSION,
+			false // Load in header
+		);
+
+		// REFACTORED: Enqueue saved card handler (needs jQuery, logger)
+		// Must load before payment-session.js to handle saved card selection
+		wp_enqueue_script(
+			'checkout-com-flow-saved-card-handler-script',
+			WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/js/modules/flow-saved-card-handler.js',
+			array( 'jquery', 'checkout-com-flow-logger-script' ), // jQuery and logger are dependencies
 			WC_CHECKOUTCOM_PLUGIN_VERSION,
 			false // Load in header
 		);
@@ -1255,11 +1309,44 @@ function callback_for_setting_up_scripts() {
 		$payment_session_version = WC_CHECKOUTCOM_PLUGIN_VERSION . '-' . time();
 	}
 	
+	$card_settings            = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+	$terms_prevention_value   = WC_Admin_Settings::get_option( 'flow_terms_prevention_enabled', '' );
+	if ( '' === $terms_prevention_value && isset( $card_settings['flow_terms_prevention_enabled'] ) ) {
+		$terms_prevention_value = $card_settings['flow_terms_prevention_enabled'];
+	}
+	$terms_prevention_enabled = 'yes' === $terms_prevention_value;
+	$payment_session_deps      = array(
+		'jquery',
+		'flow-customization-script',
+		'checkout-com-flow-container-script',
+		'checkout-com-flow-logger-script',
+		'checkout-com-flow-validation-script',
+		'checkout-com-flow-state-script',
+		'checkout-com-flow-3ds-detection-script',
+		'checkout-com-flow-updated-checkout-guard-script',
+		'checkout-com-flow-container-ready-handler-script',
+		'checkout-com-flow-field-change-handler-script',
+		'checkout-com-flow-saved-card-handler-script',
+		'checkout-com-flow-initialization-script',
+		'wp-i18n',
+	);
+
+	if ( $terms_prevention_enabled ) {
+		wp_enqueue_script(
+			'checkout-com-flow-terms-prevention-script',
+			WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/js/modules/flow-terms-prevention.js',
+			array( 'jquery', 'checkout-com-flow-logger-script' ), // jQuery and logger are dependencies
+			WC_CHECKOUTCOM_PLUGIN_VERSION,
+			false // Load in header to intercept events early
+		);
+		$payment_session_deps[] = 'checkout-com-flow-terms-prevention-script';
+	}
+
 	wp_enqueue_script(
-		'checkout-com-flow-payment-session-script', 
-		WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/js/payment-session.js', 
-		array( 'jquery', 'flow-customization-script', 'checkout-com-flow-container-script', 'checkout-com-flow-logger-script', 'checkout-com-flow-terms-prevention-script', 'checkout-com-flow-validation-script', 'checkout-com-flow-state-script', 'checkout-com-flow-initialization-script', 'wp-i18n' ), // Logger, terms prevention, validation, state, and initialization are dependencies
-			$payment_session_version
+		'checkout-com-flow-payment-session-script',
+		WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/js/payment-session.js',
+		$payment_session_deps,
+		$payment_session_version
 	);
 
 		$url = 'https://api.checkout.com/payment-sessions';
@@ -1410,6 +1497,9 @@ function callback_for_setting_up_scripts() {
 		wp_set_script_translations( 'checkout-com-flow-payment-session-script', 'checkout-com-unified-payments-api' );
 
 		wp_localize_script( 'checkout-com-flow-payment-session-script', 'cko_flow_vars', $flow_vars );
+	} else {
+		// Classic mode: enqueue checkoutcom-styles.css for card payment method styling
+		wp_enqueue_style( 'checkoutcom-style' );
 	}
 }
 

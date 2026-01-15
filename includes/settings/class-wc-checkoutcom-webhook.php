@@ -64,6 +64,81 @@ class WC_Checkoutcom_Webhook {
 	}
 
 	/**
+	 * Normalize a webhook URL for comparison.
+	 *
+	 * @param string $url Webhook URL.
+	 *
+	 * @return string
+	 */
+	private function normalize_webhook_url( $url ): string {
+		$url = trim( (string) $url );
+		if ( '' === $url ) {
+			return '';
+		}
+
+		$parsed = wp_parse_url( $url );
+		if ( false === $parsed ) {
+			return $url;
+		}
+
+		$host   = isset( $parsed['host'] ) ? strtolower( $parsed['host'] ) : '';
+		$host   = str_replace( 'www.', '', $host );
+		$path   = isset( $parsed['path'] ) ? $parsed['path'] : '/';
+		$query  = isset( $parsed['query'] ) ? $parsed['query'] : '';
+
+		$path = '/' . ltrim( $path, '/' );
+		if ( '/' !== $path ) {
+			$path = untrailingslashit( $path );
+		}
+
+		$normalized = $host . $path;
+		if ( '' !== $query ) {
+			$normalized .= '?' . $query;
+		}
+
+		return $normalized;
+	}
+
+	/**
+	 * Find matching webhooks by URL.
+	 *
+	 * @param string $url Webhook URL.
+	 *
+	 * @return array
+	 */
+	public function get_matching_webhooks( $url ): array {
+		$matches    = [];
+		$webhooks   = $this->get_list();
+		$target_url = $this->normalize_webhook_url( $url );
+		$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
+
+		if ( $gateway_debug ) {
+			WC_Checkoutcom_Utility::logger( '[WEBHOOK MATCH] Target URL: ' . $target_url );
+			WC_Checkoutcom_Utility::logger( '[WEBHOOK MATCH] Total webhooks returned: ' . count( $webhooks ) );
+		}
+
+		if ( empty( $target_url ) || empty( $webhooks ) ) {
+			return [];
+		}
+
+		foreach ( $webhooks as $item ) {
+			$item_url = isset( $item['url'] ) ? $this->normalize_webhook_url( $item['url'] ) : '';
+			if ( $gateway_debug ) {
+				WC_Checkoutcom_Utility::logger( '[WEBHOOK MATCH] Compare item URL: ' . $item_url );
+			}
+			if ( '' !== $item_url && $item_url === $target_url ) {
+				$matches[] = $item;
+			}
+		}
+
+		if ( $gateway_debug ) {
+			WC_Checkoutcom_Utility::logger( '[WEBHOOK MATCH] Matches found: ' . count( $matches ) );
+		}
+
+		return $matches;
+	}
+
+	/**
 	 * Get singleton instance.
 	 *
 	 * @return WC_Checkoutcom_Webhook
@@ -88,11 +163,39 @@ class WC_Checkoutcom_Webhook {
 		// Prevent any output that might corrupt JSON response
 		ob_start();
 
-		$w_id = false;
+		$w_id          = false;
 		$error_message = '';
+		$webhook_url   = $this->generate_current_webhook_url();
 
 		if ( 'ABC' === $this->account_type ) {
-			$webhook_response = (array) $this->create( $this->generate_current_webhook_url() );
+			$matches = $this->get_matching_webhooks( $webhook_url );
+		} else {
+			$matches = WC_Checkoutcom_Workflows::get_instance()->get_matching_workflows( $webhook_url );
+		}
+
+		$match_count = count( $matches );
+		if ( $match_count > 1 ) {
+			ob_clean();
+			wp_send_json_error(
+				[
+					'message' => __( 'Multiple webhooks registered. Please delete duplicates and keep only one.', 'checkout-com-unified-payments-api' ),
+				],
+				400
+			);
+		}
+
+		if ( 1 === $match_count ) {
+			ob_clean();
+			wp_send_json_error(
+				[
+					'message' => __( 'Webhook already registered for this URL. No action needed.', 'checkout-com-unified-payments-api' ),
+				],
+				400
+			);
+		}
+
+		if ( 'ABC' === $this->account_type ) {
+			$webhook_response = (array) $this->create( $webhook_url );
 
 			if ( empty( $webhook_response ) || empty( $webhook_response['id'] ) ) {
 				$error_message = __( 'Failed to create webhook. Response: ', 'checkout-com-unified-payments-api' ) . wc_print_r( $webhook_response, true );
@@ -104,7 +207,7 @@ class WC_Checkoutcom_Webhook {
 		} else {
 
 			// NAS account type.
-			$workflow_response = WC_Checkoutcom_Workflows::get_instance()->create( $this->generate_current_webhook_url() );
+			$workflow_response = WC_Checkoutcom_Workflows::get_instance()->create( $webhook_url );
 
 			if ( empty( $workflow_response ) || empty( $workflow_response['id'] ) ) {
 				$error_message = __( 'Failed to create workflow. Response: ', 'checkout-com-unified-payments-api' ) . wc_print_r( $workflow_response, true );
@@ -233,29 +336,48 @@ class WC_Checkoutcom_Webhook {
 		// Prevent any output that might corrupt JSON response
 		ob_start();
 
-		if ( 'ABC' === $this->account_type ) {
-			$webhook_is_ready = $this->is_registered();
+		$webhook_url = $this->generate_current_webhook_url();
 
+		if ( 'ABC' === $this->account_type ) {
+			$matches = $this->get_matching_webhooks( $webhook_url );
 			$message = esc_html__( 'Webhook is configured at this URL:', 'checkout-com-unified-payments-api' );
 		} else {
 			// NAS account type.
-			// @todo: Use SDK to get webhooks or workflows.
-			$webhook_is_ready = WC_Checkoutcom_Workflows::get_instance()->is_registered();
-
+			$matches = WC_Checkoutcom_Workflows::get_instance()->get_matching_workflows( $webhook_url );
 			$message = esc_html__( 'Webhook is configured with this name:', 'checkout-com-unified-payments-api' );
 		}
 
-		if ( $webhook_is_ready ) {
-
-			$message = $message ? $message : esc_html__( 'Webhook is configured at this URL:', 'checkout-com-unified-payments-api' );
-			$message = sprintf( '%s <code>%s</code>', $message, $webhook_is_ready );
+		$match_count = count( $matches );
+		if ( $match_count > 1 ) {
+			$message = esc_html__( 'Multiple webhooks registered. Please delete duplicates and keep only one.', 'checkout-com-unified-payments-api' );
+		} elseif ( 1 === $match_count ) {
+			if ( 'ABC' === $this->account_type ) {
+				$matched_url = isset( $matches[0]['url'] ) ? $matches[0]['url'] : $webhook_url;
+				$message     = sprintf( '%s <code>%s</code>', $message, esc_html( $matched_url ) );
+			} else {
+				$matched_name = isset( $matches[0]['name'] ) ? $matches[0]['name'] : '';
+				$matched_url  = isset( $matches[0]['url'] ) ? $matches[0]['url'] : $webhook_url;
+				if ( '' !== $matched_name ) {
+					$message = sprintf(
+						'%s <code>%s</code> (<code>%s</code>)',
+						$message,
+						esc_html( $matched_name ),
+						esc_html( $matched_url )
+					);
+				} else {
+					$message = sprintf( '%s <code>%s</code>', $message, esc_html( $matched_url ) );
+				}
+			}
 		} else {
-
 			$message = esc_html__( 'Webhook is not configured with the current site or there is some issue with connection, Please check logs or try again.', 'checkout-com-unified-payments-api' );
 		}
 
 		// Clean any output
 		ob_clean();
+
+		if ( $match_count > 1 ) {
+			wp_send_json_error( [ 'message' => $message ], 400 );
+		}
 
 		wp_send_json_success( [ 'message' => $message ] );
 	}
@@ -268,18 +390,11 @@ class WC_Checkoutcom_Webhook {
 	 * @return string|null
 	 */
 	public function is_registered( $url = '' ): string {
-		$webhooks = $this->get_list();
+		$webhooks = $this->get_matching_webhooks( $url ? $url : $this->generate_current_webhook_url() );
 
-		if ( empty( $url ) ) {
-			$url = home_url( '/' );
-		}
-
-		foreach ( $webhooks as $item ) {
-			if ( false !== strpos( $item['url'], $url ) ) {
-				$this->url_is_registered = $item['url'];
-
-				return $this->url_is_registered;
-			}
+		if ( 1 === count( $webhooks ) && isset( $webhooks[0]['url'] ) ) {
+			$this->url_is_registered = $webhooks[0]['url'];
+			return $this->url_is_registered;
 		}
 
 		return $this->url_is_registered;
