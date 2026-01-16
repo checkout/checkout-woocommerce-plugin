@@ -6,3 +6,9 @@ node_modules/
 vendor/
 checkout-com-unified-payments-api.zip
 composer.phar
+
+# Docker files (local development only)
+.dockerignore
+docker-compose.yml
+docker-php.ini
+docker-start.sh
