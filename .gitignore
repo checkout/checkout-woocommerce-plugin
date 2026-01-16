@@ -12,3 +12,8 @@ composer.phar
 docker-compose.yml
 docker-php.ini
 docker-start.sh
+
+# Allow releases directory (but ignore other files in releases/)
+!releases/
+releases/*
+!releases/*.zip
