@@ -3469,6 +3469,37 @@ document.addEventListener("DOMContentLoaded", function () {
 	 * 
 	 * @returns {Promise<number|null>} Order ID if successful, null if failed
 	 */
+	function parseJsonLenient(responseText) {
+		if (typeof responseText !== 'string') {
+			return responseText;
+		}
+		const trimmed = responseText.trim();
+		if (!trimmed) {
+			return null;
+		}
+		// If response contains leading junk (e.g., "200"), extract the JSON payload.
+		const firstBraceIndex = trimmed.indexOf('{');
+		const firstBracketIndex = trimmed.indexOf('[');
+		let startIndex = -1;
+		if (firstBraceIndex !== -1 && firstBracketIndex !== -1) {
+			startIndex = Math.min(firstBraceIndex, firstBracketIndex);
+		} else if (firstBraceIndex !== -1) {
+			startIndex = firstBraceIndex;
+		} else if (firstBracketIndex !== -1) {
+			startIndex = firstBracketIndex;
+		}
+		if (startIndex === -1) {
+			return null;
+		}
+		const jsonText = trimmed.substring(startIndex);
+		try {
+			return JSON.parse(jsonText);
+		} catch (error) {
+			ckoLogger.error('[CREATE ORDER] JSON parse failed:', error);
+			return null;
+		}
+	}
+
 	async function createOrderBeforePayment() {
 		// CRITICAL: Prevent multiple simultaneous order creation calls (race condition protection)
 		if (FlowState.get('orderCreationInProgress')) {
@@ -3673,10 +3704,11 @@ document.addEventListener("DOMContentLoaded", function () {
 				wcAjaxUrl = window.location.origin + '/?wc-ajax=checkout';
 			}
 
-			const response = await jQuery.ajax({
+			const responseText = await jQuery.ajax({
 				url: wcAjaxUrl,
 				type: "POST",
-				data: ajaxData
+				data: ajaxData,
+				dataType: "text"
 			}).fail(function(xhr, status, error) {
 				ckoLogger.error('[CREATE ORDER] ❌ AJAX Request Failed');
 				ckoLogger.error('[CREATE ORDER] Status:', status);
@@ -3685,6 +3717,13 @@ document.addEventListener("DOMContentLoaded", function () {
 				ckoLogger.error('[CREATE ORDER] Status Code:', xhr.status);
 				ckoLogger.error('[CREATE ORDER] Request Data:', ajaxData);
 			});
+			
+			const response = parseJsonLenient(responseText);
+			if (!response) {
+				ckoLogger.error('[CREATE ORDER] ❌ Failed to parse AJAX response as JSON');
+				ckoLogger.error('[CREATE ORDER] Response Text:', responseText);
+				return null;
+			}
 			
 			ckoLogger.debug('[CREATE ORDER] ========== PROCESSING AJAX RESPONSE ==========');
 			ckoLogger.debug('[CREATE ORDER] Response received:', response);
