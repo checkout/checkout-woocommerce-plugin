@@ -291,6 +291,7 @@ add_action( 'plugins_loaded', 'init_checkout_com_gateway_class', 0 );
 		// Admin pages
 		if ( is_admin() ) {
 			include_once 'includes/admin/class-wc-checkoutcom-webhook-queue-admin.php';
+			include_once 'includes/admin/class-wc-checkoutcom-diagnostics.php';
 		}
 		
 		// Note: You can also access the webhook queue table directly using:
@@ -1963,67 +1964,23 @@ function cko_validate_checkout() {
 			return;
 		}
 
-	// Get posted data and prepare for validation.
-		WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] Getting posted data' );
-	$posted_data = $checkout->get_posted_data();
-		WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] Posted data retrieved' );
-		
-	try {
-		// Use Reflection to call the protected update_session method.
-			WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] Calling update_session via Reflection' );
-		$reflection1 = new ReflectionClass( $checkout );
-		$method      = $reflection1->getMethod( 'update_session' );
-		$method->setAccessible( true );
-		$method->invoke( $checkout, $posted_data );
-			WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] update_session completed' );
-	} catch ( ReflectionException $e ) {
-			WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] ERROR in update_session: ' . $e->getMessage() );
-		wp_send_json_error( array( 'message' => __( 'Could not access checkout update method.', 'checkout-com-unified-payments-api' ) ) );
-			return;
-		} catch ( Exception $e ) {
-			WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] ERROR in update_session (general): ' . $e->getMessage() );
-			WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] ERROR stack trace: ' . $e->getTraceAsString() );
-			wp_send_json_error( array( 'message' => __( 'Error updating checkout session: ', 'checkout-com-unified-payments-api' ) . $e->getMessage() ) );
-			return;
-	}
-
-	$errors = new WP_Error();
-
-	try {
-		// Use Reflection to call the protected validate_checkout method.
-			WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] Calling validate_checkout via Reflection' );
-		$reflection2 = new ReflectionClass( $checkout );
-		$method      = $reflection2->getMethod( 'validate_checkout' );
-		$method->setAccessible( true );
-		$method->invokeArgs( $checkout, array( &$posted_data, &$errors ) );
-			WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] validate_checkout completed' );
-	} catch ( ReflectionException $e ) {
-			WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] ERROR in validate_checkout: ' . $e->getMessage() );
-		wp_send_json_error( array( 'message' => __( 'Could not access checkout validate method.', 'checkout-com-unified-payments-api' ) ) );
-			return;
-		} catch ( Exception $e ) {
-			WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] ERROR in validate_checkout (general): ' . $e->getMessage() );
-			WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] ERROR stack trace: ' . $e->getTraceAsString() );
-			wp_send_json_error( array( 'message' => __( 'Error validating checkout: ', 'checkout-com-unified-payments-api' ) . $e->getMessage() ) );
-			return;
-	}
-
-	// If any validation errors occurred, send them back as an error response.
-	if ( ! empty( $errors->errors ) ) {
-			WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] Validation errors found: ' . count( $errors->errors ) );
+	// Run hook-based validation only (public API).
+	$notices = wc_get_notices( 'error' );
+	if ( ! empty( $notices ) ) {
+		WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] Validation errors found: ' . count( $notices ) );
 		$messages = array();
-		foreach ( $errors->errors as $code => $msgs ) {
-			foreach ( $msgs as $msg ) {
-				$messages[] = $msg;
-					WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] Error: ' . $code . ' - ' . $msg );
+		foreach ( $notices as $notice ) {
+			if ( isset( $notice['notice'] ) ) {
+				$messages[] = $notice['notice'];
 			}
 		}
+		wc_clear_notices();
 		wp_send_json_error( array( 'message' => implode( "\n", $messages ) ) );
-			return;
+		return;
 	}
 
 	// If everything passed, return success.
-		WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] Validation successful' );
+	WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] Validation successful' );
 	wp_send_json_success( array( 'message' => __( 'Validation successful', 'checkout-com-unified-payments-api' ) ) );
 	} catch ( Exception $e ) {
 		WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] FATAL ERROR: ' . $e->getMessage() );

@@ -75,6 +75,8 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		
 		// Store save card preference in order metadata when order is created (before 3DS redirect)
 		add_action( 'woocommerce_checkout_create_order', [ $this, 'store_save_card_preference_in_order' ], 10, 2 );
+		// Store payment session ID in order metadata when order is created (public checkout flow)
+		add_action( 'woocommerce_checkout_create_order', [ $this, 'store_payment_session_id_in_order' ], 10, 2 );
 
 		// Preserve payment method title after order status changes (webhooks may overwrite it)
 		add_action( 'woocommerce_order_status_changed', [ $this, 'preserve_payment_method_title' ], 20, 4 );
@@ -114,7 +116,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	 *
 	 * @return string Payment method title.
 	 */
-	private function get_payment_method_title_by_type( $order = null, $payment_details = null ) {
+	public function get_payment_method_title_by_type( $order = null, $payment_details = null ) {
 		// Prevent infinite recursion
 		static $in_progress = array();
 		$order_id = $order ? $order->get_id() : 0;
@@ -629,6 +631,45 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// Store in order metadata
 		$order->update_meta_data( '_cko_save_card_preference', $save_card_preference );
 		WC_Checkoutcom_Utility::logger( '[FLOW SAVE CARD] Stored save card preference in order metadata: ' . $save_card_preference . ' (Order ID: ' . $order->get_id() . ')' );
+	}
+
+	/**
+	 * Store payment session ID in order metadata when order is created.
+	 * Uses public checkout hooks so Reflection is not required.
+	 *
+	 * @param WC_Order $order The order object.
+	 * @param array    $data  The order data.
+	 * @return void
+	 */
+	public function store_payment_session_id_in_order( $order, $data ) {
+		// Only process if this is a Flow payment.
+		if ( $this->id !== $order->get_payment_method() ) {
+			return;
+		}
+
+		$payment_session_id = isset( $_POST['cko-flow-payment-session-id'] ) ? sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-session-id'] ) ) : '';
+		if ( empty( $payment_session_id ) ) {
+			return;
+		}
+
+		// Ensure payment_session_id is unique (avoid duplicate order linkage).
+		$existing_orders = wc_get_orders(
+			array(
+				'meta_key'   => '_cko_payment_session_id',
+				'meta_value' => $payment_session_id,
+				'status'     => array( 'pending', 'failed', 'on-hold', 'processing' ),
+				'limit'      => 1,
+				'return'     => 'ids',
+			)
+		);
+
+		if ( ! empty( $existing_orders ) && (int) $existing_orders[0] !== (int) $order->get_id() ) {
+			WC_Checkoutcom_Utility::logger( '[FLOW PAYMENT SESSION] Duplicate payment_session_id detected - skipping save. Order ID: ' . $order->get_id() );
+			return;
+		}
+
+		$order->update_meta_data( '_cko_payment_session_id', $payment_session_id );
+		WC_Checkoutcom_Utility::logger( '[FLOW PAYMENT SESSION] Stored payment session ID in order metadata: ' . substr( $payment_session_id, 0, 20 ) . '... (Order ID: ' . $order->get_id() . ')' );
 	}
 
 	public function add_payment_meta_field( $payment_meta, $subscription ) {
@@ -1956,7 +1997,23 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				return;
 			}
 		}
-		
+
+		// Order pre-creation mode: allow WooCommerce to create the order/subscription
+		// without attempting to process payment yet (Flow will submit payment afterward).
+		if ( isset( $_POST['cko_flow_precreate_order'] ) && '1' === sanitize_text_field( wp_unslash( $_POST['cko_flow_precreate_order'] ) ) ) {
+			WC_Checkoutcom_Utility::logger( '[FLOW PRECREATE] Skipping payment processing - order created via WC checkout for Flow.' );
+			// Ensure order is pending (do not charge yet).
+			if ( 'pending' !== $order->get_status() ) {
+				$order->set_status( 'pending' );
+				$order->save();
+			}
+
+			return array(
+				'result'   => 'success',
+				'redirect' => $order->get_checkout_payment_url( true ),
+			);
+		}
+
 		WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Order found - ID: ' . $order->get_id() . ', Status: ' . $order->get_status() . ', Payment Method: ' . $order->get_payment_method() );
 		
 		// DEBUG: Log current address state BEFORE setting addresses
@@ -3304,7 +3361,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 	if ( class_exists( 'WC_Subscriptions_Order' ) && $flow_result !== null ) {
 			// Save source id for subscription.
-			WC_Checkoutcom_Subscription::save_source_id( $order_id, $order, $flow_result['source']['id'] );
+				WC_Checkoutcom_Subscription::save_source_id( $order_id, $order, $flow_result['source']['id'] );
 
 			if ( "card" === $subs_payment_type ) {
 				$this->save_preferred_card_scheme( $order_id, $order, $flow_result['source']['scheme'] );
@@ -6208,19 +6265,19 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	 * @return void
 	 */
 	public function ajax_create_order() {
-		// Set proper headers for JSON response (only if not already sent)
+		// Set proper headers for JSON response (only if not already sent).
 		if ( ! headers_sent() ) {
 			header( 'Content-Type: application/json' );
 		}
 		
-		// Log entry point
+		// Log entry point.
 		if ( function_exists( 'WC_Checkoutcom_Utility' ) && method_exists( 'WC_Checkoutcom_Utility', 'logger' ) ) {
 			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ========== ENTRY POINT ==========' );
 			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] POST data keys: ' . implode( ', ', array_keys( $_POST ) ) );
 			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Action: ' . ( isset( $_POST['action'] ) ? $_POST['action'] : 'NOT SET' ) );
 		}
 		
-		// Verify nonce for security - check multiple possible locations
+		// Verify nonce for security - check multiple possible locations.
 		$nonce_value = '';
 		if ( isset( $_POST['woocommerce-process-checkout-nonce'] ) ) {
 			$nonce_value = sanitize_text_field( wp_unslash( $_POST['woocommerce-process-checkout-nonce'] ) );
@@ -6255,329 +6312,149 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		
 		WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Nonce validated successfully' );
 		
-		// Get payment session ID if available
+		// Get payment session ID if available (used for duplicate prevention).
 		$payment_session_id = isset( $_POST['cko-flow-payment-session-id'] ) ? sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-session-id'] ) ) : '';
 		
-		// Load WooCommerce checkout class
+		// Ensure WooCommerce is available.
 		if ( ! function_exists( 'WC' ) || ! WC() ) {
 			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ERROR: WooCommerce not available' );
 			wp_send_json_error( array( 'message' => __( 'WooCommerce not available.', 'checkout-com-unified-payments-api' ) ) );
 			return;
 		}
 		
+		// Prevent duplicate order creation for the same payment session.
+		if ( ! empty( $payment_session_id ) ) {
+			$existing_orders = wc_get_orders(
+				array(
+					'meta_key'   => '_cko_payment_session_id',
+					'meta_value' => $payment_session_id,
+					'status'     => array( 'pending', 'failed', 'on-hold', 'processing' ),
+					'limit'      => 1,
+					'return'     => 'ids',
+				)
+			);
+			
+			if ( ! empty( $existing_orders ) ) {
+				$existing_order_id = $existing_orders[0];
+				$existing_order = wc_get_order( $existing_order_id );
+				
+				if ( $existing_order ) {
+					WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ✅ Existing order found with payment_session_id - Order ID: ' . $existing_order_id );
+					
+					// Store save card preference if available (update existing order).
+					$save_card_preference = isset( $_POST['cko-flow-save-card-persist'] ) ? sanitize_text_field( wp_unslash( $_POST['cko-flow-save-card-persist'] ) ) : '';
+					if ( 'true' === $save_card_preference || 'yes' === $save_card_preference ) {
+						$existing_order->update_meta_data( '_cko_save_card_preference', 'yes' );
+						$existing_order->save();
+						WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Save card preference updated on existing order: YES' );
+					}
+					
+					wp_send_json_success(
+						array(
+							'order_id'       => $existing_order_id,
+							'order_key'      => $existing_order->get_order_key(),
+							'message'        => __( 'Using existing order.', 'checkout-com-unified-payments-api' ),
+							'existing_order' => true,
+						)
+					);
+					return;
+				}
+			}
+		}
+		
+		// Use WooCommerce public checkout flow (no Reflection).
+		// Run validation hooks first.
+		try {
+			do_action( 'woocommerce_before_checkout_process' );
+			do_action( 'woocommerce_checkout_process' );
+		} catch ( Exception $e ) {
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ERROR in validation hooks: ' . $e->getMessage() );
+			wp_send_json_error( array( 'message' => __( 'Error during checkout validation: ', 'checkout-com-unified-payments-api' ) . $e->getMessage() ) );
+			return;
+		}
+
+		// Get posted data and create order using public API.
 		$checkout = WC()->checkout();
 		if ( ! $checkout ) {
 			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ERROR: Checkout class not available' );
 			wp_send_json_error( array( 'message' => __( 'Checkout class not available.', 'checkout-com-unified-payments-api' ) ) );
 			return;
 		}
-		
-		try {
-			// CRITICAL: Check for existing order with same payment_session_id BEFORE creating new order
-			// This prevents race conditions where two simultaneous AJAX calls create duplicate orders
-			// Fix for issue: Two orders created with same payment_session_id (Order #988 and #989)
-			if ( ! empty( $payment_session_id ) ) {
-				$existing_orders = wc_get_orders( array(
-					'meta_key'   => '_cko_payment_session_id',
-					'meta_value' => $payment_session_id,
-					'status'     => array( 'pending', 'failed', 'on-hold', 'processing' ), // Only match orders that need updating
-					'limit'      => 1,
-					'return'     => 'ids',
-				) );
-				
-				if ( ! empty( $existing_orders ) ) {
-					// Existing order found with same payment_session_id - return it instead of creating duplicate
-					$existing_order_id = $existing_orders[0];
-					$existing_order = wc_get_order( $existing_order_id );
-					
-					if ( $existing_order ) {
-						WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ✅ Existing order found with payment_session_id - Order ID: ' . $existing_order_id );
-						WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ✅ Reusing existing order instead of creating duplicate - Payment Session ID: ' . substr( $payment_session_id, 0, 20 ) . '...' );
-						
-						// Store save card preference if available (update existing order)
-						$save_card_preference = isset( $_POST['cko-flow-save-card-persist'] ) ? sanitize_text_field( wp_unslash( $_POST['cko-flow-save-card-persist'] ) ) : '';
-						if ( 'true' === $save_card_preference || 'yes' === $save_card_preference ) {
-							$existing_order->update_meta_data( '_cko_save_card_preference', 'yes' );
-							$existing_order->save();
-							WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Save card preference updated on existing order: YES' );
-						}
-						
-						// Return existing order ID (prevents duplicate order creation)
-						wp_send_json_success( array(
-							'order_id' => $existing_order_id,
-							'message' => __( 'Using existing order.', 'checkout-com-unified-payments-api' ),
-							'existing_order' => true,
-						) );
-						return;
-					}
-				}
-				
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ✅ No existing order found with payment_session_id - safe to create new order - Payment Session ID: ' . substr( $payment_session_id, 0, 20 ) . '...' );
-			}
-			
-			// CRITICAL: Validate checkout form BEFORE getting posted data and creating order
-			// This ensures orders are only created when form is valid (defense-in-depth)
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Validating checkout form before order creation...' );
-			
-			// Run validation hooks FIRST (before getting posted data)
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ========== VALIDATION HOOKS PHASE ==========' );
-			try {
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Step 1: Running woocommerce_before_checkout_process hook' );
-				do_action( 'woocommerce_before_checkout_process' );
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Step 1: ✅ woocommerce_before_checkout_process completed' );
-				
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Step 2: Running woocommerce_checkout_process hook' );
-				do_action( 'woocommerce_checkout_process' );
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Step 2: ✅ woocommerce_checkout_process completed' );
-				
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ✅✅✅ Validation hooks executed successfully ✅✅✅' );
-			} catch ( Exception $e ) {
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ❌❌❌ ERROR in validation hooks ❌❌❌' );
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ERROR message: ' . $e->getMessage() );
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ERROR stack trace: ' . $e->getTraceAsString() );
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ❌❌❌ BLOCKING ORDER CREATION - Returning error ❌❌❌' );
-				wp_send_json_error( array(
-					'message' => __( 'Error during checkout validation: ', 'checkout-com-unified-payments-api' ) . $e->getMessage(),
-				) );
-				return;
-			}
-			
-			// Get posted data from form AFTER validation hooks
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ========== GETTING POSTED DATA ==========' );
-			$posted_data = $checkout->get_posted_data();
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Posted data retrieved - ' . count( $posted_data ) . ' fields' );
-			
-			// Update session with posted data
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ========== UPDATING SESSION ==========' );
-			try {
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Calling update_session via Reflection' );
-				$reflection_session = new ReflectionClass( $checkout );
-				$update_session_method = $reflection_session->getMethod( 'update_session' );
-				$update_session_method->setAccessible( true );
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Invoking update_session method...' );
-				$update_session_method->invoke( $checkout, $posted_data );
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ✅ update_session completed successfully' );
-			} catch ( ReflectionException $e ) {
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ❌❌❌ ERROR in update_session (ReflectionException) ❌❌❌' );
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ERROR: ' . $e->getMessage() );
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ❌❌❌ BLOCKING ORDER CREATION ❌❌❌' );
-				wp_send_json_error( array(
-					'message' => __( 'Could not access checkout update method.', 'checkout-com-unified-payments-api' ),
-				) );
-				return;
-			} catch ( Exception $e ) {
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ❌❌❌ ERROR in update_session (Exception) ❌❌❌' );
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ERROR: ' . $e->getMessage() );
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ERROR stack trace: ' . $e->getTraceAsString() );
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ❌❌❌ BLOCKING ORDER CREATION ❌❌❌' );
-				wp_send_json_error( array(
-					'message' => __( 'Error updating checkout session: ', 'checkout-com-unified-payments-api' ) . $e->getMessage(),
-				) );
-				return;
-			}
-			
-			// Validate checkout fields
-			$errors = new WP_Error();
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ========== STARTING FIELD VALIDATION ==========' );
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Posted data keys: ' . implode( ', ', array_keys( $posted_data ) ) );
-			
-			// Log key field values for debugging
-			$key_fields = array( 'billing_email', 'billing_first_name', 'billing_last_name', 'billing_address_1', 'billing_city', 'billing_country', 'billing_postcode' );
-			foreach ( $key_fields as $field ) {
-				$value = isset( $posted_data[ $field ] ) ? $posted_data[ $field ] : 'NOT SET';
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Field ' . $field . ': ' . ( is_string( $value ) && strlen( $value ) > 50 ? substr( $value, 0, 50 ) . '...' : $value ) );
-			}
-			
-			try {
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Calling validate_checkout via Reflection' );
-				$reflection_validate = new ReflectionClass( $checkout );
-				$validate_method = $reflection_validate->getMethod( 'validate_checkout' );
-				$validate_method->setAccessible( true );
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] About to invoke validate_checkout method' );
-				$validate_method->invokeArgs( $checkout, array( &$posted_data, &$errors ) );
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] validate_checkout completed' );
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Errors object type: ' . gettype( $errors ) );
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Errors object class: ' . get_class( $errors ) );
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Errors->errors is empty?: ' . ( empty( $errors->errors ) ? 'YES' : 'NO' ) );
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Errors->errors count: ' . ( is_array( $errors->errors ) ? count( $errors->errors ) : 'NOT ARRAY' ) );
-			} catch ( ReflectionException $e ) {
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ERROR in validate_checkout: ' . $e->getMessage() );
-				wp_send_json_error( array(
-					'message' => __( 'Could not access checkout validate method.', 'checkout-com-unified-payments-api' ),
-				) );
-				return;
-			} catch ( Exception $e ) {
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ERROR in validate_checkout (general): ' . $e->getMessage() );
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ERROR stack trace: ' . $e->getTraceAsString() );
-				wp_send_json_error( array(
-					'message' => __( 'Error validating checkout: ', 'checkout-com-unified-payments-api' ) . $e->getMessage(),
-				) );
-				return;
-			}
-			
-			// Check for validation errors - CRITICAL: Do NOT create order if validation fails
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ========== CHECKING VALIDATION ERRORS ==========' );
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Checking if errors->errors is empty...' );
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] empty($errors->errors) result: ' . ( empty( $errors->errors ) ? 'TRUE (no errors)' : 'FALSE (errors found)' ) );
-			
-			if ( ! empty( $errors->errors ) ) {
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ❌❌❌ VALIDATION ERRORS FOUND - BLOCKING ORDER CREATION ❌❌❌' );
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Validation errors count: ' . count( $errors->errors ) );
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Validation errors array: ' . wp_json_encode( $errors->errors ) );
-				$messages = array();
-				foreach ( $errors->errors as $code => $msgs ) {
-					foreach ( $msgs as $msg ) {
-						$messages[] = $msg;
-						WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ❌ Validation error [' . $code . ']: ' . $msg );
-					}
-				}
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ❌❌❌ ORDER CREATION BLOCKED - RETURNING ERROR RESPONSE ❌❌❌' );
-				wp_send_json_error( array(
-					'message' => implode( "\n", $messages ),
-				) );
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ❌❌❌ EXITING - ORDER WILL NOT BE CREATED ❌❌❌' );
-				return; // CRITICAL: Exit here - do NOT create order
-			}
-			
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ✅✅✅ NO VALIDATION ERRORS - ALL VALIDATIONS PASSED ✅✅✅' );
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ✅ Validation passed - proceeding with order creation' );
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ========== ABOUT TO CREATE ORDER ==========' );
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] All validations passed - calling create_order() method' );
-			
-			// Create order using WooCommerce checkout process
-			// Use Reflection to call protected create_order() method which triggers woocommerce_checkout_create_order hook
-			// This ensures duplicate prevention logic runs
-			$reflection = new ReflectionClass( $checkout );
-			$create_order_method = $reflection->getMethod( 'create_order' );
-			$create_order_method->setAccessible( true );
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Invoking create_order() method...' );
-			$order_id = $create_order_method->invoke( $checkout, $posted_data );
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] create_order() returned: ' . wp_json_encode( $order_id ) );
-			
-			if ( is_wp_error( $order_id ) ) {
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ❌❌❌ ERROR: Failed to create order ❌❌❌' );
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Error message: ' . $order_id->get_error_message() );
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Error code: ' . $order_id->get_error_code() );
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Error data: ' . wp_json_encode( $order_id->get_error_data() ) );
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ❌ Order creation failed - returning error response' );
-				wp_send_json_error( array(
-					'message' => __( 'Failed to create order. Please try again.', 'checkout-com-unified-payments-api' ),
-					'error' => $order_id->get_error_message(),
-				) );
-				return;
-			}
-			
-			if ( empty( $order_id ) || ! is_numeric( $order_id ) ) {
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ❌❌❌ ERROR: Invalid order ID returned ❌❌❌' );
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Order ID value: ' . wp_json_encode( $order_id ) );
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Order ID type: ' . gettype( $order_id ) );
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Order ID is empty?: ' . ( empty( $order_id ) ? 'YES' : 'NO' ) );
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Order ID is numeric?: ' . ( is_numeric( $order_id ) ? 'YES' : 'NO' ) );
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ❌ Order creation failed - invalid order ID' );
-				wp_send_json_error( array(
-					'message' => __( 'Failed to create order. Invalid order ID returned.', 'checkout-com-unified-payments-api' ),
-				) );
-				return;
-			}
-			
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ========== ORDER CREATED SUCCESSFULLY ==========' );
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ✅✅✅ Order created successfully - Order ID: ' . $order_id . ' ✅✅✅' );
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Order ID type: ' . gettype( $order_id ) );
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Order ID is numeric?: ' . ( is_numeric( $order_id ) ? 'YES' : 'NO' ) );
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Order ID value: ' . $order_id );
-			
-			// Load the order
-			$order = wc_get_order( $order_id );
-			if ( ! $order ) {
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ERROR: Order not found after creation - Order ID: ' . $order_id );
-				wp_send_json_error( array(
-					'message' => __( 'Order created but not found. Please try again.', 'checkout-com-unified-payments-api' ),
-				) );
-				return;
-			}
-			
-			// Store payment session ID if available (for webhook lookup)
-			// NOTE: Duplicate check already performed BEFORE order creation (above)
-			// This ensures one order = one payment session ID and prevents race conditions
-			if ( ! empty( $payment_session_id ) ) {
-				// Double-check for duplicates (defense in depth - should never happen after pre-check)
-				$existing_orders = wc_get_orders( array(
-					'meta_key'   => '_cko_payment_session_id',
-					'meta_value' => $payment_session_id,
-					'limit'      => 1,
-					'exclude'    => array( $order_id ), // Exclude current order
-					'return'     => 'ids',
-				) );
-				
-				if ( ! empty( $existing_orders ) ) {
-					// This should never happen after pre-check, but log as critical error if it does
-					WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ❌ CRITICAL ERROR: Payment session ID already used by order: ' . $existing_orders[0] );
-					WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ❌ Cannot save duplicate payment_session_id to order: ' . $order_id );
-					WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ❌ Payment Session ID: ' . substr( $payment_session_id, 0, 20 ) . '...' );
-					WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ❌ This violates one-order-one-payment-session-id rule' );
-					WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ❌ Race condition detected - duplicate order created despite pre-check' );
-					// Don't save duplicate - this prevents webhook matching wrong order
-					// Return error to prevent order creation with duplicate payment_session_id
-					wp_send_json_error( array(
-						'message' => __( 'Payment session ID conflict. Please refresh and try again.', 'checkout-com-unified-payments-api' ),
-						'error'   => 'duplicate_payment_session_id',
-					) );
-					return;
-				}
-				
-				// Safe to save - payment_session_id is unique (pre-checked before order creation)
-				$order->update_meta_data( '_cko_payment_session_id', $payment_session_id );
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ✅ Payment session ID saved to order: ' . substr( $payment_session_id, 0, 20 ) . '... (Unique - pre-checked before creation)' );
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ✅ One order = one payment session ID: Order ' . $order_id . ' = Payment Session ' . substr( $payment_session_id, 0, 20 ) . '...' );
-			} else {
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ⚠️ WARNING: Payment session ID is empty - Order ID: ' . $order_id );
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ⚠️ Webhook matching may fail without payment_session_id' );
-			}
-			
-			// Store save card preference if available
-			$save_card_preference = isset( $_POST['cko-flow-save-card-persist'] ) ? sanitize_text_field( wp_unslash( $_POST['cko-flow-save-card-persist'] ) ) : '';
-			if ( 'true' === $save_card_preference || 'yes' === $save_card_preference ) {
-				$order->update_meta_data( '_cko_save_card_preference', 'yes' );
-				WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Save card preference saved to order: YES' );
-			}
-			
-			// Set order status to pending
-			$order->set_status( 'pending' );
-			$order->save();
-			
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Order saved successfully - Order ID: ' . $order_id . ', Status: pending' );
-			
-			// Get order key for guest order redirect URLs
-			$order_key = $order->get_order_key();
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ========== ORDER KEY DEBUG ==========' );
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Order ID: ' . $order_id );
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Order key retrieved: ' . $order_key );
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Order key type: ' . gettype( $order_key ) );
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Order key empty?: ' . ( empty( $order_key ) ? 'YES' : 'NO' ) );
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Order key length: ' . strlen( $order_key ) );
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Customer ID: ' . $order->get_customer_id() );
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Is guest order?: ' . ( $order->get_customer_id() == 0 ? 'YES' : 'NO' ) );
-			
-			// Return success with order ID and order key
-			$response_data = array(
-				'order_id' => $order_id,
-				'order_key' => $order_key,
-				'message' => __( 'Order created successfully.', 'checkout-com-unified-payments-api' ),
-			);
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Response data being sent:' );
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] - order_id: ' . $response_data['order_id'] );
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] - order_key: ' . $response_data['order_key'] );
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ========== END ORDER KEY DEBUG ==========' );
-			wp_send_json_success( $response_data );
-			
-		} catch ( Exception $e ) {
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] EXCEPTION: ' . $e->getMessage() );
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] EXCEPTION stack trace: ' . $e->getTraceAsString() );
+
+		$posted_data = $checkout->get_posted_data();
+
+		// Create order using WooCommerce checkout processing to preserve full hook behavior
+		// (subscriptions, fees, coupons, taxes, shipping, and extension integrations).
+		if ( ! is_callable( array( $checkout, 'create_order' ) ) ) {
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ERROR: WC_Checkout::create_order() not available' );
+			wp_send_json_error( array( 'message' => __( 'Checkout API not available.', 'checkout-com-unified-payments-api' ) ) );
+			return;
+		}
+
+		$order_id = $checkout->create_order( $posted_data );
+
+		if ( is_wp_error( $order_id ) ) {
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ERROR: Failed to create order: ' . $order_id->get_error_message() );
 			wp_send_json_error( array(
 				'message' => __( 'Failed to create order. Please try again.', 'checkout-com-unified-payments-api' ),
-				'error' => $e->getMessage(),
+				'error'   => $order_id->get_error_message(),
 			) );
+			return;
 		}
+
+		if ( empty( $order_id ) ) {
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ERROR: Invalid order ID returned' );
+			wp_send_json_error( array( 'message' => __( 'Failed to create order. Invalid order ID returned.', 'checkout-com-unified-payments-api' ) ) );
+			return;
+		}
+
+		$order = wc_get_order( $order_id );
+		if ( ! $order ) {
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ERROR: Order not found after creation - Order ID: ' . $order_id );
+			wp_send_json_error( array( 'message' => __( 'Order not found after creation.', 'checkout-com-unified-payments-api' ) ) );
+			return;
+		}
+
+		// Ensure payment method is set (in case it was not saved by checkout processing).
+		if ( $order->get_payment_method() !== $this->id ) {
+			$order->set_payment_method( $this->id );
+			$order->set_payment_method_title( $this->get_title() );
+		}
+
+		// Store payment session ID if available.
+		if ( ! empty( $payment_session_id ) ) {
+			$order->update_meta_data( '_cko_payment_session_id', $payment_session_id );
+		}
+
+		// Store save card preference if available.
+		$save_card_preference = isset( $_POST['cko-flow-save-card-persist'] ) ? sanitize_text_field( wp_unslash( $_POST['cko-flow-save-card-persist'] ) ) : '';
+		if ( 'true' === $save_card_preference || 'yes' === $save_card_preference ) {
+			$order->update_meta_data( '_cko_save_card_preference', 'yes' );
+		}
+
+		// Trigger standard checkout hooks for compatibility (subscriptions/plugins rely on these).
+		// WC_Checkout::create_order() already fires these in newer versions.
+		if ( 0 === did_action( 'woocommerce_checkout_update_order_meta' ) ) {
+			do_action( 'woocommerce_checkout_update_order_meta', $order_id, $posted_data );
+		}
+		if ( 0 === did_action( 'woocommerce_checkout_order_processed' ) ) {
+			do_action( 'woocommerce_checkout_order_processed', $order_id, $posted_data, $order );
+		}
+
+		if ( 'pending' !== $order->get_status() ) {
+			$order->set_status( 'pending' );
+		}
+		$order->save();
+
+		WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ✅ Order created successfully - Order ID: ' . $order_id );
+
+		wp_send_json_success(
+			array(
+				'order_id'  => $order_id,
+				'order_key' => $order->get_order_key(),
+				'message'   => __( 'Order created successfully.', 'checkout-com-unified-payments-api' ),
+			)
+		);
 	}
 
 	/**
@@ -6715,42 +6592,99 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			$posted_data = $checkout->get_posted_data();
 			WC_Checkoutcom_Utility::logger( '[CREATE FAILED ORDER] Posted data retrieved' );
 			
-			// Create order using WooCommerce checkout process
-			// Use Reflection to call protected create_order() method which triggers woocommerce_checkout_create_order hook
-			// This ensures duplicate prevention logic runs
-			$reflection = new ReflectionClass( $checkout );
-			$create_order_method = $reflection->getMethod( 'create_order' );
-			$create_order_method->setAccessible( true );
-			$order_id = $create_order_method->invoke( $checkout, $posted_data );
-			
-			if ( is_wp_error( $order_id ) ) {
-				WC_Checkoutcom_Utility::logger( '[CREATE FAILED ORDER] ERROR: Failed to create order: ' . $order_id->get_error_message() );
+			// Create order using public WooCommerce APIs (no Reflection).
+			$customer_id = get_current_user_id();
+			$order = wc_create_order( array( 'customer_id' => $customer_id ) );
+
+			if ( is_wp_error( $order ) ) {
+				WC_Checkoutcom_Utility::logger( '[CREATE FAILED ORDER] ERROR: Failed to create order: ' . $order->get_error_message() );
 				wp_send_json_error( array(
 					'message' => __( 'Failed to create order. Please try again.', 'checkout-com-unified-payments-api' ),
-					'error' => $order_id->get_error_message(),
+					'error' => $order->get_error_message(),
 				) );
 				return;
 			}
-			
-			if ( empty( $order_id ) || ! is_numeric( $order_id ) ) {
-				WC_Checkoutcom_Utility::logger( '[CREATE FAILED ORDER] ERROR: Invalid order ID returned: ' . wp_json_encode( $order_id ) );
+
+			$order_id = $order->get_id();
+			if ( empty( $order_id ) ) {
+				WC_Checkoutcom_Utility::logger( '[CREATE FAILED ORDER] ERROR: Invalid order ID returned.' );
 				wp_send_json_error( array(
 					'message' => __( 'Failed to create order. Invalid order ID returned.', 'checkout-com-unified-payments-api' ),
 				) );
 				return;
 			}
-			
-			WC_Checkoutcom_Utility::logger( '[CREATE FAILED ORDER] Order created successfully - Order ID: ' . $order_id );
-			
-			// Load the order
-			$order = wc_get_order( $order_id );
-			if ( ! $order ) {
-				WC_Checkoutcom_Utility::logger( '[CREATE FAILED ORDER] ERROR: Order not found after creation - Order ID: ' . $order_id );
-				wp_send_json_error( array(
-					'message' => __( 'Order created but not found. Please try again.', 'checkout-com-unified-payments-api' ),
-				) );
-				return;
+
+			// Map billing/shipping data from checkout form if available.
+			$billing_fields = array(
+				'first_name' => 'billing_first_name',
+				'last_name'  => 'billing_last_name',
+				'company'    => 'billing_company',
+				'email'      => 'billing_email',
+				'phone'      => 'billing_phone',
+				'address_1'  => 'billing_address_1',
+				'address_2'  => 'billing_address_2',
+				'city'       => 'billing_city',
+				'state'      => 'billing_state',
+				'postcode'   => 'billing_postcode',
+				'country'    => 'billing_country',
+			);
+			$billing = array();
+			foreach ( $billing_fields as $key => $post_key ) {
+				if ( isset( $posted_data[ $post_key ] ) ) {
+					$billing[ $key ] = $posted_data[ $post_key ];
+				}
 			}
+			if ( ! empty( $billing ) ) {
+				$order->set_address( $billing, 'billing' );
+			}
+
+			$shipping_fields = array(
+				'first_name' => 'shipping_first_name',
+				'last_name'  => 'shipping_last_name',
+				'company'    => 'shipping_company',
+				'address_1'  => 'shipping_address_1',
+				'address_2'  => 'shipping_address_2',
+				'city'       => 'shipping_city',
+				'state'      => 'shipping_state',
+				'postcode'   => 'shipping_postcode',
+				'country'    => 'shipping_country',
+			);
+			$shipping = array();
+			foreach ( $shipping_fields as $key => $post_key ) {
+				if ( isset( $posted_data[ $post_key ] ) ) {
+					$shipping[ $key ] = $posted_data[ $post_key ];
+				}
+			}
+			if ( ! empty( $shipping ) ) {
+				$order->set_address( $shipping, 'shipping' );
+			}
+
+			// Add cart items to the failed order for tracking.
+			if ( WC()->cart ) {
+				foreach ( WC()->cart->get_cart() as $cart_item ) {
+					if ( empty( $cart_item['data'] ) ) {
+						continue;
+					}
+					$product = $cart_item['data'];
+					$item = new WC_Order_Item_Product();
+					$item->set_product( $product );
+					$item->set_quantity( isset( $cart_item['quantity'] ) ? (int) $cart_item['quantity'] : 1 );
+					if ( isset( $cart_item['line_subtotal'] ) ) {
+						$item->set_subtotal( (float) $cart_item['line_subtotal'] );
+					}
+					if ( isset( $cart_item['line_total'] ) ) {
+						$item->set_total( (float) $cart_item['line_total'] );
+					}
+					$order->add_item( $item );
+				}
+				$order->calculate_totals();
+			}
+
+			// Mark payment method as Flow.
+			$order->set_payment_method( $this );
+			$order->set_payment_method_title( $this->get_title() );
+
+			WC_Checkoutcom_Utility::logger( '[CREATE FAILED ORDER] Order created successfully - Order ID: ' . $order_id );
 			
 			// Update order status to failed
 			$order->update_status( 'failed', __( 'Payment declined before form submission', 'checkout-com-unified-payments-api' ) );

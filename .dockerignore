@@ -1,0 +1,10 @@
+node_modules
+vendor
+.git
+.gitignore
+*.zip
+*.log
+.DS_Store
+tests
+releases
+checkout-com-unified-payments-api.zip

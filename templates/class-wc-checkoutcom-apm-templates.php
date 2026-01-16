@@ -21,12 +21,12 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_Request {
 			<div class="input-group">
 				<label class="icon" for="name">
 					<span class="ckojs ckojs-card"></label>
-				<input type="text" id="name" name="name" placeholder="<?php echo ( __( 'Nome', 'checkout-com-unified-payments-api' ) ); ?>" class="input-control" required style="width: 100%;">
+				<input type="text" id="name" name="name" placeholder="<?php echo esc_attr__( 'Nome', 'checkout-com-unified-payments-api' ); ?>" class="input-control" required style="width: 100%;">
 			</div>
 			<div class="input-group">
 				<label class="icon" for="cpf">
 					<span class="ckojs ckojs-card"></label>
-				<input type="text" id="cpf" name="cpf" placeholder="<?php echo ( __( 'Cadastro de Pessoas Físicas', 'checkout-com-unified-payments-api' ) ); ?>" class="input-control" required style="width: 100%;">
+				<input type="text" id="cpf" name="cpf" placeholder="<?php echo esc_attr__( 'Cadastro de Pessoas Físicas', 'checkout-com-unified-payments-api' ); ?>" class="input-control" required style="width: 100%;">
 			</div>
 		</div>
 		<?php
@@ -64,7 +64,7 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_Request {
 				if(jQuery('#sepa-iban').val().length > 0) {
 					jQuery('.sepa-mandate-card').show();
 				} else {
-					alert('<?php echo $alert; ?>')
+					alert(<?php echo wp_json_encode( $alert ); ?>)
 				}
 
 			})
@@ -200,14 +200,14 @@ class WC_Checkoutcom_Apm_Templates extends WC_Checkoutcom_Api_Request {
 				?>
 				<script type="text/javascript">
 					jQuery(document).ready(function(){
-						var customerName = "<?php echo esc_html( $order->get_billing_first_name() . ' ' . $order->get_billing_last_name() ); ?>";
+						var customerName = <?php echo wp_json_encode( $order->get_billing_first_name() . ' ' . $order->get_billing_last_name() ); ?>;
 						jQuery('.customerName').html(customerName)
-						var address1 = "<?php echo esc_html( $order->get_billing_address_1() ); ?>";
+						var address1 = <?php echo wp_json_encode( $order->get_billing_address_1() ); ?>;
 						jQuery('.address1').html(address1)
-						var address2 = "<?php echo esc_html( $order->get_billing_address_2() ); ?>";
-						var city = "<?php echo esc_html( $order->get_billing_city() ); ?>";
+						var address2 = <?php echo wp_json_encode( $order->get_billing_address_2() ); ?>;
+						var city = <?php echo wp_json_encode( $order->get_billing_city() ); ?>;
 						jQuery('.address2').html(address2 + ' ' + city)
-						var billingCountry = "<?php echo esc_html( WC()->countries->countries[ $order->get_billing_country() ] ); ?>";
+						var billingCountry = <?php echo wp_json_encode( WC()->countries->countries[ $order->get_billing_country() ] ?? '' ); ?>;
 						var country = billingCountry.toUpperCase();
 						jQuery('.country').html(country)
 					})

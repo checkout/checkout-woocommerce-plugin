@@ -168,15 +168,11 @@ class WC_Checkout_Com_Webhook {
 				WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] Gateway class: ' . ( $gateway ? get_class( $gateway ) : 'N/A' ) );
 				
 				if ( $gateway ) {
-					// Check if method exists using reflection (for private methods)
-					$reflection = new ReflectionClass( $gateway );
-					$has_method = $reflection->hasMethod( 'get_payment_method_title_by_type' );
-					WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] Method exists (reflection): ' . ( $has_method ? 'YES' : 'NO' ) );
+					$has_method = is_callable( array( $gateway, 'get_payment_method_title_by_type' ) );
+					WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] Method exists (public): ' . ( $has_method ? 'YES' : 'NO' ) );
 					
 					if ( $has_method ) {
-						$method = $reflection->getMethod( 'get_payment_method_title_by_type' );
-						$method->setAccessible( true );
-						$correct_title = $method->invoke( $gateway, $order, null );
+						$correct_title = $gateway->get_payment_method_title_by_type( $order, null );
 						$current_title = $order->get_payment_method_title();
 						
 						WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] Current title: ' . $current_title );
@@ -421,14 +417,11 @@ class WC_Checkout_Com_Webhook {
 				
 				if ( $gateway ) {
 					// Check if method exists using reflection (for private methods)
-					$reflection = new ReflectionClass( $gateway );
-					$has_method = $reflection->hasMethod( 'get_payment_method_title_by_type' );
-					WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] Method exists (reflection): ' . ( $has_method ? 'YES' : 'NO' ) );
+					$has_method = is_callable( array( $gateway, 'get_payment_method_title_by_type' ) );
+					WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] Method exists (public): ' . ( $has_method ? 'YES' : 'NO' ) );
 					
 					if ( $has_method ) {
-						$method = $reflection->getMethod( 'get_payment_method_title_by_type' );
-						$method->setAccessible( true );
-						$correct_title = $method->invoke( $gateway, $order, null );
+						$correct_title = $gateway->get_payment_method_title_by_type( $order, null );
 						$current_title = $order->get_payment_method_title();
 						
 						WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] Current title: ' . $current_title );

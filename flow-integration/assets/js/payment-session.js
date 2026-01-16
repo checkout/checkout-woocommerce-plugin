@@ -3464,8 +3464,8 @@ document.addEventListener("DOMContentLoaded", function () {
 	}
 	
 	/**
-	 * Create order before payment processing via AJAX.
-	 * This ensures order exists before webhook arrives, preventing race conditions.
+	 * Create order before payment processing via WooCommerce checkout AJAX.
+	 * This runs full checkout processing (required for subscriptions) but skips charging.
 	 * 
 	 * @returns {Promise<number|null>} Order ID if successful, null if failed
 	 */
@@ -3644,7 +3644,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			
 			// Build data object ensuring nonce is included
 			const ajaxData = {
-				action: "cko_flow_create_order",
+				cko_flow_precreate_order: '1',
 				'cko-flow-payment-session-id': paymentSessionId,
 				'cko-flow-save-card-persist': saveCardValue
 			};
@@ -3661,8 +3661,20 @@ document.addEventListener("DOMContentLoaded", function () {
 			ckoLogger.debug('[CREATE ORDER] AJAX data keys:', Object.keys(ajaxData));
 			ckoLogger.debug('[CREATE ORDER] Nonce in data:', !!ajaxData['woocommerce-process-checkout-nonce']);
 			
+			// Use WooCommerce checkout AJAX endpoint (full checkout processing).
+			let wcAjaxUrl = '';
+			if (typeof wc_checkout_params !== 'undefined' && wc_checkout_params.wc_ajax_url) {
+				wcAjaxUrl = wc_checkout_params.wc_ajax_url.toString().replace('%%endpoint%%', 'checkout');
+			} else if (typeof wc_add_to_cart_params !== 'undefined' && wc_add_to_cart_params.wc_ajax_url) {
+				wcAjaxUrl = wc_add_to_cart_params.wc_ajax_url.toString().replace('%%endpoint%%', 'checkout');
+			} else if (typeof wc_cart_fragments_params !== 'undefined' && wc_cart_fragments_params.wc_ajax_url) {
+				wcAjaxUrl = wc_cart_fragments_params.wc_ajax_url.toString().replace('%%endpoint%%', 'checkout');
+			} else {
+				wcAjaxUrl = window.location.origin + '/?wc-ajax=checkout';
+			}
+
 			const response = await jQuery.ajax({
-				url: cko_flow_vars.ajax_url,
+				url: wcAjaxUrl,
 				type: "POST",
 				data: ajaxData
 			}).fail(function(xhr, status, error) {
@@ -3679,16 +3691,77 @@ document.addEventListener("DOMContentLoaded", function () {
 			ckoLogger.debug('[CREATE ORDER] Response.success:', response?.success);
 			ckoLogger.debug('[CREATE ORDER] Response.data:', response?.data);
 			ckoLogger.debug('[CREATE ORDER] Response.data.order_id:', response?.data?.order_id);
+
+			// Normalize WooCommerce public checkout AJAX response when enabled (result/redirect format).
+			let normalizedResponse = response;
+			if (response && typeof response === 'object' && response.result) {
+				if (response.result === 'success') {
+					const redirectUrl = response.redirect || response?.data?.redirect || '';
+					let orderIdFromRedirect = null;
+					let orderKeyFromRedirect = '';
+
+					if (redirectUrl) {
+						try {
+							const parsedUrl = new URL(redirectUrl, window.location.origin);
+							const orderReceivedMatch = parsedUrl.pathname.match(/order-received\/(\d+)/);
+							const orderPayMatch = parsedUrl.pathname.match(/order-pay\/(\d+)/);
+							if (orderReceivedMatch && orderReceivedMatch[1]) {
+								orderIdFromRedirect = parseInt(orderReceivedMatch[1], 10);
+							} else if (orderPayMatch && orderPayMatch[1]) {
+								orderIdFromRedirect = parseInt(orderPayMatch[1], 10);
+							}
+							orderKeyFromRedirect = parsedUrl.searchParams.get('key') || '';
+						} catch (error) {
+							ckoLogger.error('[CREATE ORDER] Failed to parse redirect URL:', error);
+						}
+					}
+
+					if (!orderIdFromRedirect && response.order_id) {
+						orderIdFromRedirect = parseInt(response.order_id, 10);
+					}
+
+					if (orderIdFromRedirect) {
+						normalizedResponse = {
+							success: true,
+							data: {
+								order_id: orderIdFromRedirect,
+								order_key: orderKeyFromRedirect || '',
+								redirect: redirectUrl || ''
+							},
+							_wc_public_checkout: true
+						};
+					} else {
+						normalizedResponse = {
+							success: false,
+							data: {
+								message: response.messages || 'Checkout completed but order ID was not found.'
+							},
+							_wc_public_checkout: true
+						};
+					}
+				} else if (response.result === 'failure') {
+					normalizedResponse = {
+						success: false,
+						data: {
+							message: response.messages || 'Checkout validation failed.'
+						},
+						_wc_public_checkout: true
+					};
+				}
+			}
 			
-			if (response && response.success && response.data && response.data.order_id) {
-				const orderId = response.data.order_id;
-				const orderKey = response.data.order_key || '';
+			if (normalizedResponse && normalizedResponse.success && normalizedResponse.data && normalizedResponse.data.order_id) {
+				if (normalizedResponse._wc_public_checkout && normalizedResponse.data.redirect) {
+					ckoLogger.debug('[CREATE ORDER] Public checkout redirect detected - skipping redirect (precreate mode)');
+				}
+				const orderId = normalizedResponse.data.order_id;
+				const orderKey = normalizedResponse.data.order_key || '';
 				ckoLogger.debug('[CREATE ORDER] ========== ORDER CREATED SUCCESSFULLY ==========');
 				ckoLogger.debug('[CREATE ORDER] ✅✅✅ Order created successfully - Order ID: ' + orderId + ' ✅✅✅');
 				ckoLogger.debug('[CREATE ORDER] Order ID type:', typeof orderId);
 				ckoLogger.debug('[CREATE ORDER] Order ID value:', orderId);
 				ckoLogger.debug('[CREATE ORDER] ========== ORDER KEY DEBUG ==========');
-				ckoLogger.debug('[CREATE ORDER] Response.data.order_key:', response.data.order_key);
+				ckoLogger.debug('[CREATE ORDER] Response.data.order_key:', normalizedResponse.data.order_key);
 				ckoLogger.debug('[CREATE ORDER] Order key (extracted):', orderKey);
 				ckoLogger.debug('[CREATE ORDER] Order key type:', typeof orderKey);
 				ckoLogger.debug('[CREATE ORDER] Order key length:', orderKey ? orderKey.length : 0);
@@ -3713,7 +3786,7 @@ document.addEventListener("DOMContentLoaded", function () {
 					ckoLogger.debug('[CREATE ORDER] Verification - Keys match?:', storedKey === orderKey);
 				} else {
 					ckoLogger.error('[CREATE ORDER] ❌ Order key is empty - NOT storing in sessionStorage');
-					ckoLogger.error('[CREATE ORDER] Full response.data:', JSON.stringify(response.data, null, 2));
+					ckoLogger.error('[CREATE ORDER] Full response.data:', JSON.stringify(normalizedResponse.data, null, 2));
 				}
 				
 				// Clear lock flag on success
@@ -3733,19 +3806,19 @@ document.addEventListener("DOMContentLoaded", function () {
 			} else {
 				// Check if this is a validation error
 				ckoLogger.error('[CREATE ORDER] ========== ORDER CREATION FAILED ==========');
-				ckoLogger.error('[CREATE ORDER] Response received:', response);
-				ckoLogger.error('[CREATE ORDER] Response type:', typeof response);
-				ckoLogger.error('[CREATE ORDER] Response.success:', response?.success);
-				ckoLogger.error('[CREATE ORDER] Response.data:', response?.data);
+				ckoLogger.error('[CREATE ORDER] Response received:', normalizedResponse);
+				ckoLogger.error('[CREATE ORDER] Response type:', typeof normalizedResponse);
+				ckoLogger.error('[CREATE ORDER] Response.success:', normalizedResponse?.success);
+				ckoLogger.error('[CREATE ORDER] Response.data:', normalizedResponse?.data);
 				
-				if (response && response.data && response.data.message) {
+				if (normalizedResponse && normalizedResponse.data && normalizedResponse.data.message) {
 					ckoLogger.error('[CREATE ORDER] ❌❌❌ VALIDATION FAILED - ORDER NOT CREATED ❌❌❌');
-					ckoLogger.error('[CREATE ORDER] Error message:', response.data.message);
+					ckoLogger.error('[CREATE ORDER] Error message:', normalizedResponse.data.message);
 					ckoLogger.error('[CREATE ORDER] This is a validation error - order was NOT created');
-					showError(response.data.message);
+					showError(normalizedResponse.data.message);
 				} else {
 					ckoLogger.error('[CREATE ORDER] ❌❌❌ FAILED TO CREATE ORDER ❌❌❌');
-					ckoLogger.error('[CREATE ORDER] Full response:', JSON.stringify(response, null, 2));
+					ckoLogger.error('[CREATE ORDER] Full response:', JSON.stringify(normalizedResponse, null, 2));
 					ckoLogger.error('[CREATE ORDER] Order creation failed for unknown reason');
 					showError('Failed to create order. Please check your form and try again.');
 				}
@@ -3974,53 +4047,53 @@ document.addEventListener("DOMContentLoaded", function () {
 					}
 				}
 				
-				// Create order (which includes server-side validation)
-				// OPTIMIZATION: Combined validation + order creation into single AJAX call
-				// This reduces latency by ~100-200ms compared to separate validation call
-				ckoLogger.debug('[CREATE ORDER] Creating order with built-in validation...');
-				(async function() {
-					const orderId = await createOrderBeforePayment();
-					if (!orderId) {
-						// Order creation failed - error already shown by createOrderBeforePayment()
-						// This could be due to validation errors or other issues
-						ckoLogger.error('[CREATE ORDER] Failed to create order - cannot proceed with payment');
-						return;
+				// Use WooCommerce's full checkout processing (subscriptions rely on it).
+				// For Flow (new card), pre-create the order via WC checkout before submitting payment.
+				ckoLogger.debug('[CHECKOUT] Using WooCommerce full checkout flow (pre-create order for Flow).');
+
+				// CRITICAL: Ensure payment session ID is added to form before submission
+				// This is a fallback in case form wasn't available when payment session was created
+				if (window.ckoAddPaymentSessionIdField) {
+					const added = window.ckoAddPaymentSessionIdField();
+					if (added) {
+						ckoLogger.debug('[SAVE PAYMENT SESSION ID] Hidden field added on Place Order click (fallback)');
 					}
-					
-					ckoLogger.debug('[CREATE ORDER] ✅ Order created successfully - Order ID: ' + orderId);
-				
-					// CRITICAL: Ensure payment session ID is added to form before submission
-					// This is a fallback in case form wasn't available when payment session was created
-					if (window.ckoAddPaymentSessionIdField) {
-						const added = window.ckoAddPaymentSessionIdField();
-						if (added) {
-							ckoLogger.debug('[SAVE PAYMENT SESSION ID] Hidden field added on Place Order click (fallback)');
+				}
+
+				// Persist save card checkbox before form submission
+				persistSaveCardCheckbox();
+
+				// Show flow container
+				document.getElementById("flow-container").style.display = "block";
+
+				// Place order for FLOW.
+				if (ckoFlow.flowComponent) {
+					if( savedCardSelected || savedCardEnabled ) {
+						ckoLogger.debug('[SAVED CARD] Saved card selected - submitting checkout form directly (bypassing Flow component)');
+						// CRITICAL: Ensure payment session ID is in form before submission
+						if (window.ckoAddPaymentSessionIdField) {
+							window.ckoAddPaymentSessionIdField();
 						}
-					}
-					
-					// Persist save card checkbox before form submission
-					persistSaveCardCheckbox();
-
-					// Show flow container
-					document.getElementById("flow-container").style.display = "block";
-
-					// Place order for FLOW.
-					if (ckoFlow.flowComponent) {
-						if( savedCardSelected || savedCardEnabled ) {
-							ckoLogger.debug('[SAVED CARD] Saved card selected - submitting checkout form directly (bypassing Flow component)');
-							// CRITICAL: Ensure payment session ID is in form before submission
-							if (window.ckoAddPaymentSessionIdField) {
-								window.ckoAddPaymentSessionIdField();
+						// Submit directly - Flow component NOT used for saved cards
+						// WooCommerce will call process_payment() which makes direct API call
+						form.submit();
+					} else {
+						// Pre-create order via WooCommerce checkout (required for subscriptions)
+						ckoLogger.debug('[CREATE ORDER] Creating order via WooCommerce checkout before Flow payment...');
+						(async function() {
+							const orderId = await createOrderBeforePayment();
+							if (!orderId) {
+								ckoLogger.error('[CREATE ORDER] Failed to create order - cannot proceed with payment');
+								return;
 							}
-							// Submit directly - Flow component NOT used for saved cards
-							// WooCommerce will call process_payment() which makes direct API call
-							form.submit();
-						} else {
+
+							ckoLogger.debug('[CREATE ORDER] ✅ Order created successfully - Order ID: ' + orderId);
+
 							// CRITICAL: Ensure payment session ID is in form before Flow component submission
 							if (window.ckoAddPaymentSessionIdField) {
 								window.ckoAddPaymentSessionIdField();
 							}
-							
+
 							// Double-check component validity before submitting (defense-in-depth)
 							if (ckoFlow.flowComponent && typeof ckoFlow.flowComponent.isValid === 'function') {
 								const isValid = ckoFlow.flowComponent.isValid();
@@ -4033,10 +4106,8 @@ document.addEventListener("DOMContentLoaded", function () {
 										showError('Payment processing failed. Please try again.');
 									}
 								} else {
-									ckoLogger.error('Flow component became invalid after order creation - cannot submit');
+									ckoLogger.error('Flow component is invalid - cannot submit');
 									showError('Payment form is not valid. Please check your payment details and try again.');
-									// Note: Order was created but payment cannot proceed
-									// The order will remain in "pending" status
 								}
 							} else {
 								// Fallback: submit without validation check
@@ -4053,17 +4124,17 @@ document.addEventListener("DOMContentLoaded", function () {
 									showError('Payment processing failed. Please try again.');
 								}
 							}
-						}
-					} else {
-						ckoLogger.error('[CREATE ORDER] Flow component not found - cannot process payment');
-						showError('Payment component not loaded. Please refresh the page and try again.');
+						})();
 					}
+				} else {
+					ckoLogger.error('[CHECKOUT] Flow component not found - cannot process payment');
+					showError('Payment component not loaded. Please refresh the page and try again.');
+				}
 
-					// Place order for saved card.
-					if (!ckoFlow.flowComponent) {
-						form.submit();
-					}
-				})(); // Close async IIFE for order creation
+				// Place order for saved card when Flow component isn't available.
+				if (!ckoFlow.flowComponent) {
+					form.submit();
+				}
 			} else {
 				// console.log('[CURRENT VERSION] Flow payment method not selected or not found');
 			}
@@ -4139,15 +4210,29 @@ function validateCheckout(form, onSuccess, onError) {
 			...Object.fromEntries(new URLSearchParams(formData)),
 		},
 		success: function (response) {
+			// Normalize WooCommerce public checkout AJAX response (result/redirect format) if used.
+			let normalizedResponse = response;
+			if (response && typeof response === 'object' && response.result) {
+				if (response.result === 'success') {
+					normalizedResponse = { success: true, data: {} };
+				} else if (response.result === 'failure') {
+					normalizedResponse = {
+						success: false,
+						data: {
+							message: response.messages || 'Checkout validation failed.'
+						}
+					};
+				}
+			}
 
 			// If the response indicates success, trigger the onSuccess callback.
-			if (response.success) {
-				onSuccess(response);
+			if (normalizedResponse.success) {
+				onSuccess(normalizedResponse);
 			} else {
 				
 				// Show an error message and trigger the onError callback if provided.
-				showError(response.data.message);
-				if (onError) onError(response);
+				showError(normalizedResponse.data.message);
+				if (onError) onError(normalizedResponse);
 			}
 		},
 		error: function () {

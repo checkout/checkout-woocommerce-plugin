@@ -40,6 +40,17 @@ if ( ! defined( 'ABSPATH' ) ) {
 	}
 }
 
+// Require admin capability for browser access
+if ( php_sapi_name() !== 'cli' ) {
+	if ( ! is_user_logged_in() ) {
+		wp_die( esc_html__( 'You must be logged in to view this page.', 'checkout-com-unified-payments-api' ) );
+	}
+
+	if ( ! current_user_can( 'manage_woocommerce' ) ) {
+		wp_die( esc_html__( 'You do not have permission to view this page.', 'checkout-com-unified-payments-api' ) );
+	}
+}
+
 // Check if WooCommerce is active
 if ( ! class_exists( 'WooCommerce' ) ) {
 	die( 'Error: WooCommerce is not active.' );
