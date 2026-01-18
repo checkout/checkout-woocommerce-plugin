@@ -1530,6 +1530,8 @@ function cko_enqueue_frontend_assets() {
 		'debug_logging' => $debug_logging ? true : false,
 		// Enabled payment methods
 		'enabled_payment_methods' => $enabled_payment_methods,
+			'waiting_message_title' => esc_html__( 'Please fill in all required fields to continue with payment.', 'checkout-com-unified-payments-api' ),
+			'waiting_message_fields' => esc_html__( 'Required fields: Email, Billing Address', 'checkout-com-unified-payments-api' ),
 		);
 
 		wp_set_script_translations( 'checkout-com-flow-payment-session-script', 'checkout-com-unified-payments-api' );

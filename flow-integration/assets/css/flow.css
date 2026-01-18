@@ -18,11 +18,29 @@
 	min-height: 100px;
 	position: relative;
 	transition: opacity 0.3s ease, box-shadow 0.3s ease;
+	width: 100%;
+	box-sizing: border-box;
+}
+
+/* Ensure payment box shows/hides correctly in older WordPress */
+.payment_method_wc_checkout_com_flow .payment_box.payment_method_wc_checkout_com_flow {
+	display: none;
+	padding: 0;
+	margin: 0;
+	clear: both;
+	float: none;
+	width: 100%;
+	box-sizing: border-box;
+}
+
+.payment_method_wc_checkout_com_flow input[type="radio"]:checked ~ .payment_box.payment_method_wc_checkout_com_flow,
+.payment_method_wc_checkout_com_flow input[type="radio"]:checked + label ~ .payment_box.payment_method_wc_checkout_com_flow,
+.payment_method_wc_checkout_com_flow input[type="radio"]:checked + label + .payment_box.payment_method_wc_checkout_com_flow {
+	display: block;
 }
 
 /* When saved cards exist, style Flow container as a simple bordered block */
-.cko-flow__saved-cards-accordion-container ~ * .cko-flow__container,
-.payment_method_wc_checkout_com_flow:has(.cko-flow__saved-cards-accordion-container) .cko-flow__container {
+body.cko-flow--has-saved-cards .payment_method_wc_checkout_com_flow .cko-flow__container {
 	background: #ffffff;
 	border: 1px solid #186aff;
 	border-radius: 8px;
@@ -278,113 +296,50 @@ body.cko-flow--method-selected.cko-flow--ready #place_order {
 	}
 }
 
-/* Style the main payment method label - Customizable via CSS Variables */
-/* Defaults match standard WooCommerce appearance: transparent background, no border, icon on right */
+/* Flow payment method label - Match Stripe's simplicity: minimal CSS, let WooCommerce handle defaults */
 .payment_method_wc_checkout_com_flow > label[for="payment_method_wc_checkout_com_flow"] {
-	display: flex !important;
-	align-items: center;
-	justify-content: space-between; /* For icon on right */
-	padding: var(--cko-payment-label-padding, 8px 12px); /* Standard WooCommerce padding */
-	background: var(--cko-payment-label-bg, transparent); /* Default: transparent (matches standard) */
-	border: var(--cko-payment-label-border-width, 0px) solid var(--cko-payment-label-border-color, transparent); /* Default: no border */
-	border-radius: var(--cko-payment-label-border-radius, 0px); /* Default: no rounding (matches standard) */
-	margin: 0 0 12px 0;
-	font-family: inherit; /* Inherit from theme (matches standard) */
-	cursor: pointer;
-	transition: all 0.2s ease;
-	text-align: var(--cko-payment-label-text-align, left); /* Default: left (matches standard WooCommerce) */
-}
-
-.payment_method_wc_checkout_com_flow > label[for="payment_method_wc_checkout_com_flow"]:hover {
-	border-color: var(--cko-payment-label-border-color-hover, var(--cko-payment-label-border-color, transparent));
-	box-shadow: var(--cko-payment-label-box-shadow-hover, none);
-}
-
-/* Payment method icon/image - LEFT side (hidden by default, shown if icon_position = 'left') */
-.payment_method_wc_checkout_com_flow > label[for="payment_method_wc_checkout_com_flow"]::before {
-	content: '';
-	display: var(--cko-payment-label-icon-display-left, none); /* Default: hidden (icon on right) */
-	width: 40px;
-	height: 24px;
-	margin-right: 12px;
-	background-image: url('data:image/svg+xml;utf8,<svg width="40" height="24" viewBox="0 0 40 24" xmlns="http://www.w3.org/2000/svg" fill="none"><rect x="0.5" y="0.5" width="39" height="23" rx="3.5" stroke="%23186aff"/><path fill-rule="evenodd" clip-rule="evenodd" d="M26.8571 6.85714H13.1428V17.1429H26.8571V6.85714ZM12.2857 6V18H27.7143V6H12.2857Z" fill="%23186aff"/><path fill-rule="evenodd" clip-rule="evenodd" d="evenodd" d="M26.8571 9.42857H13.1428V7.71429H26.8571V9.42857Z" fill="%23186aff"/><path fill-rule="evenodd" clip-rule="evenodd" d="M18.2857 15.4286H14.8571V14.5714H18.2857V15.4286Z" fill="%23186aff"/></svg>');
-	background-size: contain;
-	background-repeat: no-repeat;
-	background-position: center;
-	flex-shrink: 0;
-	order: var(--cko-payment-label-icon-order-left, 0);
-}
-
-/* Payment method icon/image - RIGHT side (shown by default, matches standard WooCommerce) */
-.payment_method_wc_checkout_com_flow > label[for="payment_method_wc_checkout_com_flow"]::after {
-	content: '';
-	display: var(--cko-payment-label-icon-display-right, inline-block); /* Default: shown (icon on right) */
-	width: 40px;
-	height: 24px;
-	margin-left: 12px;
-}
-/* Style the main payment method label to match accordion design */
-.payment_method_wc_checkout_com_flow > label[for="payment_method_wc_checkout_com_flow"] {
-	display: flex !important;
-	align-items: center;
-	padding: 16px 20px;
-	background: #ffffff;
-	border: 1px solid #186aff;
-	border-radius: 8px;
-	margin: 0 0 12px 0;
-	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-	cursor: pointer;
-	transition: all 0.2s ease;
-}
-
-.payment_method_wc_checkout_com_flow > label[for="payment_method_wc_checkout_com_flow"]:hover {
-	border-color: #0052cc;
-	box-shadow: 0 2px 8px rgba(24, 106, 255, 0.15);
-}
-
-/* Payment method icon/image */
-.payment_method_wc_checkout_com_flow > label[for="payment_method_wc_checkout_com_flow"]::before {
-	content: '';
+	/* Let WooCommerce handle default styling - only override if absolutely necessary */
 	display: inline-block;
-	width: 40px;
-	height: 24px;
-	margin-right: 12px;
-	background-image: url('data:image/svg+xml;utf8,<svg width="40" height="24" viewBox="0 0 40 24" xmlns="http://www.w3.org/2000/svg" fill="none"><rect x="0.5" y="0.5" width="39" height="23" rx="3.5" stroke="%23186aff"/><path fill-rule="evenodd" clip-rule="evenodd" d="M26.8571 6.85714H13.1428V17.1429H26.8571V6.85714ZM12.2857 6V18H27.7143V6H12.2857Z" fill="%23186aff"/><path fill-rule="evenodd" clip-rule="evenodd" d="M26.8571 9.42857H13.1428V7.71429H26.8571V9.42857Z" fill="%23186aff"/><path fill-rule="evenodd" clip-rule="evenodd" d="M18.2857 15.4286H14.8571V14.5714H18.2857V15.4286Z" fill="%23186aff"/></svg>');
-	background-size: contain;
-	background-repeat: no-repeat;
-	background-position: center;
-	flex-shrink: 0;
-	order: var(--cko-payment-label-icon-order-right, 2); /* Right side */
+	vertical-align: middle;
 }
 
-/* Custom image support - add this class to use custom image */
-.payment_method_wc_checkout_com_flow.has-custom-icon > label[for="payment_method_wc_checkout_com_flow"]::before {
-	background-image: var(--checkout-payment-icon);
+/* Hide pseudo-elements/icons by default - let WooCommerce handle label styling */
+.payment_method_wc_checkout_com_flow > label[for="payment_method_wc_checkout_com_flow"]::before,
+.payment_method_wc_checkout_com_flow > label[for="payment_method_wc_checkout_com_flow"]::after {
+	display: none;
 }
 
+/* Support for enhanced label markup (when JS adds title/subtitle) */
 .payment_method_wc_checkout_com_flow > label[for="payment_method_wc_checkout_com_flow"] .cko-flow__payment-method-text {
-	display: flex;
-	flex-direction: column;
-	flex: 1;
-	order: 1; /* Text always on left */
-	text-align: var(--cko-payment-label-text-align, left); /* Default: left (matches standard WooCommerce) */
+	display: block;
 }
 
 .payment_method_wc_checkout_com_flow > label[for="payment_method_wc_checkout_com_flow"] .cko-flow__payment-method-title {
-	font-size: var(--cko-payment-label-title-font-size, inherit); /* Default: inherit from theme */
-	font-weight: var(--cko-payment-label-title-font-weight, inherit); /* Default: inherit from theme */
-	color: var(--cko-payment-label-text-color, inherit); /* Default: inherit from theme (matches standard) */
+	display: block;
 	line-height: 1.4;
-	text-align: var(--cko-payment-label-text-align, left); /* Default: left (matches standard WooCommerce) */
 }
 
 .payment_method_wc_checkout_com_flow > label[for="payment_method_wc_checkout_com_flow"] .cko-flow__payment-method-subtitle {
-	font-size: var(--cko-payment-label-subtitle-font-size, 0.9em); /* Slightly smaller */
-	color: var(--cko-payment-label-subtitle-color, inherit); /* Default: inherit from theme (matches standard) */
+	display: block;
+	font-size: 0.9em;
 	margin-top: 2px;
 	line-height: 1.3;
-	opacity: var(--cko-payment-label-subtitle-opacity, 0.7); /* Subtle by default */
-	text-align: var(--cko-payment-label-text-align, left); /* Default: left (matches standard WooCommerce) */
+	opacity: 0.7;
+}
+
+/* Old WC/theme compatibility: minimal alignment like Stripe - just ensure radio/label align */
+.woocommerce-checkout #payment .payment_methods li.payment_method_wc_checkout_com_flow > input[type="radio"] {
+	vertical-align: middle;
+	margin-right: 0.5em;
+}
+
+.woocommerce-checkout #payment .payment_methods li.payment_method_wc_checkout_com_flow > label[for="payment_method_wc_checkout_com_flow"] {
+	vertical-align: middle;
+}
+
+/* Avoid layout shift before JS styles the save-card label */
+.cko-flow__save-card-label-text {
+	display: inline-block;
 }
 
 .payment_method_wc_checkout_com_flow > label[for="payment_method_wc_checkout_com_flow"] .cko-flow__payment-method-title {
@@ -402,7 +357,7 @@ body.cko-flow--method-selected.cko-flow--ready #place_order {
 }
 
 /* Saved Cards Accordion Style - Matches Flow Style */
-.cko-flow__saved-cards-accordion-container {
+.payment_method_wc_checkout_com_flow .cko-flow__saved-cards-accordion-container {
 	margin: 20px 0;
 	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
 	display: block !important;
@@ -411,25 +366,25 @@ body.cko-flow--method-selected.cko-flow--ready #place_order {
 	min-height: 50px !important;
 }
 
-body[data-saved-payment-order="saved_cards_first"] .cko-flow__saved-cards-accordion-container {
+body[data-saved-payment-order="saved_cards_first"] .payment_method_wc_checkout_com_flow .cko-flow__saved-cards-accordion-container {
 	display: block !important;
 	opacity: 1 !important;
 	visibility: visible !important;
 	min-height: 50px !important;
 }
 
-body[data-saved-payment-order="new_payment_first"] .cko-flow__saved-cards-accordion-container {
+body[data-saved-payment-order="new_payment_first"] .payment_method_wc_checkout_com_flow .cko-flow__saved-cards-accordion-container {
 	display: none !important;
 }
 
-body[data-saved-payment-order="new_payment_first"].cko-flow--ready .cko-flow__saved-cards-accordion-container {
+body[data-saved-payment-order="new_payment_first"].cko-flow--ready .payment_method_wc_checkout_com_flow .cko-flow__saved-cards-accordion-container {
 	display: block !important;
 	opacity: 1 !important;
 	visibility: visible !important;
 	min-height: 50px !important;
 }
 
-.cko-flow__saved-cards-accordion {
+.payment_method_wc_checkout_com_flow .cko-flow__saved-cards-accordion {
 	background: #ffffff;
 	border: 1px solid #186aff;
 	border-radius: 8px;
@@ -439,7 +394,7 @@ body[data-saved-payment-order="new_payment_first"].cko-flow--ready .cko-flow__sa
 	visibility: visible !important;
 }
 
-.cko-flow__saved-cards-accordion-header {
+.payment_method_wc_checkout_com_flow .cko-flow__saved-cards-accordion-header {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
@@ -448,7 +403,7 @@ body[data-saved-payment-order="new_payment_first"].cko-flow--ready .cko-flow__sa
 	cursor: pointer;
 }
 
-.cko-flow__saved-cards-accordion-left {
+.payment_method_wc_checkout_com_flow .cko-flow__saved-cards-accordion-left {
 	display: flex;
 	align-items: center;
 	gap: 12px;
@@ -487,14 +442,14 @@ body[data-saved-payment-order="new_payment_first"].cko-flow--ready .cko-flow__sa
 	line-height: 1.3;
 }
 
-.cko-flow__saved-cards-accordion-panel {
+.payment_method_wc_checkout_com_flow .cko-flow__saved-cards-accordion-panel {
 	padding: 0 16px 12px 16px;
 	display: block !important;
 	opacity: 1 !important;
 	visibility: visible !important;
 }
 
-.cko-flow__saved-cards-accordion-panel .woocommerce-SavedPaymentMethods {
+.payment_method_wc_checkout_com_flow .cko-flow__saved-cards-accordion-panel .woocommerce-SavedPaymentMethods {
 	margin: 0 !important;
 	padding: 0 !important;
 	list-style: none !important;
@@ -505,16 +460,16 @@ body[data-saved-payment-order="new_payment_first"].cko-flow--ready .cko-flow__sa
 	visibility: visible !important;
 }
 
-.cko-flow__saved-cards-accordion-panel .woocommerce-SavedPaymentMethods-new,
-.cko-flow__saved-cards-accordion-panel .woocommerce-SavedPaymentMethods li.woocommerce-SavedPaymentMethods-new,
-.cko-flow__saved-cards-accordion-panel .woocommerce-SavedPaymentMethods-tokenBase,
-.cko-flow__saved-cards-accordion-panel .woocommerce-SavedPaymentMethods li.woocommerce-SavedPaymentMethods-tokenBase,
-.cko-flow__saved-cards-accordion-panel input[value="new"],
-.cko-flow__saved-cards-accordion-panel li:has(input[value="new"]) {
+.payment_method_wc_checkout_com_flow .cko-flow__saved-cards-accordion-panel .woocommerce-SavedPaymentMethods-new,
+.payment_method_wc_checkout_com_flow .cko-flow__saved-cards-accordion-panel .woocommerce-SavedPaymentMethods li.woocommerce-SavedPaymentMethods-new,
+.payment_method_wc_checkout_com_flow .cko-flow__saved-cards-accordion-panel .woocommerce-SavedPaymentMethods-tokenBase,
+.payment_method_wc_checkout_com_flow .cko-flow__saved-cards-accordion-panel .woocommerce-SavedPaymentMethods li.woocommerce-SavedPaymentMethods-tokenBase,
+.payment_method_wc_checkout_com_flow .cko-flow__saved-cards-accordion-panel input[value="new"],
+.payment_method_wc_checkout_com_flow .cko-flow__saved-cards-accordion-panel li:has(input[value="new"]) {
 	display: none !important;
 }
 
-.cko-flow__saved-cards-accordion-panel .woocommerce-SavedPaymentMethods li {
+.payment_method_wc_checkout_com_flow .cko-flow__saved-cards-accordion-panel .woocommerce-SavedPaymentMethods li {
 	padding: 10px 12px;
 	margin: 6px 0 !important;
 	background: #ffffff;
@@ -522,16 +477,16 @@ body[data-saved-payment-order="new_payment_first"].cko-flow--ready .cko-flow__sa
 	border-radius: 4px;
 }
 
-.cko-flow__saved-cards-accordion-panel .woocommerce-SavedPaymentMethods li:hover {
+.payment_method_wc_checkout_com_flow .cko-flow__saved-cards-accordion-panel .woocommerce-SavedPaymentMethods li:hover {
 	border-color: #186aff;
 }
 
-.cko-flow__saved-cards-accordion-panel .woocommerce-SavedPaymentMethods li input[type="radio"] {
+.payment_method_wc_checkout_com_flow .cko-flow__saved-cards-accordion-panel .woocommerce-SavedPaymentMethods li input[type="radio"] {
 	margin-right: 10px;
 	accent-color: #186aff;
 }
 
-.cko-flow__saved-cards-accordion-panel .woocommerce-SavedPaymentMethods li label {
+.payment_method_wc_checkout_com_flow .cko-flow__saved-cards-accordion-panel .woocommerce-SavedPaymentMethods li label {
 	display: inline-flex;
 	align-items: center;
 	cursor: pointer;
@@ -542,7 +497,7 @@ body[data-saved-payment-order="new_payment_first"].cko-flow--ready .cko-flow__sa
 	font-weight: 400;
 }
 
-.cko-flow__saved-cards-accordion-panel .woocommerce-SavedPaymentMethods li label::before {
+.payment_method_wc_checkout_com_flow .cko-flow__saved-cards-accordion-panel .woocommerce-SavedPaymentMethods li label::before {
 	content: '';
 	display: inline-block;
 	width: 32px;
@@ -551,16 +506,16 @@ body[data-saved-payment-order="new_payment_first"].cko-flow--ready .cko-flow__sa
 	background: url('data:image/svg+xml,<svg width="32" height="20" xmlns="http://www.w3.org/2000/svg"><rect x="0.5" y="0.5" width="31" height="19" rx="2.5" stroke="%2368686c" fill="none"/><path d="M4 5h24M4 9h8" stroke="%2368686c" stroke-width="1.5" stroke-linecap="round"/></svg>') center/contain no-repeat;
 }
 
-.cko-flow__saved-cards-accordion-panel .woocommerce-SavedPaymentMethods li input[type="radio"]:checked + label {
+.payment_method_wc_checkout_com_flow .cko-flow__saved-cards-accordion-panel .woocommerce-SavedPaymentMethods li input[type="radio"]:checked + label {
 	font-weight: 500;
 	color: #186aff;
 }
 
-.cko-flow__saved-cards-accordion-panel .woocommerce-SavedPaymentMethods li input[type="radio"]:checked + label::before {
+.payment_method_wc_checkout_com_flow .cko-flow__saved-cards-accordion-panel .woocommerce-SavedPaymentMethods li input[type="radio"]:checked + label::before {
 	background: url('data:image/svg+xml,<svg width="32" height="20" xmlns="http://www.w3.org/2000/svg"><rect x="0.5" y="0.5" width="31" height="19" rx="2.5" stroke="%23186aff" fill="none"/><path d="M4 5h24M4 9h8" stroke="%23186aff" stroke-width="1.5" stroke-linecap="round"/></svg>') center/contain no-repeat;
 }
 
-.cko-flow__saved-cards-accordion-panel .woocommerce-SavedPaymentMethods li:has(input[type="radio"]:checked) {
+.payment_method_wc_checkout_com_flow .cko-flow__saved-cards-accordion-panel .woocommerce-SavedPaymentMethods li:has(input[type="radio"]:checked) {
 	background: #f0f6ff;
 	border-color: #186aff;
 	border-width: 1px;

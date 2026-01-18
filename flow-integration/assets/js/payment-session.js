@@ -2558,10 +2558,16 @@ function showFlowWaitingMessage() {
 	if (!waitingMessage) {
 		waitingMessage = document.createElement('div');
 		waitingMessage.className = 'cko-flow__waiting-message';
+		const waitingTitle = (window.cko_flow_vars && window.cko_flow_vars.waiting_message_title)
+			? window.cko_flow_vars.waiting_message_title
+			: 'Please fill in all required fields to continue with payment.';
+		const waitingFields = (window.cko_flow_vars && window.cko_flow_vars.waiting_message_fields)
+			? window.cko_flow_vars.waiting_message_fields
+			: 'Required fields: Email, Billing Address';
 		waitingMessage.innerHTML = `
 			<div style="padding: 20px; text-align: center; background: #f5f5f5; border-radius: 4px; margin: 10px 0;">
-				<p style="margin: 0 0 10px 0; font-weight: 600; color: #333;">Please fill in all required fields to continue with payment.</p>
-				<p style="margin: 0; font-size: 14px; color: #666;">Required fields: Email, Billing Address</p>
+				<p style="margin: 0 0 10px 0; font-weight: 600; color: #333;">${waitingTitle}</p>
+				<p style="margin: 0; font-size: 14px; color: #666;">${waitingFields}</p>
 			</div>
 		`;
 		flowContainer.appendChild(waitingMessage);
@@ -3103,6 +3109,23 @@ document.addEventListener("change", function (event) {
 	}
 });
 
+function normalizeFlowPaymentLabelText() {
+	const flowLabel = document.querySelector('label[for="payment_method_wc_checkout_com_flow"]');
+	if (!flowLabel) {
+		return;
+	}
+
+	// If Flow label enhancement already injected markup, leave it alone.
+	if (flowLabel.querySelector('.cko-flow__payment-method-text')) {
+		return;
+	}
+
+	const trimmedText = flowLabel.textContent.trim();
+	if (trimmedText) {
+		flowLabel.textContent = trimmedText;
+	}
+}
+
 /**
  * SIMPLIFIED: Single DOMContentLoaded handler
  * Handles initial Flow setup when page loads
@@ -3116,6 +3139,11 @@ document.addEventListener("DOMContentLoaded", function () {
 	window.ckoPageLoadCount++;
 	const loadTime = Date.now();
 	window.ckoPageLoadTimestamps.push(loadTime);
+
+	normalizeFlowPaymentLabelText();
+	jQuery(document.body).on('updated_checkout', function() {
+		normalizeFlowPaymentLabelText();
+	});
 	
 	// Keep only last 10 timestamps
 	if (window.ckoPageLoadTimestamps.length > 10) {

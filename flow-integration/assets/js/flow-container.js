@@ -83,6 +83,7 @@ function addPaymentMethod() {
 			}
 		});
 		
+		updateSavedCardsState(hasSavedCards);
 		if (hasSavedCards) {
 			if (typeof ckoLogger !== 'undefined') {
 				ckoLogger.debug('Skipping Flow accordion - saved cards exist (count > 0), using simple layout');
@@ -102,6 +103,18 @@ function addPaymentMethod() {
 			ckoLogger.debug('[FLOW CONTAINER] Payment method container not found');
 		}
 	}
+}
+
+function updateSavedCardsState(hasSavedCards) {
+	const body = document.body;
+	if (!body || !body.classList) {
+		return;
+	}
+
+	const accordionExists = document.querySelector('.cko-flow__saved-cards-accordion-container') !== null;
+	const shouldEnable = hasSavedCards || accordionExists;
+
+	body.classList.toggle('cko-flow--has-saved-cards', shouldEnable);
 }
 
 // Run addPaymentMethod immediately if DOM is ready, otherwise wait
@@ -130,6 +143,7 @@ jQuery(document).on("updated_checkout", function () {
 	setTimeout(function() {
 		const paymentMethod = document.querySelector('.payment_method_wc_checkout_com_flow');
 		const flowContainer = document.getElementById('flow-container');
+		updateSavedCardsState(false);
 		
 		// If Flow payment method is selected but container is missing, create it
 		if (paymentMethod && !flowContainer) {
@@ -162,7 +176,7 @@ setTimeout(function() {
 	
 	// If saved cards accordion was created after initial load, remove Flow accordion if it exists
 	const savedCardsAccordion = document.querySelector('.cko-flow__saved-cards-accordion-container');
-	const flowAccordion = document.querySelector('.cko-flow__accordion-container, .flow-accordion-container');
+		const flowAccordion = document.querySelector('.cko-flow__accordion-container, .flow-accordion-container');
 	if (flowAccordion && flowAccordion.classList) {
 		flowAccordion.classList.add('cko-flow__accordion-container');
 	}

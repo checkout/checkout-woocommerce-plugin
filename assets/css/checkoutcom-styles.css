@@ -637,9 +637,8 @@ ul.wc_payment_methods label[for*="payment_method_wc_checkout_com_"] img {
     vertical-align: middle;
 }
 
-/* Ensure Checkout.com payment method titles are left-aligned with minimal spacing */
-.woocommerce-checkout ul.wc_payment_methods li.payment_method_wc_checkout_com_cards > label,
-.woocommerce-checkout ul.wc_payment_methods li.payment_method_wc_checkout_com_flow > label {
+/* Ensure Checkout.com card payment method title is left-aligned with minimal spacing */
+.woocommerce-checkout ul.wc_payment_methods li.payment_method_wc_checkout_com_cards > label {
     display: inline-block !important;
     text-align: left !important;
     margin: 0 !important;
@@ -647,66 +646,20 @@ ul.wc_payment_methods label[for*="payment_method_wc_checkout_com_"] img {
     line-height: 1.4 !important;
 }
 
-/* Override flow.css flex display, padding, borders, and icons for Flow payment method label */
-.woocommerce-checkout ul.wc_payment_methods li.payment_method_wc_checkout_com_flow > label[for="payment_method_wc_checkout_com_flow"] {
-    display: inline-block !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    background: transparent !important;
-    border: 0 !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    font-family: inherit !important;
-    align-items: unset !important;
-    justify-content: unset !important;
-}
-
-.woocommerce-checkout ul.wc_payment_methods li.payment_method_wc_checkout_com_flow > label[for="payment_method_wc_checkout_com_flow"]::before,
-.woocommerce-checkout ul.wc_payment_methods li.payment_method_wc_checkout_com_flow > label[for="payment_method_wc_checkout_com_flow"]::after {
-    content: none !important;
-    display: none !important;
-}
-
-/* Ensure the list item itself has no extra spacing */
-.woocommerce-checkout ul.wc_payment_methods li.payment_method_wc_checkout_com_cards,
-.woocommerce-checkout ul.wc_payment_methods li.payment_method_wc_checkout_com_flow {
+/* Ensure the card list item itself has no extra spacing */
+.woocommerce-checkout ul.wc_payment_methods li.payment_method_wc_checkout_com_cards {
     margin-bottom: 0 !important;
     padding-bottom: 0 !important;
 }
 
-/* Older WooCommerce: keep label/radio aligned without extra gaps */
-.woocommerce-checkout #payment .payment_methods li.payment_method_wc_checkout_com_flow {
-    padding: 0.3em 0 !important;
-}
-
+/* Flow payment method: minimal CSS like Stripe - let WooCommerce handle defaults */
 .woocommerce-checkout #payment .payment_methods li.payment_method_wc_checkout_com_flow > input[type="radio"] {
-    vertical-align: middle !important;
-    margin: 0 0.5em 0 0 !important;
+    vertical-align: middle;
+    margin-right: 0.5em;
 }
 
-.woocommerce-checkout #payment .payment_methods li.payment_method_wc_checkout_com_flow > label {
-    display: inline-block !important;
-    vertical-align: middle !important;
-    padding: 0 !important;
-    margin: 0 !important;
-}
-
-/* Higher specificity overrides for older themes using #payment selectors */
 .woocommerce-checkout #payment .payment_methods li.payment_method_wc_checkout_com_flow > label[for="payment_method_wc_checkout_com_flow"] {
-    display: inline-block !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    background: transparent !important;
-    border: 0 !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    font-family: inherit !important;
-}
-
-.woocommerce-checkout #payment .payment_methods li.payment_method_wc_checkout_com_flow > label[for="payment_method_wc_checkout_com_flow"]::before,
-.woocommerce-checkout #payment .payment_methods li.payment_method_wc_checkout_com_flow > label[for="payment_method_wc_checkout_com_flow"]::after {
-    content: none !important;
-    display: none !important;
+    vertical-align: middle;
 }
 
 .woocommerce-SavedPaymentMethods-token{
