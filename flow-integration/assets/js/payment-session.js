@@ -212,7 +212,7 @@ var ckoFlow = {
 			skeleton.classList.add("show");
 		}
 		if (placeOrderBtn) {
-			placeOrderBtn.classList.add("flow-loading");
+			placeOrderBtn.classList.add("cko-flow--loading");
 		}
 		
 		// REFACTORED: Use initialization helper to collect checkout data
@@ -831,7 +831,7 @@ var ckoFlow = {
 					skeleton.classList.remove("show");
 				}
 				if (placeOrderBtn) {
-					placeOrderBtn.classList.remove("flow-loading");
+					placeOrderBtn.classList.remove("cko-flow--loading");
 				}
 				
 				// Show user-friendly error message
@@ -1073,7 +1073,7 @@ var ckoFlow = {
 					ckoLogger.debug('onReady - Place Order button found:', !!placeOrderBtn);
 					if (placeOrderBtn) {
 						ckoLogger.debug('onReady - Button classes BEFORE:', placeOrderBtn.className);
-						placeOrderBtn.classList.remove("flow-loading");
+						placeOrderBtn.classList.remove("cko-flow--loading");
 						ckoLogger.debug('onReady - Button classes AFTER:', placeOrderBtn.className);
 						placeOrderBtn.style.removeProperty('opacity');
 						placeOrderBtn.style.removeProperty('visibility');
@@ -1091,7 +1091,7 @@ var ckoFlow = {
 					}
 					
 					// Step 4: Mark Flow as ready - triggers CSS animations and visibility rules
-					document.body.classList.add("flow-ready");
+					document.body.classList.add("cko-flow--ready");
 					ckoLogger.debug('onReady - ✓ Flow marked as ready - Checkout is now fully interactive');
 					
 					
@@ -1383,7 +1383,7 @@ var ckoFlow = {
 			ckoLogger.debug('onChange - Component Type:', component.type);
 			ckoLogger.debug('onChange - Component valid:', component.isValid ? component.isValid() : 'unknown');
 			ckoLogger.debug('onChange - User interacted flag:', FlowState.get('userInteracted'));
-			ckoLogger.debug('onChange - Body has flow-ready class:', document.body.classList.contains('flow-ready'));
+			ckoLogger.debug('onChange - Body has cko-flow--ready class:', document.body.classList.contains('cko-flow--ready'));
 			
 			// CRITICAL: Auto-deselect saved card when user interacts with Flow
 			// Check if a saved card is currently selected and Flow is de-emphasized
@@ -1526,7 +1526,7 @@ var ckoFlow = {
 						skeleton.classList.remove("show");
 					}
 					if (placeOrderBtn) {
-						placeOrderBtn.classList.remove("flow-loading");
+						placeOrderBtn.classList.remove("cko-flow--loading");
 					}
 
 					// Extract error message from various error object formats
@@ -1825,7 +1825,7 @@ var ckoFlow = {
 				skeleton.classList.remove("show");
 			}
 			if (placeOrderBtn) {
-				placeOrderBtn.classList.remove("flow-loading");
+				placeOrderBtn.classList.remove("cko-flow--loading");
 			}
 			
 			ckoLogger.error("Error creating payment session:", error);
@@ -1869,10 +1869,12 @@ var ckoFlow = {
 				const paymentBox = paymentMethod.querySelector("div.payment_box");
 				if (paymentBox && !paymentBox.id) {
 					paymentBox.id = "flow-container";
+					paymentBox.classList.add('cko-flow__container');
 					paymentBox.style.padding = "0";
 					flowContainer = paymentBox; // Use the newly created container directly
 					ckoLogger.debug('Created flow-container id directly on payment_box div');
 				} else if (paymentBox && paymentBox.id === 'flow-container') {
+					paymentBox.classList.add('cko-flow__container');
 					flowContainer = paymentBox; // Container exists but getElementById didn't find it (timing issue)
 				}
 			}
@@ -1913,6 +1915,9 @@ var ckoFlow = {
 		}
 
 		// Container exists - proceed with mount
+		if (flowContainer && flowContainer.classList) {
+			flowContainer.classList.add('cko-flow__container');
+		}
 		try {
 			ckoLogger.debug('Container found, mounting Flow component', {
 				containerId: flowContainer.id,
@@ -1979,7 +1984,7 @@ var ckoFlow = {
 		
 		// Step 2: Enable Place Order button
 		if (placeOrderBtn) {
-			placeOrderBtn.classList.remove("flow-loading");
+			placeOrderBtn.classList.remove("cko-flow--loading");
 			placeOrderBtn.style.removeProperty('opacity');
 			placeOrderBtn.style.removeProperty('visibility');
 			ckoLogger.debug('Place Order button enabled');
@@ -1993,7 +1998,7 @@ var ckoFlow = {
 		}
 		
 		// Step 4: Mark Flow as ready
-		document.body.classList.add("flow-ready");
+		document.body.classList.add("cko-flow--ready");
 		ckoLogger.debug('Checkout is now fully interactive');
 		
 		// CRITICAL: Listen for user interaction with Flow fields (click, focus, input)
@@ -2533,6 +2538,7 @@ function showFlowWaitingMessage() {
 			// Set the id if not already set
 			if (!paymentBox.id) {
 				paymentBox.id = "flow-container";
+				paymentBox.classList.add('cko-flow__container');
 				paymentBox.style.padding = "0";
 			}
 			
@@ -2548,10 +2554,10 @@ function showFlowWaitingMessage() {
 	flowContainer.style.display = "block";
 	
 	// Check if waiting message already exists
-	let waitingMessage = flowContainer.querySelector('.flow-waiting-message');
+	let waitingMessage = flowContainer.querySelector('.cko-flow__waiting-message');
 	if (!waitingMessage) {
 		waitingMessage = document.createElement('div');
-		waitingMessage.className = 'flow-waiting-message';
+		waitingMessage.className = 'cko-flow__waiting-message';
 		waitingMessage.innerHTML = `
 			<div style="padding: 20px; text-align: center; background: #f5f5f5; border-radius: 4px; margin: 10px 0;">
 				<p style="margin: 0 0 10px 0; font-weight: 600; color: #333;">Please fill in all required fields to continue with payment.</p>
@@ -2573,7 +2579,7 @@ function hideFlowWaitingMessage() {
 		return;
 	}
 	
-	const waitingMessage = flowContainer.querySelector('.flow-waiting-message');
+	const waitingMessage = flowContainer.querySelector('.cko-flow__waiting-message');
 	if (waitingMessage) {
 		waitingMessage.remove();
 		ckoLogger.debug('Hiding Flow waiting message');
@@ -2777,7 +2783,7 @@ function initializeFlowIfNeeded() {
 				const elements = window.FlowInitialization.getFlowElements();
 				if (elements.flowContainer) {
 					elements.flowContainer.style.display = "block";
-					document.body.classList.add("flow-method-selected");
+					document.body.classList.add("cko-flow--method-selected");
 					hideFlowWaitingMessage();
 				}
 				ckoLogger.debug(`✅ ATTEMPT #${attemptNumber} - Already initialized and mounted, skipping`);
@@ -2847,7 +2853,7 @@ function initializeFlowIfNeeded() {
 			hasBillingAddress: hasBillingAddress()
 		});
 		ckoLogger.debug('Cannot initialize Flow - validation failed');
-		document.body.classList.add("flow-method-selected");
+		document.body.classList.add("cko-flow--method-selected");
 		showFlowWaitingMessage();
 		setupFieldWatchersForInitialization();
 		return;
@@ -2859,7 +2865,7 @@ function initializeFlowIfNeeded() {
 	// Initialize Flow
 	ckoLogger.debug('✅ PROCEEDING - Initializing Flow - payment selected, container exists, validation passed');
 	ckoLogger.debug('Initializing Flow - payment selected, container exists, validation passed');
-	document.body.classList.add("flow-method-selected");
+	document.body.classList.add("cko-flow--method-selected");
 	if (elements.flowContainer) {
 		elements.flowContainer.style.display = "block";
 	}
@@ -3077,17 +3083,17 @@ document.addEventListener("change", function (event) {
 		});
 		ckoLogger.debug('All payment methods state:', paymentMethodsState);
 		
-		// Immediately add flow-method-selected class if Flow is selected
+		// Immediately add cko-flow--method-selected class if Flow is selected
 		const flowPayment = document.getElementById("payment_method_wc_checkout_com_flow");
 		if (flowPayment && flowPayment.checked) {
 			ckoLogger.debug('Checkout.com payment method SELECTED');
-			document.body.classList.add("flow-method-selected");
-			// Remove flow-ready until component is actually ready
-			document.body.classList.remove("flow-ready");
+			document.body.classList.add("cko-flow--method-selected");
+			// Remove cko-flow--ready until component is actually ready
+			document.body.classList.remove("cko-flow--ready");
 		} else {
 			ckoLogger.debug('Checkout.com payment method NOT selected - other method selected');
 			// Remove Flow classes for other payment methods
-			document.body.classList.remove("flow-method-selected", "flow-ready");
+			document.body.classList.remove("cko-flow--method-selected", "cko-flow--ready");
 			// Reset Flow interaction flags when switching to other payment methods
 			FlowState.set('userInteracted', false);
 			window.flowSavedCardSelected = false;
@@ -3266,7 +3272,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		// Clear saved card flag and mark for new Flow payment
 		window.flowSavedCardSelected = false;
 		FlowState.set('userInteracted', false); // Reset to allow user to interact with Flow
-		document.body.classList.add("flow-ready");
+		document.body.classList.add("cko-flow--ready");
 		
 		// Ensure Place Order button is visible
 		const placeOrderButton = document.getElementById('place_order');
@@ -4325,7 +4331,7 @@ jQuery(function($) {
  * of the 'saved-card-is-enabled' class on the web component root.
  *
  * Behavior:
- * 1. Initially hides the label if the body has class 'flow-method-single' and the
+ * 1. Initially hides the label if the body has class 'cko-flow--method-single' and the
  *    root element exists without 'saved-card-is-enabled'.
  * 2. Shows the label if 'saved-card-is-enabled' class is present on the root element.
  * 3. Dynamically observes the root element:
@@ -4343,7 +4349,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const rootElement = document.querySelector(rootSelector);
         
         // Check if we have saved cards (new behavior)
-        const hasSavedCards = document.querySelector('.saved-cards-accordion-container');
+        const hasSavedCards = document.querySelector('.cko-flow__saved-cards-accordion-container');
 
         if (label) {
             // ALWAYS show the label (either with saved cards or without)
@@ -4356,8 +4362,8 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             
             /* DISABLED - Old behavior that was hiding the label
-            // Old behavior: only for flow-method-single (no saved cards)
-            if (document.body.classList.contains('flow-method-single') && rootElement) {
+            // Old behavior: only for cko-flow--method-single (no saved cards)
+            if (document.body.classList.contains('cko-flow--method-single') && rootElement) {
                 if (rootElement.classList.contains('saved-card-is-enabled')) {
                     label.style.removeProperty('display'); // Show again.
                 } else {

@@ -744,8 +744,8 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		}
 		?>
 			<div></div>
-			<div id="loading-overlay"><?php esc_html_e( 'Loading...', 'checkout-com-unified-payments-api' ); ?></div>
-			<div id="loading-overlay2"><?php esc_html_e( 'Loading...Do NOT refresh.', 'checkout-com-unified-payments-api' ); ?></div>
+			<div id="loading-overlay" class="cko-flow__overlay cko-flow__overlay--primary"><?php esc_html_e( 'Loading...', 'checkout-com-unified-payments-api' ); ?></div>
+			<div id="loading-overlay2" class="cko-flow__overlay cko-flow__overlay--secondary"><?php esc_html_e( 'Loading...Do NOT refresh.', 'checkout-com-unified-payments-api' ); ?></div>
 			<?php if ( is_user_logged_in() ) : ?>
 
 				<?php if ( $order_pay_order ) : ?>
@@ -763,7 +763,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 							// IMPORTANT: Hide the accordion container, not just the list inside
 							const orderPayObserver = new MutationObserver((mutationsList, observer) => {
 								// Hide the accordion container (which contains the saved cards)
-								const $accordion = jQuery('.saved-cards-accordion-container');
+								const $accordion = jQuery('.cko-flow__saved-cards-accordion-container');
 								if ($accordion.length) {
 									$accordion.hide();
 									if (flowDebugLogging) console.log('[FLOW] Hiding saved cards accordion for MOTO order');
@@ -799,7 +799,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 							orderPayObserver.observe(orderPayTargetNode, orderPayConfig);
 
 							// Try to hide it immediately in case it's already present.
-							jQuery('.saved-cards-accordion-container').hide();
+							jQuery('.cko-flow__saved-cards-accordion-container').hide();
 							jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide();
 							
 							// Hide the "Save to account" checkbox for MOTO orders (Admin order + Order-pay page + Guest customer)
@@ -817,14 +817,14 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 							function enhancePaymentLabel() {
 								const $label = $('.payment_method_wc_checkout_com_flow > label[for="payment_method_wc_checkout_com_flow"]');
 								
-								if ($label.length && !$label.find('.payment-method-text').length) {
+								if ($label.length && !$label.find('.cko-flow__payment-method-text').length) {
 									const labelText = $label.text().trim();
 									
 									// Wrap label text in styled containers
 									$label.html(`
-										<span class="payment-method-text">
-											<span class="payment-method-title">${labelText}</span>
-											<span class="payment-method-subtitle">Secure payment powered by Checkout.com</span>
+										<span class="cko-flow__payment-method-text">
+											<span class="cko-flow__payment-method-title">${labelText}</span>
+											<span class="cko-flow__payment-method-subtitle">Secure payment powered by Checkout.com</span>
 										</span>
 									`);
 									
@@ -842,7 +842,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 								const $label = $('label[for="wc-wc_checkout_com_flow-new-payment-method"]');
 								
 								if ($label.length) {
-									$label.html('<span class="save-card-label-text">Save card for future purchases</span>');
+									$label.html('<span class="cko-flow__save-card-label-text">Save card for future purchases</span>');
 									flowLog('Save card label customized');
 								}
 								
@@ -860,7 +860,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 									});
 									
 									// Style the label text
-									$('.save-card-label-text').css({
+									$('.cko-flow__save-card-label-text').css({
 										'color': colors.colorPrimary || '#1a1a1a',
 										'font-family': colors.label?.fontFamily || 'inherit',
 										'font-size': colors.label?.fontSize || '14px',
@@ -978,7 +978,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 								// This function only applies to saved cards accordion and Flow container
 								
 								// Apply to saved cards accordion
-								const $accordion = $('.saved-cards-accordion');
+								const $accordion = $('.cko-flow__saved-cards-accordion');
 								if ($accordion.length) {
 									$accordion.css({
 										'background-color': colors.colorFormBackground || '#ffffff',
@@ -987,14 +987,14 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 									});
 									
 									// Apply to saved cards header text
-									$('.saved-cards-label-text').css({
+									$('.cko-flow__saved-cards-label-text').css({
 										'color': colors.colorPrimary || '#1a1a1a',
 										'font-family': colors.label?.fontFamily || 'inherit',
 										'font-size': colors.label?.fontSize || '15px',
 										'font-weight': colors.label?.fontWeight || '600',
 									});
 									
-									$('.saved-cards-label-subtext').css({
+									$('.cko-flow__saved-cards-label-subtext').css({
 										'color': colors.colorSecondary || '#666',
 										'font-family': colors.footnote?.fontFamily || 'inherit',
 										'font-size': colors.footnote?.fontSize || '13px',
@@ -1003,7 +1003,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 								
 								// Apply to Flow container border
 								const $flowContainer = $('#flow-container');
-								if ($flowContainer.length && $('.saved-cards-accordion-container').length) {
+								if ($flowContainer.length && $('.cko-flow__saved-cards-accordion-container').length) {
 									$flowContainer.css({
 										'background-color': colors.colorFormBackground || '#ffffff',
 										'border-color': colors.colorPrimary || '#186aff',
@@ -1043,7 +1043,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 				// Wrap saved payment methods in styled accordion container
 				function wrapSavedCardsInAccordion() {
-					if (totalCount > 0 && !$('.saved-cards-accordion-container').length && $savedMethods.length > 0) {
+					if (totalCount > 0 && !$('.cko-flow__saved-cards-accordion-container').length && $savedMethods.length > 0) {
 						// Wait for Flow container or use payment method container as fallback
 						let $insertionPoint = $('#flow-container');
 						let $fallbackPoint = $('.payment_method_wc_checkout_com_flow').first();
@@ -1057,11 +1057,11 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 						if ($insertionPoint.length || $fallbackPoint.length) {
 							// Create accordion container
 							const accordionHTML = `
-								<div class="saved-cards-accordion-container">
-									<div class="saved-cards-accordion">
-										<div class="saved-cards-accordion-header">
-											<div class="saved-cards-accordion-left">
-												<div class="saved-cards-icon">
+								<div class="cko-flow__saved-cards-accordion-container">
+									<div class="cko-flow__saved-cards-accordion">
+										<div class="cko-flow__saved-cards-accordion-header">
+											<div class="cko-flow__saved-cards-accordion-left">
+												<div class="cko-flow__saved-cards-icon">
 													<svg width="40" height="24" viewBox="0 0 40 24" xmlns="http://www.w3.org/2000/svg" fill="none">
 														<rect x="0.5" y="0.5" width="39" height="23" rx="3.5" stroke="#186aff"></rect>
 														<path fill-rule="evenodd" clip-rule="evenodd" d="M26.8571 6.85714H13.1428V17.1429H26.8571V6.85714ZM12.2857 6V18H27.7143V6H12.2857Z" fill="#186aff"></path>
@@ -1069,13 +1069,13 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 														<path fill-rule="evenodd" clip-rule="evenodd" d="M18.2857 15.4286H14.8571V14.5714H18.2857V15.4286Z" fill="#186aff"></path>
 													</svg>
 												</div>
-												<div class="saved-cards-label">
-													<span class="saved-cards-label-text">Saved cards</span>
-													<span class="saved-cards-label-subtext">${totalCount} card${totalCount !== 1 ? 's' : ''} available</span>
+												<div class="cko-flow__saved-cards-label">
+													<span class="cko-flow__saved-cards-label-text">Saved cards</span>
+													<span class="cko-flow__saved-cards-label-subtext">${totalCount} card${totalCount !== 1 ? 's' : ''} available</span>
 												</div>
 											</div>
 										</div>
-										<div class="saved-cards-accordion-panel">
+										<div class="cko-flow__saved-cards-accordion-panel">
 											<!-- Saved payment methods will be moved here -->
 										</div>
 									</div>
@@ -1118,7 +1118,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 							
 							// Move saved payment methods into the accordion panel
 							$savedMethods.each(function() {
-								$(this).appendTo('.saved-cards-accordion-panel');
+								$(this).appendTo('.cko-flow__saved-cards-accordion-panel');
 							});
 							
 							flowLog('Saved cards wrapped in accordion');
@@ -1128,7 +1128,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 						flowLog('No default card selection - user must explicitly select');
 						
 						// Ensure no saved cards are auto-selected (remove any defaults)
-						$('.saved-cards-accordion-panel input[name="wc-wc_checkout_com_flow-payment-token"]:not(#wc-wc_checkout_com_flow-payment-token-new)').prop('checked', false).removeAttr('checked');
+						$('.cko-flow__saved-cards-accordion-panel input[name="wc-wc_checkout_com_flow-payment-token"]:not(#wc-wc_checkout_com_flow-payment-token-new)').prop('checked', false).removeAttr('checked');
 						
 						// Ensure "new" card option is selected by default
 						const $newCardRadio = $('#wc-wc_checkout_com_flow-payment-token-new');
@@ -1146,7 +1146,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 							
 							// CRITICAL: After moving cards, ensure visibility rules are applied
 							// Remove any inline display styles that might have been set during the move
-							$('.saved-cards-accordion-container').each(function() {
+							$('.cko-flow__saved-cards-accordion-container').each(function() {
 								// Remove inline style to let CSS handle visibility
 								if (this.style.display) {
 									this.style.removeProperty('display');
@@ -1154,7 +1154,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 								}
 							});
 							
-							$('.saved-cards-accordion-panel').each(function() {
+							$('.cko-flow__saved-cards-accordion-panel').each(function() {
 								if (this.style.display) {
 									this.style.removeProperty('display');
 									flowLog('Removed inline display style from accordion panel');
@@ -1196,9 +1196,9 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					
 					setTimeout(function() {
 						// Check if accordion AND panel exist, and if saved methods are inside
-						const $existingAccordion = $('.saved-cards-accordion-container');
-						const $existingPanel = $('.saved-cards-accordion-panel');
-						const $panelMethods = $('.saved-cards-accordion-panel .woocommerce-SavedPaymentMethods');
+						const $existingAccordion = $('.cko-flow__saved-cards-accordion-container');
+						const $existingPanel = $('.cko-flow__saved-cards-accordion-panel');
+						const $panelMethods = $('.cko-flow__saved-cards-accordion-panel .woocommerce-SavedPaymentMethods');
 						const $allMethods = $('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods');
 						
 						flowLog('After updated_checkout:', {
@@ -1251,7 +1251,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 							const $label = $('label[for="wc-wc_checkout_com_flow-new-payment-method"]');
 							
 							if ($label.length) {
-								$label.html('<span class="save-card-label-text">Save card for future purchases</span>');
+								$label.html('<span class="cko-flow__save-card-label-text">Save card for future purchases</span>');
 								flowLog('Save card label customized (section 2)');
 							}
 							
@@ -1269,7 +1269,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 								});
 								
 								// Style the label text
-								$('.save-card-label-text').css({
+								$('.cko-flow__save-card-label-text').css({
 									'color': colors.colorPrimary || '#1a1a1a',
 									'font-family': colors.label?.fontFamily || 'inherit',
 									'font-size': colors.label?.fontSize || '14px',
@@ -1387,7 +1387,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 							// This function only applies to saved cards accordion and Flow container
 							
 							// Apply to saved cards accordion
-							const $accordion = $('.saved-cards-accordion');
+							const $accordion = $('.cko-flow__saved-cards-accordion');
 							if ($accordion.length) {
 								$accordion.css({
 									'background-color': colors.colorFormBackground || '#ffffff',
@@ -1396,14 +1396,14 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 								});
 								
 								// Apply to saved cards header text
-								$('.saved-cards-label-text').css({
+								$('.cko-flow__saved-cards-label-text').css({
 									'color': colors.colorPrimary || '#1a1a1a',
 									'font-family': colors.label?.fontFamily || 'inherit',
 									'font-size': colors.label?.fontSize || '15px',
 									'font-weight': colors.label?.fontWeight || '600',
 								});
 								
-								$('.saved-cards-label-subtext').css({
+								$('.cko-flow__saved-cards-label-subtext').css({
 									'color': colors.colorSecondary || '#666',
 									'font-family': colors.footnote?.fontFamily || 'inherit',
 									'font-size': colors.footnote?.fontSize || '13px',
@@ -1412,7 +1412,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 							
 							// Apply to Flow container border
 							const $flowContainer = $('#flow-container');
-							if ($flowContainer.length && $('.saved-cards-accordion-container').length) {
+							if ($flowContainer.length && $('.cko-flow__saved-cards-accordion-container').length) {
 								$flowContainer.css({
 									'background-color': colors.colorFormBackground || '#ffffff',
 									'border-color': colors.colorPrimary || '#186aff',
@@ -1452,7 +1452,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 				// Wrap saved payment methods in styled accordion container
 				function wrapSavedCardsInAccordion() {
-					if (totalCount > 0 && !$('.saved-cards-accordion-container').length && $savedMethods.length > 0) {
+					if (totalCount > 0 && !$('.cko-flow__saved-cards-accordion-container').length && $savedMethods.length > 0) {
 						// Wait for Flow container or use payment method container as fallback
 						let $insertionPoint = $('#flow-container');
 						let $fallbackPoint = $('.payment_method_wc_checkout_com_flow').first();
@@ -1466,11 +1466,11 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 						if ($insertionPoint.length || $fallbackPoint.length) {
 							// Create accordion container
 							const accordionHTML = `
-								<div class="saved-cards-accordion-container">
-									<div class="saved-cards-accordion">
-										<div class="saved-cards-accordion-header">
-											<div class="saved-cards-accordion-left">
-												<div class="saved-cards-icon">
+								<div class="cko-flow__saved-cards-accordion-container">
+									<div class="cko-flow__saved-cards-accordion">
+										<div class="cko-flow__saved-cards-accordion-header">
+											<div class="cko-flow__saved-cards-accordion-left">
+												<div class="cko-flow__saved-cards-icon">
 													<svg width="40" height="24" viewBox="0 0 40 24" xmlns="http://www.w3.org/2000/svg" fill="none">
 														<rect x="0.5" y="0.5" width="39" height="23" rx="3.5" stroke="#186aff"></rect>
 														<path fill-rule="evenodd" clip-rule="evenodd" d="M26.8571 6.85714H13.1428V17.1429H26.8571V6.85714ZM12.2857 6V18H27.7143V6H12.2857Z" fill="#186aff"></path>
@@ -1478,13 +1478,13 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 														<path fill-rule="evenodd" clip-rule="evenodd" d="M18.2857 15.4286H14.8571V14.5714H18.2857V15.4286Z" fill="#186aff"></path>
 													</svg>
 												</div>
-												<div class="saved-cards-label">
-													<span class="saved-cards-label-text">Saved cards</span>
-													<span class="saved-cards-label-subtext">${totalCount} card${totalCount !== 1 ? 's' : ''} available</span>
+												<div class="cko-flow__saved-cards-label">
+													<span class="cko-flow__saved-cards-label-text">Saved cards</span>
+													<span class="cko-flow__saved-cards-label-subtext">${totalCount} card${totalCount !== 1 ? 's' : ''} available</span>
 												</div>
 											</div>
 										</div>
-										<div class="saved-cards-accordion-panel">
+										<div class="cko-flow__saved-cards-accordion-panel">
 											<!-- Saved payment methods will be moved here -->
 										</div>
 									</div>
@@ -1527,7 +1527,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 							
 							// Move saved payment methods into the accordion panel
 							$savedMethods.each(function() {
-								$(this).appendTo('.saved-cards-accordion-panel');
+								$(this).appendTo('.cko-flow__saved-cards-accordion-panel');
 							});
 							
 							flowLog('Saved cards wrapped in accordion');
@@ -1537,7 +1537,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 						flowLog('No default card selection - user must explicitly select');
 						
 						// Ensure no saved cards are auto-selected (remove any defaults)
-						$('.saved-cards-accordion-panel input[name="wc-wc_checkout_com_flow-payment-token"]:not(#wc-wc_checkout_com_flow-payment-token-new)').prop('checked', false).removeAttr('checked');
+						$('.cko-flow__saved-cards-accordion-panel input[name="wc-wc_checkout_com_flow-payment-token"]:not(#wc-wc_checkout_com_flow-payment-token-new)').prop('checked', false).removeAttr('checked');
 						
 						// Ensure "new" card option is selected by default
 						const $newCardRadio = $('#wc-wc_checkout_com_flow-payment-token-new');
@@ -1555,7 +1555,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 							
 							// CRITICAL: After moving cards, ensure visibility rules are applied
 							// Remove any inline display styles that might have been set during the move
-							$('.saved-cards-accordion-container').each(function() {
+							$('.cko-flow__saved-cards-accordion-container').each(function() {
 								// Remove inline style to let CSS handle visibility
 								if (this.style.display) {
 									this.style.removeProperty('display');
@@ -1563,7 +1563,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 								}
 							});
 							
-							$('.saved-cards-accordion-panel').each(function() {
+							$('.cko-flow__saved-cards-accordion-panel').each(function() {
 								if (this.style.display) {
 									this.style.removeProperty('display');
 									flowLog('Removed inline display style from accordion panel');
@@ -1605,9 +1605,9 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					
 					setTimeout(function() {
 						// Check if accordion AND panel exist, and if saved methods are inside
-						const $existingAccordion = $('.saved-cards-accordion-container');
-						const $existingPanel = $('.saved-cards-accordion-panel');
-						const $panelMethods = $('.saved-cards-accordion-panel .woocommerce-SavedPaymentMethods');
+						const $existingAccordion = $('.cko-flow__saved-cards-accordion-container');
+						const $existingPanel = $('.cko-flow__saved-cards-accordion-panel');
+						const $panelMethods = $('.cko-flow__saved-cards-accordion-panel .woocommerce-SavedPaymentMethods');
 						const $allMethods = $('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods');
 						
 						flowLog('After updated_checkout:', {
@@ -1659,10 +1659,10 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		<?php endif; ?>
 		
 		<!-- Skeleton loader for better UX while Flow component loads -->
-		<div id="flow-skeleton" class="flow-skeleton-loader">
-			<div class="flow-skeleton-line"></div>
-			<div class="flow-skeleton-line"></div>
-			<div class="flow-skeleton-line short"></div>
+		<div id="flow-skeleton" class="flow-skeleton-loader cko-flow__skeleton">
+			<div class="flow-skeleton-line cko-flow__skeleton-line"></div>
+			<div class="flow-skeleton-line cko-flow__skeleton-line"></div>
+			<div class="flow-skeleton-line short cko-flow__skeleton-line cko-flow__skeleton-line--short"></div>
 		</div>
 		
 	<!-- Inline script to immediately hide place order button before CSS/JS loads (prevents flash) -->
@@ -1750,7 +1750,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				if (typeof window.flowGuestObserver === 'undefined') {
 					window.flowGuestObserver = new MutationObserver((mutationsList, observer) => {
 					// Hide the accordion container (which contains the saved cards)
-					const $accordion = jQuery('.saved-cards-accordion-container');
+					const $accordion = jQuery('.cko-flow__saved-cards-accordion-container');
 					if ($accordion.length) {
 						$accordion.hide();
 						if (flowDebugLogging) console.log('[FLOW] Hiding saved cards accordion for non-logged-in user');
@@ -1774,7 +1774,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				}
 
 				// Try to hide it immediately in case it's already present.
-				jQuery('.saved-cards-accordion-container').hide();
+				jQuery('.cko-flow__saved-cards-accordion-container').hide();
 				jQuery('.woocommerce-SavedPaymentMethods.wc-saved-payment-methods').hide();
 			</script>
 		<?php endif; ?>

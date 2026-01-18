@@ -35,6 +35,7 @@ function addPaymentMethod() {
 		
 		if (innerDiv && !innerDiv.id) {
 			innerDiv.id = "flow-container";
+			innerDiv.classList.add('cko-flow__container');
             innerDiv.style.padding = "0";
 			if (typeof ckoLogger !== 'undefined') {
 				ckoLogger.debug('[FLOW CONTAINER] ✅ Created flow-container id on payment_box div');
@@ -52,6 +53,7 @@ function addPaymentMethod() {
 			}
 			
 		} else if (innerDiv && innerDiv.id === 'flow-container') {
+			innerDiv.classList.add('cko-flow__container');
 			if (typeof ckoLogger !== 'undefined') {
 				ckoLogger.debug('[FLOW CONTAINER] ✅ Container already exists with correct ID');
 			}
@@ -136,6 +138,9 @@ jQuery(document).on("updated_checkout", function () {
 			}
 			addPaymentMethod(); // This will emit cko:flow-container-ready event
 		} else if (flowContainer) {
+			if (flowContainer.classList) {
+				flowContainer.classList.add('cko-flow__container');
+			}
 			// Container exists - emit event so Flow can check if remounting is needed
 			const containerReadyEvent = new CustomEvent('cko:flow-container-ready', {
 				detail: { container: flowContainer },
@@ -156,8 +161,11 @@ setTimeout(function() {
 	}
 	
 	// If saved cards accordion was created after initial load, remove Flow accordion if it exists
-	const savedCardsAccordion = document.querySelector('.saved-cards-accordion-container');
-	const flowAccordion = document.querySelector('.flow-accordion-container');
+	const savedCardsAccordion = document.querySelector('.cko-flow__saved-cards-accordion-container');
+	const flowAccordion = document.querySelector('.cko-flow__accordion-container, .flow-accordion-container');
+	if (flowAccordion && flowAccordion.classList) {
+		flowAccordion.classList.add('cko-flow__accordion-container');
+	}
 	
 	if (savedCardsAccordion && flowAccordion) {
 		if (typeof ckoLogger !== 'undefined') {

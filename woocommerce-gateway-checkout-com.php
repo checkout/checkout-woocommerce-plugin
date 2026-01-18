@@ -367,7 +367,7 @@ add_action( 'plugins_loaded', 'init_checkout_com_gateway_class', 0 );
 		}
 
 		// Load payment gateway class.
-		add_filter( 'woocommerce_payment_gateways', 'checkout_com_add_gateway' );
+		add_filter( 'woocommerce_payment_gateways', 'cko_checkout_com_add_gateway' );
 	}
 }
 
@@ -681,9 +681,9 @@ if ( ! function_exists( 'cko_ajax_test_apple_pay_certificate' ) ) {
  *
  * @return array
  */
-function checkout_com_add_gateway( $methods ) {
+function cko_checkout_com_add_gateway( $methods ) {
 
-	$array = get_selected_apms_class();
+	$array = cko_get_selected_apms_class();
 
 	$methods[] = 'WC_Gateway_Checkout_Com_Cards';
 	$methods[] = 'WC_Gateway_Checkout_Com_Apple_Pay';
@@ -702,7 +702,7 @@ function checkout_com_add_gateway( $methods ) {
  *
  * @return array
  */
-function get_selected_apms_class() {
+function cko_get_selected_apms_class() {
 
 	$apms_settings       = get_option( 'woocommerce_wc_checkout_com_alternative_payments_settings' );
 	$selected_apms_class = [];
@@ -720,7 +720,7 @@ function get_selected_apms_class() {
 	return $selected_apms_class;
 }
 
-add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), 'checkout_com_action_links' );
+add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), 'cko_checkout_com_action_links' );
 
 /**
  * Add settings link.
@@ -729,7 +729,7 @@ add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), 'checkout_com_
  *
  * @return array
  */
-function checkout_com_action_links( $links ) {
+function cko_checkout_com_action_links( $links ) {
 	$plugin_links = [
 		'<a href="' . admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards' ) . '">' . __( 'Settings', 'checkout-com-unified-payments-api' ) . '</a>',
 	];
@@ -738,12 +738,12 @@ function checkout_com_action_links( $links ) {
 }
 
 // This action will register flagged order status in woocommerce.
-add_action( 'init', 'register_cko_new_order_statuses' );
+add_action( 'init', 'cko_register_order_statuses' );
 
 /**
  * Register flagged order status.
  */
-function register_cko_new_order_statuses() {
+function cko_register_order_statuses() {
 	register_post_status(
 		'wc-flagged',
 		[
@@ -759,7 +759,7 @@ function register_cko_new_order_statuses() {
 }
 
 
-add_filter( 'wc_order_statuses', 'my_new_wc_order_statuses' );
+add_filter( 'wc_order_statuses', 'cko_new_wc_order_statuses' );
 
 /**
  * Register flagged status in wc_order_statuses.
@@ -768,7 +768,7 @@ add_filter( 'wc_order_statuses', 'my_new_wc_order_statuses' );
  *
  * @return array
  */
-function my_new_wc_order_statuses( $order_statuses ) {
+function cko_new_wc_order_statuses( $order_statuses ) {
 	$order_statuses['wc-flagged'] = _x( 'Suspected Fraud', 'Order status', 'checkout-com-unified-payments-api' );
 
 	return $order_statuses;
@@ -1075,14 +1075,51 @@ function cko_show_validation_notices() {
 	}
 }
 
-add_action( 'admin_enqueue_scripts', 'cko_admin_enqueue_scripts' );
+add_action( 'admin_enqueue_scripts', 'cko_admin_enqueue_scripts', 10, 1 );
 
 /**
  * Load admin scripts.
  *
  * @return void
  */
-function cko_admin_enqueue_scripts() {
+function cko_admin_enqueue_scripts( $hook ) {
+	if ( ! is_admin() ) {
+		return;
+	}
+
+	$allowed_hooks = array(
+		'woocommerce_page_wc-settings',
+		'woocommerce_page_checkoutcom-diagnostics',
+		'woocommerce_page_checkout-com-webhook-queue',
+		'checkout-com-webhook-queue',
+	);
+
+	if ( ! in_array( $hook, $allowed_hooks, true ) ) {
+		return;
+	}
+
+	if ( 'woocommerce_page_wc-settings' === $hook ) {
+		$tab = isset( $_GET['tab'] ) ? sanitize_text_field( wp_unslash( $_GET['tab'] ) ) : '';
+		$section = isset( $_GET['section'] ) ? sanitize_text_field( wp_unslash( $_GET['section'] ) ) : '';
+		$screen = isset( $_GET['screen'] ) ? sanitize_text_field( wp_unslash( $_GET['screen'] ) ) : '';
+
+		if ( 'checkout' !== $tab ) {
+			return;
+		}
+
+		$allowed_sections = array(
+			'wc_checkout_com_cards',
+			'wc_checkout_com_flow',
+			'wc_checkout_com_google_pay',
+			'wc_checkout_com_apple_pay',
+			'wc_checkout_com_paypal',
+			'wc_checkout_com_alternative_payments',
+		);
+
+		if ( ! in_array( $section, $allowed_sections, true ) && ! in_array( $screen, array( 'advanced', 'webhook_queue', 'debug_settings' ), true ) ) {
+			return;
+		}
+	}
 
 	$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 	$checkout_mode = isset( $core_settings['ckocom_checkout_mode'] ) ? $core_settings['ckocom_checkout_mode'] : 'classic';
@@ -1117,7 +1154,7 @@ function cko_admin_enqueue_scripts() {
 	wp_localize_script( 'cko-admin-script', 'cko_admin_vars', $vars );
 }
 
-add_action( 'wp_enqueue_scripts', 'callback_for_setting_up_scripts' );
+add_action( 'wp_enqueue_scripts', 'cko_enqueue_frontend_assets' );
 
 /**
  * Load checkout.com style sheet.
@@ -1125,7 +1162,7 @@ add_action( 'wp_enqueue_scripts', 'callback_for_setting_up_scripts' );
  *
  * Only on Checkout related pages.
  */
-function callback_for_setting_up_scripts() {
+function cko_enqueue_frontend_assets() {
 
 	// Load on Cart, Checkout, pay for order or add payment method pages.
 	if ( ! is_cart() && ! is_checkout() && ! isset( $_GET['pay_for_order'] ) && ! is_add_payment_method_page() ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
@@ -1504,7 +1541,7 @@ function callback_for_setting_up_scripts() {
 	}
 }
 
-add_action( 'woocommerce_order_item_add_action_buttons', 'action_woocommerce_order_item_add_action_buttons', 10, 1 );
+add_action( 'woocommerce_order_item_add_action_buttons', 'cko_action_woocommerce_order_item_add_action_buttons', 10, 1 );
 
 /**
  * Add custom button to admin order.
@@ -1512,7 +1549,7 @@ add_action( 'woocommerce_order_item_add_action_buttons', 'action_woocommerce_ord
  *
  * @param WC_Order $order The order being edited.
  */
-function action_woocommerce_order_item_add_action_buttons( $order ) {
+function cko_action_woocommerce_order_item_add_action_buttons( $order ) {
 
 	// Check order payment method is checkout.
 	if ( false === strpos( $order->get_payment_method(), 'wc_checkout_com_' ) ) {
@@ -1534,13 +1571,14 @@ function action_woocommerce_order_item_add_action_buttons( $order ) {
 </script>
 
 <input type="hidden" value="" name="cko_payment_action" id="cko_payment_action" />
+<?php wp_nonce_field( 'cko_payment_action', 'cko_payment_action_nonce' ); ?>
 <button class="button" id="cko-capture" style="display:none;">Capture</button>
 <button class="button" id="cko-void" style="display:none;">Void</button>
 		<?php
 	}
 }
 
-add_action( 'woocommerce_process_shop_order_meta', 'handle_order_capture_void_action', 50, 2 );
+add_action( 'woocommerce_process_shop_order_meta', 'cko_handle_order_capture_void_action', 50, 2 );
 
 /**
  * Do action for capture and void button.
@@ -1550,13 +1588,21 @@ add_action( 'woocommerce_process_shop_order_meta', 'handle_order_capture_void_ac
  *
  * @return bool|void
  */
-function handle_order_capture_void_action( $order_id, $order ) {
+function cko_handle_order_capture_void_action( $order_id, $order ) {
 
 	if ( ! is_admin() ) {
 		return;
 	}
 
-	if ( ! isset( $_POST['cko_payment_action'] ) || ! sanitize_text_field( $_POST['cko_payment_action'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
+	if ( ! current_user_can( 'manage_woocommerce' ) ) {
+		return;
+	}
+
+	if ( ! isset( $_POST['cko_payment_action'] ) || ! sanitize_text_field( wp_unslash( $_POST['cko_payment_action'] ) ) ) {
+		return;
+	}
+
+	if ( ! isset( $_POST['cko_payment_action_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['cko_payment_action_nonce'] ) ), 'cko_payment_action' ) ) {
 		return;
 	}
 
@@ -1568,7 +1614,7 @@ function handle_order_capture_void_action( $order_id, $order ) {
 	WC_Admin_Notices::remove_notice( 'wc_checkout_com_cards' );
 
 	// check if post is capture.
-	if ( 'cko-capture' === sanitize_text_field( $_POST['cko_payment_action'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
+	if ( 'cko-capture' === sanitize_text_field( wp_unslash( $_POST['cko_payment_action'] ) ) ) {
 
 		// send capture request to cko.
 		$result = (array) WC_Checkoutcom_Api_Request::capture_payment( $order_id );
@@ -1595,7 +1641,7 @@ function handle_order_capture_void_action( $order_id, $order ) {
 
 		return true;
 
-	} elseif ( 'cko-void' === sanitize_text_field( $_POST['cko_payment_action'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
+	} elseif ( 'cko-void' === sanitize_text_field( wp_unslash( $_POST['cko_payment_action'] ) ) ) {
 		// check if post is void.
 		// send void request to cko.
 		$result = (array) WC_Checkoutcom_Api_Request::void_payment( $order_id );
@@ -1632,7 +1678,7 @@ function handle_order_capture_void_action( $order_id, $order ) {
 	}
 }
 
-add_action( 'woocommerce_thankyou', 'add_fawry_number' );
+add_action( 'woocommerce_thankyou', 'cko_add_fawry_number' );
 
 /**
  * Add the fawry reference number in the "thank you" page.
@@ -1641,7 +1687,7 @@ add_action( 'woocommerce_thankyou', 'add_fawry_number' );
  *
  * @return void
  */
-function add_fawry_number( $order_id ) {
+function cko_add_fawry_number( $order_id ) {
 
 	$order = wc_get_order( $order_id );
 
@@ -1759,12 +1805,12 @@ function cko_is_nas_account() {
 	return isset( $core_settings['ckocom_account_type'] ) && ( 'NAS' === $core_settings['ckocom_account_type'] );
 }
 
-add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_cards', 'subscription_payment', 10, 2 );
-add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_alternative_payments_sepa', 'subscription_payment', 10, 2 );
-add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_google_pay', 'subscription_payment', 10, 2 );
-add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_apple_pay', 'subscription_payment', 10, 2 );
-add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_paypal', 'subscription_payment', 10, 2 );
-add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_flow', 'subscription_payment', 10, 2 );
+add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_cards', 'cko_subscription_payment', 10, 2 );
+add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_alternative_payments_sepa', 'cko_subscription_payment', 10, 2 );
+add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_google_pay', 'cko_subscription_payment', 10, 2 );
+add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_apple_pay', 'cko_subscription_payment', 10, 2 );
+add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_paypal', 'cko_subscription_payment', 10, 2 );
+add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_flow', 'cko_subscription_payment', 10, 2 );
 
 /**
  * Function to handle subscription renewal payment for card, SEPA APM, Google Pay & Apple Pay.
@@ -1772,13 +1818,13 @@ add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_flow', '
  * @param float    $renewal_total The amount to charge.
  * @param WC_Order $renewal_order A WC_Order object created to record the renewal payment.
  */
-function subscription_payment( $renewal_total, $renewal_order ) {
+function cko_subscription_payment( $renewal_total, $renewal_order ) {
 	include_once 'includes/subscription/class-wc-checkoutcom-subscription.php';
 
 	WC_Checkoutcom_Subscription::renewal_payment( $renewal_total, $renewal_order );
 }
 
-add_action( 'woocommerce_subscription_status_cancelled', 'subscription_cancelled', 20 );
+add_action( 'woocommerce_subscription_status_cancelled', 'cko_subscription_cancelled', 20 );
 
 /**
  * Function to handle subscription cancelled.
@@ -1787,10 +1833,10 @@ add_action( 'woocommerce_subscription_status_cancelled', 'subscription_cancelled
  *
  * @return void
  */
-function subscription_cancelled( $subscription ) {
+function cko_subscription_cancelled( $subscription ) {
 	include_once 'includes/subscription/class-wc-checkoutcom-subscription.php';
 
-	WC_Checkoutcom_Subscription::subscription_cancelled( $subscription );
+	WC_Checkoutcom_Subscription::cko_subscription_cancelled( $subscription );
 }
 
 // @TODO : Remove all below functions and logic once product is fixed.
@@ -2138,9 +2184,9 @@ function cko_get_payment_status( $request ) {
  *
  * @return void
  */
-function get_updated_cart_info() {
+function cko_get_updated_cart_info() {
 	wp_send_json_success( WC_Checkoutcom_Api_Request::get_cart_info(true) );
 }
 
-add_action('wp_ajax_get_cart_info', 'get_updated_cart_info');
-add_action('wp_ajax_nopriv_get_cart_info', 'get_updated_cart_info');
+add_action('wp_ajax_get_cart_info', 'cko_get_updated_cart_info');
+add_action('wp_ajax_nopriv_get_cart_info', 'cko_get_updated_cart_info');

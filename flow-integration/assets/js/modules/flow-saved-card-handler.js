@@ -39,10 +39,10 @@
 
 					// Mark as ready when Flow component is valid
 					if (ckoFlow.flowComponent) {
-						document.body.classList.add('flow-ready');
+						document.body.classList.add('cko-flow--ready');
 					} else {
 						// Flow not initialized yet, wait for it
-						document.body.classList.remove('flow-ready');
+						document.body.classList.remove('cko-flow--ready');
 					}
 
 					// Scroll to Flow container
@@ -55,7 +55,7 @@
 				// If a saved card is selected
 				else if (selectedToken.length > 0) {
 					ckoLogger.debug('Saved card selected - making Place Order button visible');
-					document.body.classList.add('flow-ready');
+					document.body.classList.add('cko-flow--ready');
 
 					// Keep Flow container visible
 					if (flowContainer) {
