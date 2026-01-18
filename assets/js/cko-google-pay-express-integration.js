@@ -467,47 +467,63 @@ jQuery( function ( $ ) {
                 });
             }
             
-            // For Blocks cart, inject the button wrapper if it doesn't exist
-            if (isBlocksCart && !wrapperExists) {
-                cko_google_pay_vars.debug && console.log('[Google Pay Express] Injecting button wrapper for Blocks cart');
-                const paymentOptions = jQuery('.wc-block-cart__payment-options');
-                if (paymentOptions.length) {
-                    // Check if button wrapper already exists in payment options
-                    if (!paymentOptions.find('#cko-google-pay-button-wrapper-cart').length) {
-                        // Append instead of replacing to preserve PayPal button
-                        paymentOptions.append('<div class="cko-google-pay-cart-button"><h3>Express Checkout</h3><div id="cko-google-pay-button-wrapper-cart" style="display: block;"></div></div>');
+            const getOrCreateCartButtonsContainer = function() {
+                const existingButtons = jQuery('.cko-express-checkout-container .cko-express-checkout-buttons').first();
+                if (existingButtons.length) {
+                    return existingButtons;
+                }
+
+                const container = jQuery('<div id="cko-express-checkout-cart-container" class="cko-express-checkout-container"><div class="cko-express-checkout-buttons"></div></div>');
+                const buttons = container.find('.cko-express-checkout-buttons');
+
+                if (isBlocksCart) {
+                    const paymentOptions = jQuery('.wc-block-cart__payment-options');
+                    if (paymentOptions.length) {
+                        paymentOptions.append(container);
+                        return buttons;
                     }
-                } else {
-                    // Fallback: inject after proceed to checkout button
+
                     const proceedButton = jQuery('.wc-block-cart__submit, .wc-block-components-button--contained');
                     if (proceedButton.length) {
-                        proceedButton.after('<div class="cko-google-pay-cart-button"><h3>Express Checkout</h3><div id="cko-google-pay-button-wrapper-cart" style="display: block;"></div></div>');
-                    } else {
-                        // Another fallback: inject before cart totals
-                        const cartTotals = jQuery('.wc-block-cart__totals');
-                        if (cartTotals.length) {
-                            cartTotals.before('<div class="cko-google-pay-cart-button"><h3>Express Checkout</h3><div id="cko-google-pay-button-wrapper-cart" style="display: block;"></div></div>');
-                        } else {
-                            // Last fallback: inject at the end of cart block
-                            const cartBlock = jQuery('.wc-block-cart');
-                            if (cartBlock.length) {
-                                cartBlock.append('<div class="cko-google-pay-cart-button"><h3>Express Checkout</h3><div id="cko-google-pay-button-wrapper-cart" style="display: block;"></div></div>');
-                            }
-                        }
+                        proceedButton.before(container);
+                        return buttons;
+                    }
+
+                    const cartTotals = jQuery('.wc-block-cart__totals');
+                    if (cartTotals.length) {
+                        cartTotals.before(container);
+                        return buttons;
+                    }
+
+                    const cartBlock = jQuery('.wc-block-cart');
+                    if (cartBlock.length) {
+                        cartBlock.append(container);
+                        return buttons;
                     }
                 }
-            } else if (isClassicCart && !wrapperExists) {
-                // For classic cart, try to inject if wrapper doesn't exist
-                cko_google_pay_vars.debug && console.log('[Google Pay Express] Injecting button wrapper for classic cart');
-                const proceedToCheckout = jQuery('.wc-proceed-to-checkout');
-                if (proceedToCheckout.length) {
-                    proceedToCheckout.before('<div class="cko-google-pay-cart-button"><h3>Express Checkout</h3><div id="cko-google-pay-button-wrapper-cart" style="display: block;"></div></div>');
-                } else {
-                    // Fallback: inject before cart totals
+
+                if (isClassicCart) {
+                    const proceedToCheckout = jQuery('.wc-proceed-to-checkout');
+                    if (proceedToCheckout.length) {
+                        proceedToCheckout.before(container);
+                        return buttons;
+                    }
+
                     const cartTotals = jQuery('.cart_totals');
                     if (cartTotals.length) {
-                        cartTotals.before('<div class="cko-google-pay-cart-button"><h3>Express Checkout</h3><div id="cko-google-pay-button-wrapper-cart" style="display: block;"></div></div>');
+                        cartTotals.before(container);
+                        return buttons;
                     }
+                }
+
+                return buttons;
+            };
+
+            if ((isBlocksCart || isClassicCart) && !wrapperExists) {
+                cko_google_pay_vars.debug && console.log('[Google Pay Express] Injecting button wrapper for cart');
+                const buttonsContainer = getOrCreateCartButtonsContainer();
+                if (buttonsContainer && buttonsContainer.length && !buttonsContainer.find('#cko-google-pay-button-wrapper-cart').length) {
+                    buttonsContainer.append('<div class="cko-google-pay-cart-button"><div id="cko-google-pay-button-wrapper-cart"></div></div>');
                 }
             }
             

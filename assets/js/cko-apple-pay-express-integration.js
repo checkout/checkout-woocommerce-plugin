@@ -477,38 +477,63 @@ jQuery( function ( $ ) {
             const isBlocksCart = jQuery('.wc-block-cart').length > 0;
             const isClassicCart = jQuery('.woocommerce-cart').length > 0 && !isBlocksCart;
             const wrapperExists = jQuery('#cko-apple-pay-button-wrapper-cart').length > 0;
-            
-            if (isBlocksCart && !wrapperExists) {
-                const paymentOptions = jQuery('.cko-express-checkout-buttons, .wc-block-cart__payment-options');
-                if (paymentOptions.length) {
-                    if (!paymentOptions.find('#cko-apple-pay-button-wrapper-cart').length) {
-                        paymentOptions.append('<div id="cko-apple-pay-button-wrapper-cart" style="display: block;"></div>');
+
+            const getOrCreateCartButtonsContainer = function() {
+                const existingButtons = jQuery('.cko-express-checkout-container .cko-express-checkout-buttons').first();
+                if (existingButtons.length) {
+                    return existingButtons;
+                }
+
+                const container = jQuery('<div id="cko-express-checkout-cart-container" class="cko-express-checkout-container"><div class="cko-express-checkout-buttons"></div></div>');
+                const buttons = container.find('.cko-express-checkout-buttons');
+
+                if (isBlocksCart) {
+                    const paymentOptions = jQuery('.wc-block-cart__payment-options');
+                    if (paymentOptions.length) {
+                        paymentOptions.append(container);
+                        return buttons;
                     }
-                } else {
+
                     const proceedButton = jQuery('.wc-block-cart__submit, .wc-block-components-button--contained');
                     if (proceedButton.length) {
-                        proceedButton.after('<div id="cko-apple-pay-button-wrapper-cart" style="display: block;"></div>');
-                    } else {
-                        const cartTotals = jQuery('.wc-block-cart__totals');
-                        if (cartTotals.length) {
-                            cartTotals.before('<div id="cko-apple-pay-button-wrapper-cart" style="display: block;"></div>');
-                        } else {
-                            const cartBlock = jQuery('.wc-block-cart');
-                            if (cartBlock.length) {
-                                cartBlock.append('<div id="cko-apple-pay-button-wrapper-cart" style="display: block;"></div>');
-                            }
-                        }
+                        proceedButton.before(container);
+                        return buttons;
+                    }
+
+                    const cartTotals = jQuery('.wc-block-cart__totals');
+                    if (cartTotals.length) {
+                        cartTotals.before(container);
+                        return buttons;
+                    }
+
+                    const cartBlock = jQuery('.wc-block-cart');
+                    if (cartBlock.length) {
+                        cartBlock.append(container);
+                        return buttons;
                     }
                 }
-            } else if (isClassicCart && !wrapperExists) {
-                const proceedToCheckout = jQuery('.cko-express-checkout-buttons, .wc-proceed-to-checkout');
-                if (proceedToCheckout.length) {
-                    proceedToCheckout.append('<div id="cko-apple-pay-button-wrapper-cart" style="display: block;"></div>');
-                } else {
+
+                if (isClassicCart) {
+                    const proceedToCheckout = jQuery('.wc-proceed-to-checkout');
+                    if (proceedToCheckout.length) {
+                        proceedToCheckout.before(container);
+                        return buttons;
+                    }
+
                     const cartTotals = jQuery('.cart_totals');
                     if (cartTotals.length) {
-                        cartTotals.before('<div id="cko-apple-pay-button-wrapper-cart" style="display: block;"></div>');
+                        cartTotals.before(container);
+                        return buttons;
                     }
+                }
+
+                return buttons;
+            };
+
+            if ((isBlocksCart || isClassicCart) && !wrapperExists) {
+                const buttonsContainer = getOrCreateCartButtonsContainer();
+                if (buttonsContainer && buttonsContainer.length && !buttonsContainer.find('#cko-apple-pay-button-wrapper-cart').length) {
+                    buttonsContainer.append('<div id="cko-apple-pay-button-wrapper-cart"></div>');
                 }
             }
             

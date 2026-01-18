@@ -413,45 +413,62 @@ const cko_express_create_order_id = async function () {
                 jQuery('#cko-paypal-button-wrapper-cart').empty();
             }
             
-            // For Blocks cart, inject the button wrapper if it doesn't exist
-            if (isBlocksCart && !wrapperExists) {
-                const paymentOptions = jQuery('.wc-block-cart__payment-options');
-                if (paymentOptions.length) {
-                    // Check if button wrapper already exists in payment options
-                    if (!paymentOptions.find('#cko-paypal-button-wrapper-cart').length) {
-                        // Append instead of replacing to preserve Google Pay button
-                        paymentOptions.append('<div class="cko-paypal-cart-button"><h3>Express Checkout</h3><div id="cko-paypal-button-wrapper-cart"></div></div>');
+            const getOrCreateCartButtonsContainer = function() {
+                const existingButtons = jQuery('.cko-express-checkout-container .cko-express-checkout-buttons').first();
+                if (existingButtons.length) {
+                    return existingButtons;
+                }
+
+                const container = jQuery('<div id="cko-express-checkout-cart-container" class="cko-express-checkout-container"><div class="cko-express-checkout-buttons"></div></div>');
+                const buttons = container.find('.cko-express-checkout-buttons');
+
+                if (isBlocksCart) {
+                    const paymentOptions = jQuery('.wc-block-cart__payment-options');
+                    if (paymentOptions.length) {
+                        paymentOptions.append(container);
+                        return buttons;
                     }
-                } else {
-                    // Fallback: inject after proceed to checkout button
+
                     const proceedButton = jQuery('.wc-block-cart__submit, .wc-block-components-button--contained');
                     if (proceedButton.length) {
-                        proceedButton.after('<div class="cko-paypal-cart-button"><h3>Express Checkout</h3><div id="cko-paypal-button-wrapper-cart"></div></div>');
-                    } else {
-                        // Another fallback: inject before cart totals
-                        const cartTotals = jQuery('.wc-block-cart__totals');
-                        if (cartTotals.length) {
-                            cartTotals.before('<div class="cko-paypal-cart-button"><h3>Express Checkout</h3><div id="cko-paypal-button-wrapper-cart"></div></div>');
-                        } else {
-                            // Last fallback: inject at the end of cart block
-                            const cartBlock = jQuery('.wc-block-cart');
-                            if (cartBlock.length) {
-                                cartBlock.append('<div class="cko-paypal-cart-button"><h3>Express Checkout</h3><div id="cko-paypal-button-wrapper-cart"></div></div>');
-                            }
-                        }
+                        proceedButton.before(container);
+                        return buttons;
+                    }
+
+                    const cartTotals = jQuery('.wc-block-cart__totals');
+                    if (cartTotals.length) {
+                        cartTotals.before(container);
+                        return buttons;
+                    }
+
+                    const cartBlock = jQuery('.wc-block-cart');
+                    if (cartBlock.length) {
+                        cartBlock.append(container);
+                        return buttons;
                     }
                 }
-            } else if (isClassicCart && !wrapperExists) {
-                // For classic cart, try to inject if wrapper doesn't exist
-                const proceedToCheckout = jQuery('.wc-proceed-to-checkout');
-                if (proceedToCheckout.length) {
-                    proceedToCheckout.before('<div class="cko-paypal-cart-button"><h3>Express Checkout</h3><div id="cko-paypal-button-wrapper-cart"></div></div>');
-                } else {
-                    // Fallback: inject before cart totals
+
+                if (isClassicCart) {
+                    const proceedToCheckout = jQuery('.wc-proceed-to-checkout');
+                    if (proceedToCheckout.length) {
+                        proceedToCheckout.before(container);
+                        return buttons;
+                    }
+
                     const cartTotals = jQuery('.cart_totals');
                     if (cartTotals.length) {
-                        cartTotals.before('<div class="cko-paypal-cart-button"><h3>Express Checkout</h3><div id="cko-paypal-button-wrapper-cart"></div></div>');
+                        cartTotals.before(container);
+                        return buttons;
                     }
+                }
+
+                return buttons;
+            };
+
+            if ((isBlocksCart || isClassicCart) && !wrapperExists) {
+                const buttonsContainer = getOrCreateCartButtonsContainer();
+                if (buttonsContainer && buttonsContainer.length && !buttonsContainer.find('#cko-paypal-button-wrapper-cart').length) {
+                    buttonsContainer.append('<div class="cko-paypal-cart-button"><div id="cko-paypal-button-wrapper-cart"></div></div>');
                 }
             }
             

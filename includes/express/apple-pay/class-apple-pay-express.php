@@ -325,44 +325,7 @@ class CKO_Apple_Pay_Express {
 			WC_Checkoutcom_Utility::express_checkout_container_rendered( true );
 			$container_rendered = true;
 			?>
-			<style>
-				.cko-express-checkout-container {
-					margin: 15px 0;
-					text-align: center;
-					padding: 15px;
-					background: #f8f9fa;
-					border: 1px solid #e9ecef;
-					border-radius: 5px;
-				}
-				.cko-express-checkout-container h3 {
-					margin: 0 0 15px 0;
-					font-size: 16px;
-					color: #333;
-				}
-				.cko-express-checkout-buttons {
-					display: flex;
-					flex-direction: column;
-					gap: 10px;
-					align-items: center;
-					justify-content: center;
-				}
-				.cko-express-checkout-buttons > div {
-					width: 100%;
-					max-width: 300px;
-				}
-				.cko-express-checkout-buttons #cko-apple-pay-button-wrapper,
-				.cko-express-checkout-buttons #cko-google-pay-button-wrapper,
-				.cko-express-checkout-buttons #cko-paypal-button-wrapper {
-					display: block !important;
-				}
-				.cko-express-checkout-buttons .cko-disabled {
-					cursor: not-allowed;
-					-webkit-filter: grayscale(100%);
-					filter: grayscale(100%);
-				}
-			</style>
 			<div class="cko-express-checkout-container">
-				<h3><?php _e( 'Express Checkout', 'checkout-com-unified-payments-api' ); ?></h3>
 				<div class="cko-express-checkout-buttons">
 					<div id="cko-apple-pay-button-wrapper"></div>
 					<?php if ( $google_pay_express_enabled && $google_pay_available && $google_pay_show_on_product ) : ?>
@@ -378,33 +341,7 @@ class CKO_Apple_Pay_Express {
 			// Only Apple Pay is enabled, render Apple Pay's own container (only if unified container wasn't already rendered)
 			$container_rendered = true;
 			?>
-			<style>
-				.cko-apple-pay-product-button {
-					margin: 15px 0;
-					text-align: center;
-					padding: 15px;
-					background: #f8f9fa;
-					border: 1px solid #e9ecef;
-					border-radius: 5px;
-				}
-				.cko-apple-pay-product-button .cko-disabled {
-					cursor: not-allowed;
-					-webkit-filter: grayscale(100%);
-					filter: grayscale(100%);
-				}
-				.cko-apple-pay-product-button #cko-apple-pay-button-wrapper {
-					display: block;
-					max-width: 300px;
-					margin: 0 auto;
-				}
-				.cko-apple-pay-product-button h3 {
-					margin: 0 0 10px 0;
-					font-size: 16px;
-					color: #333;
-				}
-			</style>
 			<div class="cko-apple-pay-product-button">
-				<h3><?php _e( 'Express Checkout', 'checkout-com-unified-payments-api' ); ?></h3>
 				<div id="cko-apple-pay-button-wrapper" style="display: block;"></div>
 			</div>
 			<?php
@@ -565,48 +502,11 @@ class CKO_Apple_Pay_Express {
 			WC_Checkoutcom_Utility::express_checkout_container_rendered( true );
 			$container_rendered = true;
 			?>
-			<style>
-				.cko-express-checkout-container {
-					margin: 15px 0;
-					text-align: center;
-					padding: 15px;
-					background: #f8f9fa;
-					border: 1px solid #e9ecef;
-					border-radius: 5px;
-				}
-				.cko-express-checkout-container h3 {
-					margin: 0 0 15px 0;
-					font-size: 16px;
-					color: #333;
-				}
-				.cko-express-checkout-buttons {
-					display: flex;
-					flex-direction: column;
-					gap: 10px;
-					align-items: center;
-					justify-content: center;
-				}
-				.cko-express-checkout-buttons > div {
-					width: 100%;
-					max-width: 300px;
-				}
-				.cko-express-checkout-buttons #cko-apple-pay-button-wrapper-cart,
-				.cko-express-checkout-buttons #cko-google-pay-button-wrapper-cart,
-				.cko-express-checkout-buttons #cko-paypal-button-wrapper-cart {
-					display: block !important;
-				}
-				.cko-express-checkout-buttons .cko-disabled {
-					cursor: not-allowed;
-					-webkit-filter: grayscale(100%);
-					filter: grayscale(100%);
-				}
-			</style>
 			<div class="cko-express-checkout-container">
-				<h3><?php _e( 'Express Checkout', 'checkout-com-unified-payments-api' ); ?></h3>
 				<div class="cko-express-checkout-buttons">
 					<div id="cko-apple-pay-button-wrapper-cart"></div>
 					<?php if ( $google_pay_express_enabled && $google_pay_available && $google_pay_show_on_cart ) : ?>
-						<div id="cko-google-pay-button-wrapper-cart" style="display: block;"></div>
+						<div id="cko-google-pay-button-wrapper-cart"></div>
 					<?php endif; ?>
 					<?php if ( $paypal_express_enabled && $paypal_available && $paypal_show_on_cart ) : ?>
 						<div id="cko-paypal-button-wrapper-cart"></div>
@@ -618,34 +518,8 @@ class CKO_Apple_Pay_Express {
 			// Only Apple Pay is enabled, render Apple Pay's own container (only if unified container wasn't already rendered)
 			$container_rendered = true;
 			?>
-			<style>
-				.cko-apple-pay-cart-button {
-					margin: 15px 0;
-					text-align: center;
-					padding: 15px;
-					background: #f8f9fa;
-					border: 1px solid #e9ecef;
-					border-radius: 5px;
-				}
-				.cko-apple-pay-cart-button .cko-disabled {
-					cursor: not-allowed;
-					-webkit-filter: grayscale(100%);
-					filter: grayscale(100%);
-				}
-				.cko-apple-pay-cart-button #cko-apple-pay-button-wrapper-cart {
-					display: block;
-					max-width: 300px;
-					margin: 0 auto;
-				}
-				.cko-apple-pay-cart-button h3 {
-					margin: 0 0 10px 0;
-					font-size: 16px;
-					color: #333;
-				}
-			</style>
 			<div class="cko-apple-pay-cart-button">
-				<h3><?php _e( 'Express Checkout', 'checkout-com-unified-payments-api' ); ?></h3>
-				<div id="cko-apple-pay-button-wrapper-cart" style="display: block;"></div>
+				<div id="cko-apple-pay-button-wrapper-cart"></div>
 			</div>
 			<?php
 		} else {
@@ -657,7 +531,6 @@ class CKO_Apple_Pay_Express {
 				if (buttonsContainer && !document.getElementById('cko-apple-pay-button-wrapper-cart')) {
 					var appleWrapper = document.createElement('div');
 					appleWrapper.id = 'cko-apple-pay-button-wrapper-cart';
-					appleWrapper.style.display = 'block';
 					// Insert at the beginning to maintain Apple Pay -> Google Pay -> PayPal order
 					buttonsContainer.insertBefore(appleWrapper, buttonsContainer.firstChild);
 				}
