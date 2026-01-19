@@ -38,8 +38,94 @@
 		 * @returns {string|null} Field value or null if not found
 		 */
 		getCheckoutFieldValue: function(fieldId) {
-			const el = document.getElementById(fieldId);
-			return el && el.value ? el.value.trim() : null;
+			const isUsableField = function(el) {
+				if (!el) {
+					return false;
+				}
+				if (el.disabled || el.hasAttribute('disabled')) {
+					return false;
+				}
+				if (el.offsetParent === null) {
+					return false;
+				}
+				if (el.style && el.style.display === 'none') {
+					return false;
+				}
+				return true;
+			};
+
+			const getValueFromElement = function(el) {
+				if (!el || el.value == null) {
+					return null;
+				}
+				const value = String(el.value).trim();
+				return value ? value : null;
+			};
+
+			const getById = function(id) {
+				const el = document.getElementById(id);
+				if (el && isUsableField(el)) {
+					return getValueFromElement(el);
+				}
+				return null;
+			};
+
+			const getByName = function(name) {
+				const el = document.querySelector(`[name="${name}"]`);
+				if (el && isUsableField(el)) {
+					return getValueFromElement(el);
+				}
+				return null;
+			};
+
+			const getByDataKey = function(key) {
+				const el = document.querySelector(`[data-key="${key}"] input, [data-key="${key}"] select, [data-key="${key}"] textarea`);
+				if (el && isUsableField(el)) {
+					return getValueFromElement(el);
+				}
+				return null;
+			};
+
+			let value = getById(fieldId);
+			if (value) {
+				return value;
+			}
+
+			// Fallback: try name attribute
+			value = getByName(fieldId);
+			if (value) {
+				return value;
+			}
+
+			// Fallback: try array-style name
+			value = getByName(fieldId + '[]');
+			if (value) {
+				return value;
+			}
+
+			// Fallback: check common checkout plugin wrappers (data-key)
+			value = getByDataKey(fieldId);
+			if (value) {
+				return value;
+			}
+
+			// Fallback: some one-page checkouts use shipping fields in place of billing
+			if (fieldId.indexOf('billing_') === 0) {
+				const shippingFieldId = fieldId.replace('billing_', 'shipping_');
+				value = getById(shippingFieldId) || getByName(shippingFieldId) || getByDataKey(shippingFieldId);
+				if (value) {
+					return value;
+				}
+			}
+
+			// Final fallback: use stored values from flow field tracking
+			const stored = window.ckoFlowFieldValues?.[fieldId];
+			if (stored != null) {
+				const storedValue = String(stored).trim();
+				return storedValue ? storedValue : null;
+			}
+
+			return null;
 		},
 		
 		/**
@@ -149,12 +235,24 @@
 			const postcode = this.getCheckoutFieldValue("billing_postcode");
 			
 			if (!address1 || !city || !country) {
+				if (typeof window.ckoLogger !== 'undefined') {
+					window.ckoLogger.debug('hasCompleteBillingAddress: Missing required billing fields', {
+						address1: address1 ? 'SET' : 'EMPTY',
+						city: city ? 'SET' : 'EMPTY',
+						country: country ? 'SET' : 'EMPTY'
+					});
+				}
 				return false;
 			}
 			
 			// Check if postcode is required for country
 			const postcodeRequired = this.isPostcodeRequiredForCountry(country);
 			if (postcodeRequired && !postcode) {
+				if (typeof window.ckoLogger !== 'undefined') {
+					window.ckoLogger.debug('hasCompleteBillingAddress: Postcode required but missing', {
+						country: country
+					});
+				}
 				return false;
 			}
 			
@@ -245,11 +343,19 @@
 			// Validate email format
 			const email = this.getCheckoutFieldValue("billing_email");
 			if (!email || !this.isValidEmail(email)) {
+				if (typeof window.ckoLogger !== 'undefined') {
+					window.ckoLogger.debug('requiredFieldsFilledAndValid: Email missing or invalid', {
+						email: email ? 'SET' : 'EMPTY'
+					});
+				}
 				return false;
 			}
 			
 			// Check billing address is complete
 			if (!this.hasCompleteBillingAddress()) {
+				if (typeof window.ckoLogger !== 'undefined') {
+					window.ckoLogger.debug('requiredFieldsFilledAndValid: Billing address incomplete');
+				}
 				return false;
 			}
 			
@@ -427,9 +533,8 @@
 			const failedFields = [];
 			const result = filteredFieldIds.every((id) => {
 				const field = document.getElementById(id);
-				const fieldExists = !!field;
-				const fieldValue = field?.value || '';
-				const fieldValueTrimmed = fieldValue.trim();
+				const fieldValueTrimmed = this.getCheckoutFieldValue(id) || '';
+				const fieldExists = !!field || fieldValueTrimmed !== '';
 				const isEmpty = fieldValueTrimmed === "";
 				const isValid = fieldExists && !isEmpty;
 				

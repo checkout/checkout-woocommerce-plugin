@@ -45,6 +45,25 @@
 			});
 		});
 
+	// Immediate check for postcode changes (some checkout UIs don't fire all events consistently)
+	const immediateSelectors = [
+		'#billing_postcode',
+		'[name="billing_postcode"]',
+		'[data-key="billing_postcode"] input',
+		'[data-key="billing_postcode"] select',
+		'[data-key="billing_postcode"] textarea',
+		'#shipping_postcode',
+		'[name="shipping_postcode"]',
+		'[data-key="shipping_postcode"] input',
+		'[data-key="shipping_postcode"] select',
+		'[data-key="shipping_postcode"] textarea'
+	];
+	jQuery(document).on('input change', immediateSelectors.join(', '), function () {
+		if (typeof checkRequiredFieldsStatus === 'function') {
+			checkRequiredFieldsStatus();
+		}
+	});
+
 		// Add a direct handler for billing country changes to update cko_flow_vars
 		// This ensures the flow component is updated with the correct country for APMs
 		jQuery('#billing_country').on('change', function () {

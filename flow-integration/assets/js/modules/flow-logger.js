@@ -11,6 +11,14 @@
 
 (function() {
 	'use strict';
+
+	const isDebugEnabled = function() {
+		const value = (typeof cko_flow_vars !== 'undefined') ? cko_flow_vars.debug_logging : undefined;
+		if (value === true || value === 1 || value === '1' || value === 'yes' || value === 'true') {
+			return true;
+		}
+		return window.flowDebugLogging === true;
+	};
 	
 	/**
 	 * Centralized logging utility for Checkout.com Flow integration.
@@ -23,7 +31,9 @@
 		 * Whether debug logging is enabled
 		 * @type {boolean}
 		 */
-		debugEnabled: (typeof cko_flow_vars !== 'undefined' && cko_flow_vars.debug_logging) || false,
+		get debugEnabled() {
+			return isDebugEnabled();
+		},
 		
 		/**
 		 * Log error message (always visible in production)
@@ -85,7 +95,7 @@
 		 * @param {*} [data] - Optional data object
 		 */
 		debug: function(message, data) {
-			if (this.debugEnabled) {
+			if (isDebugEnabled()) {
 				console.log('[FLOW DEBUG] ' + message, data !== undefined ? data : '');
 			}
 		},
@@ -96,7 +106,7 @@
 		 * @param {*} [data] - Optional data object
 		 */
 		performance: function(message, data) {
-			if (this.debugEnabled) {
+			if (isDebugEnabled()) {
 				console.log('[FLOW PERFORMANCE] ' + message, data !== undefined ? data : '');
 			}
 		}

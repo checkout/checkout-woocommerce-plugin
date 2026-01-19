@@ -1140,9 +1140,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 						// Reset flags
 						window.flowSavedCardSelected = false;
 						window.flowUserInteracted = false;
-							window.flowUserInteracted = false;
-							flowLog('Unchecked all saved cards and selected new payment method');
-						}
+						flowLog('Unchecked all saved cards and selected new payment method');
 							
 							// CRITICAL: After moving cards, ensure visibility rules are applied
 							// Remove any inline display styles that might have been set during the move
@@ -1549,9 +1547,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 						// Reset flags
 						window.flowSavedCardSelected = false;
 						window.flowUserInteracted = false;
-							window.flowUserInteracted = false;
-							flowLog('Unchecked all saved cards and selected new payment method');
-						}
+						flowLog('Unchecked all saved cards and selected new payment method');
 							
 							// CRITICAL: After moving cards, ensure visibility rules are applied
 							// Remove any inline display styles that might have been set during the move

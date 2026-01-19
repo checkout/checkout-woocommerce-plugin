@@ -10,8 +10,17 @@
  */
 if (typeof window.ckoLogger === 'undefined') {
 	console.warn('[FLOW] Logger module not loaded - using fallback logger');
+	const isDebugEnabled = function() {
+		const value = (typeof cko_flow_vars !== 'undefined') ? cko_flow_vars.debug_logging : undefined;
+		if (value === true || value === 1 || value === '1' || value === 'yes' || value === 'true') {
+			return true;
+		}
+		return window.flowDebugLogging === true;
+	};
 	window.ckoLogger = {
-		debugEnabled: (typeof cko_flow_vars !== 'undefined' && cko_flow_vars.debug_logging) || false,
+		get debugEnabled() {
+			return isDebugEnabled();
+		},
 		error: function(m, d) { console.error('[FLOW ERROR] ' + m, d !== undefined ? d : ''); },
 		warn: function(m, d) { console.warn('[FLOW WARNING] ' + m, d !== undefined ? d : ''); },
 		webhook: function(m, d) { console.log('[FLOW WEBHOOK] ' + m, d !== undefined ? d : ''); },
@@ -19,12 +28,12 @@ if (typeof window.ckoLogger === 'undefined') {
 		payment: function(m, d) { console.log('[FLOW PAYMENT] ' + m, d !== undefined ? d : ''); },
 		version: function(v) { console.log('🚀 Checkout.com Flow v' + v); },
 		debug: function(m, d) { 
-			if (this.debugEnabled) {
+			if (isDebugEnabled()) {
 				console.log('[FLOW DEBUG] ' + m, d !== undefined ? d : '');
 			}
 		},
 		performance: function(m, d) { 
-			if (this.debugEnabled) {
+			if (isDebugEnabled()) {
 				console.log('[FLOW PERFORMANCE] ' + m, d !== undefined ? d : '');
 			}
 		}
@@ -2654,12 +2663,49 @@ function reloadFlowComponent() {
 	}
 }
 
+function logCheckoutFieldSnapshot(context) {
+	if (typeof ckoLogger === 'undefined' || !ckoLogger.debugEnabled) {
+		return;
+	}
+
+	const getValue = function(fieldId) {
+		if (typeof window.getCheckoutFieldValue === 'function') {
+			return window.getCheckoutFieldValue(fieldId);
+		}
+		const field = document.getElementById(fieldId);
+		if (!field) {
+			return null;
+		}
+		return (field.value || '').trim();
+	};
+
+	const country = getValue('billing_country');
+	const postcode = getValue('billing_postcode');
+	const state = getValue('billing_state');
+	const city = getValue('billing_city');
+	const address1 = getValue('billing_address_1');
+	const email = getValue('billing_email');
+	const paymentMethod = (document.querySelector('input[name="payment_method"]:checked') || {}).value || null;
+
+	ckoLogger.debug(`[FLOW] ${context} - checkout field snapshot`, {
+		paymentMethod: paymentMethod,
+		country: country || null,
+		postcodeLength: postcode ? postcode.length : 0,
+		hasPostcode: !!postcode,
+		state: state || null,
+		hasCity: !!city,
+		hasAddress1: !!address1,
+		hasEmail: !!email
+	});
+}
+
 /**
  * Check required fields status and handle Flow accordingly
  */
 function checkRequiredFieldsStatus() {
 	const wereFilled = FlowState.get('fieldsWereFilled') || false;
 	const areFilled = requiredFieldsFilledAndValid();
+	logCheckoutFieldSnapshot('checkRequiredFieldsStatus');
 	
 	ckoLogger.debug('checkRequiredFieldsStatus:', {
 		wereFilled: wereFilled,
@@ -3142,7 +3188,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	normalizeFlowPaymentLabelText();
 	jQuery(document.body).on('updated_checkout', function() {
+		logCheckoutFieldSnapshot('updated_checkout');
 		normalizeFlowPaymentLabelText();
+		checkRequiredFieldsStatus();
 	});
 	
 	// Keep only last 10 timestamps
@@ -3159,7 +3207,7 @@ document.addEventListener("DOMContentLoaded", function () {
 	}
 	
 	if (debugEnabled) {
-		ckoLogger.debug(`Page load #${window.ckoPageLoadCount} at ${new Date().toLocaleTimeString()}`);
+	ckoLogger.debug(`Page load #${window.ckoPageLoadCount} at ${new Date().toLocaleTimeString()}`);
 	}
 	
 	// CRITICAL: Check for 3DS return FIRST - before any other checks
@@ -3764,7 +3812,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			ckoLogger.debug('[CREATE ORDER] Response.success:', response?.success);
 			ckoLogger.debug('[CREATE ORDER] Response.data:', response?.data);
 			ckoLogger.debug('[CREATE ORDER] Response.data.order_id:', response?.data?.order_id);
-
+			
 			// Normalize WooCommerce public checkout AJAX response when enabled (result/redirect format).
 			let normalizedResponse = response;
 			if (response && typeof response === 'object' && response.result) {
@@ -4123,34 +4171,34 @@ document.addEventListener("DOMContentLoaded", function () {
 				// Use WooCommerce's full checkout processing (subscriptions rely on it).
 				// For Flow (new card), pre-create the order via WC checkout before submitting payment.
 				ckoLogger.debug('[CHECKOUT] Using WooCommerce full checkout flow (pre-create order for Flow).');
-
-				// CRITICAL: Ensure payment session ID is added to form before submission
-				// This is a fallback in case form wasn't available when payment session was created
-				if (window.ckoAddPaymentSessionIdField) {
-					const added = window.ckoAddPaymentSessionIdField();
-					if (added) {
-						ckoLogger.debug('[SAVE PAYMENT SESSION ID] Hidden field added on Place Order click (fallback)');
-					}
-				}
-
-				// Persist save card checkbox before form submission
-				persistSaveCardCheckbox();
-
-				// Show flow container
-				document.getElementById("flow-container").style.display = "block";
-
-				// Place order for FLOW.
-				if (ckoFlow.flowComponent) {
-					if( savedCardSelected || savedCardEnabled ) {
-						ckoLogger.debug('[SAVED CARD] Saved card selected - submitting checkout form directly (bypassing Flow component)');
-						// CRITICAL: Ensure payment session ID is in form before submission
-						if (window.ckoAddPaymentSessionIdField) {
-							window.ckoAddPaymentSessionIdField();
+				
+					// CRITICAL: Ensure payment session ID is added to form before submission
+					// This is a fallback in case form wasn't available when payment session was created
+					if (window.ckoAddPaymentSessionIdField) {
+						const added = window.ckoAddPaymentSessionIdField();
+						if (added) {
+							ckoLogger.debug('[SAVE PAYMENT SESSION ID] Hidden field added on Place Order click (fallback)');
 						}
-						// Submit directly - Flow component NOT used for saved cards
-						// WooCommerce will call process_payment() which makes direct API call
-						form.submit();
-					} else {
+					}
+					
+					// Persist save card checkbox before form submission
+					persistSaveCardCheckbox();
+
+					// Show flow container
+					document.getElementById("flow-container").style.display = "block";
+
+					// Place order for FLOW.
+					if (ckoFlow.flowComponent) {
+						if( savedCardSelected || savedCardEnabled ) {
+							ckoLogger.debug('[SAVED CARD] Saved card selected - submitting checkout form directly (bypassing Flow component)');
+							// CRITICAL: Ensure payment session ID is in form before submission
+							if (window.ckoAddPaymentSessionIdField) {
+								window.ckoAddPaymentSessionIdField();
+							}
+							// Submit directly - Flow component NOT used for saved cards
+							// WooCommerce will call process_payment() which makes direct API call
+							form.submit();
+						} else {
 						// Pre-create order via WooCommerce checkout (required for subscriptions)
 						ckoLogger.debug('[CREATE ORDER] Creating order via WooCommerce checkout before Flow payment...');
 						(async function() {
@@ -4166,7 +4214,7 @@ document.addEventListener("DOMContentLoaded", function () {
 							if (window.ckoAddPaymentSessionIdField) {
 								window.ckoAddPaymentSessionIdField();
 							}
-
+							
 							// Double-check component validity before submitting (defense-in-depth)
 							if (ckoFlow.flowComponent && typeof ckoFlow.flowComponent.isValid === 'function') {
 								const isValid = ckoFlow.flowComponent.isValid();
@@ -4198,16 +4246,16 @@ document.addEventListener("DOMContentLoaded", function () {
 								}
 							}
 						})();
-					}
-				} else {
+						}
+					} else {
 					ckoLogger.error('[CHECKOUT] Flow component not found - cannot process payment');
-					showError('Payment component not loaded. Please refresh the page and try again.');
-				}
+						showError('Payment component not loaded. Please refresh the page and try again.');
+					}
 
 				// Place order for saved card when Flow component isn't available.
-				if (!ckoFlow.flowComponent) {
-					form.submit();
-				}
+					if (!ckoFlow.flowComponent) {
+						form.submit();
+					}
 			} else {
 				// console.log('[CURRENT VERSION] Flow payment method not selected or not found');
 			}
