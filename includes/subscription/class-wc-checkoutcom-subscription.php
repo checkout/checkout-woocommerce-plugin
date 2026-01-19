@@ -24,6 +24,14 @@ class WC_Checkoutcom_Subscription {
 		$args              = [];
 		$subscriptions_arr = [];
 
+		// Clear parent-order flags copied onto renewal orders (prevents webhook short-circuit).
+		$renewal_order->delete_meta_data( 'cko_payment_authorized' );
+		$renewal_order->delete_meta_data( 'cko_payment_captured' );
+		$renewal_order->delete_meta_data( 'cko_payment_voided' );
+		$renewal_order->delete_meta_data( 'cko_payment_refunded' );
+		$renewal_order->save();
+		WC_Checkoutcom_Utility::logger( 'Subscription renewal: cleared payment flags on renewal order ID ' . $renewal_order->get_id() );
+
 		// Get subscription object from the order.
 		if ( wcs_order_contains_subscription( $renewal_order, 'renewal' ) ) {
 			$subscriptions_arr = wcs_get_subscriptions_for_order( $renewal_order, [ 'order_type' => 'renewal' ] );
