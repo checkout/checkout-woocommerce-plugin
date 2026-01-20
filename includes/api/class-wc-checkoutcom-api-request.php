@@ -258,6 +258,7 @@ class WC_Checkoutcom_Api_Request {
 			$payment_option = 'PayPal';
 
 			$method = new RequestPayPalSource();
+			$method->invoice_number = $order->get_id();
 
 		} elseif ( 'wc_checkout_com_flow' === $post_data['payment_method'] ) {
 			$payment_option = 'Flow';
