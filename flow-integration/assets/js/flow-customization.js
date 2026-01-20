@@ -64,13 +64,20 @@ if (expand_first_payment_method === "yes") {
 	expand_first_payment_method = false;
 }
 
+const cardholderNamePositionRaw =
+	cko_flow_customization_vars.flow_component_cardholder_name_position || "top";
+const cardholderNamePosition = ["top", "bottom", "hidden"].includes(
+	cardholderNamePositionRaw
+)
+	? cardholderNamePositionRaw
+	: "top";
+
 window.componentOptions = {
 	flow: {
 		expandFirstPaymentMethod: expand_first_payment_method,
 	},
 	card: {
-		displayCardholderName:
-			cko_flow_customization_vars.flow_component_cardholder_name_position,
+		displayCardholderName: cardholderNamePosition,
 	},
 };
 
@@ -82,7 +89,7 @@ let show_card_holder_name =
 window.saved_payment = cko_flow_customization_vars.flow_saved_payment;
 
 document.addEventListener("DOMContentLoaded", function () {
-	if (show_card_holder_name === "yes") {
+	if (show_card_holder_name === "yes" && cardholderNamePosition !== "hidden") {
 		// Function to set cardholder name
 		function setCardholderName() {
 			let family_name = "";
@@ -136,9 +143,10 @@ document.addEventListener("DOMContentLoaded", function () {
 			const cardholderName = `${given_name} ${family_name}`.trim();
 			
 			if (cardholderName) {
-				window.componentOptions.card.data = {
-					cardholderName: cardholderName,
-				};
+				if (!window.componentOptions.card.data) {
+					window.componentOptions.card.data = {};
+				}
+				window.componentOptions.card.data.cardholderName = cardholderName;
 			}
 		}
 		

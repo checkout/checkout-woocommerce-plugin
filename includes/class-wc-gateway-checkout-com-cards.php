@@ -448,6 +448,34 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 			}
 		} elseif ( 'card_settings' === $screen ) {
 			WC_Admin_Settings::save_fields( WC_Checkoutcom_Cards_Settings::cards_settings() );
+
+			// Fallback: ensure key card settings are persisted even if save_fields misses them.
+			$settings = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+			$manual_keys = array( 'flow_component_cardholder_name_position', 'flow_show_card_holder_name', 'flow_saved_payment' );
+			$manual_updated = false;
+			foreach ( $manual_keys as $manual_key ) {
+				$nested_value = $_POST['woocommerce_wc_checkout_com_cards_settings'][ $manual_key ] ?? null;
+				$direct_value = $_POST[ $manual_key ] ?? null;
+				$source_value = null;
+
+				if ( null !== $nested_value ) {
+					$source_value = $nested_value;
+				} elseif ( null !== $direct_value ) {
+					$source_value = $direct_value;
+				} elseif ( 'flow_show_card_holder_name' === $manual_key ) {
+					// Unchecked checkbox won't be posted; treat as "no".
+					$source_value = 'no';
+				}
+
+				if ( null !== $source_value ) {
+					$settings[ $manual_key ] = sanitize_text_field( $source_value );
+					$manual_updated = true;
+				}
+			}
+			if ( $manual_updated ) {
+				update_option( 'woocommerce_wc_checkout_com_cards_settings', $settings );
+			}
+
 		} elseif ( 'orders_settings' === $screen ) {
 			WC_Admin_Settings::save_fields( WC_Checkoutcom_Cards_Settings::order_settings() );
 		} elseif ( 'debug_settings' === $screen || ( 'advanced' === $screen && 'debug_settings' === $subtab ) ) {
