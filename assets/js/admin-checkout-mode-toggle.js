@@ -24,7 +24,6 @@
 			if (!checkoutModeField.length) {
 				// Try alternative selectors
 				const alt1 = $('select[id*="ckocom_checkout_mode"]');
-				const alt2 = $('select[id*="checkout_mode"]');
 				
 				if (alt1.length) {
 					this.initWithField(alt1);

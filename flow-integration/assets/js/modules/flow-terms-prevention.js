@@ -30,7 +30,6 @@
 		const $element = jQuery(element);
 		const id = (element.id || '').toLowerCase();
 		const name = (element.name || '').toLowerCase();
-		const className = (element.className || '').toLowerCase();
 		
 		// Check ID/name patterns
 		if (id.includes('terms') || id.includes('agree') || id.includes('policy') ||
@@ -60,7 +59,7 @@
 		}
 		
 		return false;
-	}
+	};
 	
 	/**
 	 * CRITICAL FIX: Prevent page reload when terms checkbox is clicked
