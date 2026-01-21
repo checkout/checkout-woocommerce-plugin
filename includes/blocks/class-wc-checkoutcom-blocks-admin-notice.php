@@ -79,9 +79,11 @@ class WC_Checkoutcom_Blocks_Admin_Notice {
      * Dismiss the notice.
      */
     public static function dismiss_notice() {
-        if ( ! wp_verify_nonce( $_POST['nonce'] ?? '', 'checkoutcom_dismiss_blocks_notice' ) ) {
-            wp_die( 'Security check failed' );
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_die( esc_html__( 'You do not have permission to perform this action.', 'checkout-com-unified-payments-api' ) );
         }
+
+        check_ajax_referer( 'checkoutcom_dismiss_blocks_notice', 'nonce' );
 
         update_option( 'checkoutcom_blocks_notice_dismissed', true );
         wp_die();

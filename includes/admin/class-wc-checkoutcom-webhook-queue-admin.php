@@ -30,8 +30,15 @@ class WC_Checkoutcom_Webhook_Queue_Admin {
 	 * The menu is kept for backward compatibility but the main access is via settings.
 	 */
 	public static function add_admin_menu() {
-		// Menu is now integrated into Checkout.com settings navigation
-		// This method is kept for backward compatibility but won't create a separate menu
+		// Register standalone page for backward compatibility and to allow action handlers to work
+		add_submenu_page(
+			null, // Hidden from menu (no parent)
+			__( 'Webhook Queue', 'checkout-com-unified-payments-api' ),
+			__( 'Webhook Queue', 'checkout-com-unified-payments-api' ),
+			'manage_woocommerce',
+			'checkout-com-webhook-queue',
+			array( __CLASS__, 'render_admin_page' )
+		);
 	}
 
 	/**
@@ -47,21 +54,47 @@ class WC_Checkoutcom_Webhook_Queue_Admin {
 		}
 
 		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_die( esc_html__( 'You do not have sufficient permissions to access this page.', 'checkout-com-unified-payments-api' ) );
 			return;
 		}
 
 		// Handle cleanup action
 		if ( isset( $_GET['action'] ) && 'cleanup' === $_GET['action'] ) {
-			check_admin_referer( 'cko_webhook_queue_cleanup' );
-			
-			if ( class_exists( 'WC_Checkout_Com_Webhook_Queue' ) ) {
-				WC_Checkout_Com_Webhook_Queue::cleanup_old_webhooks( 7 );
-				WC_Checkout_Com_Webhook_Queue::cleanup_old_unprocessed_webhooks( 7 );
-				
-				add_action( 'admin_notices', function() {
-					echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Old webhooks cleaned up successfully.', 'checkout-com-unified-payments-api' ) . '</p></div>';
-				} );
+			// Verify nonce
+			if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'cko_webhook_queue_cleanup' ) ) {
+				wp_die( esc_html__( 'Security check failed. Please try again.', 'checkout-com-unified-payments-api' ) );
+				return;
 			}
+			
+			if ( ! class_exists( 'WC_Checkout_Com_Webhook_Queue' ) ) {
+				wp_die( esc_html__( 'Webhook Queue class not found.', 'checkout-com-unified-payments-api' ) );
+				return;
+			}
+
+			// Perform cleanup
+			$processed_deleted = WC_Checkout_Com_Webhook_Queue::cleanup_old_webhooks( 7 );
+			$unprocessed_deleted = WC_Checkout_Com_Webhook_Queue::cleanup_old_unprocessed_webhooks( 7 );
+			
+			// Build redirect URL (remove action and nonce parameters)
+			if ( $is_standalone_page ) {
+				$redirect_url = admin_url( 'admin.php?page=checkout-com-webhook-queue' );
+			} else {
+				$redirect_url = admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards&screen=webhook_queue' );
+			}
+			
+			// Add success message to URL
+			$redirect_url = add_query_arg( 
+				array( 
+					'cko_cleanup' => 'success',
+					'processed' => $processed_deleted,
+					'unprocessed' => $unprocessed_deleted,
+				), 
+				$redirect_url 
+			);
+			
+			// Redirect to prevent resubmission
+			wp_safe_redirect( $redirect_url );
+			exit;
 		}
 	}
 
@@ -75,6 +108,25 @@ class WC_Checkoutcom_Webhook_Queue_Admin {
 			echo '<div class="wrap"><h1>' . esc_html__( 'Webhook Queue', 'checkout-com-unified-payments-api' ) . '</h1>';
 			echo '<div class="notice notice-error"><p>' . esc_html__( 'Webhook Queue class not found.', 'checkout-com-unified-payments-api' ) . '</p></div></div>';
 			return;
+		}
+
+		// Show success message after cleanup
+		if ( isset( $_GET['cko_cleanup'] ) && 'success' === $_GET['cko_cleanup'] ) {
+			$processed_deleted = isset( $_GET['processed'] ) ? absint( $_GET['processed'] ) : 0;
+			$unprocessed_deleted = isset( $_GET['unprocessed'] ) ? absint( $_GET['unprocessed'] ) : 0;
+			$total_deleted = $processed_deleted + $unprocessed_deleted;
+			
+			echo '<div class="notice notice-success is-dismissible"><p>';
+			if ( $total_deleted > 0 ) {
+				printf(
+					esc_html__( 'Old webhooks cleaned up successfully. Deleted %d processed webhook(s) and %d unprocessed webhook(s).', 'checkout-com-unified-payments-api' ),
+					$processed_deleted,
+					$unprocessed_deleted
+				);
+			} else {
+				echo esc_html__( 'Cleanup completed. No old webhooks found to delete.', 'checkout-com-unified-payments-api' );
+			}
+			echo '</p></div>';
 		}
 
 		$table_name = $wpdb->prefix . 'cko_pending_webhooks';

@@ -5,7 +5,7 @@
  * Description: Extends WooCommerce by Adding the Checkout.com Gateway.
  * Author: Checkout.com
  * Author URI: https://www.checkout.com/
- * Version: 5.0.0
+ * Version: 5.0.1
  * Requires at least: 5.0
  * Tested up to: 6.7.0
  * WC requires at least: 3.0
@@ -38,19 +38,41 @@ if ( ! defined( 'ABSPATH' ) ) {
 $autoloader_path = __DIR__ . '/vendor/autoload.php';
 if ( file_exists( $autoloader_path ) ) {
 	require_once $autoloader_path;
-	// Verify SDK classes are available
-	if ( ! class_exists( 'Checkout\CheckoutSdk' ) ) {
-		error_log( 'Checkout.com SDK classes not loaded after autoloader inclusion. Path: ' . $autoloader_path );
+	// Verify SDK classes are available (only log if WP_DEBUG is enabled)
+	if ( ! class_exists( 'Checkout\CheckoutSdk' ) && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+		error_log( 'Checkout.com SDK classes not loaded after autoloader inclusion. Path: ' . esc_html( $autoloader_path ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
 	}
-} else {
-	error_log( 'Checkout.com SDK autoloader not found at: ' . $autoloader_path );
+} elseif ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+	error_log( 'Checkout.com SDK autoloader not found at: ' . esc_html( $autoloader_path ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
 }
+
+// Load utility class early (needed for logging in early hooks)
+$utility_path = __DIR__ . '/includes/api/class-wc-checkoutcom-utility.php';
+if ( file_exists( $utility_path ) ) {
+	require_once $utility_path;
+}
+
 add_filter( 'woocommerce_checkout_registration_enabled', '__return_true' );
 
-// Debug: Log available payment gateways on checkout page
-// Also force Flow gateway to be available if it's enabled and checkout mode is 'flow'
-// Use priority 1 to run BEFORE other filters that might remove it, and also run during checkout processing
-add_filter( 'woocommerce_available_payment_gateways', function( $available_gateways ) {
+/**
+ * Handler for cleanup of old webhooks.
+ */
+function cko_cleanup_old_webhooks_handler() {
+	if ( class_exists( 'WC_Checkout_Com_Webhook_Queue' ) ) {
+		// Cleanup processed webhooks older than 7 days
+		WC_Checkout_Com_Webhook_Queue::cleanup_old_webhooks( 7 );
+		// Cleanup unprocessed webhooks older than 7 days (orphaned)
+		WC_Checkout_Com_Webhook_Queue::cleanup_old_unprocessed_webhooks( 7 );
+	}
+}
+
+/**
+ * Force Flow gateway to be available if checkout mode is 'flow'.
+ *
+ * @param array $available_gateways Available payment gateways.
+ * @return array Filtered available payment gateways.
+ */
+function cko_force_flow_gateway_available( $available_gateways ) {
 	// Process on checkout page, order-pay page, and during checkout processing (when POST data exists)
 	$is_checkout_context = is_checkout() || is_wc_endpoint_url( 'order-pay' ) || ( defined( 'DOING_AJAX' ) && DOING_AJAX ) || ( isset( $_POST['payment_method'] ) && 'wc_checkout_com_flow' === $_POST['payment_method'] );
 	
@@ -122,11 +144,16 @@ add_filter( 'woocommerce_available_payment_gateways', function( $available_gatew
 		}
 	}
 	return $available_gateways;
-}, 1 );
+}
+add_filter( 'woocommerce_available_payment_gateways', 'cko_force_flow_gateway_available', 1 );
 
-// Backup filter at priority 999 to ensure gateway is added AFTER WooCommerce's internal filtering
-// This catches cases where WooCommerce removes it between priority 1 and checkout processing
-add_filter( 'woocommerce_available_payment_gateways', function( $available_gateways ) {
+/**
+ * Backup filter to ensure Flow gateway is added AFTER WooCommerce's internal filtering.
+ *
+ * @param array $available_gateways Available payment gateways.
+ * @return array Filtered available payment gateways.
+ */
+function cko_backup_force_flow_gateway_available( $available_gateways ) {
 	// Only process if checkout mode is 'flow' and gateway is not already in list
 	$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 	$checkout_mode = isset( $checkout_setting['ckocom_checkout_mode'] ) ? $checkout_setting['ckocom_checkout_mode'] : 'classic';
@@ -146,10 +173,13 @@ add_filter( 'woocommerce_available_payment_gateways', function( $available_gatew
 	}
 	
 	return $available_gateways;
-}, 999 );
+}
+add_filter( 'woocommerce_available_payment_gateways', 'cko_backup_force_flow_gateway_available', 999 );
 
-// Add hook to log before checkout process starts
-add_action( 'woocommerce_before_checkout_process', function() {
+/**
+ * Log before checkout process starts for Flow payments.
+ */
+function cko_log_before_checkout_process() {
 	try {
 		if ( isset( $_POST['payment_method'] ) && 'wc_checkout_com_flow' === $_POST['payment_method'] ) {
 			WC_Checkoutcom_Utility::logger( '[FLOW SERVER] ========== BEFORE CHECKOUT PROCESS ==========' );
@@ -170,11 +200,13 @@ add_action( 'woocommerce_before_checkout_process', function() {
 		WC_Checkoutcom_Utility::logger( '[FLOW SERVER] ERROR in before_checkout_process hook: ' . $e->getMessage() );
 		WC_Checkoutcom_Utility::logger( '[FLOW SERVER] ERROR stack trace: ' . $e->getTraceAsString() );
 	}
-}, 1 );
+}
+add_action( 'woocommerce_before_checkout_process', 'cko_log_before_checkout_process', 1 );
 
-// Add hook to log when WooCommerce validates payment method during checkout processing
-// Use try-catch to prevent fatal errors from breaking checkout
-add_action( 'woocommerce_checkout_process', function() {
+/**
+ * Log when WooCommerce validates payment method during checkout processing.
+ */
+function cko_log_checkout_process() {
 	try {
 		if ( isset( $_POST['payment_method'] ) && 'wc_checkout_com_flow' === $_POST['payment_method'] ) {
 			WC_Checkoutcom_Utility::logger( '[FLOW SERVER] ========== WOOCOMMERCE CHECKOUT PROCESS ==========' );
@@ -209,13 +241,17 @@ add_action( 'woocommerce_checkout_process', function() {
 		WC_Checkoutcom_Utility::logger( '[FLOW SERVER] ERROR stack trace: ' . $e->getTraceAsString() );
 		// Don't throw - just log the error to prevent breaking checkout
 	}
-}, 5 );
+}
+add_action( 'woocommerce_checkout_process', 'cko_log_checkout_process', 5 );
 
-// Additional hook to ensure order ID is updated in session after order creation
-// This handles cases where the order was replaced with an existing one
-add_action( 'woocommerce_new_order', function( $order_id ) {
+/**
+ * Update order ID in session after order creation for Classic Cards payments.
+ *
+ * @param int $order_id Order ID.
+ */
+function cko_update_order_id_in_session( $order_id ) {
 	// Only apply to Classic Cards payment method
-	if ( ! isset( $_POST['payment_method'] ) || 'wc_checkout_com_cards' !== $_POST['payment_method'] ) {
+	if ( ! isset( $_POST['payment_method'] ) || 'wc_checkout_com_cards' !== wp_unslash( $_POST['payment_method'] ) ) {
 		return;
 	}
 	
@@ -226,12 +262,13 @@ add_action( 'woocommerce_new_order', function( $order_id ) {
 			WC_Checkoutcom_Utility::logger( '[CLASSIC CARDS] Order ID mismatch detected - Session: ' . $session_order_id . ', New Order: ' . $order_id . ' - Order was likely replaced with existing one' );
 		}
 	}
-}, 5 );
+}
+add_action( 'woocommerce_new_order', 'cko_update_order_id_in_session', 5 );
 
 /**
  * Constants.
  */
-define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '5.0.0' );
+define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '5.0.1' );
 define( 'WC_CHECKOUTCOM_PLUGIN_URL', untrailingslashit( plugins_url( basename( plugin_dir_path( __FILE__ ) ), basename( __FILE__ ) ) ) );
 define( 'WC_CHECKOUTCOM_PLUGIN_PATH', untrailingslashit( plugin_dir_path( __FILE__ ) ) );
 
@@ -254,6 +291,7 @@ add_action( 'plugins_loaded', 'init_checkout_com_gateway_class', 0 );
 		// Admin pages
 		if ( is_admin() ) {
 			include_once 'includes/admin/class-wc-checkoutcom-webhook-queue-admin.php';
+			include_once 'includes/admin/class-wc-checkoutcom-diagnostics.php';
 		}
 		
 		// Note: You can also access the webhook queue table directly using:
@@ -272,14 +310,7 @@ add_action( 'plugins_loaded', 'init_checkout_com_gateway_class', 0 );
 		}
 		
 		// Hook for cleanup of old webhooks
-		add_action( 'cko_cleanup_old_webhooks', function() {
-			if ( class_exists( 'WC_Checkout_Com_Webhook_Queue' ) ) {
-				// Cleanup processed webhooks older than 7 days
-				WC_Checkout_Com_Webhook_Queue::cleanup_old_webhooks( 7 );
-				// Cleanup unprocessed webhooks older than 7 days (orphaned)
-				WC_Checkout_Com_Webhook_Queue::cleanup_old_unprocessed_webhooks( 7 );
-			}
-		} );
+		add_action( 'cko_cleanup_old_webhooks', 'cko_cleanup_old_webhooks_handler' );
 		
 		include_once 'includes/class-wc-gateway-checkout-com-cards.php';
 		include_once 'includes/class-wc-gateway-checkout-com-apple-pay.php';
@@ -336,7 +367,7 @@ add_action( 'plugins_loaded', 'init_checkout_com_gateway_class', 0 );
 		}
 
 		// Load payment gateway class.
-		add_filter( 'woocommerce_payment_gateways', 'checkout_com_add_gateway' );
+		add_filter( 'woocommerce_payment_gateways', 'cko_checkout_com_add_gateway' );
 	}
 }
 
@@ -430,22 +461,30 @@ add_action(
  */
 if ( ! function_exists( 'cko_ajax_generate_apple_pay_csr' ) ) {
 	function cko_ajax_generate_apple_pay_csr() {
-	if ( ! class_exists( 'WC_Gateway_Checkout_Com_Apple_Pay' ) ) {
-		wp_send_json_error( [ 
-			'message' => __( 'Apple Pay gateway class not found.', 'checkout-com-unified-payments-api' ),
-		] );
-		return;
-	}
+		// Capability check for admin-only AJAX handler
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_send_json_error( [ 
+				'message' => __( 'Permission denied.', 'checkout-com-unified-payments-api' ),
+			] );
+			return;
+		}
 
-	// Get the gateway instance
-	$gateways = WC()->payment_gateways()->payment_gateways();
-	if ( isset( $gateways['wc_checkout_com_apple_pay'] ) ) {
-		$gateways['wc_checkout_com_apple_pay']->ajax_generate_csr();
-	} else {
-		// Fallback: create a temporary instance
-		$gateway = new WC_Gateway_Checkout_Com_Apple_Pay();
-		$gateway->ajax_generate_csr();
-	}
+		if ( ! class_exists( 'WC_Gateway_Checkout_Com_Apple_Pay' ) ) {
+			wp_send_json_error( [ 
+				'message' => __( 'Apple Pay gateway class not found.', 'checkout-com-unified-payments-api' ),
+			] );
+			return;
+		}
+
+		// Get the gateway instance
+		$gateways = WC()->payment_gateways()->payment_gateways();
+		if ( isset( $gateways['wc_checkout_com_apple_pay'] ) ) {
+			$gateways['wc_checkout_com_apple_pay']->ajax_generate_csr();
+		} else {
+			// Fallback: create a temporary instance
+			$gateway = new WC_Gateway_Checkout_Com_Apple_Pay();
+			$gateway->ajax_generate_csr();
+		}
 	}
 }
 
@@ -455,22 +494,30 @@ if ( ! function_exists( 'cko_ajax_generate_apple_pay_csr' ) ) {
  */
 if ( ! function_exists( 'cko_ajax_upload_apple_pay_certificate' ) ) {
 	function cko_ajax_upload_apple_pay_certificate() {
-	if ( ! class_exists( 'WC_Gateway_Checkout_Com_Apple_Pay' ) ) {
-		wp_send_json_error( [ 
-			'message' => __( 'Apple Pay gateway class not found.', 'checkout-com-unified-payments-api' ),
-		] );
-		return;
-	}
+		// Capability check for admin-only AJAX handler
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_send_json_error( [ 
+				'message' => __( 'Permission denied.', 'checkout-com-unified-payments-api' ),
+			] );
+			return;
+		}
+
+		if ( ! class_exists( 'WC_Gateway_Checkout_Com_Apple_Pay' ) ) {
+			wp_send_json_error( [ 
+				'message' => __( 'Apple Pay gateway class not found.', 'checkout-com-unified-payments-api' ),
+			] );
+			return;
+		}
 	
-	// Get the gateway instance
-	$gateways = WC()->payment_gateways()->payment_gateways();
-	if ( isset( $gateways['wc_checkout_com_apple_pay'] ) ) {
-		$gateways['wc_checkout_com_apple_pay']->ajax_upload_certificate();
-	} else {
-		// Fallback: create a temporary instance
-		$gateway = new WC_Gateway_Checkout_Com_Apple_Pay();
-		$gateway->ajax_upload_certificate();
-	}
+		// Get the gateway instance
+		$gateways = WC()->payment_gateways()->payment_gateways();
+		if ( isset( $gateways['wc_checkout_com_apple_pay'] ) ) {
+			$gateways['wc_checkout_com_apple_pay']->ajax_upload_certificate();
+		} else {
+			// Fallback: create a temporary instance
+			$gateway = new WC_Gateway_Checkout_Com_Apple_Pay();
+			$gateway->ajax_upload_certificate();
+		}
 	}
 }
 
@@ -480,22 +527,30 @@ if ( ! function_exists( 'cko_ajax_upload_apple_pay_certificate' ) ) {
  */
 if ( ! function_exists( 'cko_ajax_generate_apple_pay_merchant_certificate' ) ) {
 	function cko_ajax_generate_apple_pay_merchant_certificate() {
-	if ( ! class_exists( 'WC_Gateway_Checkout_Com_Apple_Pay' ) ) {
-		wp_send_json_error( [ 
-			'message' => __( 'Apple Pay gateway class not found.', 'checkout-com-unified-payments-api' ),
-		] );
-		return;
-	}
+		// Capability check for admin-only AJAX handler
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_send_json_error( [ 
+				'message' => __( 'Permission denied.', 'checkout-com-unified-payments-api' ),
+			] );
+			return;
+		}
+
+		if ( ! class_exists( 'WC_Gateway_Checkout_Com_Apple_Pay' ) ) {
+			wp_send_json_error( [ 
+				'message' => __( 'Apple Pay gateway class not found.', 'checkout-com-unified-payments-api' ),
+			] );
+			return;
+		}
 	
-	// Get the gateway instance
-	$gateways = WC()->payment_gateways()->payment_gateways();
-	if ( isset( $gateways['wc_checkout_com_apple_pay'] ) ) {
-		$gateways['wc_checkout_com_apple_pay']->ajax_generate_merchant_certificate();
-	} else {
-		// Fallback: create a temporary instance
-		$gateway = new WC_Gateway_Checkout_Com_Apple_Pay();
-		$gateway->ajax_generate_merchant_certificate();
-	}
+		// Get the gateway instance
+		$gateways = WC()->payment_gateways()->payment_gateways();
+		if ( isset( $gateways['wc_checkout_com_apple_pay'] ) ) {
+			$gateways['wc_checkout_com_apple_pay']->ajax_generate_merchant_certificate();
+		} else {
+			// Fallback: create a temporary instance
+			$gateway = new WC_Gateway_Checkout_Com_Apple_Pay();
+			$gateway->ajax_generate_merchant_certificate();
+		}
 	}
 }
 
@@ -504,20 +559,28 @@ if ( ! function_exists( 'cko_ajax_generate_apple_pay_merchant_certificate' ) ) {
  */
 if ( ! function_exists( 'cko_ajax_upload_apple_pay_domain_association' ) ) {
 	function cko_ajax_upload_apple_pay_domain_association() {
-	if ( ! class_exists( 'WC_Gateway_Checkout_Com_Apple_Pay' ) ) {
-		wp_send_json_error( [ 
-			'message' => __( 'Apple Pay gateway class not found.', 'checkout-com-unified-payments-api' ),
-		] );
-		return;
-	}
+		// Capability check for admin-only AJAX handler
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_send_json_error( [ 
+				'message' => __( 'Permission denied.', 'checkout-com-unified-payments-api' ),
+			] );
+			return;
+		}
+
+		if ( ! class_exists( 'WC_Gateway_Checkout_Com_Apple_Pay' ) ) {
+			wp_send_json_error( [ 
+				'message' => __( 'Apple Pay gateway class not found.', 'checkout-com-unified-payments-api' ),
+			] );
+			return;
+		}
 	
-	$gateways = WC()->payment_gateways()->payment_gateways();
-	if ( isset( $gateways['wc_checkout_com_apple_pay'] ) ) {
-		$gateways['wc_checkout_com_apple_pay']->ajax_upload_domain_association();
-	} else {
-		$gateway = new WC_Gateway_Checkout_Com_Apple_Pay();
-		$gateway->ajax_upload_domain_association();
-	}
+		$gateways = WC()->payment_gateways()->payment_gateways();
+		if ( isset( $gateways['wc_checkout_com_apple_pay'] ) ) {
+			$gateways['wc_checkout_com_apple_pay']->ajax_upload_domain_association();
+		} else {
+			$gateway = new WC_Gateway_Checkout_Com_Apple_Pay();
+			$gateway->ajax_upload_domain_association();
+		}
 	}
 }
 
@@ -526,20 +589,28 @@ if ( ! function_exists( 'cko_ajax_upload_apple_pay_domain_association' ) ) {
  */
 if ( ! function_exists( 'cko_ajax_generate_apple_pay_merchant_identity_csr' ) ) {
 	function cko_ajax_generate_apple_pay_merchant_identity_csr() {
-	if ( ! class_exists( 'WC_Gateway_Checkout_Com_Apple_Pay' ) ) {
-		wp_send_json_error( [ 
-			'message' => __( 'Apple Pay gateway class not found.', 'checkout-com-unified-payments-api' ),
-		] );
-		return;
-	}
+		// Capability check for admin-only AJAX handler
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_send_json_error( [ 
+				'message' => __( 'Permission denied.', 'checkout-com-unified-payments-api' ),
+			] );
+			return;
+		}
+
+		if ( ! class_exists( 'WC_Gateway_Checkout_Com_Apple_Pay' ) ) {
+			wp_send_json_error( [ 
+				'message' => __( 'Apple Pay gateway class not found.', 'checkout-com-unified-payments-api' ),
+			] );
+			return;
+		}
 	
-	$gateways = WC()->payment_gateways()->payment_gateways();
-	if ( isset( $gateways['wc_checkout_com_apple_pay'] ) ) {
-		$gateways['wc_checkout_com_apple_pay']->ajax_generate_merchant_identity_csr();
-	} else {
-		$gateway = new WC_Gateway_Checkout_Com_Apple_Pay();
-		$gateway->ajax_generate_merchant_identity_csr();
-	}
+		$gateways = WC()->payment_gateways()->payment_gateways();
+		if ( isset( $gateways['wc_checkout_com_apple_pay'] ) ) {
+			$gateways['wc_checkout_com_apple_pay']->ajax_generate_merchant_identity_csr();
+		} else {
+			$gateway = new WC_Gateway_Checkout_Com_Apple_Pay();
+			$gateway->ajax_generate_merchant_identity_csr();
+		}
 	}
 }
 
@@ -548,20 +619,28 @@ if ( ! function_exists( 'cko_ajax_generate_apple_pay_merchant_identity_csr' ) ) 
  */
 if ( ! function_exists( 'cko_ajax_upload_apple_pay_merchant_identity_certificate' ) ) {
 	function cko_ajax_upload_apple_pay_merchant_identity_certificate() {
-	if ( ! class_exists( 'WC_Gateway_Checkout_Com_Apple_Pay' ) ) {
-		wp_send_json_error( [ 
-			'message' => __( 'Apple Pay gateway class not found.', 'checkout-com-unified-payments-api' ),
-		] );
-		return;
-	}
+		// Capability check for admin-only AJAX handler
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_send_json_error( [ 
+				'message' => __( 'Permission denied.', 'checkout-com-unified-payments-api' ),
+			] );
+			return;
+		}
+
+		if ( ! class_exists( 'WC_Gateway_Checkout_Com_Apple_Pay' ) ) {
+			wp_send_json_error( [ 
+				'message' => __( 'Apple Pay gateway class not found.', 'checkout-com-unified-payments-api' ),
+			] );
+			return;
+		}
 	
-	$gateways = WC()->payment_gateways()->payment_gateways();
-	if ( isset( $gateways['wc_checkout_com_apple_pay'] ) ) {
-		$gateways['wc_checkout_com_apple_pay']->ajax_upload_merchant_identity_certificate();
-	} else {
-		$gateway = new WC_Gateway_Checkout_Com_Apple_Pay();
-		$gateway->ajax_upload_merchant_identity_certificate();
-	}
+		$gateways = WC()->payment_gateways()->payment_gateways();
+		if ( isset( $gateways['wc_checkout_com_apple_pay'] ) ) {
+			$gateways['wc_checkout_com_apple_pay']->ajax_upload_merchant_identity_certificate();
+		} else {
+			$gateway = new WC_Gateway_Checkout_Com_Apple_Pay();
+			$gateway->ajax_upload_merchant_identity_certificate();
+		}
 	}
 }
 
@@ -570,20 +649,28 @@ if ( ! function_exists( 'cko_ajax_upload_apple_pay_merchant_identity_certificate
  */
 if ( ! function_exists( 'cko_ajax_test_apple_pay_certificate' ) ) {
 	function cko_ajax_test_apple_pay_certificate() {
-	if ( ! class_exists( 'WC_Gateway_Checkout_Com_Apple_Pay' ) ) {
-		wp_send_json_error( [ 
-			'message' => __( 'Apple Pay gateway class not found.', 'checkout-com-unified-payments-api' ),
-		] );
-		return;
-	}
+		// Capability check for admin-only AJAX handler
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_send_json_error( [ 
+				'message' => __( 'Permission denied.', 'checkout-com-unified-payments-api' ),
+			] );
+			return;
+		}
+
+		if ( ! class_exists( 'WC_Gateway_Checkout_Com_Apple_Pay' ) ) {
+			wp_send_json_error( [ 
+				'message' => __( 'Apple Pay gateway class not found.', 'checkout-com-unified-payments-api' ),
+			] );
+			return;
+		}
 	
-	$gateways = WC()->payment_gateways()->payment_gateways();
-	if ( isset( $gateways['wc_checkout_com_apple_pay'] ) ) {
-		$gateways['wc_checkout_com_apple_pay']->ajax_test_certificate();
-	} else {
-		$gateway = new WC_Gateway_Checkout_Com_Apple_Pay();
-		$gateway->ajax_test_certificate();
-	}
+		$gateways = WC()->payment_gateways()->payment_gateways();
+		if ( isset( $gateways['wc_checkout_com_apple_pay'] ) ) {
+			$gateways['wc_checkout_com_apple_pay']->ajax_test_certificate();
+		} else {
+			$gateway = new WC_Gateway_Checkout_Com_Apple_Pay();
+			$gateway->ajax_test_certificate();
+		}
 	}
 }
 
@@ -594,9 +681,9 @@ if ( ! function_exists( 'cko_ajax_test_apple_pay_certificate' ) ) {
  *
  * @return array
  */
-function checkout_com_add_gateway( $methods ) {
+function cko_checkout_com_add_gateway( $methods ) {
 
-	$array = get_selected_apms_class();
+	$array = cko_get_selected_apms_class();
 
 	$methods[] = 'WC_Gateway_Checkout_Com_Cards';
 	$methods[] = 'WC_Gateway_Checkout_Com_Apple_Pay';
@@ -611,69 +698,11 @@ function checkout_com_add_gateway( $methods ) {
 }
 
 /**
- * Filter payment gateways in admin settings to show only one "Checkout.com" entry
- * based on checkout mode (Flow or Classic).
- * 
- * This filter only affects the display in WooCommerce > Settings > Payments.
- * All gateways remain registered in the system for functionality.
- * 
- * For existing environments: This will hide duplicate entries in the settings page
- * while preserving all gateway registrations in the database.
- */
-add_filter( 'woocommerce_payment_gateways', 'checkout_com_filter_admin_gateways', 20 );
-function checkout_com_filter_admin_gateways( $gateways ) {
-	// Only filter in admin settings page (WooCommerce > Settings > Payments)
-	if ( ! is_admin() || ! isset( $_GET['page'] ) || 'wc-settings' !== $_GET['page'] || ! isset( $_GET['tab'] ) || 'checkout' !== $_GET['tab'] ) {
-		return $gateways;
-	}
-
-	$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
-	$checkout_mode = isset( $checkout_setting['ckocom_checkout_mode'] ) ? $checkout_setting['ckocom_checkout_mode'] : 'classic';
-
-	// Get all Checkout.com gateway IDs
-	$cko_gateway_ids = array(
-		'wc_checkout_com_cards',
-		'wc_checkout_com_apple_pay',
-		'wc_checkout_com_google_pay',
-		'wc_checkout_com_paypal',
-		'wc_checkout_com_flow',
-	);
-
-	// Add alternative payments gateways (if any are enabled)
-	$apms_settings = get_option( 'woocommerce_wc_checkout_com_alternative_payments_settings', array() );
-	if ( ! empty( $apms_settings['enabled'] ) && 'yes' === $apms_settings['enabled'] ) {
-		$apm_selected = ! empty( $apms_settings['ckocom_apms_selector'] ) ? $apms_settings['ckocom_apms_selector'] : array();
-		foreach ( $apm_selected as $value ) {
-			$cko_gateway_ids[] = 'wc_checkout_com_alternative_payments_' . $value;
-		}
-	}
-
-	// Filter based on checkout mode
-	if ( 'flow' === $checkout_mode ) {
-		// In Flow mode: Only show Flow gateway in settings
-		foreach ( $cko_gateway_ids as $gateway_id ) {
-			if ( 'wc_checkout_com_flow' !== $gateway_id && isset( $gateways[ $gateway_id ] ) ) {
-				unset( $gateways[ $gateway_id ] );
-			}
-		}
-	} else {
-		// In Classic mode: Only show Cards gateway in settings, hide others
-		foreach ( $cko_gateway_ids as $gateway_id ) {
-			if ( 'wc_checkout_com_cards' !== $gateway_id && isset( $gateways[ $gateway_id ] ) ) {
-				unset( $gateways[ $gateway_id ] );
-			}
-		}
-	}
-
-	return $gateways;
-}
-
-/**
  * Return the class name of the apm selected.
  *
  * @return array
  */
-function get_selected_apms_class() {
+function cko_get_selected_apms_class() {
 
 	$apms_settings       = get_option( 'woocommerce_wc_checkout_com_alternative_payments_settings' );
 	$selected_apms_class = [];
@@ -691,7 +720,7 @@ function get_selected_apms_class() {
 	return $selected_apms_class;
 }
 
-add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), 'checkout_com_action_links' );
+add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), 'cko_checkout_com_action_links' );
 
 /**
  * Add settings link.
@@ -700,7 +729,7 @@ add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), 'checkout_com_
  *
  * @return array
  */
-function checkout_com_action_links( $links ) {
+function cko_checkout_com_action_links( $links ) {
 	$plugin_links = [
 		'<a href="' . admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards' ) . '">' . __( 'Settings', 'checkout-com-unified-payments-api' ) . '</a>',
 	];
@@ -709,12 +738,12 @@ function checkout_com_action_links( $links ) {
 }
 
 // This action will register flagged order status in woocommerce.
-add_action( 'init', 'register_cko_new_order_statuses' );
+add_action( 'init', 'cko_register_order_statuses' );
 
 /**
  * Register flagged order status.
  */
-function register_cko_new_order_statuses() {
+function cko_register_order_statuses() {
 	register_post_status(
 		'wc-flagged',
 		[
@@ -730,7 +759,7 @@ function register_cko_new_order_statuses() {
 }
 
 
-add_filter( 'wc_order_statuses', 'my_new_wc_order_statuses' );
+add_filter( 'wc_order_statuses', 'cko_new_wc_order_statuses' );
 
 /**
  * Register flagged status in wc_order_statuses.
@@ -739,7 +768,7 @@ add_filter( 'wc_order_statuses', 'my_new_wc_order_statuses' );
  *
  * @return array
  */
-function my_new_wc_order_statuses( $order_statuses ) {
+function cko_new_wc_order_statuses( $order_statuses ) {
 	$order_statuses['wc-flagged'] = _x( 'Suspected Fraud', 'Order status', 'checkout-com-unified-payments-api' );
 
 	return $order_statuses;
@@ -932,16 +961,76 @@ function cko_check_incomplete_orders() {
 	}
 	
 	if ( $is_incomplete ) {
+		// Store notice data in transient for display
+		set_transient( 'cko_flow_incomplete_order_notice_' . $order_id, array(
+			'missing_fields' => $missing_fields,
+			'order_id' => $order_id,
+		), 3600 );
 		// Set a persistent notice
-		add_action( 'admin_notices', function() use ( $missing_fields, $order_id ) {
-			echo '<div class="notice notice-error is-dismissible">';
-			echo '<p><strong>⚠️ Checkout.com Flow Warning:</strong> ';
-			echo 'This manual order is missing: ' . implode( ', ', $missing_fields ) . '. ';
-			echo 'Flow payments will fail without this information. ';
-			echo 'Please complete the order details before proceeding with payment.';
-			echo '</p></div>';
-		});
+		add_action( 'admin_notices', 'cko_show_flow_incomplete_order_notice' );
 	}
+}
+
+/**
+ * Show admin notice for incomplete Flow orders.
+ */
+function cko_show_flow_incomplete_order_notice() {
+	// Check if we're on the order edit page
+	if ( ! isset( $_GET['post'] ) || ! isset( $_GET['action'] ) || 'edit' !== $_GET['action'] ) {
+		return;
+	}
+	
+	$order_id = absint( $_GET['post'] );
+	$notice_data = get_transient( 'cko_flow_incomplete_order_notice_' . $order_id );
+	
+	if ( ! $notice_data || ! is_array( $notice_data ) ) {
+		return;
+	}
+	
+	$missing_fields = isset( $notice_data['missing_fields'] ) ? $notice_data['missing_fields'] : array();
+	
+	echo '<div class="notice notice-error is-dismissible">';
+	echo '<p><strong>⚠️ Checkout.com Flow Warning:</strong> ';
+	echo 'This manual order is missing: ' . esc_html( implode( ', ', $missing_fields ) ) . '. ';
+	echo 'Flow payments will fail without this information. ';
+	echo 'Please complete the order details before proceeding with payment.';
+	echo '</p></div>';
+	
+	// Delete transient after showing notice once
+	delete_transient( 'cko_flow_incomplete_order_notice_' . $order_id );
+}
+
+/**
+ * Add resource hints for Flow checkout in wp_head.
+ */
+function cko_add_flow_resource_hints() {
+	$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+	$environment = isset( $core_settings['ckocom_environment'] ) ? $core_settings['ckocom_environment'] : 'sandbox';
+	$api_domain = 'sandbox' === $environment ? 'api.sandbox.checkout.com' : 'api.checkout.com';
+	?>
+	<link rel="dns-prefetch" href="//checkout-web-components.checkout.com">
+	<link rel="preconnect" href="https://checkout-web-components.checkout.com" crossorigin>
+	<link rel="preconnect" href="https://<?php echo esc_attr( $api_domain ); ?>" crossorigin>
+	<!-- CDN resource hints for risk.js and other SDK resources -->
+	<link rel="dns-prefetch" href="//cdn.checkout.com">
+	<link rel="preconnect" href="https://cdn.checkout.com" crossorigin>
+	<link rel="dns-prefetch" href="//devices.checkout.com">
+	<link rel="preconnect" href="https://devices.checkout.com" crossorigin>
+	<?php
+}
+
+/**
+ * Add async attribute to Flow SDK script tag.
+ *
+ * @param string $tag    Script tag HTML.
+ * @param string $handle Script handle.
+ * @return string Modified script tag.
+ */
+function cko_add_async_to_flow_script( $tag, $handle ) {
+	if ( 'checkout-com-flow-script' === $handle ) {
+		return str_replace( ' src', ' async src', $tag );
+	}
+	return $tag;
 }
 
 // Show admin notices based on transients
@@ -986,17 +1075,58 @@ function cko_show_validation_notices() {
 	}
 }
 
-add_action( 'admin_enqueue_scripts', 'cko_admin_enqueue_scripts' );
+add_action( 'admin_enqueue_scripts', 'cko_admin_enqueue_scripts', 10, 1 );
 
 /**
  * Load admin scripts.
  *
  * @return void
  */
-function cko_admin_enqueue_scripts() {
+function cko_admin_enqueue_scripts( $hook ) {
+	if ( ! is_admin() ) {
+		return;
+	}
 
-	$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
-	$checkout_mode = $core_settings['ckocom_checkout_mode'];
+	$allowed_hooks = array(
+		'woocommerce_page_wc-settings',
+		'woocommerce_page_checkoutcom-diagnostics',
+		'woocommerce_page_checkout-com-webhook-queue',
+		'checkout-com-webhook-queue',
+	);
+
+	if ( ! in_array( $hook, $allowed_hooks, true ) ) {
+		return;
+	}
+
+	if ( 'woocommerce_page_wc-settings' === $hook ) {
+		$tab = isset( $_GET['tab'] ) ? sanitize_text_field( wp_unslash( $_GET['tab'] ) ) : '';
+		$section = isset( $_GET['section'] ) ? sanitize_text_field( wp_unslash( $_GET['section'] ) ) : '';
+		$screen = isset( $_GET['screen'] ) ? sanitize_text_field( wp_unslash( $_GET['screen'] ) ) : '';
+
+		if ( 'checkout' !== $tab ) {
+			return;
+		}
+
+		$allowed_sections = array(
+			'wc_checkout_com_cards',
+			'wc_checkout_com_flow',
+			'wc_checkout_com_google_pay',
+			'wc_checkout_com_apple_pay',
+			'wc_checkout_com_paypal',
+			'wc_checkout_com_alternative_payments',
+		);
+
+		// Allow main Payments list (no section/screen) so admin.js can hide duplicate gateways.
+		if ( ! empty( $section )
+			&& ! in_array( $section, $allowed_sections, true )
+			&& ! in_array( $screen, array( 'advanced', 'webhook_queue', 'debug_settings' ), true )
+		) {
+			return;
+		}
+	}
+
+	$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+	$checkout_mode = isset( $core_settings['ckocom_checkout_mode'] ) ? $core_settings['ckocom_checkout_mode'] : 'classic';
 	$flow_enabled  = false;
 
 	if( $checkout_mode === 'flow' ) {
@@ -1005,6 +1135,12 @@ function cko_admin_enqueue_scripts() {
 
 	// Load admin scripts.
 	wp_enqueue_script( 'cko-admin-script', WC_CHECKOUTCOM_PLUGIN_URL . '/assets/js/admin.js', [ 'jquery' ], WC_CHECKOUTCOM_PLUGIN_VERSION );
+	
+	// Load checkout mode toggle script for Quick Settings page
+	wp_enqueue_script( 'cko-admin-checkout-mode-toggle', WC_CHECKOUTCOM_PLUGIN_URL . '/assets/js/admin-checkout-mode-toggle.js', [ 'jquery' ], WC_CHECKOUTCOM_PLUGIN_VERSION );
+	
+	// Load admin settings CSS
+	wp_enqueue_style( 'cko-admin-settings', WC_CHECKOUTCOM_PLUGIN_URL . '/assets/css/admin-settings.css', [], WC_CHECKOUTCOM_PLUGIN_VERSION );
 
 	$vars = [
 		'nas_docs'                           => 'https://www.checkout.com/docs/four/resources/api-authentication/api-keys',
@@ -1022,7 +1158,7 @@ function cko_admin_enqueue_scripts() {
 	wp_localize_script( 'cko-admin-script', 'cko_admin_vars', $vars );
 }
 
-add_action( 'wp_enqueue_scripts', 'callback_for_setting_up_scripts' );
+add_action( 'wp_enqueue_scripts', 'cko_enqueue_frontend_assets' );
 
 /**
  * Load checkout.com style sheet.
@@ -1030,7 +1166,7 @@ add_action( 'wp_enqueue_scripts', 'callback_for_setting_up_scripts' );
  *
  * Only on Checkout related pages.
  */
-function callback_for_setting_up_scripts() {
+function cko_enqueue_frontend_assets() {
 
 	// Load on Cart, Checkout, pay for order or add payment method pages.
 	if ( ! is_cart() && ! is_checkout() && ! isset( $_GET['pay_for_order'] ) && ! is_add_payment_method_page() ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
@@ -1040,7 +1176,7 @@ function callback_for_setting_up_scripts() {
 	// Register adn enqueue checkout css.
 	wp_register_style( 'checkoutcom-style', WC_CHECKOUTCOM_PLUGIN_URL . '/assets/css/checkoutcom-styles.css', [], WC_CHECKOUTCOM_PLUGIN_VERSION );
 	wp_register_style( 'normalize', WC_CHECKOUTCOM_PLUGIN_URL . '/assets/css/normalize.css', [], WC_CHECKOUTCOM_PLUGIN_VERSION );
-	wp_enqueue_style( 'checkoutcom-style' );
+	// Don't enqueue checkoutcom-style here - will be enqueued after flow.css to ensure overrides work
 	wp_enqueue_style( 'normalize' );
 
 	// load cko apm settings.
@@ -1056,9 +1192,21 @@ function callback_for_setting_up_scripts() {
 	}
 
 	// Enqueue FLOW scripts.
-	$core_settings      = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
-	$checkout_mode      = $core_settings['ckocom_checkout_mode'];
+	$core_settings      = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+	$checkout_mode      = isset( $core_settings['ckocom_checkout_mode'] ) ? $core_settings['ckocom_checkout_mode'] : 'classic';
 	$flow_customization = get_option( 'woocommerce_wc_checkout_com_flow_settings', array() );
+	
+	// Merge Card settings into Flow customization vars (for Card Holder Name, Position, and Saved Payment Display Order)
+	// These settings were moved from Flow settings to Card settings
+	if ( isset( $core_settings['flow_show_card_holder_name'] ) ) {
+		$flow_customization['flow_show_card_holder_name'] = $core_settings['flow_show_card_holder_name'];
+	}
+	if ( isset( $core_settings['flow_component_cardholder_name_position'] ) ) {
+		$flow_customization['flow_component_cardholder_name_position'] = $core_settings['flow_component_cardholder_name_position'];
+	}
+	if ( isset( $core_settings['flow_saved_payment'] ) ) {
+		$flow_customization['flow_saved_payment'] = $core_settings['flow_saved_payment'];
+	}
 	
 	// Ensure flow_component_name is always set with a default value
 	if ( empty( $flow_customization['flow_component_name'] ) ) {
@@ -1067,20 +1215,7 @@ function callback_for_setting_up_scripts() {
 
 	if ( 'flow' === $checkout_mode ) {
 		// Add resource hints for faster DNS resolution and connection to Checkout.com
-		add_action( 'wp_head', function() use ( $core_settings ) {
-			$environment = $core_settings['ckocom_environment'] ?? 'sandbox';
-			$api_domain = 'sandbox' === $environment ? 'api.sandbox.checkout.com' : 'api.checkout.com';
-			?>
-			<link rel="dns-prefetch" href="//checkout-web-components.checkout.com">
-			<link rel="preconnect" href="https://checkout-web-components.checkout.com" crossorigin>
-			<link rel="preconnect" href="https://<?php echo esc_attr( $api_domain ); ?>" crossorigin>
-			<!-- CDN resource hints for risk.js and other SDK resources -->
-			<link rel="dns-prefetch" href="//cdn.checkout.com">
-			<link rel="preconnect" href="https://cdn.checkout.com" crossorigin>
-			<link rel="dns-prefetch" href="//devices.checkout.com">
-			<link rel="preconnect" href="https://devices.checkout.com" crossorigin>
-			<?php
-		}, 1 );
+		add_action( 'wp_head', 'cko_add_flow_resource_hints', 1 );
 		
 		// Load Checkout.com SDK asynchronously for better performance
 		wp_enqueue_script(
@@ -1092,12 +1227,7 @@ function callback_for_setting_up_scripts() {
 		);
 		
 		// Add async attribute to SDK script for non-blocking load
-		add_filter( 'script_loader_tag', function( $tag, $handle ) {
-			if ( 'checkout-com-flow-script' === $handle ) {
-				return str_replace( ' src', ' async src', $tag );
-			}
-			return $tag;
-		}, 10, 2 );
+		add_filter( 'script_loader_tag', 'cko_add_async_to_flow_script', 10, 2 );
 
 		wp_enqueue_script(
 			'flow-customization-script',
@@ -1111,11 +1241,103 @@ function callback_for_setting_up_scripts() {
 
 		wp_register_style( 'cko-flow-style', WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/css/flow.css', array(), WC_CHECKOUTCOM_PLUGIN_VERSION );
 		wp_enqueue_style( 'cko-flow-style' );
+		// Enqueue checkoutcom-styles.css after flow.css to ensure spacing overrides work
+		wp_enqueue_style( 'checkoutcom-style' );
+
+		// REFACTORED: Enqueue logger module FIRST (before other Flow scripts)
+		// Logger module has no dependencies - must load before payment-session.js
+		wp_enqueue_script(
+			'checkout-com-flow-logger-script', 
+			WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/js/modules/flow-logger.js', 
+			array(), // No dependencies - must load first
+			WC_CHECKOUTCOM_PLUGIN_VERSION,
+			false // Load in header to ensure it's available early
+		);
+
+		// REFACTORED: Enqueue validation module (needs jQuery and logger)
+		// Must load before payment-session.js
+		wp_enqueue_script(
+			'checkout-com-flow-validation-script', 
+			WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/js/modules/flow-validation.js', 
+			array( 'jquery', 'checkout-com-flow-logger-script' ), // jQuery and logger are dependencies
+			WC_CHECKOUTCOM_PLUGIN_VERSION,
+			false // Load in header
+		);
+
+		// REFACTORED: Enqueue state management module (needs logger)
+		// Must load before payment-session.js to provide centralized state
+		wp_enqueue_script(
+			'checkout-com-flow-state-script', 
+			WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/js/modules/flow-state.js', 
+			array( 'checkout-com-flow-logger-script' ), // Logger is dependency
+			WC_CHECKOUTCOM_PLUGIN_VERSION,
+			false // Load in header
+		);
+
+		// REFACTORED: Enqueue early 3DS detection module (needs logger, state)
+		// Must load before payment-session.js to prevent 3DS return initialization
+		wp_enqueue_script(
+			'checkout-com-flow-3ds-detection-script',
+			WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/js/modules/flow-3ds-detection.js',
+			array( 'checkout-com-flow-logger-script', 'checkout-com-flow-state-script' ), // Logger and state are dependencies
+			WC_CHECKOUTCOM_PLUGIN_VERSION,
+			false // Load in header
+		);
+
+		// REFACTORED: Enqueue updated_checkout guard module (needs jQuery, logger, state)
+		// Must load before payment-session.js to protect Flow component lifecycle
+		wp_enqueue_script(
+			'checkout-com-flow-updated-checkout-guard-script',
+			WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/js/modules/flow-updated-checkout-guard.js',
+			array( 'jquery', 'checkout-com-flow-logger-script', 'checkout-com-flow-state-script' ), // jQuery, logger, and state are dependencies
+			WC_CHECKOUTCOM_PLUGIN_VERSION,
+			false // Load in header
+		);
+
+		// REFACTORED: Enqueue container-ready handler (needs logger, state)
+		// Must load before payment-session.js to react to container lifecycle events
+		wp_enqueue_script(
+			'checkout-com-flow-container-ready-handler-script',
+			WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/js/modules/flow-container-ready-handler.js',
+			array( 'checkout-com-flow-logger-script', 'checkout-com-flow-state-script' ), // Logger and state are dependencies
+			WC_CHECKOUTCOM_PLUGIN_VERSION,
+			false // Load in header
+		);
+
+		// REFACTORED: Enqueue field change handler (needs jQuery, logger, state)
+		// Must load before payment-session.js to wire input listeners
+		wp_enqueue_script(
+			'checkout-com-flow-field-change-handler-script',
+			WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/js/modules/flow-field-change-handler.js',
+			array( 'jquery', 'checkout-com-flow-logger-script', 'checkout-com-flow-state-script' ), // jQuery, logger, and state are dependencies
+			WC_CHECKOUTCOM_PLUGIN_VERSION,
+			false // Load in header
+		);
+
+		// REFACTORED: Enqueue saved card handler (needs jQuery, logger)
+		// Must load before payment-session.js to handle saved card selection
+		wp_enqueue_script(
+			'checkout-com-flow-saved-card-handler-script',
+			WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/js/modules/flow-saved-card-handler.js',
+			array( 'jquery', 'checkout-com-flow-logger-script' ), // jQuery and logger are dependencies
+			WC_CHECKOUTCOM_PLUGIN_VERSION,
+			false // Load in header
+		);
+
+		// REFACTORED: Enqueue initialization helper module (needs jQuery, logger, validation, state)
+		// Must load before payment-session.js to provide initialization helpers
+		wp_enqueue_script(
+			'checkout-com-flow-initialization-script', 
+			WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/js/modules/flow-initialization.js', 
+			array( 'jquery', 'checkout-com-flow-logger-script', 'checkout-com-flow-validation-script', 'checkout-com-flow-state-script' ), // jQuery, logger, validation, and state are dependencies
+			WC_CHECKOUTCOM_PLUGIN_VERSION,
+			false // Load in header
+		);
 
 		wp_enqueue_script(
 			'checkout-com-flow-container-script', 
 			WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/js/flow-container.js', 
-			array( 'jquery' ), 
+			array( 'jquery', 'checkout-com-flow-logger-script' ), // Logger is dependency
 			WC_CHECKOUTCOM_PLUGIN_VERSION
 		);
 
@@ -1129,11 +1351,44 @@ function callback_for_setting_up_scripts() {
 		$payment_session_version = WC_CHECKOUTCOM_PLUGIN_VERSION . '-' . time();
 	}
 	
+	$card_settings            = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+	$terms_prevention_value   = WC_Admin_Settings::get_option( 'flow_terms_prevention_enabled', '' );
+	if ( '' === $terms_prevention_value && isset( $card_settings['flow_terms_prevention_enabled'] ) ) {
+		$terms_prevention_value = $card_settings['flow_terms_prevention_enabled'];
+	}
+	$terms_prevention_enabled = 'yes' === $terms_prevention_value;
+	$payment_session_deps      = array(
+		'jquery',
+		'flow-customization-script',
+		'checkout-com-flow-container-script',
+		'checkout-com-flow-logger-script',
+		'checkout-com-flow-validation-script',
+		'checkout-com-flow-state-script',
+		'checkout-com-flow-3ds-detection-script',
+		'checkout-com-flow-updated-checkout-guard-script',
+		'checkout-com-flow-container-ready-handler-script',
+		'checkout-com-flow-field-change-handler-script',
+		'checkout-com-flow-saved-card-handler-script',
+		'checkout-com-flow-initialization-script',
+		'wp-i18n',
+	);
+
+	if ( $terms_prevention_enabled ) {
+		wp_enqueue_script(
+			'checkout-com-flow-terms-prevention-script',
+			WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/js/modules/flow-terms-prevention.js',
+			array( 'jquery', 'checkout-com-flow-logger-script' ), // jQuery and logger are dependencies
+			WC_CHECKOUTCOM_PLUGIN_VERSION,
+			false // Load in header to intercept events early
+		);
+		$payment_session_deps[] = 'checkout-com-flow-terms-prevention-script';
+	}
+
 	wp_enqueue_script(
-		'checkout-com-flow-payment-session-script', 
-		WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/js/payment-session.js', 
-		array( 'jquery', 'flow-customization-script', 'checkout-com-flow-container-script', 'wp-i18n' ), 
-			$payment_session_version
+		'checkout-com-flow-payment-session-script',
+		WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/js/payment-session.js',
+		$payment_session_deps,
+		$payment_session_version
 	);
 
 		$url = 'https://api.checkout.com/payment-sessions';
@@ -1195,21 +1450,23 @@ function callback_for_setting_up_scripts() {
 		$exemption = WC_Admin_Settings::get_option( 'ckocom_card_3ds_exemption', '' );
 		$allow_upgrade = 'yes' === WC_Admin_Settings::get_option( 'ckocom_card_3ds_allow_upgrade', 'yes' );
 		
-		// Debug: Log 3DS settings for troubleshooting
-		$allow_upgrade_raw = WC_Admin_Settings::get_option( 'ckocom_card_3ds_allow_upgrade', 'yes' );
-		error_log('[FLOW] 3DS Settings Debug: ' . print_r([
-			'three_d_enabled_raw' => WC_Admin_Settings::get_option( 'ckocom_card_threed', '0' ),
-			'three_d_enabled' => $three_d_enabled,
-			'attempt_no_three_d_raw' => WC_Admin_Settings::get_option( 'ckocom_card_notheed', '0' ),
-			'attempt_no_three_d' => $attempt_no_three_d,
-			'challenge_indicator' => $challenge_indicator,
-			'exemption' => $exemption,
-			'allow_upgrade_raw' => $allow_upgrade_raw,
-			'allow_upgrade_raw_type' => gettype($allow_upgrade_raw),
-			'allow_upgrade_comparison' => ($allow_upgrade_raw === 'yes'),
-			'allow_upgrade' => $allow_upgrade,
-			'settings_source' => 'card_settings'
-		], true));
+		// Debug: Log 3DS settings for troubleshooting (only if WP_DEBUG is enabled)
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			$allow_upgrade_raw = WC_Admin_Settings::get_option( 'ckocom_card_3ds_allow_upgrade', 'yes' );
+			error_log( '[FLOW] 3DS Settings Debug: ' . print_r( array( // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+				'three_d_enabled_raw' => WC_Admin_Settings::get_option( 'ckocom_card_threed', '0' ),
+				'three_d_enabled' => $three_d_enabled,
+				'attempt_no_three_d_raw' => WC_Admin_Settings::get_option( 'ckocom_card_notheed', '0' ),
+				'attempt_no_three_d' => $attempt_no_three_d,
+				'challenge_indicator' => $challenge_indicator,
+				'exemption' => $exemption,
+				'allow_upgrade_raw' => $allow_upgrade_raw,
+				'allow_upgrade_raw_type' => gettype( $allow_upgrade_raw ),
+				'allow_upgrade_comparison' => ( $allow_upgrade_raw === 'yes' ),
+				'allow_upgrade' => $allow_upgrade,
+				'settings_source' => 'card_settings',
+			), true ) );
+		}
 		
 		// Validate 3DS values according to Checkout.com API requirements
 		$valid_challenge_indicators = ['no_preference', 'no_challenge_requested', 'challenge_requested', 'challenge_requested_mandate'];
@@ -1221,14 +1478,18 @@ function callback_for_setting_up_scripts() {
 		];
 		
 		// Ensure challenge indicator is valid
-		if (!in_array($challenge_indicator, $valid_challenge_indicators)) {
-			error_log('[FLOW] Invalid challenge_indicator: ' . $challenge_indicator . ', using default: no_preference');
+		if ( ! in_array( $challenge_indicator, $valid_challenge_indicators, true ) ) {
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				error_log( '[FLOW] Invalid challenge_indicator: ' . esc_html( $challenge_indicator ) . ', using default: no_preference' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			}
 			$challenge_indicator = 'no_preference';
 		}
 		
 		// Ensure exemption is valid - use empty string if not valid (no exemption)
-		if (empty($exemption) || !in_array($exemption, $valid_exemptions)) {
-			error_log('[FLOW] Invalid or empty exemption: ' . $exemption . ', using empty string (no exemption)');
+		if ( empty( $exemption ) || ! in_array( $exemption, $valid_exemptions, true ) ) {
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				error_log( '[FLOW] Invalid or empty exemption: ' . esc_html( $exemption ) . ', using empty string (no exemption)' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			}
 			$exemption = '';
 		}
 		
@@ -1273,15 +1534,20 @@ function callback_for_setting_up_scripts() {
 		'debug_logging' => $debug_logging ? true : false,
 		// Enabled payment methods
 		'enabled_payment_methods' => $enabled_payment_methods,
+			'waiting_message_title' => esc_html__( 'Please fill in all required fields to continue with payment.', 'checkout-com-unified-payments-api' ),
+			'waiting_message_fields' => esc_html__( 'Required fields: Email, Billing Address', 'checkout-com-unified-payments-api' ),
 		);
 
 		wp_set_script_translations( 'checkout-com-flow-payment-session-script', 'checkout-com-unified-payments-api' );
 
 		wp_localize_script( 'checkout-com-flow-payment-session-script', 'cko_flow_vars', $flow_vars );
+	} else {
+		// Classic mode: enqueue checkoutcom-styles.css for card payment method styling
+		wp_enqueue_style( 'checkoutcom-style' );
 	}
 }
 
-add_action( 'woocommerce_order_item_add_action_buttons', 'action_woocommerce_order_item_add_action_buttons', 10, 1 );
+add_action( 'woocommerce_order_item_add_action_buttons', 'cko_action_woocommerce_order_item_add_action_buttons', 10, 1 );
 
 /**
  * Add custom button to admin order.
@@ -1289,7 +1555,7 @@ add_action( 'woocommerce_order_item_add_action_buttons', 'action_woocommerce_ord
  *
  * @param WC_Order $order The order being edited.
  */
-function action_woocommerce_order_item_add_action_buttons( $order ) {
+function cko_action_woocommerce_order_item_add_action_buttons( $order ) {
 
 	// Check order payment method is checkout.
 	if ( false === strpos( $order->get_payment_method(), 'wc_checkout_com_' ) ) {
@@ -1311,13 +1577,14 @@ function action_woocommerce_order_item_add_action_buttons( $order ) {
 </script>
 
 <input type="hidden" value="" name="cko_payment_action" id="cko_payment_action" />
+<?php wp_nonce_field( 'cko_payment_action', 'cko_payment_action_nonce' ); ?>
 <button class="button" id="cko-capture" style="display:none;">Capture</button>
 <button class="button" id="cko-void" style="display:none;">Void</button>
 		<?php
 	}
 }
 
-add_action( 'woocommerce_process_shop_order_meta', 'handle_order_capture_void_action', 50, 2 );
+add_action( 'woocommerce_process_shop_order_meta', 'cko_handle_order_capture_void_action', 50, 2 );
 
 /**
  * Do action for capture and void button.
@@ -1327,13 +1594,21 @@ add_action( 'woocommerce_process_shop_order_meta', 'handle_order_capture_void_ac
  *
  * @return bool|void
  */
-function handle_order_capture_void_action( $order_id, $order ) {
+function cko_handle_order_capture_void_action( $order_id, $order ) {
 
 	if ( ! is_admin() ) {
 		return;
 	}
 
-	if ( ! isset( $_POST['cko_payment_action'] ) || ! sanitize_text_field( $_POST['cko_payment_action'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
+	if ( ! current_user_can( 'manage_woocommerce' ) ) {
+		return;
+	}
+
+	if ( ! isset( $_POST['cko_payment_action'] ) || ! sanitize_text_field( wp_unslash( $_POST['cko_payment_action'] ) ) ) {
+		return;
+	}
+
+	if ( ! isset( $_POST['cko_payment_action_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['cko_payment_action_nonce'] ) ), 'cko_payment_action' ) ) {
 		return;
 	}
 
@@ -1345,7 +1620,7 @@ function handle_order_capture_void_action( $order_id, $order ) {
 	WC_Admin_Notices::remove_notice( 'wc_checkout_com_cards' );
 
 	// check if post is capture.
-	if ( 'cko-capture' === sanitize_text_field( $_POST['cko_payment_action'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
+	if ( 'cko-capture' === sanitize_text_field( wp_unslash( $_POST['cko_payment_action'] ) ) ) {
 
 		// send capture request to cko.
 		$result = (array) WC_Checkoutcom_Api_Request::capture_payment( $order_id );
@@ -1372,7 +1647,7 @@ function handle_order_capture_void_action( $order_id, $order ) {
 
 		return true;
 
-	} elseif ( 'cko-void' === sanitize_text_field( $_POST['cko_payment_action'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
+	} elseif ( 'cko-void' === sanitize_text_field( wp_unslash( $_POST['cko_payment_action'] ) ) ) {
 		// check if post is void.
 		// send void request to cko.
 		$result = (array) WC_Checkoutcom_Api_Request::void_payment( $order_id );
@@ -1409,7 +1684,7 @@ function handle_order_capture_void_action( $order_id, $order ) {
 	}
 }
 
-add_action( 'woocommerce_thankyou', 'add_fawry_number' );
+add_action( 'woocommerce_thankyou', 'cko_add_fawry_number' );
 
 /**
  * Add the fawry reference number in the "thank you" page.
@@ -1418,7 +1693,7 @@ add_action( 'woocommerce_thankyou', 'add_fawry_number' );
  *
  * @return void
  */
-function add_fawry_number( $order_id ) {
+function cko_add_fawry_number( $order_id ) {
 
 	$order = wc_get_order( $order_id );
 
@@ -1536,12 +1811,12 @@ function cko_is_nas_account() {
 	return isset( $core_settings['ckocom_account_type'] ) && ( 'NAS' === $core_settings['ckocom_account_type'] );
 }
 
-add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_cards', 'subscription_payment', 10, 2 );
-add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_alternative_payments_sepa', 'subscription_payment', 10, 2 );
-add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_google_pay', 'subscription_payment', 10, 2 );
-add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_apple_pay', 'subscription_payment', 10, 2 );
-add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_paypal', 'subscription_payment', 10, 2 );
-add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_flow', 'subscription_payment', 10, 2 );
+add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_cards', 'cko_subscription_payment', 10, 2 );
+add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_alternative_payments_sepa', 'cko_subscription_payment', 10, 2 );
+add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_google_pay', 'cko_subscription_payment', 10, 2 );
+add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_apple_pay', 'cko_subscription_payment', 10, 2 );
+add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_paypal', 'cko_subscription_payment', 10, 2 );
+add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_flow', 'cko_subscription_payment', 10, 2 );
 
 /**
  * Function to handle subscription renewal payment for card, SEPA APM, Google Pay & Apple Pay.
@@ -1549,13 +1824,13 @@ add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_flow', '
  * @param float    $renewal_total The amount to charge.
  * @param WC_Order $renewal_order A WC_Order object created to record the renewal payment.
  */
-function subscription_payment( $renewal_total, $renewal_order ) {
+function cko_subscription_payment( $renewal_total, $renewal_order ) {
 	include_once 'includes/subscription/class-wc-checkoutcom-subscription.php';
 
 	WC_Checkoutcom_Subscription::renewal_payment( $renewal_total, $renewal_order );
 }
 
-add_action( 'woocommerce_subscription_status_cancelled', 'subscription_cancelled', 20 );
+add_action( 'woocommerce_subscription_status_cancelled', 'cko_subscription_cancelled', 20 );
 
 /**
  * Function to handle subscription cancelled.
@@ -1564,10 +1839,10 @@ add_action( 'woocommerce_subscription_status_cancelled', 'subscription_cancelled
  *
  * @return void
  */
-function subscription_cancelled( $subscription ) {
+function cko_subscription_cancelled( $subscription ) {
 	include_once 'includes/subscription/class-wc-checkoutcom-subscription.php';
 
-	WC_Checkoutcom_Subscription::subscription_cancelled( $subscription );
+	WC_Checkoutcom_Subscription::cko_subscription_cancelled( $subscription );
 }
 
 // @TODO : Remove all below functions and logic once product is fixed.
@@ -1658,15 +1933,9 @@ if ( ! function_exists( 'cko_ajax_flow_create_payment_session' ) ) {
  * AJAX handler wrapper for Flow order creation.
  * This ensures the handler is always available, even if the gateway class isn't fully instantiated.
  */
-if ( ! function_exists( 'cko_ajax_flow_create_order' ) ) {
+	if ( ! function_exists( 'cko_ajax_flow_create_order' ) ) {
 	function cko_ajax_flow_create_order() {
-		// Log immediately to verify function is being called
-		error_log( '[WRAPPER] cko_ajax_flow_create_order called' );
-		error_log( '[WRAPPER] POST action: ' . ( isset( $_POST['action'] ) ? $_POST['action'] : 'NOT SET' ) );
-		error_log( '[WRAPPER] POST keys: ' . implode( ', ', array_keys( $_POST ) ) );
-		
 		if ( ! class_exists( 'WC_Gateway_Checkout_Com_Flow' ) ) {
-			error_log( '[WRAPPER] ERROR: Flow gateway class not found' );
 			wp_send_json_error( array(
 				'message' => __( 'Flow gateway class not found.', 'checkout-com-unified-payments-api' ),
 			) );
@@ -1676,10 +1945,8 @@ if ( ! function_exists( 'cko_ajax_flow_create_order' ) ) {
 		// Get the gateway instance
 		$gateways = WC()->payment_gateways()->payment_gateways();
 		if ( isset( $gateways['wc_checkout_com_flow'] ) ) {
-			error_log( '[WRAPPER] Using existing gateway instance' );
 			$gateways['wc_checkout_com_flow']->ajax_create_order();
 		} else {
-			error_log( '[WRAPPER] Creating new gateway instance' );
 			// Fallback: create a temporary instance
 			$gateway = new WC_Gateway_Checkout_Com_Flow();
 			$gateway->ajax_create_order();
@@ -1687,12 +1954,15 @@ if ( ! function_exists( 'cko_ajax_flow_create_order' ) ) {
 	}
 }
 
-// Register Flow AJAX handlers VERY early (before gateway class instantiation)
-// Use 'init' hook with priority 0 to ensure registration happens as early as possible
-add_action( 'init', function() {
+/**
+ * Register Flow AJAX handlers VERY early (before gateway class instantiation).
+ */
+function cko_register_flow_ajax_handlers() {
 	add_action( 'wp_ajax_cko_flow_create_order', 'cko_ajax_flow_create_order', 1 );
 	add_action( 'wp_ajax_nopriv_cko_flow_create_order', 'cko_ajax_flow_create_order', 1 );
-}, 0 );
+}
+// Use 'init' hook with priority 0 to ensure registration happens as early as possible
+add_action( 'init', 'cko_register_flow_ajax_handlers', 0 );
 
 // Also register directly (in case init hook doesn't work for AJAX)
 add_action( 'wp_ajax_cko_flow_create_payment_session', 'cko_ajax_flow_create_payment_session' );
@@ -1706,7 +1976,7 @@ add_action( 'wp_ajax_nopriv_cko_flow_create_order', 'cko_ajax_flow_create_order'
 function cko_validate_checkout() {
 	try {
 		WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] ========== ENTRY POINT ==========' );
-		WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] Payment method in POST: ' . ( isset( $_POST['payment_method'] ) ? sanitize_text_field( $_POST['payment_method'] ) : 'NOT SET' ) );
+		WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] Payment method in POST: ' . ( isset( $_POST['payment_method'] ) ? sanitize_text_field( wp_unslash( $_POST['payment_method'] ) ) : 'NOT SET' ) );
 		
 	// Load WooCommerce checkout class.
 		if ( ! function_exists( 'WC' ) || ! WC() ) {
@@ -1746,67 +2016,23 @@ function cko_validate_checkout() {
 			return;
 		}
 
-	// Get posted data and prepare for validation.
-		WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] Getting posted data' );
-	$posted_data = $checkout->get_posted_data();
-		WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] Posted data retrieved' );
-		
-	try {
-		// Use Reflection to call the protected update_session method.
-			WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] Calling update_session via Reflection' );
-		$reflection1 = new ReflectionClass( $checkout );
-		$method      = $reflection1->getMethod( 'update_session' );
-		$method->setAccessible( true );
-		$method->invoke( $checkout, $posted_data );
-			WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] update_session completed' );
-	} catch ( ReflectionException $e ) {
-			WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] ERROR in update_session: ' . $e->getMessage() );
-		wp_send_json_error( array( 'message' => __( 'Could not access checkout update method.', 'checkout-com-unified-payments-api' ) ) );
-			return;
-		} catch ( Exception $e ) {
-			WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] ERROR in update_session (general): ' . $e->getMessage() );
-			WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] ERROR stack trace: ' . $e->getTraceAsString() );
-			wp_send_json_error( array( 'message' => __( 'Error updating checkout session: ', 'checkout-com-unified-payments-api' ) . $e->getMessage() ) );
-			return;
-	}
-
-	$errors = new WP_Error();
-
-	try {
-		// Use Reflection to call the protected validate_checkout method.
-			WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] Calling validate_checkout via Reflection' );
-		$reflection2 = new ReflectionClass( $checkout );
-		$method      = $reflection2->getMethod( 'validate_checkout' );
-		$method->setAccessible( true );
-		$method->invokeArgs( $checkout, array( &$posted_data, &$errors ) );
-			WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] validate_checkout completed' );
-	} catch ( ReflectionException $e ) {
-			WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] ERROR in validate_checkout: ' . $e->getMessage() );
-		wp_send_json_error( array( 'message' => __( 'Could not access checkout validate method.', 'checkout-com-unified-payments-api' ) ) );
-			return;
-		} catch ( Exception $e ) {
-			WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] ERROR in validate_checkout (general): ' . $e->getMessage() );
-			WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] ERROR stack trace: ' . $e->getTraceAsString() );
-			wp_send_json_error( array( 'message' => __( 'Error validating checkout: ', 'checkout-com-unified-payments-api' ) . $e->getMessage() ) );
-			return;
-	}
-
-	// If any validation errors occurred, send them back as an error response.
-	if ( ! empty( $errors->errors ) ) {
-			WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] Validation errors found: ' . count( $errors->errors ) );
+	// Run hook-based validation only (public API).
+	$notices = wc_get_notices( 'error' );
+	if ( ! empty( $notices ) ) {
+		WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] Validation errors found: ' . count( $notices ) );
 		$messages = array();
-		foreach ( $errors->errors as $code => $msgs ) {
-			foreach ( $msgs as $msg ) {
-				$messages[] = $msg;
-					WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] Error: ' . $code . ' - ' . $msg );
+		foreach ( $notices as $notice ) {
+			if ( isset( $notice['notice'] ) ) {
+				$messages[] = $notice['notice'];
 			}
 		}
+		wc_clear_notices();
 		wp_send_json_error( array( 'message' => implode( "\n", $messages ) ) );
-			return;
+		return;
 	}
 
 	// If everything passed, return success.
-		WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] Validation successful' );
+	WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] Validation successful' );
 	wp_send_json_success( array( 'message' => __( 'Validation successful', 'checkout-com-unified-payments-api' ) ) );
 	} catch ( Exception $e ) {
 		WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] FATAL ERROR: ' . $e->getMessage() );
@@ -1964,9 +2190,9 @@ function cko_get_payment_status( $request ) {
  *
  * @return void
  */
-function get_updated_cart_info() {
+function cko_get_updated_cart_info() {
 	wp_send_json_success( WC_Checkoutcom_Api_Request::get_cart_info(true) );
 }
 
-add_action('wp_ajax_get_cart_info', 'get_updated_cart_info');
-add_action('wp_ajax_nopriv_get_cart_info', 'get_updated_cart_info');
+add_action('wp_ajax_get_cart_info', 'cko_get_updated_cart_info');
+add_action('wp_ajax_nopriv_get_cart_info', 'cko_get_updated_cart_info');

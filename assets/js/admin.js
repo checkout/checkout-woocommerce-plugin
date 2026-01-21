@@ -268,35 +268,81 @@ jQuery( function ( $ ) {
 
 		webhookSettings: function () {
 
-			if ( ! $( '.cko-admin-settings__links .current.cko-webhook' ).length ) {
+			// Check if webhook check button exists (more reliable than checking for non-existent selector)
+			if ( ! $( '#checkoutcom-is-register-webhook' ).length ) {
 				return;
 			}
+
+			// Check if required variables are available
+			if ( typeof cko_admin_vars === 'undefined' ) {
+				console.error( 'Checkout.com: cko_admin_vars is not defined' );
+				return;
+			}
+
+			// Use ajaxurl from WordPress global or fallback
+			var ajaxUrl = ( typeof ajaxurl !== 'undefined' ) ? ajaxurl : ( cko_admin_vars.ajaxurl || '/wp-admin/admin-ajax.php' );
 
 			$( '.submit .woocommerce-save-button' ).attr( 'disabled', 'disabled' ).hide();
 
 
 			// Fetch the latest webhooks.
 			$( '#checkoutcom-is-register-webhook' ).on( 'click', function () {
-				$( this ).attr( 'disabled', 'disabled' );
-				$( this ).siblings( '.spinner' ).addClass( 'is-active' );
+				console.log( 'Checkout.com: Webhook check button clicked' );
+				var $button = $( this );
+				$button.attr( 'disabled', 'disabled' );
+				$button.siblings( '.spinner' ).addClass( 'is-active' );
 				$( '.checkoutcom-is-register-webhook-text' ).html( '' );
 				$( '#checkoutcom-is-register-webhook' ).siblings( '.dashicons-yes' ).addClass( 'hidden' );
 
+				// Check if nonce is available
+				if ( ! cko_admin_vars.checkoutcom_check_webhook_nonce ) {
+					console.error( 'Checkout.com: Security nonce is missing' );
+					$( '.checkoutcom-is-register-webhook-text' ).html( '<span style="color: #d63638;">⚠ Security nonce is missing. Please refresh the page.</span>' );
+					$button.prop( 'disabled', false );
+					$button.siblings( '.spinner' ).removeClass( 'is-active' );
+					return;
+				}
+
 				$.ajax( {
-					url: ajaxurl,
+					url: ajaxUrl,
 					type: 'POST',
 					data: {
 						'action': 'wc_checkoutcom_check_webhook',
 						'security': cko_admin_vars.checkoutcom_check_webhook_nonce
 					}
 				} ).done( function ( response ) {
-					if ( response.data.message ) {
-						$( '#checkoutcom-is-register-webhook' ).siblings( '.dashicons-yes.hidden' ).removeClass( 'hidden' );
-						$( '.checkoutcom-is-register-webhook-text' ).html( response.data.message );
+					console.log( 'Checkout.com Webhook Check Response:', response );
+					if ( response && response.success && response.data && response.data.message ) {
+						var message = response.data.message;
+						var isConfigured = message.indexOf( 'Webhook is configured' ) !== -1;
+						
+						if ( isConfigured ) {
+							// Show checkmark icon
+							$( '#checkoutcom-is-register-webhook' ).siblings( '.dashicons-yes.hidden' ).removeClass( 'hidden' );
+							// Change button text to "Refresh Status"
+							$button.text( cko_admin_vars.webhook_refresh || 'Refresh Status' );
+							// Display message with checkmark prefix
+							$( '.checkoutcom-is-register-webhook-text' ).html( '<span style="color: #008000;">✓ ' + message + '</span>' );
+						} else {
+							// Hide checkmark for errors
+							$( '#checkoutcom-is-register-webhook' ).siblings( '.dashicons-yes' ).addClass( 'hidden' );
+							// Keep button text as "Run Webhook check"
+							$button.text( cko_admin_vars.webhook_check || 'Run Webhook check' );
+							// Display error message
+							$( '.checkoutcom-is-register-webhook-text' ).html( '<span style="color: #d63638;">⚠ ' + message + '</span>' );
+						}
+					} else {
+						console.error( 'Checkout.com: Invalid response format', response );
+						$( '.checkoutcom-is-register-webhook-text' ).html( '<span style="color: #d63638;">⚠ Invalid response from server. Please check console for details.</span>' );
 					}
 
-				} ).fail( function ( response ) {
-					alert( cko_admin_vars.webhook_check_error );
+				} ).fail( function ( xhr, status, error ) {
+					console.error( 'Checkout.com Webhook Check Error:', status, error, xhr );
+					var errorMessage = cko_admin_vars.webhook_check_error || 'An error occurred while checking webhook status. Please try again.';
+					if ( xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message ) {
+						errorMessage = xhr.responseJSON.data.message;
+					}
+					alert( errorMessage );
 
 				} ).always( function () {
 					$( '#checkoutcom-is-register-webhook' ).prop( 'disabled', false );
@@ -304,25 +350,61 @@ jQuery( function ( $ ) {
 				} );
 			} );
 
+			// Auto-check webhook status on page load
+			var $webhookContainer = $( '.checkoutcom-is-register-webhook-text' );
+			if ( $webhookContainer.length ) {
+				// Trigger click after a short delay to ensure DOM is ready
+				setTimeout( function() {
+					$( '#checkoutcom-is-register-webhook' ).trigger( 'click' );
+				}, 500 );
+			}
 
 			// Register a new webhook.
 			$( '#checkoutcom-register-webhook' ).on( 'click', function () {
-				$( this ).attr( 'disabled', 'disabled' );
-				$( this ).siblings( '.spinner' ).addClass( 'is-active' );
+				var $button = $( this );
+				$button.attr( 'disabled', 'disabled' );
+				$button.siblings( '.spinner' ).addClass( 'is-active' );
 				$( '#checkoutcom-register-webhook' ).siblings( '.dashicons-yes' ).addClass( 'hidden' );
 
+				// Check if nonce is available
+				if ( ! cko_admin_vars.checkoutcom_register_webhook_nonce ) {
+					console.error( 'Checkout.com: Security nonce is missing' );
+					alert( 'Security nonce is missing. Please refresh the page and try again.' );
+					$button.prop( 'disabled', false );
+					$button.siblings( '.spinner' ).removeClass( 'is-active' );
+					return;
+				}
+
 				$.ajax( {
-					url: ajaxurl,
+					url: ajaxUrl,
 					type: 'POST',
 					data: {
 						'action': 'wc_checkoutcom_register_webhook',
 						'security': cko_admin_vars.checkoutcom_register_webhook_nonce
 					}
 				} ).done( function ( response ) {
-					$( '#checkoutcom-register-webhook' ).siblings( '.dashicons-yes.hidden' ).removeClass( 'hidden' );
+					console.log( 'Checkout.com Webhook Register Response:', response );
+					if ( response && response.success ) {
+						$( '#checkoutcom-register-webhook' ).siblings( '.dashicons-yes.hidden' ).removeClass( 'hidden' );
+						// After successful registration, refresh webhook status
+						setTimeout( function() {
+							$( '#checkoutcom-is-register-webhook' ).trigger( 'click' );
+						}, 500 );
+					} else {
+						var errorMessage = cko_admin_vars.webhook_register_error || 'An error occurred while registering the webhook. Please try again.';
+						if ( response && response.data && response.data.message ) {
+							errorMessage = response.data.message;
+						}
+						alert( errorMessage );
+					}
 
-				} ).fail( function ( response ) {
-					alert( cko_admin_vars.webhook_register_error );
+				} ).fail( function ( xhr, status, error ) {
+					console.error( 'Checkout.com Webhook Register Error:', status, error, xhr );
+					var errorMessage = cko_admin_vars.webhook_register_error || 'An error occurred while registering the webhook. Please try again.';
+					if ( xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message ) {
+						errorMessage = xhr.responseJSON.data.message;
+					}
+					alert( errorMessage );
 
 				} ).always( function () {
 					$( '#checkoutcom-register-webhook' ).prop( 'disabled', false );
@@ -334,13 +416,31 @@ jQuery( function ( $ ) {
 		},
 
 		toggleSecretKeyVisibility: function () {
-			const field = $('#woocommerce_wc_checkout_com_cards_ckocom_sk');
-			if (!field.length) return;
+			// Find password field for Secret Key - try multiple selectors
+			const fieldSelectors = [
+				'#woocommerce_wc_checkout_com_cards_ckocom_sk',
+				'input[name="woocommerce_wc_checkout_com_cards_settings[ckocom_sk]"]',
+				'input[type="password"][id*="ckocom_sk"]',
+				'input[type="password"][name*="ckocom_sk"]',
+				'tr:has(label:contains("Secret Key")) input[type="password"]'
+			];
+			
+			let field = null;
+			for (let i = 0; i < fieldSelectors.length; i++) {
+				field = $(fieldSelectors[i]);
+				if (field.length && field.attr('type') === 'password') {
+					break;
+				}
+			}
+			
+			if (!field || !field.length) return;
 
-			const wrapper = field.closest('td');
+			// Check if button already exists in the same table cell
+			const parentCell = field.closest('td');
+			if (parentCell.find('.cko-toggle-password').length) return;
 
 			// Create the toggle button
-			const toggleBtn = $('<button type="button" class="button button-secondary" style="margin-left: 10px;">View</button>');
+			const toggleBtn = $('<button type="button" class="button button-secondary cko-toggle-password" style="margin-left: 10px;">View</button>');
 			toggleBtn.on('click', function (e) {
 				e.preventDefault();
 				const currentType = field.attr('type');
@@ -384,6 +484,13 @@ jQuery( function ( $ ) {
 				// On change
 				presetField.on('change', toggleCustomHeight);
 			});
+		},
+
+		checkoutModeToggle: function () {
+			// This function is now handled by admin-checkout-mode-toggle.js
+			// Keeping this stub for backward compatibility
+			// The new script handles everything more robustly
+			return;
 		}
 	}
 
@@ -405,10 +512,18 @@ jQuery( function ( $ ) {
 	// Script to hide and show fields.
 	admin_functions.cardSettings();
 
+	// Initialize webhook settings
 	admin_functions.webhookSettings();
 
+	// Toggle secret key visibility - run immediately and after a delay for dynamic content
 	admin_functions.toggleSecretKeyVisibility();
+	setTimeout(function() {
+		admin_functions.toggleSecretKeyVisibility();
+	}, 500);
 
 	// Handle express button size settings
 	admin_functions.expressButtonSizeSettings();
+
+	// Handle checkout mode toggle for Enabled Payment Methods
+	admin_functions.checkoutModeToggle();
 } );

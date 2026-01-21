@@ -346,13 +346,13 @@ class WC_Checkoutcom_Express_Checkout_Element {
 		?>
 		<div class="cko-express-checkout-shop-compact" data-product-id="<?php echo esc_attr( $product_id ); ?>">
 			<?php if ( isset( $methods['apple_pay'] ) ) : ?>
-				<div id="cko-apple-pay-button-wrapper-<?php echo esc_attr( $product_id ); ?>" data-product-id="<?php echo esc_attr( $product_id ); ?>" style="display: block;"></div>
+				<div id="cko-apple-pay-button-wrapper-<?php echo esc_attr( $product_id ); ?>" data-product-id="<?php echo esc_attr( $product_id ); ?>"></div>
 			<?php endif; ?>
 			<?php if ( isset( $methods['google_pay'] ) ) : ?>
-				<div id="cko-google-pay-button-wrapper-<?php echo esc_attr( $product_id ); ?>" data-product-id="<?php echo esc_attr( $product_id ); ?>" style="display: block;"></div>
+				<div id="cko-google-pay-button-wrapper-<?php echo esc_attr( $product_id ); ?>" data-product-id="<?php echo esc_attr( $product_id ); ?>"></div>
 			<?php endif; ?>
 			<?php if ( isset( $methods['paypal'] ) ) : ?>
-				<div id="cko-paypal-button-wrapper-<?php echo esc_attr( $product_id ); ?>" data-product-id="<?php echo esc_attr( $product_id ); ?>" style="display: block;"></div>
+				<div id="cko-paypal-button-wrapper-<?php echo esc_attr( $product_id ); ?>" data-product-id="<?php echo esc_attr( $product_id ); ?>"></div>
 			<?php endif; ?>
 		</div>
 		<?php
@@ -412,38 +412,6 @@ class WC_Checkoutcom_Express_Checkout_Element {
 		if ( ! is_product() && ! is_shop() && ! is_cart() && ! is_checkout() ) {
 			return;
 		}
-
-		// Enqueue minimal CSS - let SDKs handle their own styling
-		// Shop page uses compact horizontal layout
-		wp_add_inline_style( 'woocommerce-general', '
-			#cko-express-checkout-element,
-			#cko-express-checkout-element-cart,
-			#cko-express-checkout-element-checkout {
-				margin-top: 1em;
-				clear: both;
-			}
-			/* Simple horizontal layout - let SDKs handle their own sizing */
-			.cko-express-checkout-shop-compact {
-				margin: 10px 0;
-				display: flex;
-				flex-direction: row;
-				gap: 8px;
-				align-items: center;
-				justify-content: center;
-				flex-wrap: wrap;
-				width: 100%;
-			}
-			/* Equal width containers - let buttons render naturally */
-			.cko-express-checkout-shop-compact > div {
-				flex: 1 1 auto;
-				min-width: 0;
-				display: block;
-			}
-			.cko-disabled {
-				cursor: not-allowed;
-				opacity: 0.5;
-			}
-		' );
 	}
 }
 

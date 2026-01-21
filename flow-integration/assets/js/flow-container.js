@@ -1,43 +1,74 @@
-// ALWAYS VISIBLE - Critical for diagnosing Flow disappearing issue
-console.log('[FLOW CONTAINER] Script loaded');
+// Production-ready: Use ckoLogger if available, otherwise silent
+if (typeof ckoLogger !== 'undefined') {
+	ckoLogger.debug('[FLOW CONTAINER] Script loaded');
+}
 
 // Define addPaymentMethod outside any event listener so it's always available
 function addPaymentMethod() {
-	// ALWAYS VISIBLE - Critical for diagnosing Flow disappearing issue
-	console.log('[FLOW CONTAINER] addPaymentMethod() called');
+	if (typeof ckoLogger !== 'undefined') {
+		ckoLogger.debug('[FLOW CONTAINER] addPaymentMethod() called');
+	}
 	
 	const paymentContainer = document.querySelector(
 		".payment_method_wc_checkout_com_flow"
 	);
 
-	console.log('[FLOW CONTAINER] addPaymentMethod() state:', {
-		paymentContainerExists: !!paymentContainer,
-		existingContainerId: document.getElementById('flow-container') ? 'EXISTS' : 'NOT FOUND'
-	});
+	if (typeof ckoLogger !== 'undefined') {
+		ckoLogger.debug('[FLOW CONTAINER] addPaymentMethod() state:', {
+			paymentContainerExists: !!paymentContainer,
+			existingContainerId: document.getElementById('flow-container') ? 'EXISTS' : 'NOT FOUND'
+		});
+	}
 
 	if (paymentContainer) {
 		// Add flow-container to the PAYMENT_BOX div, not the accordion!
 		// Skip any accordion divs and find the actual payment_box
 		const innerDiv = paymentContainer.querySelector("div.payment_box");
 		
-		console.log('[FLOW CONTAINER] addPaymentMethod() - payment_box div:', {
-			innerDivExists: !!innerDiv,
-			innerDivHasId: innerDiv ? !!innerDiv.id : false,
-			innerDivId: innerDiv ? innerDiv.id : 'N/A'
-		});
+		if (typeof ckoLogger !== 'undefined') {
+			ckoLogger.debug('[FLOW CONTAINER] addPaymentMethod() - payment_box div:', {
+				innerDivExists: !!innerDiv,
+				innerDivHasId: innerDiv ? !!innerDiv.id : false,
+				innerDivId: innerDiv ? innerDiv.id : 'N/A'
+			});
+		}
 		
 		if (innerDiv && !innerDiv.id) {
 			innerDiv.id = "flow-container";
+			innerDiv.classList.add('cko-flow__container');
             innerDiv.style.padding = "0";
-			console.log('[FLOW CONTAINER] ✅ Created flow-container id on payment_box div');
 			if (typeof ckoLogger !== 'undefined') {
-				ckoLogger.debug('Set flow-container id on payment_box div');
+				ckoLogger.debug('[FLOW CONTAINER] ✅ Created flow-container id on payment_box div');
 			}
+			
+			// EVENT-DRIVEN: Emit custom event when container is created/recreated
+			// This allows payment-session.js to react immediately instead of polling
+			const containerReadyEvent = new CustomEvent('cko:flow-container-ready', {
+				detail: { container: innerDiv },
+				bubbles: true
+			});
+			document.dispatchEvent(containerReadyEvent);
+			if (typeof ckoLogger !== 'undefined') {
+				ckoLogger.debug('[FLOW CONTAINER] ✅ Emitted cko:flow-container-ready event');
+			}
+			
 		} else if (innerDiv && innerDiv.id === 'flow-container') {
-			console.log('[FLOW CONTAINER] ✅ Container already exists with correct ID');
+			innerDiv.classList.add('cko-flow__container');
+			if (typeof ckoLogger !== 'undefined') {
+				ckoLogger.debug('[FLOW CONTAINER] ✅ Container already exists with correct ID');
+			}
+			
+			// Still emit event even if container exists - allows Flow to check if it needs remounting
+			const containerReadyEvent = new CustomEvent('cko:flow-container-ready', {
+				detail: { container: innerDiv },
+				bubbles: true
+			});
+			document.dispatchEvent(containerReadyEvent);
 		} else if (!innerDiv) {
-			console.log('[FLOW CONTAINER] ❌ ERROR: payment_box div not found inside payment method container');
-			console.log('[FLOW CONTAINER] Payment container HTML:', paymentContainer.innerHTML.substring(0, 200));
+			if (typeof ckoLogger !== 'undefined') {
+				ckoLogger.error('[FLOW CONTAINER] ❌ ERROR: payment_box div not found inside payment method container');
+				ckoLogger.debug('[FLOW CONTAINER] Payment container HTML:', paymentContainer.innerHTML.substring(0, 200));
+			}
 		}
 		
 		// IMPORTANT: Check for saved payment methods (not accordion, which is created later)
@@ -52,6 +83,7 @@ function addPaymentMethod() {
 			}
 		});
 		
+		updateSavedCardsState(hasSavedCards);
 		if (hasSavedCards) {
 			if (typeof ckoLogger !== 'undefined') {
 				ckoLogger.debug('Skipping Flow accordion - saved cards exist (count > 0), using simple layout');
@@ -67,71 +99,73 @@ function addPaymentMethod() {
 		// Use the default WooCommerce payment method label instead
 		// This ensures "Payment FLOW Payment" label is always visible
 	} else {
-		console.log('[FLOW CONTAINER] ❌ Payment method container not found');
+		if (typeof ckoLogger !== 'undefined') {
+			ckoLogger.debug('[FLOW CONTAINER] Payment method container not found');
+		}
 	}
+}
+
+function updateSavedCardsState(hasSavedCards) {
+	const body = document.body;
+	if (!body || !body.classList) {
+		return;
+	}
+
+	const accordionExists = document.querySelector('.cko-flow__saved-cards-accordion-container') !== null;
+	const shouldEnable = hasSavedCards || accordionExists;
+
+	body.classList.toggle('cko-flow--has-saved-cards', shouldEnable);
 }
 
 // Run addPaymentMethod immediately if DOM is ready, otherwise wait
 if (document.readyState === 'loading') {
 	document.addEventListener("DOMContentLoaded", function () {
-		console.log('[FLOW CONTAINER] DOMContentLoaded - calling addPaymentMethod()');
+		if (typeof ckoLogger !== 'undefined') {
+			ckoLogger.debug('[FLOW CONTAINER] DOMContentLoaded - calling addPaymentMethod()');
+		}
 		addPaymentMethod();
 	});
 } else {
-	console.log('[FLOW CONTAINER] DOM already loaded - calling addPaymentMethod() immediately');
+	if (typeof ckoLogger !== 'undefined') {
+		ckoLogger.debug('[FLOW CONTAINER] DOM already loaded - calling addPaymentMethod() immediately');
+	}
 	addPaymentMethod();
 }
 
-// Attach updated_checkout handler immediately (doesn't need to wait for DOMContentLoaded)
+// EVENT-DRIVEN DESIGN: Listen for updated_checkout and ensure container exists
+// When container is ready, emit event for payment-session.js to handle Flow lifecycle
 jQuery(document).on("updated_checkout", function () {
-	// ALWAYS VISIBLE - Critical for diagnosing Flow disappearing issue
-	console.log('[FLOW CONTAINER] updated_checkout event fired, re-checking...');
+	if (typeof ckoLogger !== 'undefined') {
+		ckoLogger.debug('[FLOW CONTAINER] updated_checkout event fired');
+	}
 	
-	// CRITICAL: Wait for WooCommerce to finish updating DOM before checking
-	// WooCommerce replaces HTML asynchronously, so we need to wait
+	// Wait for WooCommerce to finish DOM updates
 	setTimeout(function() {
-		const flowContainer = document.getElementById('flow-container');
-		const flowComponentRoot = document.querySelector('[data-testid="checkout-web-component-root"]');
 		const paymentMethod = document.querySelector('.payment_method_wc_checkout_com_flow');
+		const flowContainer = document.getElementById('flow-container');
+		updateSavedCardsState(false);
 		
-		console.log('[FLOW CONTAINER] After updated_checkout (100ms):', {
-			flowContainerExists: !!flowContainer,
-			flowComponentRootExists: !!flowComponentRoot,
-			paymentMethodExists: !!paymentMethod
-		});
-		
-		// CRITICAL FIX: Always call addPaymentMethod() if payment method exists but container doesn't
-		// This ensures the container is recreated after WooCommerce destroys it
+		// If Flow payment method is selected but container is missing, create it
 		if (paymentMethod && !flowContainer) {
-			console.log('[FLOW CONTAINER] Payment method exists but container missing - creating container');
-			addPaymentMethod();
-		} else if (flowContainer && (!flowComponentRoot || !flowContainer.querySelector('[data-testid="checkout-web-component-root"]'))) {
-			console.log('[FLOW CONTAINER] Flow component not mounted after DOM update, calling addPaymentMethod');
-			addPaymentMethod();
-		} else if (flowContainer && flowComponentRoot) {
-			console.log('[FLOW CONTAINER] Flow component is still mounted, skipping addPaymentMethod');
-		} else if (!paymentMethod) {
-			console.log('[FLOW CONTAINER] Payment method not found - Flow not selected');
-		} else {
-			console.log('[FLOW CONTAINER] Container not found yet, will retry...');
-			// Container might not be ready yet, retry after a short delay
-			setTimeout(function() {
-				const flowContainerRetry = document.getElementById('flow-container');
-				const paymentMethodRetry = document.querySelector('.payment_method_wc_checkout_com_flow');
-				console.log('[FLOW CONTAINER] Retry check (300ms total):', {
-					flowContainerExists: !!flowContainerRetry,
-					paymentMethodExists: !!paymentMethodRetry
-				});
-				if (paymentMethodRetry && !flowContainerRetry) {
-					console.log('[FLOW CONTAINER] Payment method found on retry but container missing - creating container');
-					addPaymentMethod();
-				} else if (flowContainerRetry && !document.querySelector('[data-testid="checkout-web-component-root"]')) {
-					console.log('[FLOW CONTAINER] Flow container found on retry, calling addPaymentMethod');
-					addPaymentMethod();
-				}
-			}, 200);
+			if (typeof ckoLogger !== 'undefined') {
+				ckoLogger.debug('[FLOW CONTAINER] Container missing after updated_checkout - recreating');
+			}
+			addPaymentMethod(); // This will emit cko:flow-container-ready event
+		} else if (flowContainer) {
+			if (flowContainer.classList) {
+				flowContainer.classList.add('cko-flow__container');
+			}
+			// Container exists - emit event so Flow can check if remounting is needed
+			const containerReadyEvent = new CustomEvent('cko:flow-container-ready', {
+				detail: { container: flowContainer },
+				bubbles: true
+			});
+			document.dispatchEvent(containerReadyEvent);
+			if (typeof ckoLogger !== 'undefined') {
+				ckoLogger.debug('[FLOW CONTAINER] Container exists - emitted cko:flow-container-ready event');
+			}
 		}
-	}, 100); // Wait 100ms for WooCommerce to finish updating DOM
+	}, 100); // Wait for WooCommerce to finish DOM updates
 });
 
 // Additional check after a delay to catch late-rendered saved cards
@@ -141,8 +175,11 @@ setTimeout(function() {
 	}
 	
 	// If saved cards accordion was created after initial load, remove Flow accordion if it exists
-	const savedCardsAccordion = document.querySelector('.saved-cards-accordion-container');
-	const flowAccordion = document.querySelector('.flow-accordion-container');
+	const savedCardsAccordion = document.querySelector('.cko-flow__saved-cards-accordion-container');
+		const flowAccordion = document.querySelector('.cko-flow__accordion-container, .flow-accordion-container');
+	if (flowAccordion && flowAccordion.classList) {
+		flowAccordion.classList.add('cko-flow__accordion-container');
+	}
 	
 	if (savedCardsAccordion && flowAccordion) {
 		if (typeof ckoLogger !== 'undefined') {

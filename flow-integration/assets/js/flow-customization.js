@@ -64,13 +64,20 @@ if (expand_first_payment_method === "yes") {
 	expand_first_payment_method = false;
 }
 
+const cardholderNamePositionRaw =
+	cko_flow_customization_vars.flow_component_cardholder_name_position || "top";
+const cardholderNamePosition = ["top", "bottom", "hidden"].includes(
+	cardholderNamePositionRaw
+)
+	? cardholderNamePositionRaw
+	: "top";
+
 window.componentOptions = {
 	flow: {
 		expandFirstPaymentMethod: expand_first_payment_method,
 	},
 	card: {
-		displayCardholderName:
-			cko_flow_customization_vars.flow_component_cardholder_name_position,
+		displayCardholderName: cardholderNamePosition,
 	},
 };
 
@@ -82,7 +89,7 @@ let show_card_holder_name =
 window.saved_payment = cko_flow_customization_vars.flow_saved_payment;
 
 document.addEventListener("DOMContentLoaded", function () {
-	if (show_card_holder_name === "yes") {
+	if (show_card_holder_name === "yes" && cardholderNamePosition !== "hidden") {
 		// Function to set cardholder name
 		function setCardholderName() {
 			let family_name = "";
@@ -136,9 +143,10 @@ document.addEventListener("DOMContentLoaded", function () {
 			const cardholderName = `${given_name} ${family_name}`.trim();
 			
 			if (cardholderName) {
-				window.componentOptions.card.data = {
-					cardholderName: cardholderName,
-				};
+				if (!window.componentOptions.card.data) {
+					window.componentOptions.card.data = {};
+				}
+				window.componentOptions.card.data.cardholderName = cardholderName;
 			}
 		}
 		
@@ -151,7 +159,14 @@ document.addEventListener("DOMContentLoaded", function () {
 window.componentName = cko_flow_customization_vars.flow_component_name || 'flow';
 
 // Locale and Translation section.
-window.locale = cko_flow_customization_vars.flow_component_locale;
+// Use Flow locale setting if provided, otherwise fallback to WordPress locale
+// WordPress locale is passed as wp_locale (full locale like 'fr_FR') or can be extracted from browser
+const flowLocale = cko_flow_customization_vars.flow_component_locale;
+const wpLocale = cko_flow_customization_vars.wp_locale ? 
+	cko_flow_customization_vars.wp_locale.substring(0, 2) : // Extract language code (e.g., 'fr_FR' -> 'fr')
+	(navigator.language || navigator.userLanguage || 'en').substring(0, 2);
+
+window.locale = flowLocale || wpLocale || 'en';
 
 function isValidJson(str) {
     try {

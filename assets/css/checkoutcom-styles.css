@@ -60,7 +60,6 @@ apple-pay-button {
     --apple-pay-button-border-radius: 3px;
     --apple-pay-button-padding: 2px 0px;
     --apple-pay-button-box-sizing: border-box;
-    margin-top: 15px;
 }
 
 /* For mobile devices */
@@ -207,8 +206,8 @@ apple-pay-button {
 
 
 .google-pay-button {
-    width: 160px;
-    height: 50px;
+    width: var(--wallet-button-width);
+    height: var(--wallet-button-height);
     background-origin: content-box;
     background-position: center;
     background-repeat: no-repeat;
@@ -219,8 +218,7 @@ apple-pay-button {
     outline: 0;
     padding: 11px 24px;
     cursor: pointer;
-    float: right;
-    margin-top: 15px;
+    display: inline-block;
 }
 .google-pay-white {
     background-color: #fff;
@@ -637,6 +635,31 @@ ul.wc_payment_methods label[for*="payment_method_wc_checkout_com_"] img {
     vertical-align: middle;
 }
 
+/* Ensure Checkout.com card payment method title is left-aligned with minimal spacing */
+.woocommerce-checkout ul.wc_payment_methods li.payment_method_wc_checkout_com_cards > label {
+    display: inline-block !important;
+    text-align: left !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    line-height: 1.4 !important;
+}
+
+/* Ensure the card list item itself has no extra spacing */
+.woocommerce-checkout ul.wc_payment_methods li.payment_method_wc_checkout_com_cards {
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+}
+
+/* Flow payment method: minimal CSS like Stripe - let WooCommerce handle defaults */
+.woocommerce-checkout #payment .payment_methods li.payment_method_wc_checkout_com_flow > input[type="radio"] {
+    vertical-align: middle;
+    margin-right: 0.5em;
+}
+
+.woocommerce-checkout #payment .payment_methods li.payment_method_wc_checkout_com_flow > label[for="payment_method_wc_checkout_com_flow"] {
+    vertical-align: middle;
+}
+
 .woocommerce-SavedPaymentMethods-token{
     display: -webkit-box;
 }
@@ -699,4 +722,59 @@ ul.wc_payment_methods label[for*="payment_method_wc_checkout_com_"] img {
 .sepa-example {
     font-size: 14px;
     font-weight: 800;
+}
+
+/* Express checkout containers - keep styling minimal so themes can control layout */
+.cko-express-checkout-container,
+.cko-apple-pay-product-button,
+.cko-google-pay-product-button,
+.cko-paypal-product-button,
+.cko-apple-pay-cart-button,
+.cko-google-pay-cart-button,
+.cko-paypal-cart-button {
+    margin: 1em 0;
+}
+
+.cko-express-checkout-container h3,
+.cko-apple-pay-product-button h3,
+.cko-google-pay-product-button h3,
+.cko-paypal-product-button h3,
+.cko-apple-pay-cart-button h3,
+.cko-google-pay-cart-button h3,
+.cko-paypal-cart-button h3 {
+    margin: 0 0 0.75em 0;
+}
+
+.cko-express-checkout-buttons {
+    display: block;
+}
+
+.cko-express-checkout-buttons > div {
+    margin: 0.5em 0;
+}
+
+#cko-express-checkout-element,
+#cko-express-checkout-element-cart,
+#cko-express-checkout-element-checkout,
+.cko-express-checkout-shop-compact {
+    margin: 1em 0;
+}
+
+.cko-express-checkout-shop-compact > div {
+    margin: 0.5em 0;
+}
+
+#cko-apple-pay-button-wrapper,
+#cko-google-pay-button-wrapper,
+#cko-paypal-button-wrapper,
+#cko-apple-pay-button-wrapper-cart,
+#cko-google-pay-button-wrapper-cart,
+#cko-paypal-button-wrapper-cart {
+    display: block;
+    max-width: 100%;
+}
+
+.cko-disabled {
+    opacity: 0.6;
+    pointer-events: none;
 }

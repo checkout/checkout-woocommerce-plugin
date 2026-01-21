@@ -4,7 +4,7 @@ Checkout.com Payment Gateway plugin for WooCommerce with Flow integration suppor
 
 ## Version
 
-**Current Version:** 5.0.0
+**Current Version:** 5.0.1
 
 ## Features
 
@@ -12,8 +12,9 @@ Checkout.com Payment Gateway plugin for WooCommerce with Flow integration suppor
 - **Checkout.com Flow** - Modern, secure payment processing using Checkout.com's Flow Web Components
 - **Saved Cards** - Customers can save payment methods for future use
 - **3D Secure (3DS)** - Full support for 3D Secure authentication
+- **3DS Return Handling** - Server-side processing on return to reduce client-side failures
 - **Card Validation** - Real-time card validation before order creation
-- **Webhook Processing** - Reliable webhook handling with queue system
+- **Webhook Processing** - Reliable webhook handling with queue system and duplicate detection
 - **Order Management** - Automatic order status updates based on payment status
 
 ### Payment Methods Supported
@@ -38,7 +39,7 @@ Checkout.com Payment Gateway plugin for WooCommerce with Flow integration suppor
 
 1. **Secret Key** - Your Checkout.com secret key
 2. **Public Key** - Your Checkout.com public key
-3. **Webhook URL** - Configure in Checkout.com Hub:
+3. **Webhook URL** - Configure in Plugin Settings
    ```
    https://your-site.com/?wc-api=wc_checkoutcom_webhook
    ```
@@ -49,6 +50,162 @@ Checkout.com Payment Gateway plugin for WooCommerce with Flow integration suppor
 - Configure Flow appearance and behavior
 - Set up saved cards functionality
 - Configure 3DS settings
+
+### Quick Setup (Flow)
+
+1. In WordPress, go to **Plugins → Checkout.com Payment Gateway → Settings**.
+2. If the Checkout.com gateways are disabled, enable them in **WooCommerce → Settings → Payments**.
+3. In **Quick Setup**, set:
+   - **Checkout Mode**: Flow
+   - **Environment**: Sandbox (or Live)
+   - **Account Type**: NAS (if applicable)
+   - **Secret Key** and **Public Key**
+   - **Payment Method Title**
+4. Under **Webhook Status**, click **Refresh Status**.
+5. If not configured, click **Register Webhook**.
+6. (Optional) Set **Enabled Payment Methods** for Flow.
+7. Click **Save changes**.
+
+## Upgrade Your WooCommerce Integration to Flow
+
+
+
+Follow this guide to upgrade your WooCommerce plugin to Flow.
+
+### Before You Begin
+
+- Ensure your WordPress and WooCommerce instances are up to date.
+- You need the following Checkout.com API credentials:
+  - Public key
+  - Secret key
+  - Signature key
+
+### Key Considerations
+
+- Your existing Checkout.com keys will continue to work after upgrading.
+- Make sure all required APMs and wallet methods are selected under **Enabled Payment Methods** (Flow).
+- Confirm with Checkout.com Support that those APMs and wallets are onboarded for **Flow** on your account.
+
+### Upgrade Steps
+
+1. **Install the updated plugin**
+   - Use the WordPress plugin directory:
+     - Go to **Plugins → Add New**.
+     - Search for **Checkout.com Payment Gateway**.
+     - Select **Install Now**, then **Activate Plugin**.
+   - Or install manually:
+     - Download the latest release from the WooCommerce plugin repository.
+     - Go to **Plugins → Add New → Upload Plugin → Choose file**.
+     - Upload the ZIP file and select **Install Now**, then **Activate Plugin**.
+2. **Configure the plugin**
+   - Go to **Checkout.com → Quick Settings**.
+   - Set **Checkout Mode** to **Flow**.
+   - Set **Environment** to **Sandbox** or **Live** depending on the environment you are upgrading.
+   - Your existing **Public Key** and **Secret Key** will be pre-populated during upgrade.
+   - Set **Payment Method Title**.
+   - Use **Refresh Status** (Webhook) to check the webhook status.
+   - If not registered, select **Register Webhook**.
+   - If already registered, you will see a green confirmation line with the webhook URL.
+   - Recheck **Card Settings** and **Order Settings**; existing values remain, no changes needed.
+   - For **Express Payments**, follow the instructions under **Express Payments**.
+   - For Flow look-and-feel changes, update **Flow Settings**.
+3. **Test your updated integration**
+   - Follow WooCommerce test instructions and confirm order updates in WooCommerce.
+
+### Go Live
+
+After validating the upgrade:
+- Set **Environment** to **Live**.
+- Set **Secret Key** and **Public Key** to your production keys.
+
+## Apple Pay Setup Guide
+
+**Path A: New merchant (Flow checkout)**
+- Complete Checkout.com Apple Pay for web (Flow) setup:
+  https://www.checkout.com/docs/payments/add-payment-methods/apple-pay/web
+- Enable **Apple Pay** in **Quick Setup**.
+- For **Fast Checkout** (Express Checkout), configure Apple Pay under **Express Checkout**:
+  https://www.checkout.com/docs/payments/add-payment-methods/apple-pay/api-only
+
+**Path B: Upgrading from classic checkout**
+- Ask Checkout.com support to enable Apple Pay for **Flow** and share your **site URL/domain**:
+  https://www.checkout.com/docs/payments/add-payment-methods/apple-pay/web
+- Enable **Apple Pay** in **Quick Setup** and save.
+
+**Path C: Express Checkout already configured**
+- Go to **Express Checkout** settings and verify Apple Pay.
+- Enable **Fast Checkout**.
+
+### Express Payments (Apple Pay) Guide
+
+Use this if you want Apple Pay buttons outside the Flow card form.
+
+#### If you already have Apple Pay configured
+- Go to **Checkout.com → Express Payments → Apple Pay**.
+- You should see **✅ Setup Detected** with a prompt to run **Step 4: Test Certificate and Key**.
+- Click **Test Certificate and Key** to verify compatibility with the new plugin version.
+- No other changes are needed unless the test fails.
+
+#### Full setup (new or reconfiguration)
+Apple Pay setup requires moving between **Checkout.com Settings** and your **Apple Developer** account. You will generate files in the plugin, upload them to Apple, download certificates from Apple, and upload them back in the plugin.
+
+1. **Step 1a: Generate Certificate Signing Request (CSR)**
+   - Create a Merchant ID in Apple Developer if needed.
+   - Generate the CSR in the plugin and upload it to Apple Developer within 24 hours.
+2. **Step 1b: Upload Domain Association File**
+   - Download the domain association file from Apple Developer and upload it here.
+   - Verify the file is publicly accessible at:
+     `https://YOUR-DOMAIN/.well-known/apple-developer-merchantid-domain-association.txt`
+   - For Bitnami, you may need to place it manually:
+     `sudo cp /path/to/apple-developer-merchantid-domain-association.txt /opt/bitnami/apps/letsencrypt/.well-known/apple-developer-merchantid-domain-association.txt`
+3. **Step 3a: Generate Merchant Identity CSR and Key**
+   - Generate `uploadMe.csr` and `certificate_sandbox.key`.
+   - Upload the CSR to Apple Developer and download the signed certificate.
+4. **Step 3b: Upload and Convert Merchant Identity Certificate**
+   - Upload the signed certificate and convert it to PEM.
+5. **Step 4: Test Certificate and Key (Final Verification)**
+   - Ensure Merchant Identifier, Domain Name, Display Name, certificate, and key are configured.
+   - Click **Test Certificate and Key**.
+
+#### Apple Pay settings to verify
+- **Enable Apple Pay**
+- **Payment Method Title** and **Description**
+- **Merchant Identifier**
+- **Merchant Identity Certificate Path** and **Key Path**
+- **Domain Name** and **Display Name**
+
+#### Express Checkout settings
+- Enable **Apple Pay / Google Pay**
+- Choose where to show buttons (Product, Shop/Category, Cart, Checkout)
+- Configure appearance (Theme, Button Language)
+
+Docs: https://www.checkout.com/docs/payments/add-payment-methods/apple-pay/api-only
+
+## Google Pay Setup Guide
+
+**Path A: New merchant (Flow checkout)**
+- Enable **Google Pay** in **Quick Setup**.
+- For **Fast Checkout**, configure Google Pay under **Express Checkout**.
+
+**Path B: Upgrading from classic checkout**
+- Enable **Google Pay** in **Quick Setup** and save.
+
+**Path C: Express Checkout already configured**
+- Go to **Express Checkout** settings and verify Google Pay.
+- Enable **Fast Checkout**.
+
+## PayPal Setup Guide
+
+**Path A: New merchant (Flow checkout)**
+- Enable **PayPal** in **Quick Setup**.
+- For **Fast Checkout**, configure PayPal under **Express Checkout**.
+
+**Path B: Upgrading from classic checkout**
+- Enable **PayPal** in **Quick Setup** and save.
+
+**Path C: Express Checkout already configured**
+- Go to **Express Checkout** settings and verify PayPal.
+- Enable **Fast Checkout**.
 
 ## Flow Integration Details
 
@@ -86,6 +243,7 @@ The payment flow follows these steps:
 - Payment is processed securely through Checkout.com
 - For 3D Secure: Customer is redirected for authentication
 - Payment result is returned
+- For 3DS return: server-side handler processes the return and redirects to success page
 
 #### Step 6: Webhook Processing
 - Checkout.com sends webhook with payment status
@@ -152,8 +310,9 @@ The payment flow follows these steps:
 2. Customer is redirected to bank's 3DS page
 3. Customer completes authentication
 4. Customer is redirected back to store
-5. Payment status is confirmed via webhook
-6. Order status is updated accordingly
+5. Server-side handler processes the return and redirects to success page
+6. Payment status is confirmed via webhook
+7. Order status is updated accordingly
 
 **Features:**
 - Automatic 3DS detection
@@ -217,6 +376,7 @@ Update Order Status
 - **payment-session.js**: Handles order creation, payment session, Flow component integration
 - **flow-container.js**: Manages Flow component container and initialization
 - **flow-customization.js**: Customizes Flow component appearance and behavior
+- **modules/**: Flow modules (logger, state, 3DS detection, validation, guards)
 
 #### Backend (PHP)
 - **class-wc-gateway-checkout-com-flow.php**: Main gateway class, handles payment processing
@@ -267,7 +427,17 @@ checkout-com-unified-payments-api/
 │       ├── js/
 │       │   ├── payment-session.js
 │       │   ├── flow-container.js
-│       │   └── flow-customization.js
+│       │   ├── flow-customization.js
+│       │   └── modules/
+│       │       ├── flow-3ds-detection.js
+│       │       ├── flow-container-ready-handler.js
+│       │       ├── flow-field-change-handler.js
+│       │       ├── flow-initialization.js
+│       │       ├── flow-logger.js
+│       │       ├── flow-saved-card-handler.js
+│       │       ├── flow-state.js
+│       │       ├── flow-terms-prevention.js
+│       │       └── flow-updated-checkout-guard.js
 │       └── css/
 │           └── flow.css
 ├── includes/                              # Core functionality
@@ -286,6 +456,7 @@ checkout-com-unified-payments-api/
 - WooCommerce 3.0+
 - PHP 7.3+
 - SSL Certificate (required for production)
+- Tested up to WordPress 6.7.0 and WooCommerce 8.3.1
 
 ## Support
 
@@ -296,18 +467,14 @@ For support and integration help:
 
 ## License
 
-MIT License
+GPL v2 or later
 
 ## Changelog
 
-### Version 5.0.0
-- Initial Flow integration release
-- Complete Flow Web Components integration
-- Saved cards functionality
-- 3D Secure support
-- Webhook queue system
-- Enhanced order management
-- Comprehensive validation and error handling
+### Version 5.0.1
+- Flow module refactor for stability and 3DS return handling
+- Webhook duplicate detection and improved matching
+- Checkout styling updates for payment method title spacing
 
 ## Documentation
 

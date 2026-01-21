@@ -44,8 +44,23 @@ class Checkout_SDK {
 			return;
 		}
 		
-		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
-		$environment   = 'sandbox' === $core_settings['ckocom_environment'] ? Environment::sandbox() : Environment::production();
+		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		
+		// Validate that API keys are present before initializing SDK
+		// This prevents errors when keys are being registered/updated
+		$public_key = $use_fallback ? ( $core_settings['fallback_ckocom_pk'] ?? '' ) : ( $core_settings['ckocom_pk'] ?? '' );
+		$secret_key = $use_fallback ? ( $core_settings['fallback_ckocom_sk'] ?? '' ) : ( $core_settings['ckocom_sk'] ?? '' );
+		
+		if ( empty( $public_key ) || empty( $secret_key ) ) {
+			// Keys not set yet - this is normal during initial setup or key registration
+			// Don't initialize SDK, but don't log as error (only log if WP_DEBUG is enabled)
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				WC_Checkoutcom_Utility::logger( 'Checkout.com SDK not initialized: API keys not configured yet.' );
+			}
+			return;
+		}
+		
+		$environment   = 'sandbox' === ( $core_settings['ckocom_environment'] ?? 'sandbox' ) ? Environment::sandbox() : Environment::production();
 		$subdomain     = ! isset( $core_settings['ckocom_region'] ) ? '--' : $core_settings['ckocom_region'];
 
 		$this->nas_account_type = cko_is_nas_account();
@@ -56,17 +71,17 @@ class Checkout_SDK {
 			$builder = CheckoutSdk::builder()->previous()->staticKeys();
 		}
 
-		$builder->publicKey( $core_settings['ckocom_pk'] );
-		$builder->secretKey( $core_settings['ckocom_sk'] );
+		$builder->publicKey( $public_key );
+		$builder->secretKey( $secret_key );
 		$builder->environment( $environment );
 
-		if ( '--' !== $subdomain ) {
+		if ( '--' !== $subdomain && 'global' !== $subdomain ) {
 			$builder->environmentSubdomain( $subdomain );
 		}
 
 		if ( $use_fallback ) {
-			$builder->publicKey( $core_settings['fallback_ckocom_pk'] );
-			$builder->secretKey( $core_settings['fallback_ckocom_sk'] );
+			$builder->publicKey( $core_settings['fallback_ckocom_pk'] ?? '' );
+			$builder->secretKey( $core_settings['fallback_ckocom_sk'] ?? '' );
 		}
 
 		try {

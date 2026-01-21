@@ -19,6 +19,17 @@ $table_name = $wpdb->prefix . 'cko_pending_webhooks';
 // Check if running from command line
 $is_cli = php_sapi_name() === 'cli';
 
+// Require admin capability for browser access
+if ( ! $is_cli ) {
+	if ( ! is_user_logged_in() ) {
+		wp_die( esc_html__( 'You must be logged in to view this page.', 'checkout-com-unified-payments-api' ) );
+	}
+
+	if ( ! current_user_can( 'manage_woocommerce' ) ) {
+		wp_die( esc_html__( 'You do not have permission to view this page.', 'checkout-com-unified-payments-api' ) );
+	}
+}
+
 if ($is_cli) {
     // Command line output
     echo "========================================\n";
@@ -130,7 +141,7 @@ if ($is_cli) {
             
             <?php
             // Get records
-            $limit = isset($_GET['limit']) ? intval($_GET['limit']) : 50;
+    $limit = isset($_GET['limit']) ? absint($_GET['limit']) : 50;
             $records = $wpdb->get_results($wpdb->prepare(
                 "SELECT * FROM $table_name ORDER BY created_at DESC LIMIT %d",
                 $limit
@@ -180,7 +191,7 @@ if ($is_cli) {
                 </table>
                 
                 <?php if (isset($_GET['view'])): 
-                    $view_id = intval($_GET['view']);
+                    $view_id = absint($_GET['view']);
                     $webhook = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_name WHERE id = %d", $view_id));
                     if ($webhook):
                 ?>

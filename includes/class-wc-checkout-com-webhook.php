@@ -147,6 +147,65 @@ class WC_Checkout_Com_Webhook {
 		$order->update_meta_data( '_cko_payment_id', $payment_id );
 		$order->update_meta_data( 'cko_payment_authorized', true );
 
+		// CRITICAL: Ensure payment method title is correct before status update (for Flow gateway)
+		// WooCommerce generates "Payment via [title]" note when update_status() is called
+		WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] ========== CHECKING PAYMENT METHOD TITLE (AUTHORIZE) ==========' );
+		WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] Order ID: ' . $order_id );
+		WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] Order payment method: ' . $order->get_payment_method() );
+		WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] Is Flow gateway: ' . ( $order->get_payment_method() === 'wc_checkout_com_flow' ? 'YES' : 'NO' ) );
+		
+		if ( $order->get_payment_method() === 'wc_checkout_com_flow' ) {
+			$payment_type = $order->get_meta( '_cko_flow_payment_type' );
+			WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] Payment type from meta: ' . ( $payment_type ?: 'EMPTY' ) );
+			
+			if ( ! empty( $payment_type ) ) {
+				$available_gateways = WC()->payment_gateways()->get_available_payment_gateways();
+				WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] Available gateways count: ' . count( $available_gateways ) );
+				WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] Available gateway IDs: ' . implode( ', ', array_keys( $available_gateways ) ) );
+				
+				$gateway = isset( $available_gateways[ $order->get_payment_method() ] ) ? $available_gateways[ $order->get_payment_method() ] : null;
+				WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] Gateway found: ' . ( $gateway ? 'YES' : 'NO' ) );
+				WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] Gateway class: ' . ( $gateway ? get_class( $gateway ) : 'N/A' ) );
+				
+				if ( $gateway ) {
+					$has_method = is_callable( array( $gateway, 'get_payment_method_title_by_type' ) );
+					WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] Method exists (public): ' . ( $has_method ? 'YES' : 'NO' ) );
+					
+					if ( $has_method ) {
+						$correct_title = $gateway->get_payment_method_title_by_type( $order, null );
+						$current_title = $order->get_payment_method_title();
+						
+						WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] Current title: ' . $current_title );
+						WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] Correct title: ' . $correct_title );
+						
+						// CRITICAL: Always set and save the title before update_status() to ensure WooCommerce uses it
+						// WooCommerce generates "Payment via [title]" note during update_status() using get_payment_method_title()
+						// Even if title appears correct, we need to ensure it's persisted and order is reloaded
+						WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] ✅ FORCING UPDATE - Setting title to: ' . $correct_title . ' before update_status()' );
+						$order->set_payment_method_title( $correct_title );
+						$order->save();
+						
+						// Reload order to ensure the title is persisted before update_status() reads it
+						// WooCommerce may cache the order object, so we need a fresh instance
+						clean_post_cache( $order_id );
+						$order = wc_get_order( $order_id );
+						$verified_title = $order ? $order->get_payment_method_title() : 'N/A';
+						WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] ✅ Title set and saved. Verified after reload: ' . $verified_title );
+					} else {
+						WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] ❌ Method get_payment_method_title_by_type not found' );
+					}
+				} else {
+					WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] ❌ Gateway not found in available gateways' );
+				}
+			} else {
+				WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] ❌ Payment type metadata is empty' );
+			}
+		} else {
+			WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] ⏭️ Not a Flow gateway order, skipping' );
+		}
+		
+		WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] ========== CHECK COMPLETE (AUTHORIZE) ==========' );
+
 		$order->add_order_note( $message );
 		$order->update_status( $auth_status );
 
@@ -335,6 +394,66 @@ class WC_Checkout_Com_Webhook {
 			/* translators: %1$s: Payment ID, %2$s: Action ID, %3$s: Amount. */
 			$order_message = sprintf( esc_html__( 'Checkout.com Payment partially captured - Payment ID: %1$s, Action ID: %2$s, Amount: %3$s', 'checkout-com-unified-payments-api' ), $payment_id, $action_id, $formatted_amount );
 		}
+
+		// CRITICAL: Ensure payment method title is correct before status update (for Flow gateway)
+		// WooCommerce generates "Payment via [title]" note when update_status() is called
+		WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] ========== CHECKING PAYMENT METHOD TITLE (CAPTURE) ==========' );
+		WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] Order ID: ' . $order_id );
+		WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] Order payment method: ' . $order->get_payment_method() );
+		WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] Is Flow gateway: ' . ( $order->get_payment_method() === 'wc_checkout_com_flow' ? 'YES' : 'NO' ) );
+		
+		if ( $order->get_payment_method() === 'wc_checkout_com_flow' ) {
+			$payment_type = $order->get_meta( '_cko_flow_payment_type' );
+			WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] Payment type from meta: ' . ( $payment_type ?: 'EMPTY' ) );
+			
+			if ( ! empty( $payment_type ) ) {
+				$available_gateways = WC()->payment_gateways()->get_available_payment_gateways();
+				WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] Available gateways count: ' . count( $available_gateways ) );
+				WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] Available gateway IDs: ' . implode( ', ', array_keys( $available_gateways ) ) );
+				
+				$gateway = isset( $available_gateways[ $order->get_payment_method() ] ) ? $available_gateways[ $order->get_payment_method() ] : null;
+				WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] Gateway found: ' . ( $gateway ? 'YES' : 'NO' ) );
+				WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] Gateway class: ' . ( $gateway ? get_class( $gateway ) : 'N/A' ) );
+				
+				if ( $gateway ) {
+					// Check if method exists using reflection (for private methods)
+					$has_method = is_callable( array( $gateway, 'get_payment_method_title_by_type' ) );
+					WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] Method exists (public): ' . ( $has_method ? 'YES' : 'NO' ) );
+					
+					if ( $has_method ) {
+						$correct_title = $gateway->get_payment_method_title_by_type( $order, null );
+						$current_title = $order->get_payment_method_title();
+						
+						WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] Current title: ' . $current_title );
+						WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] Correct title: ' . $correct_title );
+						
+						// CRITICAL: Always set and save the title before update_status() to ensure WooCommerce uses it
+						// WooCommerce generates "Payment via [title]" note during update_status() using get_payment_method_title()
+						// Even if title appears correct, we need to ensure it's persisted and order is reloaded
+						WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] ✅ FORCING UPDATE - Setting title to: ' . $correct_title . ' before update_status()' );
+						$order->set_payment_method_title( $correct_title );
+						$order->save();
+						
+						// Reload order to ensure the title is persisted before update_status() reads it
+						// WooCommerce may cache the order object, so we need a fresh instance
+						clean_post_cache( $order_id );
+						$order = wc_get_order( $order_id );
+						$verified_title = $order ? $order->get_payment_method_title() : 'N/A';
+						WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] ✅ Title set and saved. Verified after reload: ' . $verified_title );
+					} else {
+						WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] ❌ Method get_payment_method_title_by_type not found' );
+					}
+				} else {
+					WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] ❌ Gateway not found in available gateways' );
+				}
+			} else {
+				WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] ❌ Payment type metadata is empty' );
+			}
+		} else {
+			WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] ⏭️ Not a Flow gateway order, skipping' );
+		}
+		
+		WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] ========== CHECK COMPLETE (CAPTURE) ==========' );
 
 		// add notes for the order and update status.
 		$order->add_order_note( $order_message );

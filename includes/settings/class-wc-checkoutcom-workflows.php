@@ -65,21 +65,175 @@ class WC_Checkoutcom_Workflows {
 	 */
 	public function __construct() {
 
-		$core_settings   = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
-		$environment     = ( 'sandbox' === $core_settings['ckocom_environment'] );
-		$subdomain_check = isset( $core_settings['ckocom_region'] ) && 'global' !== $core_settings['ckocom_region'];
+		$core_settings   = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		$environment     = ( 'sandbox' === ( $core_settings['ckocom_environment'] ?? 'sandbox' ) );
+		$region          = isset( $core_settings['ckocom_region'] ) ? sanitize_text_field( $core_settings['ckocom_region'] ) : '';
+		
+		// Valid region values: 'global', 'ksa', or empty string
+		// Filter out invalid values like '--' or other placeholders
+		$valid_regions = array( 'global', 'ksa' );
+		if ( ! empty( $region ) && ! in_array( $region, $valid_regions, true ) ) {
+			// Invalid region value, default to global (no subdomain)
+			$region = '';
+		}
+		
+		$subdomain_check = ! empty( $region ) && 'global' !== $region;
 
-		$core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
+		$secret_key_raw = $core_settings['ckocom_sk'] ?? '';
+		$this->secret_key = cko_is_nas_account() ? 'Bearer ' . $secret_key_raw : $secret_key_raw;
 
-		$this->secret_key = $core_settings['ckocom_sk'];
-
-		if ( $subdomain_check ) {
-			$this->url = $environment ? 'https://' . $core_settings['ckocom_region'] . '.api.sandbox.checkout.com/workflows' : 'https://' . $core_settings['ckocom_region'] . '.api.checkout.com/workflows';
+		if ( $subdomain_check && ! empty( $region ) ) {
+			$this->url = $environment ? 'https://' . $region . '.api.sandbox.checkout.com/workflows' : 'https://' . $region . '.api.checkout.com/workflows';
 		} else {
 			$this->url = $environment ? 'https://api.sandbox.checkout.com/workflows' : 'https://api.checkout.com/workflows';
 		}
 
 		$this->checkout = new Checkout_SDK();
+	}
+
+	/**
+	 * Normalize a webhook URL for comparison.
+	 *
+	 * @param string $url Webhook URL.
+	 *
+	 * @return string
+	 */
+	private function normalize_webhook_url( $url ): string {
+		$url = trim( (string) $url );
+		if ( '' === $url ) {
+			return '';
+		}
+
+		$parsed = wp_parse_url( $url );
+		if ( false === $parsed ) {
+			return $url;
+		}
+
+		$host   = isset( $parsed['host'] ) ? strtolower( $parsed['host'] ) : '';
+		$host   = str_replace( 'www.', '', $host );
+		$path   = isset( $parsed['path'] ) ? $parsed['path'] : '/';
+		$query  = isset( $parsed['query'] ) ? $parsed['query'] : '';
+
+		$path = '/' . ltrim( $path, '/' );
+		if ( '/' !== $path ) {
+			$path = untrailingslashit( $path );
+		}
+
+		$normalized = $host . $path;
+		if ( '' !== $query ) {
+			$normalized .= '?' . $query;
+		}
+
+		return $normalized;
+	}
+
+	/**
+	 * Generate a short workflow name for the webhook.
+	 *
+	 * @param string $url Webhook URL.
+	 *
+	 * @return string
+	 */
+	private function generate_workflow_name( $url ): string {
+		$parsed = wp_parse_url( $url );
+		$host   = isset( $parsed['host'] ) ? strtolower( $parsed['host'] ) : '';
+		$host   = str_replace( 'www.', '', $host );
+
+		return $host ? sprintf( 'WC-CKO %s', $host ) : 'WC-CKO';
+	}
+
+	/**
+	 * Extract action URLs from a workflow item.
+	 *
+	 * @param array $item Workflow item.
+	 *
+	 * @return array
+	 */
+	private function extract_action_urls( array $item ): array {
+		$urls    = [];
+		$actions = isset( $item['actions'] ) && is_array( $item['actions'] ) ? $item['actions'] : [];
+
+		foreach ( $actions as $action ) {
+			if ( isset( $action['url'] ) ) {
+				$urls[] = $action['url'];
+				continue;
+			}
+			if ( isset( $action['configuration']['url'] ) ) {
+				$urls[] = $action['configuration']['url'];
+				continue;
+			}
+			if ( isset( $action['configuration']['destination']['url'] ) ) {
+				$urls[] = $action['configuration']['destination']['url'];
+			}
+		}
+
+		return $urls;
+	}
+
+	/**
+	 * Find matching workflows by webhook URL.
+	 *
+	 * @param string $url Webhook URL.
+	 *
+	 * @return array
+	 */
+	public function get_matching_workflows( $url ): array {
+		$matches    = [];
+		$workflows  = $this->get_list();
+		$target_url = $this->normalize_webhook_url( $url );
+		$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
+
+		if ( $gateway_debug ) {
+			WC_Checkoutcom_Utility::logger( '[WORKFLOW MATCH] Target URL: ' . $target_url );
+			WC_Checkoutcom_Utility::logger( '[WORKFLOW MATCH] Total workflows returned: ' . count( $workflows ) );
+		}
+
+		if ( empty( $target_url ) || empty( $workflows ) ) {
+			return [];
+		}
+
+		foreach ( $workflows as $item ) {
+			$action_urls = $this->extract_action_urls( $item );
+			if ( $gateway_debug ) {
+				$action_count = is_array( $item['actions'] ?? null ) ? count( $item['actions'] ) : 0;
+				WC_Checkoutcom_Utility::logger( '[WORKFLOW MATCH] Workflow ID: ' . ( $item['id'] ?? 'N/A' ) . ' Name: ' . ( $item['name'] ?? 'N/A' ) . ' Actions: ' . $action_count );
+			}
+			foreach ( $action_urls as $action_url ) {
+				$action_url = $this->normalize_webhook_url( $action_url );
+				if ( $gateway_debug ) {
+					WC_Checkoutcom_Utility::logger( '[WORKFLOW MATCH] Compare action URL: ' . $action_url );
+				}
+				if ( '' !== $action_url && $action_url === $target_url ) {
+					$matches[] = [
+						'id'   => $item['id'] ?? '',
+						'name' => $item['name'] ?? '',
+						'url'  => $action_url,
+					];
+					break;
+				}
+			}
+
+			// Fallback: some older workflows store the URL in the name field.
+			if ( empty( $action_urls ) && ! empty( $item['name'] ) ) {
+				$name_url = $this->normalize_webhook_url( $item['name'] );
+				if ( $gateway_debug ) {
+					WC_Checkoutcom_Utility::logger( '[WORKFLOW MATCH] Compare name URL: ' . $name_url );
+				}
+				if ( '' !== $name_url && $name_url === $target_url ) {
+					$matches[] = [
+						'id'   => $item['id'] ?? '',
+						'name' => $item['name'] ?? '',
+						'url'  => $name_url,
+					];
+				}
+			}
+		}
+
+		if ( $gateway_debug ) {
+			WC_Checkoutcom_Utility::logger( '[WORKFLOW MATCH] Matches found: ' . count( $matches ) );
+		}
+
+		return $matches;
 	}
 
 	/**
@@ -103,19 +257,14 @@ class WC_Checkoutcom_Workflows {
 	 * @return string|null
 	 */
 	public function is_registered( $url = '' ): string {
-		$webhooks = $this->get_list();
-
 		if ( empty( $url ) ) {
-			$url = home_url( '/' );
+			$url = WC_Checkoutcom_Webhook::get_instance()->generate_current_webhook_url();
 		}
 
-		foreach ( $webhooks as $item ) {
-
-			if ( false !== strpos( $item['name'], $url ) ) {
-				$this->url_is_registered = $item['name'];
-
-				return $this->url_is_registered;
-			}
+		$matches = $this->get_matching_workflows( $url );
+		if ( 1 === count( $matches ) && ! empty( $matches[0]['name'] ) ) {
+			$this->url_is_registered = $matches[0]['name'];
+			return $this->url_is_registered;
 		}
 
 		return $this->url_is_registered;
@@ -132,38 +281,63 @@ class WC_Checkoutcom_Workflows {
 			return $this->list;
 		}
 
-		try {
-			$builder = $this->checkout->get_builder();
-			
-			// Check if SDK was properly initialized
-			if ( ! $builder ) {
-				WC_Checkoutcom_Utility::logger( 'Checkout.com SDK not initialized - cannot fetch workflows' );
-				return array();
-			}
-
-			$workflows = $builder->getWorkflowsClient()->getWorkflows();
-
-			if ( ! is_wp_error( $workflows ) && ! empty( $workflows ) ) {
-
-				if ( isset( $workflows['data'] ) && ! empty( $workflows['data'] ) ) {
-					$this->list = $workflows['data'];
-
-					return $this->list;
-				}
-			}
-		} catch ( CheckoutApiException $ex ) {
-			$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
-
-			$error_message = 'An error has occurred while processing workflow request. ';
-
-			if ( $gateway_debug ) {
-				$error_message .= $ex->getMessage();
-			}
-
-			WC_Checkoutcom_Utility::logger( $error_message, $ex );
+		// Use direct API call instead of SDK
+		if ( empty( $this->secret_key ) || empty( $this->url ) ) {
+			return array();
 		}
 
-		return $this->list;
+		// Validate URL before making request (prevent malformed URLs like ".api.sandbox.checkout.com")
+		if ( false === filter_var( $this->url, FILTER_VALIDATE_URL ) ) {
+			$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
+			if ( $gateway_debug ) {
+				WC_Checkoutcom_Utility::logger( 'Workflow API URL is invalid: ' . $this->url );
+			}
+			return array();
+		}
+
+		// Make direct API call to workflows endpoint
+		$response = wp_remote_get(
+			$this->url,
+			array(
+				'headers' => array(
+					'Authorization' => $this->secret_key,
+					'Content-Type'  => 'application/json',
+				),
+				'timeout' => 30,
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
+			if ( $gateway_debug ) {
+				WC_Checkoutcom_Utility::logger( 'Workflow API request error: ' . $response->get_error_message() . ' (URL: ' . $this->url . ')' );
+			}
+			return array();
+		}
+
+		$response_code = wp_remote_retrieve_response_code( $response );
+		if ( $response_code < 200 || $response_code >= 300 ) {
+			$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
+			if ( $gateway_debug ) {
+				$body = wp_remote_retrieve_body( $response );
+				WC_Checkoutcom_Utility::logger( 'Workflow API request failed with status ' . $response_code . ': ' . $body );
+			}
+			return array();
+		}
+
+		$body = wp_remote_retrieve_body( $response );
+		$data = json_decode( $body, true );
+
+		if ( isset( $data['data'] ) && ! empty( $data['data'] ) ) {
+			$this->list = $data['data'];
+			$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
+			if ( $gateway_debug ) {
+				WC_Checkoutcom_Utility::logger( '[WORKFLOW GET_LIST] Retrieved ' . count( $this->list ) . ' workflows' );
+			}
+			return $this->list;
+		}
+
+		return array();
 	}
 
 	/**
@@ -266,7 +440,7 @@ class WC_Checkoutcom_Workflows {
 		$workflow_request             = new CreateWorkflowRequest();
 		$workflow_request->actions    = [ $action_request ];
 		$workflow_request->conditions = [ $event_workflow_condition_request ];
-		$workflow_request->name       = $url;
+		$workflow_request->name       = $this->generate_workflow_name( $url );
 		$workflow_request->active     = true;
 
 		$workflows = [];
@@ -275,7 +449,12 @@ class WC_Checkoutcom_Workflows {
 			
 			// Check if SDK was properly initialized
 			if ( ! $builder ) {
-				WC_Checkoutcom_Utility::logger( 'Checkout.com SDK not initialized - cannot create workflow' );
+				// Only log this error once per hour in admin context to avoid log spam
+				$transient_key = 'cko_workflows_create_sdk_error_logged';
+				if ( is_admin() && ! get_transient( $transient_key ) ) {
+					WC_Checkoutcom_Utility::logger( 'Checkout.com SDK not initialized - cannot create workflow. Please ensure vendor/autoload.php is loaded and API keys are configured.' );
+					set_transient( $transient_key, true, HOUR_IN_SECONDS );
+				}
 				return array();
 			}
 			

@@ -5,3 +5,15 @@ node_modules/
 **/**.mp4
 vendor/
 checkout-com-unified-payments-api.zip
+composer.phar
+
+# Docker files (local development only)
+.dockerignore
+docker-compose.yml
+docker-php.ini
+docker-start.sh
+
+# Allow releases directory (but ignore other files in releases/)
+!releases/
+releases/*
+!releases/*.zip
