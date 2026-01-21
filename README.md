@@ -66,6 +66,58 @@ Checkout.com Payment Gateway plugin for WooCommerce with Flow integration suppor
 6. (Optional) Set **Enabled Payment Methods** for Flow.
 7. Click **Save changes**.
 
+## Upgrade Your WooCommerce Integration to Flow
+
+
+
+Follow this guide to upgrade your WooCommerce plugin to Flow.
+
+### Before You Begin
+
+- Ensure your WordPress and WooCommerce instances are up to date.
+- You need the following Checkout.com API credentials:
+  - Public key
+  - Secret key
+  - Signature key
+
+### Key Considerations
+
+- Your existing Checkout.com keys will continue to work after upgrading.
+- Make sure all required APMs and wallet methods are selected under **Enabled Payment Methods** (Flow).
+- Confirm with Checkout.com Support that those APMs and wallets are onboarded for **Flow** on your account.
+
+### Upgrade Steps
+
+1. **Install the updated plugin**
+   - Use the WordPress plugin directory:
+     - Go to **Plugins → Add New**.
+     - Search for **Checkout.com Payment Gateway**.
+     - Select **Install Now**, then **Activate Plugin**.
+   - Or install manually:
+     - Download the latest release from the WooCommerce plugin repository.
+     - Go to **Plugins → Add New → Upload Plugin → Choose file**.
+     - Upload the ZIP file and select **Install Now**, then **Activate Plugin**.
+2. **Configure the plugin**
+   - Go to **Checkout.com → Quick Settings**.
+   - Set **Checkout Mode** to **Flow**.
+   - Set **Environment** to **Sandbox** or **Live** depending on the environment you are upgrading.
+   - Your existing **Public Key** and **Secret Key** will be pre-populated during upgrade.
+   - Set **Payment Method Title**.
+   - Use **Refresh Status** (Webhook) to check the webhook status.
+   - If not registered, select **Register Webhook**.
+   - If already registered, you will see a green confirmation line with the webhook URL.
+   - Recheck **Card Settings** and **Order Settings**; existing values remain, no changes needed.
+   - For **Express Payments**, follow the instructions under **Express Payments**.
+   - For Flow look-and-feel changes, update **Flow Settings**.
+3. **Test your updated integration**
+   - Follow WooCommerce test instructions and confirm order updates in WooCommerce.
+
+### Go Live
+
+After validating the upgrade:
+- Set **Environment** to **Live**.
+- Set **Secret Key** and **Public Key** to your production keys.
+
 ## Apple Pay Setup Guide
 
 **Path A: New merchant (Flow checkout)**
@@ -83,6 +135,51 @@ Checkout.com Payment Gateway plugin for WooCommerce with Flow integration suppor
 **Path C: Express Checkout already configured**
 - Go to **Express Checkout** settings and verify Apple Pay.
 - Enable **Fast Checkout**.
+
+### Express Payments (Apple Pay) Guide
+
+Use this if you want Apple Pay buttons outside the Flow card form.
+
+#### If you already have Apple Pay configured
+- Go to **Checkout.com → Express Payments → Apple Pay**.
+- You should see **✅ Setup Detected** with a prompt to run **Step 4: Test Certificate and Key**.
+- Click **Test Certificate and Key** to verify compatibility with the new plugin version.
+- No other changes are needed unless the test fails.
+
+#### Full setup (new or reconfiguration)
+Apple Pay setup requires moving between **Checkout.com Settings** and your **Apple Developer** account. You will generate files in the plugin, upload them to Apple, download certificates from Apple, and upload them back in the plugin.
+
+1. **Step 1a: Generate Certificate Signing Request (CSR)**
+   - Create a Merchant ID in Apple Developer if needed.
+   - Generate the CSR in the plugin and upload it to Apple Developer within 24 hours.
+2. **Step 1b: Upload Domain Association File**
+   - Download the domain association file from Apple Developer and upload it here.
+   - Verify the file is publicly accessible at:
+     `https://YOUR-DOMAIN/.well-known/apple-developer-merchantid-domain-association.txt`
+   - For Bitnami, you may need to place it manually:
+     `sudo cp /path/to/apple-developer-merchantid-domain-association.txt /opt/bitnami/apps/letsencrypt/.well-known/apple-developer-merchantid-domain-association.txt`
+3. **Step 3a: Generate Merchant Identity CSR and Key**
+   - Generate `uploadMe.csr` and `certificate_sandbox.key`.
+   - Upload the CSR to Apple Developer and download the signed certificate.
+4. **Step 3b: Upload and Convert Merchant Identity Certificate**
+   - Upload the signed certificate and convert it to PEM.
+5. **Step 4: Test Certificate and Key (Final Verification)**
+   - Ensure Merchant Identifier, Domain Name, Display Name, certificate, and key are configured.
+   - Click **Test Certificate and Key**.
+
+#### Apple Pay settings to verify
+- **Enable Apple Pay**
+- **Payment Method Title** and **Description**
+- **Merchant Identifier**
+- **Merchant Identity Certificate Path** and **Key Path**
+- **Domain Name** and **Display Name**
+
+#### Express Checkout settings
+- Enable **Apple Pay / Google Pay**
+- Choose where to show buttons (Product, Shop/Category, Cart, Checkout)
+- Configure appearance (Theme, Button Language)
+
+Docs: https://www.checkout.com/docs/payments/add-payment-methods/apple-pay/api-only
 
 ## Google Pay Setup Guide
 

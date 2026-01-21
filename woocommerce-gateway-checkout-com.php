@@ -1116,7 +1116,11 @@ function cko_admin_enqueue_scripts( $hook ) {
 			'wc_checkout_com_alternative_payments',
 		);
 
-		if ( ! in_array( $section, $allowed_sections, true ) && ! in_array( $screen, array( 'advanced', 'webhook_queue', 'debug_settings' ), true ) ) {
+		// Allow main Payments list (no section/screen) so admin.js can hide duplicate gateways.
+		if ( ! empty( $section )
+			&& ! in_array( $section, $allowed_sections, true )
+			&& ! in_array( $screen, array( 'advanced', 'webhook_queue', 'debug_settings' ), true )
+		) {
 			return;
 		}
 	}
