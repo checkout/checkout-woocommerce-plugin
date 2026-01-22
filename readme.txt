@@ -2,7 +2,7 @@
 Contributors: checkoutintegration
 Tags: checkout, payments, credit card, payment gateway, apple pay, google pay, payment request
 Requires at least: 5.0
-Stable tag: 5.0.0
+Stable tag: 5.0.1
 Requires PHP: 7.3
 Tested up to: 6.7.0
 License: GPLv2 or later
@@ -179,6 +179,12 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v5.0.1 22nd January 2026
+- **[fix]** Multiple installation issue
+- **[fix]** Flow module refactor for stability and 3DS return handling
+- **[fix]** Webhook duplicate detection and improved matching
+- **[style]** Checkout styling updates for payment method title spacing
+
 v.5.0.0 18th December 2025
 - **[feat]** FLOW Integration :
 - Initial Flow integration release

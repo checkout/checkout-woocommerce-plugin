@@ -1,15 +1,15 @@
-# Copyright (C) 2025 Checkout.com
+# Copyright (C) 2026 Checkout.com
 # This file is distributed under the GPL v2 or later.
 msgid ""
 msgstr ""
-"Project-Id-Version: Checkout.com Payment Gateway 5.0.0\n"
-"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/checkout-com-unified-payments-api\n"
+"Project-Id-Version: Checkout.com Payment Gateway 5.0.1\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/woocommerce-gateway-checkout-com\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2025-12-18T12:10:17+00:00\n"
+"POT-Creation-Date: 2026-01-22T06:07:55+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.9.0\n"
 "X-Domain: checkout-com-unified-payments-api\n"
@@ -29,8 +29,8 @@ msgid "Extends WooCommerce by Adding the Checkout.com Gateway."
 msgstr ""
 
 #. Author of the plugin
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:28
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:30
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:31
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:35
 #: includes/apms/class-wc-gateway-checkout-com-alternative-payments-boleto.php:23
 #: includes/apms/class-wc-gateway-checkout-com-alternative-payments-fawry.php:23
 #: includes/apms/class-wc-gateway-checkout-com-alternative-payments-ideal.php:23
@@ -45,7 +45,18 @@ msgstr ""
 msgid "Checkout.com"
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:29
+#: check-database-indexes.php:46
+#: view-webhook-queue.php:25
+msgid "You must be logged in to view this page."
+msgstr ""
+
+#: check-database-indexes.php:50
+#: includes/admin/class-wc-checkoutcom-diagnostics.php:47
+#: view-webhook-queue.php:29
+msgid "You do not have permission to view this page."
+msgstr ""
+
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:32
 #: includes/apms/class-wc-gateway-checkout-com-alternative-payments-boleto.php:24
 #: includes/apms/class-wc-gateway-checkout-com-alternative-payments-fawry.php:24
 #: includes/apms/class-wc-gateway-checkout-com-alternative-payments-ideal.php:24
@@ -59,264 +70,377 @@ msgstr ""
 msgid "The Checkout.com extension allows shop owners to process online payments through the <a href=\"https://www.checkout.com\">Checkout.com Payment Gateway.</a>"
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:264
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:257
+#: includes/class-wc-gateway-checkout-com-google-pay.php:28
+#: includes/settings/admin/class-wc-checkoutcom-admin.php:138
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1165
+msgid "Google Pay"
+msgstr ""
+
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:258
+#: includes/class-wc-gateway-checkout-com-apple-pay.php:26
+#: includes/settings/admin/class-wc-checkoutcom-admin.php:142
+msgid "Apple Pay"
+msgstr ""
+
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:259
+#: includes/class-wc-gateway-checkout-com-paypal.php:28
+#: includes/settings/admin/class-wc-checkoutcom-admin.php:146
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1318
+msgid "PayPal"
+msgstr ""
+
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:265
+#: includes/apms/class-wc-gateway-checkout-com-alternative-payments-alipay.php:23
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:265
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1457
+msgid "Alipay"
+msgstr ""
+
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:266
+#: includes/apms/class-wc-gateway-checkout-com-alternative-payments-boleto.php:25
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:266
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1458
+msgid "Boleto"
+msgstr ""
+
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:267
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:267
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1459
+msgid "iDEAL"
+msgstr ""
+
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:268
+#: includes/apms/class-wc-gateway-checkout-com-alternative-payments-klarna.php:28
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:268
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1460
+msgid "Klarna"
+msgstr ""
+
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:269
+#: includes/apms/class-wc-gateway-checkout-com-alternative-payments-poli.php:23
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:269
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1461
+msgid "Poli"
+msgstr ""
+
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:270
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:270
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1462
+msgid "Sepa Direct Debit"
+msgstr ""
+
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:271
+#: includes/apms/class-wc-gateway-checkout-com-alternative-payments-sofort.php:23
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:271
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1463
+msgid "Sofort"
+msgstr ""
+
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:272
+#: includes/apms/class-wc-gateway-checkout-com-alternative-payments-eps.php:23
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:272
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1464
+msgid "EPS"
+msgstr ""
+
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:273
+#: includes/apms/class-wc-gateway-checkout-com-alternative-payments-bancontact.php:23
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:273
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1465
+msgid "Bancontact"
+msgstr ""
+
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:274
+#: includes/apms/class-wc-gateway-checkout-com-alternative-payments-knet.php:23
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:274
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1466
+msgid "KNET"
+msgstr ""
+
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:275
+#: includes/apms/class-wc-gateway-checkout-com-alternative-payments-fawry.php:25
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:275
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1467
+msgid "Fawry"
+msgstr ""
+
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:276
+#: includes/apms/class-wc-gateway-checkout-com-alternative-payments-qpay.php:23
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:276
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1468
+msgid "QPay"
+msgstr ""
+
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:277
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:277
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1469
+msgid "Multibanco"
+msgstr ""
+
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:278
+msgid "Alma"
+msgstr ""
+
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:703
 #: includes/class-wc-gateway-checkout-com-alternative-payments.php:67
 #: includes/class-wc-gateway-checkout-com-apple-pay.php:114
-#: includes/class-wc-gateway-checkout-com-cards.php:183
+#: includes/class-wc-gateway-checkout-com-cards.php:193
 #: includes/class-wc-gateway-checkout-com-google-pay.php:994
-#: includes/class-wc-gateway-checkout-com-paypal.php:867
+#: includes/class-wc-gateway-checkout-com-paypal.php:877
 msgid "Other Settings"
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:306
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:747
 msgid "Loading..."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:307
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:748
 msgid "Loading...Do NOT refresh."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:1421
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:1858
 msgid "%s ending in %s (expires %s/%s)"
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:1423
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:1860
 msgid "(default)"
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:1437
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:1874
 msgid "Use a new payment method"
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:1516
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:1521
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:1525
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:1547
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:1552
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:1556
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:1952
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:1957
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:1961
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:1983
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:1988
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:1992
 msgid "Order not found. Please try again."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:1889
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:3506
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:2360
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:4148
 msgid "Payment was not approved. Please try again."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:1893
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:3510
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:2364
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:4152
 msgid "Payment failed with status: %s"
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:1897
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:3531
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:3578
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:2368
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:4173
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:4220
 msgid "Payment was not approved by Checkout.com"
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:1898
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:2369
 msgid "Payment declined - Payment ID: %s, Reason: %s"
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2015
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2019
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2023
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2028
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:2536
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:2540
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:2544
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:2549
 msgid "Checkout.com Payment Authorised - using FLOW (3DS return): %s - Payment ID: %s, Amount: %s"
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2033
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:2554
 msgid "Checkout.com Payment Flagged (3DS return) - Payment ID: %s, Amount: %s"
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2046
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:3438
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:3441
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:3444
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:3608
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:3612
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:2567
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:4080
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:4083
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:4086
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:4250
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:4254
 msgid "An error occurred while processing your payment. Please try again."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2103
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2284
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:2625
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:2806
 msgid "Saved payment method not found. Please try using a new payment method or refresh the page."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2104
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2285
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:2626
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:2807
 msgid "Payment failed - Saved card token not found"
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2105
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:2627
 msgid "Payment failed - Token ID %s not found. Available tokens: %s"
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2140
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2312
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2438
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2524
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:2662
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:2834
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:2960
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:3046
 msgid "Payment failed - Saved card payment error"
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2141
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2313
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2439
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2525
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:2663
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:2835
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:2961
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:3047
 msgid "Payment failed - Error: %s"
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2173
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2324
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2450
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2536
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:2695
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:2846
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:2972
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:3058
 msgid "Checkout.com 3d Redirect waiting - Payment ID: %1$s, URL: %2$s"
 msgstr ""
 
 #. translators: %1$s: Payment ID, %2$s: Action ID.
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2201
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2214
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2358
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2365
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2484
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2491
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2570
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2577
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:2723
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:2736
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:2880
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:2887
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:3006
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:3013
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:3092
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:3099
 msgid "Checkout.com Payment Authorised - Payment ID: %1$s, Action ID: %2$s"
 msgstr ""
 
 #. translators: %1$s: Payment ID, %2$s: Action ID.
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2209
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2362
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2488
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2574
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:2731
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:2884
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:3010
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:3096
 msgid "Checkout.com Payment Flagged - Payment ID: %1$s, Action ID: %2$s"
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2601
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:3123
 msgid "There was an issue completing the payment. Please complete the payment."
 msgstr ""
 
 #. translators: %1$s: payment type (e.g., card, applepay), %2$s: Payment ID.
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2732
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:3261
 msgid "Checkout.com Payment Authorised - using FLOW : %1$s - Payment ID: %2$s"
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2850
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:3379
 msgid "Payment failed. Please try again."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2950
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:3490
 msgid "There was an error processing your order. Please check your order history."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2983
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:3523
 msgid "Missing payment ID"
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:2983
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:3003
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:3009
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:3043
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:3276
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:3318
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:3322
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:3438
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:3441
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:3444
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:3612
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:3822
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:3523
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:3543
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:3549
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:3583
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:3821
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:3825
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:3863
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:3867
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:4080
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:4083
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:4086
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:4254
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:4604
 msgid "Payment Error"
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:3003
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:3543
 msgid "Order not found"
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:3009
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:3549
 msgid "Invalid order key"
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:3043
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:3583
 msgid "Payment processing error"
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:3276
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:3280
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:3821
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:3825
 msgid "Order not found and cart is empty. Please contact support."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:3318
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:3322
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:3863
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:3867
 msgid "Failed to create order. Please contact support."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:3592
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:4234
 msgid "Payment Failed"
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:3607
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:4249
 msgid "Payment processing failed due to an error."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:3651
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:4296
 msgid "Payment security check failed: Currency mismatch. Cart may have been modified during payment."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:3653
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:4298
 msgid "Security check failed: Payment currency does not match order. Please try again."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:3664
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:4316
 msgid "Payment security check failed: Amount mismatch. Payment amount (%s) does not match order total (%s). Cart may have been modified during payment."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:3666
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:4318
 msgid "Security check failed: Payment amount does not match order total. Your cart may have been modified during payment. Please try again."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:3798
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:4580
 msgid "Payment processing failed"
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:3802
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:4584
 msgid "Payment processing failed. Please try again."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:3822
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:4604
 msgid "Payment processing failed. Please contact support."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:4053
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:4223
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:4835
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:5011
 msgid "Shipping"
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:4235
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:5027
 msgid "Product"
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:4250
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:5046
 msgid "Payment Amount"
 msgstr ""
 
 #. translators: %s: Action ID.
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:4545
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:5355
 #: includes/class-wc-gateway-checkout-com-alternative-payments.php:132
 #: includes/class-wc-gateway-checkout-com-apple-pay.php:1715
-#: includes/class-wc-gateway-checkout-com-cards.php:963
+#: includes/class-wc-gateway-checkout-com-cards.php:1179
 msgid "Checkout.com Payment refunded from Admin - Action ID : %s"
 msgstr ""
 
 #. translators: %s: Action ID.
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:4551
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:5360
 #: includes/class-wc-gateway-checkout-com-alternative-payments.php:123
 #: includes/class-wc-gateway-checkout-com-apple-pay.php:1706
-#: includes/class-wc-gateway-checkout-com-cards.php:969
+#: includes/class-wc-gateway-checkout-com-cards.php:1185
 msgid "Checkout.com Payment Partially refunded from Admin - Action ID : %s"
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:5321
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:5781
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:6167
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:6466
 #: includes/class-wc-gateway-checkout-com-apple-pay.php:1943
 #: includes/class-wc-gateway-checkout-com-apple-pay.php:2182
 #: includes/class-wc-gateway-checkout-com-apple-pay.php:2643
@@ -327,136 +451,114 @@ msgstr ""
 msgid "Security check failed. Please refresh the page and try again."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:5334
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:6180
 msgid "Payment gateway not properly configured. Please contact support."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:5342
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:6188
 msgid "Invalid request data."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:5353
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:6199
 msgid "Invalid request format."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:5382
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:6228
 msgid "Failed to create payment session. Please try again."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:5398
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:6244
 msgid "Payment session error: "
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:5399
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:6245
 msgid "Error creating payment session. Please try again."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:5469
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:5890
-#: woocommerce-gateway-checkout-com.php:1714
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:6317
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:6575
+#: woocommerce-gateway-checkout-com.php:1984
 msgid "WooCommerce not available."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:5476
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:5897
-#: woocommerce-gateway-checkout-com.php:1721
-msgid "Checkout class not available."
-msgstr ""
-
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:5513
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:6352
 msgid "Using existing order."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:5545
-#: woocommerce-gateway-checkout-com.php:1745
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:6368
+#: woocommerce-gateway-checkout-com.php:2015
 msgid "Error during checkout validation: "
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:5570
-#: woocommerce-gateway-checkout-com.php:1764
-msgid "Could not access checkout update method."
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:6376
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:6582
+#: woocommerce-gateway-checkout-com.php:1991
+msgid "Checkout class not available."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:5579
-#: woocommerce-gateway-checkout-com.php:1769
-msgid "Error updating checkout session: "
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:6386
+msgid "Checkout API not available."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:5611
-#: woocommerce-gateway-checkout-com.php:1785
-msgid "Could not access checkout validate method."
-msgstr ""
-
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:5618
-#: woocommerce-gateway-checkout-com.php:1790
-msgid "Error validating checkout: "
-msgstr ""
-
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:5669
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:5765
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:5917
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:6395
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:6598
 msgid "Failed to create order. Please try again."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:5683
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:5926
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:6403
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:6608
 msgid "Failed to create order. Invalid order ID returned."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:5699
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:5938
-msgid "Order created but not found. Please try again."
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:6410
+msgid "Order not found after creation."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:5727
-msgid "Payment session ID conflict. Please refresh and try again."
-msgstr ""
-
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:5758
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:6451
 msgid "Order created successfully."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:5793
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:6478
 msgid "Missing required parameters."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:5803
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:6488
 msgid "Order not found."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:5815
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:6500
 msgid "Payment session ID already saved."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:5823
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:6508
 msgid "Payment session ID already exists with different value. Cannot overwrite."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:5838
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:6523
 msgid "Payment session ID saved successfully."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:5883
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:6568
 msgid "Payment was declined."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:5944
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:6686
 msgid "Payment declined before form submission"
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:5947
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:6689
 msgid "Payment declined (client-side) - Reason: %s, Message: %s"
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:5957
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:6699
 msgid "Failed order created successfully."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:5964
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:6706
 msgid "Error creating failed order: "
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:5983
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:6725
 #: includes/settings/class-wc-checkoutcom-logging-settings.php:288
 #: includes/settings/class-wc-checkoutcom-logging-settings.php:313
 #: includes/settings/class-wc-checkoutcom-logging-settings.php:334
@@ -464,190 +566,330 @@ msgstr ""
 msgid "Security check failed."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:6002
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:6744
 msgid "Save card preference stored."
 msgstr ""
 
-#: flow-integration/class-wc-gateway-checkout-com-flow.php:6008
+#: flow-integration/class-wc-gateway-checkout-com-flow.php:6750
 msgid "Session not available."
 msgstr ""
 
-#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:62
-msgid "Old webhooks cleaned up successfully."
+#: includes/admin/class-wc-checkoutcom-diagnostics.php:32
+#: includes/admin/class-wc-checkoutcom-diagnostics.php:33
+#: includes/admin/class-wc-checkoutcom-diagnostics.php:59
+msgid "Checkout.com Diagnostics"
 msgstr ""
 
-#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:75
-#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:86
-#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:104
-#: includes/settings/admin/class-wc-checkoutcom-admin.php:86
+#: includes/admin/class-wc-checkoutcom-diagnostics.php:62
+msgid "These tools are intended for troubleshooting by administrators."
+msgstr ""
+
+#: includes/admin/class-wc-checkoutcom-diagnostics.php:65
+msgid "Apple Pay Domain Association"
+msgstr ""
+
+#: includes/admin/class-wc-checkoutcom-diagnostics.php:69
+msgid "Directory"
+msgstr ""
+
+#: includes/admin/class-wc-checkoutcom-diagnostics.php:74
+msgid "File"
+msgstr ""
+
+#: includes/admin/class-wc-checkoutcom-diagnostics.php:79
+msgid "File URL"
+msgstr ""
+
+#: includes/admin/class-wc-checkoutcom-diagnostics.php:84
+msgid "Rewrite Rules"
+msgstr ""
+
+#: includes/admin/class-wc-checkoutcom-diagnostics.php:85
+msgid ".well-known rule"
+msgstr ""
+
+#: includes/admin/class-wc-checkoutcom-diagnostics.php:89
+msgid ".htaccess"
+msgstr ""
+
+#: includes/admin/class-wc-checkoutcom-diagnostics.php:90
+msgid "Server rule check"
+msgstr ""
+
+#: includes/admin/class-wc-checkoutcom-diagnostics.php:97
+msgid "File preview (first 200 chars):"
+msgstr ""
+
+#: includes/admin/class-wc-checkoutcom-diagnostics.php:103
+msgid "Apple Pay CSR Generation Test"
+msgstr ""
+
+#: includes/admin/class-wc-checkoutcom-diagnostics.php:104
+msgid "This will call Checkout.com and generate a CSR using your configured secret key."
+msgstr ""
+
+#: includes/admin/class-wc-checkoutcom-diagnostics.php:110
+msgid "Run CSR Test"
+msgstr ""
+
+#: includes/admin/class-wc-checkoutcom-diagnostics.php:139
+#: includes/class-wc-gateway-checkout-com-apple-pay.php:1960
+#: includes/class-wc-gateway-checkout-com-apple-pay.php:2271
+msgid "Secret key is not configured. Please configure Checkout.com settings first."
+msgstr ""
+
+#: includes/admin/class-wc-checkoutcom-diagnostics.php:194
+msgid "CSR request failed."
+msgstr ""
+
+#: includes/admin/class-wc-checkoutcom-diagnostics.php:208
+msgid "CSR generated successfully."
+msgstr ""
+
+#. translators: %s response code
+#: includes/admin/class-wc-checkoutcom-diagnostics.php:217
+msgid "CSR request failed with status %s."
+msgstr ""
+
+#: includes/admin/class-wc-checkoutcom-diagnostics.php:235
+msgid "Directory exists"
+msgstr ""
+
+#: includes/admin/class-wc-checkoutcom-diagnostics.php:236
+msgid "Directory missing"
+msgstr ""
+
+#: includes/admin/class-wc-checkoutcom-diagnostics.php:239
+msgid "File exists"
+msgstr ""
+
+#: includes/admin/class-wc-checkoutcom-diagnostics.php:240
+msgid "File missing"
+msgstr ""
+
+#: includes/admin/class-wc-checkoutcom-diagnostics.php:250
+msgid "Not checked"
+msgstr ""
+
+#: includes/admin/class-wc-checkoutcom-diagnostics.php:255
+msgid "Accessible (200)"
+msgstr ""
+
+#: includes/admin/class-wc-checkoutcom-diagnostics.php:257
+msgid "HTTP status: "
+msgstr ""
+
+#: includes/admin/class-wc-checkoutcom-diagnostics.php:273
+msgid "Rule found"
+msgstr ""
+
+#: includes/admin/class-wc-checkoutcom-diagnostics.php:274
+msgid "Rule not found"
+msgstr ""
+
+#: includes/admin/class-wc-checkoutcom-diagnostics.php:280
+msgid ".well-known rule present"
+msgstr ""
+
+#: includes/admin/class-wc-checkoutcom-diagnostics.php:281
+msgid ".well-known rule not found"
+msgstr ""
+
+#: includes/admin/class-wc-checkoutcom-diagnostics.php:283
+msgid ".htaccess not found (common on Nginx)"
+msgstr ""
+
+#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:36
+#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:37
+#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:108
+#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:138
+#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:156
+#: includes/settings/admin/class-wc-checkoutcom-admin.php:164
 msgid "Webhook Queue"
 msgstr ""
 
-#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:76
+#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:57
+msgid "You do not have sufficient permissions to access this page."
+msgstr ""
+
+#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:65
+msgid "Security check failed. Please try again."
+msgstr ""
+
+#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:70
+#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:109
 msgid "Webhook Queue class not found."
 msgstr ""
 
-#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:88
+#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:122
+msgid "Old webhooks cleaned up successfully. Deleted %d processed webhook(s) and %d unprocessed webhook(s)."
+msgstr ""
+
+#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:127
+msgid "Cleanup completed. No old webhooks found to delete."
+msgstr ""
+
+#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:140
 msgid "Table %s does not exist. Please ensure the plugin is activated."
 msgstr ""
 
-#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:108
+#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:160
 msgid "Total Webhooks"
 msgstr ""
 
-#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:112
-#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:185
+#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:164
+#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:237
 msgid "Pending"
 msgstr ""
 
-#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:116
-#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:181
+#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:168
+#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:233
 msgid "Processed"
 msgstr ""
 
-#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:133
+#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:185
 msgid "🔄 Refresh"
 msgstr ""
 
-#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:137
+#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:189
 msgid "Are you sure you want to delete all processed webhooks older than 7 days?"
 msgstr ""
 
-#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:138
+#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:190
 msgid "🗑️ Cleanup Old Processed"
 msgstr ""
 
-#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:145
+#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:197
 msgid "📭 No Webhooks Found"
 msgstr ""
 
-#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:146
+#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:198
 msgid "The table exists but contains no records."
 msgstr ""
 
-#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:152
+#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:204
 msgid "ID"
 msgstr ""
 
-#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:153
+#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:205
 msgid "Payment ID"
 msgstr ""
 
-#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:154
+#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:206
 msgid "Order ID"
 msgstr ""
 
-#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:155
+#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:207
 msgid "Payment Session ID"
 msgstr ""
 
-#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:156
+#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:208
 msgid "Type"
 msgstr ""
 
-#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:157
+#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:209
 msgid "Status"
 msgstr ""
 
-#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:158
+#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:210
 msgid "Created At"
 msgstr ""
 
-#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:159
+#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:211
 msgid "Processed At"
 msgstr ""
 
-#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:160
+#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:212
 msgid "Webhook Data"
 msgstr ""
 
-#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:196
+#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:248
 msgid "View Full JSON"
 msgstr ""
 
-#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:206
+#: includes/admin/class-wc-checkoutcom-webhook-queue-admin.php:258
 msgid "Showing latest 100 records. Total: %d records."
 msgstr ""
 
-#: includes/api/class-wc-checkoutcom-api-request.php:127
-#: includes/api/class-wc-checkoutcom-api-request.php:1182
+#: includes/api/class-wc-checkoutcom-api-request.php:130
+#: includes/api/class-wc-checkoutcom-api-request.php:1199
 msgid "An error has occurred while processing your payment. Redirection link not found"
 msgstr ""
 
-#: includes/api/class-wc-checkoutcom-api-request.php:145
+#: includes/api/class-wc-checkoutcom-api-request.php:148
 msgid "An error has occurred while processing your payment. Please check your card details and try again. "
 msgstr ""
 
 #. translators: 1: Response status, 2: Summary.
-#: includes/api/class-wc-checkoutcom-api-request.php:152
-#: includes/api/class-wc-checkoutcom-api-request.php:730
+#: includes/api/class-wc-checkoutcom-api-request.php:155
+#: includes/api/class-wc-checkoutcom-api-request.php:744
 msgid "Status : %1$s, Response summary : %2$s"
 msgstr ""
 
-#: includes/api/class-wc-checkoutcom-api-request.php:163
-#: includes/api/class-wc-checkoutcom-api-request.php:754
+#: includes/api/class-wc-checkoutcom-api-request.php:166
+#: includes/api/class-wc-checkoutcom-api-request.php:768
 msgid "An error has occurred while processing your payment. "
 msgstr ""
 
-#: includes/api/class-wc-checkoutcom-api-request.php:722
-#: includes/api/class-wc-checkoutcom-api-request.php:1191
+#: includes/api/class-wc-checkoutcom-api-request.php:736
+#: includes/api/class-wc-checkoutcom-api-request.php:1208
 msgid "An error has occurred while processing your payment. Please check your card details and try again."
 msgstr ""
 
-#: includes/api/class-wc-checkoutcom-api-request.php:833
+#: includes/api/class-wc-checkoutcom-api-request.php:849
 msgid "An error has occurred while processing your Google pay payment."
 msgstr ""
 
-#: includes/api/class-wc-checkoutcom-api-request.php:852
-#: includes/api/class-wc-checkoutcom-api-request.php:930
-#: includes/api/class-wc-checkoutcom-api-request.php:1009
+#: includes/api/class-wc-checkoutcom-api-request.php:869
+#: includes/api/class-wc-checkoutcom-api-request.php:947
+#: includes/api/class-wc-checkoutcom-api-request.php:1026
 msgid "An error has occurred. No Cko Payment Id"
 msgstr ""
 
 #. translators: 1: Order ID.
-#: includes/api/class-wc-checkoutcom-api-request.php:871
-#: includes/api/class-wc-checkoutcom-api-request.php:947
+#: includes/api/class-wc-checkoutcom-api-request.php:888
+#: includes/api/class-wc-checkoutcom-api-request.php:964
 msgid "Payment has already been voided or captured on Checkout.com hub for order Id : %s"
 msgstr ""
 
 #. translators: 1: Order ID.
-#: includes/api/class-wc-checkoutcom-api-request.php:888
+#: includes/api/class-wc-checkoutcom-api-request.php:905
 msgid "An error has occurred while processing your capture payment on Checkout.com hub. Order Id : %s"
 msgstr ""
 
-#: includes/api/class-wc-checkoutcom-api-request.php:904
+#: includes/api/class-wc-checkoutcom-api-request.php:921
 msgid "An error has occurred while processing your capture request."
 msgstr ""
 
 #. translators: 1: Order ID.
-#: includes/api/class-wc-checkoutcom-api-request.php:964
+#: includes/api/class-wc-checkoutcom-api-request.php:981
 msgid "An error has occurred while processing your void payment on Checkout.com hub. Order Id : %s"
 msgstr ""
 
-#: includes/api/class-wc-checkoutcom-api-request.php:980
+#: includes/api/class-wc-checkoutcom-api-request.php:997
 msgid "An error has occurred while processing your void request."
 msgstr ""
 
-#: includes/api/class-wc-checkoutcom-api-request.php:1038
-#: includes/api/class-wc-checkoutcom-api-request.php:1125
+#: includes/api/class-wc-checkoutcom-api-request.php:1055
+#: includes/api/class-wc-checkoutcom-api-request.php:1142
 msgid "An error has occurred while processing your refund. "
 msgstr ""
 
-#: includes/api/class-wc-checkoutcom-api-request.php:1070
+#: includes/api/class-wc-checkoutcom-api-request.php:1087
 msgid "Checkout.com Refund : Process via fallback account."
 msgstr ""
 
 #. translators: 1: Order ID.
-#: includes/api/class-wc-checkoutcom-api-request.php:1076
-#: includes/api/class-wc-checkoutcom-api-request.php:1111
+#: includes/api/class-wc-checkoutcom-api-request.php:1093
+#: includes/api/class-wc-checkoutcom-api-request.php:1128
 msgid "An error has occurred while processing your refund payment on Checkout.com hub. Order Id : %s"
 msgstr ""
 
-#: includes/api/class-wc-checkoutcom-api-request.php:1203
+#: includes/api/class-wc-checkoutcom-api-request.php:1220
 msgid "An error has occurred while creating apm payments. "
 msgstr ""
 
-#: includes/api/class-wc-checkoutcom-api-request.php:1871
+#: includes/api/class-wc-checkoutcom-api-request.php:1895
 msgid "An error has occurred while processing your payment."
 msgstr ""
 
@@ -655,27 +897,12 @@ msgstr ""
 msgid "An error has occurred while getting sepa info."
 msgstr ""
 
-#: includes/apms/class-wc-gateway-checkout-com-alternative-payments-alipay.php:23
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1202
-msgid "Alipay"
-msgstr ""
-
 #: includes/apms/class-wc-gateway-checkout-com-alternative-payments-alipay.php:38
 msgid "Pay with Alipay. You will be redirected upon place order"
 msgstr ""
 
-#: includes/apms/class-wc-gateway-checkout-com-alternative-payments-bancontact.php:23
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1210
-msgid "Bancontact"
-msgstr ""
-
 #: includes/apms/class-wc-gateway-checkout-com-alternative-payments-bancontact.php:38
 msgid "Pay with Bancontact. You will be redirected upon place order"
-msgstr ""
-
-#: includes/apms/class-wc-gateway-checkout-com-alternative-payments-boleto.php:25
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1203
-msgid "Boleto"
 msgstr ""
 
 #: includes/apms/class-wc-gateway-checkout-com-alternative-payments-boleto.php:57
@@ -686,18 +913,8 @@ msgstr ""
 msgid "Please enter your CPF"
 msgstr ""
 
-#: includes/apms/class-wc-gateway-checkout-com-alternative-payments-eps.php:23
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1209
-msgid "EPS"
-msgstr ""
-
 #: includes/apms/class-wc-gateway-checkout-com-alternative-payments-eps.php:38
 msgid "Pay with EPS. You will be redirected upon place order"
-msgstr ""
-
-#: includes/apms/class-wc-gateway-checkout-com-alternative-payments-fawry.php:25
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1212
-msgid "Fawry"
 msgstr ""
 
 #: includes/apms/class-wc-gateway-checkout-com-alternative-payments-fawry.php:40
@@ -714,6 +931,14 @@ msgstr ""
 msgid "Checkout.com Payment Captured - Action ID - %s"
 msgstr ""
 
+#: includes/apms/class-wc-gateway-checkout-com-alternative-payments-giropay.php:23
+msgid "Giropay"
+msgstr ""
+
+#: includes/apms/class-wc-gateway-checkout-com-alternative-payments-giropay.php:39
+msgid "Pay with Giropay. You will be redirected upon place order"
+msgstr ""
+
 #: includes/apms/class-wc-gateway-checkout-com-alternative-payments-ideal.php:25
 msgid "Ideal"
 msgstr ""
@@ -722,19 +947,9 @@ msgstr ""
 msgid "Pay with iDEAL. You will be redirected upon place order"
 msgstr ""
 
-#: includes/apms/class-wc-gateway-checkout-com-alternative-payments-klarna.php:28
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1205
-msgid "Klarna"
-msgstr ""
-
 #: includes/apms/class-wc-gateway-checkout-com-alternative-payments-klarna.php:170
 #: includes/apms/class-wc-gateway-checkout-com-alternative-payments-klarna.php:218
 msgid "An error has occurred while Klarna payment request. "
-msgstr ""
-
-#: includes/apms/class-wc-gateway-checkout-com-alternative-payments-knet.php:23
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1211
-msgid "KNET"
 msgstr ""
 
 #: includes/apms/class-wc-gateway-checkout-com-alternative-payments-knet.php:38
@@ -749,18 +964,8 @@ msgstr ""
 msgid "Pay by Multibanco with Checkout.com"
 msgstr ""
 
-#: includes/apms/class-wc-gateway-checkout-com-alternative-payments-poli.php:23
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1206
-msgid "Poli"
-msgstr ""
-
 #: includes/apms/class-wc-gateway-checkout-com-alternative-payments-poli.php:38
 msgid "Pay with Poli. You will be redirected upon place order"
-msgstr ""
-
-#: includes/apms/class-wc-gateway-checkout-com-alternative-payments-qpay.php:23
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1213
-msgid "QPay"
 msgstr ""
 
 #: includes/apms/class-wc-gateway-checkout-com-alternative-payments-qpay.php:38
@@ -796,11 +1001,6 @@ msgstr ""
 msgid "Checkout.com - Sepa payment Action ID : %1$s - Sepa mandate reference : %2$s"
 msgstr ""
 
-#: includes/apms/class-wc-gateway-checkout-com-alternative-payments-sofort.php:23
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1208
-msgid "Sofort"
-msgstr ""
-
 #: includes/apms/class-wc-gateway-checkout-com-alternative-payments-sofort.php:38
 msgid "Pay with Sofort. You will be redirected upon place order"
 msgstr ""
@@ -821,55 +1021,54 @@ msgstr ""
 msgid "Configure Payment Methods"
 msgstr ""
 
-#: includes/class-wc-checkout-com-webhook.php:216
+#: includes/blocks/class-wc-checkoutcom-blocks-admin-notice.php:83
+msgid "You do not have permission to perform this action."
+msgstr ""
+
+#: includes/class-wc-checkout-com-webhook.php:275
 msgid "Checkout.com Card verified webhook received - Payment ID: %s, Action ID: %s"
 msgstr ""
 
-#: includes/class-wc-checkout-com-webhook.php:320
+#: includes/class-wc-checkout-com-webhook.php:379
 msgid "Checkout.com Payment Capture webhook received - Payment ID: %s, Amount: %s"
 msgstr ""
 
 #. translators: %1$s: Payment ID, %2$s: Action ID, %3$s: Amount.
-#: includes/class-wc-checkout-com-webhook.php:331
+#: includes/class-wc-checkout-com-webhook.php:390
 msgid "Checkout.com Payment Captured - Payment ID: %1$s, Action ID: %2$s, Amount: %3$s"
 msgstr ""
 
 #. translators: %1$s: Payment ID, %2$s: Action ID, %3$s: Amount.
-#: includes/class-wc-checkout-com-webhook.php:336
+#: includes/class-wc-checkout-com-webhook.php:395
 msgid "Checkout.com Payment partially captured - Payment ID: %1$s, Action ID: %2$s, Amount: %3$s"
 msgstr ""
 
-#: includes/class-wc-checkout-com-webhook.php:539
+#: includes/class-wc-checkout-com-webhook.php:658
 msgid "Checkout.com Payment Void webhook received - Payment ID: %s%s"
 msgstr ""
 
 #. translators: %1$s: Payment ID, %2$s: Action ID, %3$s: Amount.
-#: includes/class-wc-checkout-com-webhook.php:549
+#: includes/class-wc-checkout-com-webhook.php:668
 msgid "Checkout.com Payment Voided - Payment ID: %1$s, Action ID: %2$s, Amount: %3$s"
 msgstr ""
 
 #. translators: %1$s: Payment ID, %2$s: Action ID, %3$s: Amount.
-#: includes/class-wc-checkout-com-webhook.php:678
+#: includes/class-wc-checkout-com-webhook.php:797
 msgid "Checkout.com Payment Refunded - Payment ID: %1$s, Action ID: %2$s, Amount: %3$s"
 msgstr ""
 
 #. translators: %1$s: Payment ID, %2$s: Action ID, %3$s: Amount.
-#: includes/class-wc-checkout-com-webhook.php:683
+#: includes/class-wc-checkout-com-webhook.php:802
 msgid "Checkout.com Payment partially refunded - Payment ID: %1$s, Action ID: %2$s, Amount: %3$s"
 msgstr ""
 
 #. translators: %1$s: Payment ID, %2$s: Action ID, %3$s: Amount.
-#: includes/class-wc-checkout-com-webhook.php:697
+#: includes/class-wc-checkout-com-webhook.php:816
 msgid "Checkout.com Payment fully refunded - Payment ID: %1$s, Action ID: %2$s, Amount: %3$s"
 msgstr ""
 
 #: includes/class-wc-gateway-checkout-com-alternative-payments.php:38
 msgid "Alternative Payment"
-msgstr ""
-
-#: includes/class-wc-gateway-checkout-com-apple-pay.php:26
-#: includes/settings/admin/class-wc-checkoutcom-admin.php:69
-msgid "Apple Pay"
 msgstr ""
 
 #: includes/class-wc-gateway-checkout-com-apple-pay.php:158
@@ -1046,7 +1245,7 @@ msgid "Upload the file below"
 msgstr ""
 
 #: includes/class-wc-gateway-checkout-com-apple-pay.php:461
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:646
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:901
 msgid "Upload Domain Association File"
 msgstr ""
 
@@ -1159,15 +1358,15 @@ msgid "Private Key (.key) must be saved on the server"
 msgstr ""
 
 #: includes/class-wc-gateway-checkout-com-apple-pay.php:1621
-#: includes/class-wc-gateway-checkout-com-cards.php:479
+#: includes/class-wc-gateway-checkout-com-cards.php:695
 #: includes/class-wc-gateway-checkout-com-google-pay.php:1045
 msgid "There was an issue completing the payment."
 msgstr ""
 
 #. translators: %s: Action ID.
 #: includes/class-wc-gateway-checkout-com-apple-pay.php:1649
-#: includes/class-wc-gateway-checkout-com-cards.php:564
-#: includes/class-wc-gateway-checkout-com-cards.php:673
+#: includes/class-wc-gateway-checkout-com-cards.php:780
+#: includes/class-wc-gateway-checkout-com-cards.php:889
 #: includes/class-wc-gateway-checkout-com-google-pay.php:520
 #: includes/class-wc-gateway-checkout-com-google-pay.php:1088
 msgid "Checkout.com Payment Authorised - Action ID : %s"
@@ -1175,8 +1374,8 @@ msgstr ""
 
 #. translators: %s: Action ID.
 #: includes/class-wc-gateway-checkout-com-apple-pay.php:1657
-#: includes/class-wc-gateway-checkout-com-cards.php:572
-#: includes/class-wc-gateway-checkout-com-cards.php:681
+#: includes/class-wc-gateway-checkout-com-cards.php:788
+#: includes/class-wc-gateway-checkout-com-cards.php:897
 #: includes/class-wc-gateway-checkout-com-google-pay.php:528
 #: includes/class-wc-gateway-checkout-com-google-pay.php:1096
 msgid "Checkout.com Payment Flagged - Action ID : %s"
@@ -1300,11 +1499,6 @@ msgstr ""
 #: includes/settings/class-wc-checkoutcom-logging-settings.php:338
 #: includes/settings/class-wc-checkoutcom-logging-settings.php:360
 msgid "Insufficient permissions."
-msgstr ""
-
-#: includes/class-wc-gateway-checkout-com-apple-pay.php:1960
-#: includes/class-wc-gateway-checkout-com-apple-pay.php:2271
-msgid "Secret key is not configured. Please configure Checkout.com settings first."
 msgstr ""
 
 #: includes/class-wc-gateway-checkout-com-apple-pay.php:2034
@@ -1480,107 +1674,101 @@ msgstr ""
 msgid "Use a new card"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:145
+#: includes/class-wc-gateway-checkout-com-cards.php:155
 msgid "Please enter a valid card number"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:146
+#: includes/class-wc-gateway-checkout-com-cards.php:156
 msgid "Please enter a valid expiry date"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:147
+#: includes/class-wc-gateway-checkout-com-cards.php:157
 msgid "Please enter a valid cvv code"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:213
-#: woocommerce-gateway-checkout-com.php:705
+#: includes/class-wc-gateway-checkout-com-cards.php:271
+#: woocommerce-gateway-checkout-com.php:734
 msgid "Settings"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:245
+#: includes/class-wc-gateway-checkout-com-cards.php:310
 msgid "Webhook Queue Admin class not found."
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:287
+#: includes/class-wc-gateway-checkout-com-cards.php:503
 msgid "Please enter your card details."
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:362
+#: includes/class-wc-gateway-checkout-com-cards.php:578
 msgid "PAN"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:369
+#: includes/class-wc-gateway-checkout-com-cards.php:585
 msgid "PAN error"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:377
+#: includes/class-wc-gateway-checkout-com-cards.php:593
 msgid "Expiry date"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:381
+#: includes/class-wc-gateway-checkout-com-cards.php:597
 msgid "Expiry error"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:389
-#: includes/class-wc-gateway-checkout-com-cards.php:417
+#: includes/class-wc-gateway-checkout-com-cards.php:605
+#: includes/class-wc-gateway-checkout-com-cards.php:633
 #: assets/js/blocks/checkout-com-cards-form.js:89
 msgid "CVV"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:393
+#: includes/class-wc-gateway-checkout-com-cards.php:609
 msgid "CVV error"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:400
+#: includes/class-wc-gateway-checkout-com-cards.php:616
 msgid "Select your preferred card brand"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:401
+#: includes/class-wc-gateway-checkout-com-cards.php:617
 msgid "Your card has two brands and you can choose your preferred brand for this payment, if you don't the merchant preferred brand will be selected."
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:416
+#: includes/class-wc-gateway-checkout-com-cards.php:632
 msgid "Card Code"
 msgstr ""
 
 #. translators: %s: URL
-#: includes/class-wc-gateway-checkout-com-cards.php:525
+#: includes/class-wc-gateway-checkout-com-cards.php:741
 #: includes/class-wc-gateway-checkout-com-google-pay.php:490
 #: includes/class-wc-gateway-checkout-com-google-pay.php:1058
 msgid "Checkout.com 3d Redirect waiting. URL : %s"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:643
+#: includes/class-wc-gateway-checkout-com-cards.php:859
 msgid "Unable to add payment method to your account."
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:654
+#: includes/class-wc-gateway-checkout-com-cards.php:870
 msgid "Payment method successfully added."
 msgstr ""
 
 #. translators: %s: Action ID.
-#: includes/class-wc-gateway-checkout-com-cards.php:688
+#: includes/class-wc-gateway-checkout-com-cards.php:904
 msgid "Checkout.com Payment Canceled - Action ID : %s"
 msgstr ""
 
 #. translators: %s: Action ID.
-#: includes/class-wc-gateway-checkout-com-cards.php:696
+#: includes/class-wc-gateway-checkout-com-cards.php:912
 msgid "Checkout.com Payment Captured - Action ID : %s"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-cards.php:828
+#: includes/class-wc-gateway-checkout-com-cards.php:1044
 msgid "An error has occurred while processing your cancel request. "
 msgstr ""
 
 #. translators: 1: Payment ID, 2: Webhook ID.
-#: includes/class-wc-gateway-checkout-com-cards.php:1072
+#: includes/class-wc-gateway-checkout-com-cards.php:1288
 msgid "Order payment Id (%1$s) does not match that of the webhook (%2$s)"
-msgstr ""
-
-#: includes/class-wc-gateway-checkout-com-google-pay.php:28
-#: includes/settings/admin/class-wc-checkoutcom-admin.php:66
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:910
-msgid "Google Pay"
 msgstr ""
 
 #: includes/class-wc-gateway-checkout-com-google-pay.php:867
@@ -1590,85 +1778,68 @@ msgstr ""
 
 #. translators: %s: Action ID.
 #: includes/class-wc-gateway-checkout-com-google-pay.php:1143
-#: includes/class-wc-gateway-checkout-com-paypal.php:1015
+#: includes/class-wc-gateway-checkout-com-paypal.php:1025
 msgid "Checkout.com Payment refunded - Action ID : %s"
 msgstr ""
 
 #. translators: %s: Action ID.
 #: includes/class-wc-gateway-checkout-com-google-pay.php:1148
-#: includes/class-wc-gateway-checkout-com-paypal.php:1020
+#: includes/class-wc-gateway-checkout-com-paypal.php:1030
 msgid "Checkout.com Payment Partially refunded - Action ID : %s"
 msgstr ""
 
-#: includes/class-wc-gateway-checkout-com-paypal.php:28
-#: includes/settings/admin/class-wc-checkoutcom-admin.php:72
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1063
-msgid "PayPal"
-msgstr ""
-
 #: includes/class-wc-gateway-checkout-com-paypal.php:799
-#: includes/class-wc-gateway-checkout-com-paypal.php:841
+#: includes/class-wc-gateway-checkout-com-paypal.php:851
 msgid "An error has occurred while PayPal payment request. "
 msgstr ""
 
-#: includes/express/apple-pay/class-apple-pay-express.php:365
-#: includes/express/apple-pay/class-apple-pay-express.php:407
-#: includes/express/apple-pay/class-apple-pay-express.php:605
-#: includes/express/apple-pay/class-apple-pay-express.php:647
-#: includes/express/google-pay/class-google-pay-express.php:359
-#: includes/express/google-pay/class-google-pay-express.php:401
-#: includes/express/google-pay/class-google-pay-express.php:604
-#: includes/express/google-pay/class-google-pay-express.php:646
-#: includes/express/paypal/class-paypal-express.php:401
-#: includes/express/paypal/class-paypal-express.php:443
-#: includes/express/paypal/class-paypal-express.php:646
-#: includes/express/paypal/class-paypal-express.php:688
-msgid "Express Checkout"
-msgstr ""
-
 #. translators: %3$ is funding source like "Apple Pay", other placeholders are html tags for a link.
-#: includes/express/apple-pay/class-apple-pay-express.php:715
+#: includes/express/apple-pay/class-apple-pay-express.php:588
 msgid "You are currently paying with Apple Pay. %1$s%2$sChoose another payment method%3$s."
 msgstr ""
 
 #. translators: %3$ is funding source like "Google Pay", other placeholders are html tags for a link.
-#: includes/express/google-pay/class-google-pay-express.php:719
+#: includes/express/google-pay/class-google-pay-express.php:592
 msgid "You are currently paying with Google Pay. %1$s%2$sChoose another payment method%3$s."
 msgstr ""
 
 #. translators: %3$ is funding source like "PayPal" or "Venmo", other placeholders are html tags for a link.
-#: includes/express/paypal/class-paypal-express.php:755
+#: includes/express/paypal/class-paypal-express.php:629
 msgid "You are currently paying with PayPal. %1$s%2$sChoose another payment method%3$s."
 msgstr ""
 
-#: includes/settings/admin/class-wc-checkoutcom-admin.php:57
-msgid "Core Settings"
+#: includes/settings/admin/class-wc-checkoutcom-admin.php:88
+msgid "Quick Setup"
 msgstr ""
 
-#: includes/settings/admin/class-wc-checkoutcom-admin.php:60
+#: includes/settings/admin/class-wc-checkoutcom-admin.php:93
 msgid "Card Settings"
 msgstr ""
 
-#: includes/settings/admin/class-wc-checkoutcom-admin.php:63
-msgid "Order Settings"
+#: includes/settings/admin/class-wc-checkoutcom-admin.php:98
+msgid "Express Payments"
 msgstr ""
 
-#: includes/settings/admin/class-wc-checkoutcom-admin.php:76
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1193
+#: includes/settings/admin/class-wc-checkoutcom-admin.php:104
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1448
 msgid "Alternative Payments"
 msgstr ""
 
-#: includes/settings/admin/class-wc-checkoutcom-admin.php:80
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1233
-msgid "Debug Settings"
+#: includes/settings/admin/class-wc-checkoutcom-admin.php:110
+msgid "Order Settings"
 msgstr ""
 
-#: includes/settings/admin/class-wc-checkoutcom-admin.php:83
-msgid "Webhook"
+#: includes/settings/admin/class-wc-checkoutcom-admin.php:115
+msgid "Advanced"
 msgstr ""
 
-#: includes/settings/admin/class-wc-checkoutcom-admin.php:90
+#: includes/settings/admin/class-wc-checkoutcom-admin.php:121
 msgid "Flow Settings"
+msgstr ""
+
+#: includes/settings/admin/class-wc-checkoutcom-admin.php:168
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1488
+msgid "Debug Settings"
 msgstr ""
 
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:36
@@ -1679,1469 +1850,1500 @@ msgstr ""
 msgid "Run Webhook check"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:43
-msgid "This action will check if webhook is configured for current site."
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:51
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:50
 msgid "Register New Webhook"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:55
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:54
 msgid "Register Webhook"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:62
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:61
 msgid "Click above button to register webhook URL"
 msgstr ""
 
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:87
+msgid "💳 Card (Credit/Debit) - Global"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:88
+msgid "🔐 Stored Card (Checkout.com Network) - Global"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:91
+msgid "🟢 Google Pay - Global"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:92
+msgid "🍎 Apple Pay - Global"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:93
+msgid "🅿️ PayPal - Global"
+msgstr ""
+
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:96
-msgid "Core settings"
+msgid "🇳🇱 iDEAL - Netherlands"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:97
+msgid "🇦🇹 EPS - Austria"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:98
+msgid "🇧🇪 Bancontact - Belgium"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:99
+msgid "🇵🇱 Przelewy24 - Poland"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:100
+msgid "🇵🇹 Multibanco - Portugal"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:101
+msgid "🇵🇹 MB WAY - Portugal"
 msgstr ""
 
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:102
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:899
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1052
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1182
-msgid "Enable/Disable"
+msgid "🇪🇺 Klarna - EU/Nordics/UK"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:103
+msgid "🇪🇺 SEPA Direct Debit - EU"
 msgstr ""
 
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:104
-msgid "Enable Checkout.com cards payment"
+msgid "🇫🇷 Alma (Installments) - France"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:105
-msgid "This enables Checkout.com. cards payment"
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:107
+msgid "🇰🇼 KNET - Kuwait"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:108
+msgid "🇧🇭 BenefitPay - Bahrain"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:109
+msgid "🇸🇦 STC Pay - Saudi Arabia"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:110
+msgid "🇦🇪 Tabby - UAE/Saudi Arabia"
 msgstr ""
 
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:111
-msgid "Checkout Mode"
+msgid "🇦🇪 Tamara - UAE/Saudi Arabia"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:113
-msgid "Select the checkout mode for payment processing."
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:112
+msgid "🇶🇦 QPay - Qatar"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:115
+msgid "🇲🇾 Touch n Go - Malaysia"
 msgstr ""
 
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:116
-msgid "Classic"
+msgid "🇹🇭 TrueMoney - Thailand"
 msgstr ""
 
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:117
-msgid "Flow"
+msgid "🇮🇩 DANA - Indonesia"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:118
+msgid "🇵🇭 GCash - Philippines"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:119
+msgid "🇰🇷 KakaoPay - South Korea"
 msgstr ""
 
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:122
-msgid "Region"
+msgid "🇨🇳 Alipay CN - China"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:124
-msgid "Choose subdomain for multi-region configuration"
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:123
+msgid "🇭🇰 Alipay HK - Hong Kong"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:127
-msgid "Global"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:128
-msgid "KSA"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:136
-msgid "Environment"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:138
-msgid "When going to production, make sure to set this to Live"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:141
-msgid "SandBox"
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:140
+msgid "Quick Settings"
 msgstr ""
 
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:142
-msgid "Live"
+msgid "Configure the essential settings to get started with Checkout.com payments."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:147
-msgid "Payment Option Title"
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:146
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:329
+msgid "Checkout Mode"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:149
-msgid "Pay by Card with Checkout.com"
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:148
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:331
+msgid "Select the checkout mode for payment processing. Flow is the modern, recommended option."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:150
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:911
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1064
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1194
-msgid "Title that will be displayed on the checkout page"
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:151
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:334
+msgid "Flow"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:155
-msgid "Account Type"
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:152
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:335
+msgid "Classic"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:157
-msgid "Contact support team to know your account type."
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:160
-msgid "ABC"
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:159
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:354
+msgid "Environment"
 msgstr ""
 
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:161
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:356
+msgid "When going to production, make sure to set this to Live"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:164
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:359
+msgid "SandBox"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:165
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:360
+msgid "Live"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:172
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:373
+msgid "Account Type"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:174
+msgid "Your account type is set to NAS by default and cannot be changed."
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:177
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:379
 msgid "NAS"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:166
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:187
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:178
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:378
+msgid "ABC"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:188
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:384
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:405
 msgid "Secret Key"
 msgstr ""
 
 #. translators: 1: HTML anchor opening tag, 2: HTML anchor closing tag.
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:169
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:191
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:387
 msgid "You can %1$s find your secret key %2$s in the Checkout.com Hub"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:173
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:192
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:200
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:391
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:410
 msgid "Public Key"
 msgstr ""
 
 #. translators: 1: HTML anchor opening tag, 2: HTML anchor closing tag.
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:176
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:203
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:394
 msgid "You can %1$s find your public key %2$s in the Checkout.com Hub"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:181
-msgid "Fallback Account"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:183
-msgid "Enable Fallback Account(ABC account) for Refund"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:217
-msgid "Card settings"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:223
-msgid "Payment Action"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:227
-msgid "Authorize only"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:228
-msgid "Authorize and Capture"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:235
-msgid "Capture Delay"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:237
-msgid "The delay in hours (0 means immediately, 1.2 means one hour and 30 min)"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:242
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:931
-msgid "Use 3D Secure"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:246
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:258
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:307
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:318
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:330
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:342
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:368
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:380
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:935
-msgid "No"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:247
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:259
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:306
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:319
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:331
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:343
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:369
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:381
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:936
-msgid "Yes"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:254
-msgid "Attempt non-3D Secure"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:266
-msgid "3DS Challenge Indicator"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:270
-msgid "No Preference"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:271
-msgid "No Challenge Requested"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:272
-msgid "Challenge Requested"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:273
-msgid "Challenge Requested Mandate"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:276
-msgid "Specifies the preference for whether a challenge should be performed"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:280
-msgid "3DS Exemption"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:284
-msgid "No Exemption"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:285
-msgid "Low Value"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:286
-msgid "Trusted Listing"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:287
-msgid "Trusted Listing Prompt"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:288
-msgid "Transaction Risk Assessment"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:289
-msgid "3DS Outage"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:290
-msgid "SCA Delegation"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:291
-msgid "Out of SCA Scope"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:292
-msgid "Low Risk Program"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:293
-msgid "Recurring Operation"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:294
-msgid "Data Share"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:295
-msgid "Other"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:298
-msgid "Specifies the exemption type for 3DS authentication"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:302
-msgid "Allow 3DS Upgrade"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:310
-msgid "Allow 3DS to be upgraded to a higher version if available"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:314
-msgid "Enable Save Cards"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:326
-msgid "Require CVV For Saved Cards"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:338
-msgid "Enable Dynamic Descriptor"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:346
-msgid "Dynamic Descriptor"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:350
-msgid "Descriptor Name"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:352
-msgid "Maximum 25 characters)"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:357
-msgid "Descriptor City"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:359
-msgid "Maximum 13 characters)"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:364
-msgid "Enable MADA Bin Check"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:372
-msgid "For processing MADA transactions, this option needs to be set to Yes"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:376
-msgid "Display Card Icons"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:389
-msgid "Card Icons"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:392
-msgid "Visa"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:393
-msgid "Mastercard"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:394
-msgid "American Express"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:395
-msgid "Diners Club International"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:396
-msgid "Discover"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:397
-msgid "JCB"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:398
-msgid "Cartes Bancaires"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:399
-msgid "Mada"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:407
-msgid "Language Support"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:411
-msgid "Predefined Translation"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:412
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1704
-msgid "Custom Translation"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:420
-msgid "Language Fallback"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:424
-msgid "English"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:425
-msgid "Dutch"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:426
-msgid "French"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:427
-msgid "German"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:428
-msgid "Italian"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:429
-msgid "Korean"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:430
-msgid "Spanish"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:438
-msgid "Card Number Placeholder"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:441
-msgid "Card number input box placeholder."
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:446
-msgid "Card Expiry Month Placeholder"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:449
-msgid "Card expiry month input box placeholder."
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:454
-msgid "Card Expiry Year Placeholder"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:457
-msgid "Card expiry year input box placeholder."
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:462
-msgid "Card CVV Placeholder"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:465
-msgid "Card CVV input box placeholder."
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:470
-msgid "Card Scheme Link Placeholder"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:473
-msgid "Card Scheme Link input box placeholder."
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:478
-msgid "Card Scheme Header Placeholder"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:481
-msgid "Card Scheme Header input box placeholder."
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:486
-msgid "Iframe Style"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:490
-msgid "Single Iframe"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:491
-msgid "Multiple Iframe"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:511
-msgid "Order Management settings"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:517
-msgid "Authorised Order Status"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:522
-msgid "Select the status that should be used for orders with successful payment authorisation"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:526
-msgid "Captured Order Status"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:531
-msgid "Select the status that should be used for orders with successful payment capture"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:535
-msgid "Void Order Status"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:540
-msgid "Select the status that should be used for orders that have been voided"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:544
-msgid "Flagged Order Status"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:549
-msgid "Select the status that should be used for flagged orders"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:553
-msgid "Refunded Order Status"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:558
-msgid "Select the status that should be used for new orders with successful payment refund"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:590
-msgid "Apple Pay Settings"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:596
-msgid "Enable Apple Pay"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:598
-msgid "Enable Apple Pay payment method"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:599
-msgid "Enable this option to activate Apple Pay as a payment method on your checkout page. When enabled, customers with compatible Apple devices can use Apple Pay to complete their purchase."
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:605
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:209
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:860
 msgid "Payment Method Title"
 msgstr ""
 
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:211
+msgid "The title displayed to customers at checkout (e.g., \"Pay by Card with Checkout.com\" or \"Checkout.com Payment\")"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:235
+msgid "Enabled Payment Methods"
+msgstr ""
+
+#. translators: 1: HTML anchor opening tag, 2: HTML anchor closing tag.
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:240
+msgid "Select which payment methods to enable at checkout. Leave empty to enable all available methods. %1$s Learn more about payment methods %2$s"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:258
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1454
+msgid "Alternative Payment Methods"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:262
+msgid "Select which alternative payment methods to enable at checkout."
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:314
+msgid "Core settings"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:320
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1154
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1307
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1437
+msgid "Enable/Disable"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:322
+msgid "Enable Checkout.com cards payment"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:323
+msgid "This enables Checkout.com. cards payment"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:340
+msgid "Region"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:342
+msgid "Choose subdomain for multi-region configuration"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:345
+msgid "Global"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:346
+msgid "KSA"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:365
+msgid "Payment Option Title"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:367
+msgid "Pay by Card with Checkout.com"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:368
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1166
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1319
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1449
+msgid "Title that will be displayed on the checkout page"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:375
+msgid "Contact support team to know your account type."
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:399
+msgid "Fallback Account"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:401
+msgid "Enable Fallback Account(ABC account) for Refund"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:435
+msgid "Card settings"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:441
+msgid "Payment Action"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:445
+msgid "Authorize only"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:446
+msgid "Authorize and Capture"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:453
+msgid "Capture Delay"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:455
+msgid "The delay in hours (0 means immediately, 1.2 means one hour and 30 min)"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:460
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1186
+msgid "Use 3D Secure"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:464
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:476
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:525
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:536
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:548
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:597
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:623
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:635
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1190
+msgid "No"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:465
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:477
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:524
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:537
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:549
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:598
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:624
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:636
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1191
+msgid "Yes"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:472
+msgid "Attempt non-3D Secure"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:484
+msgid "3DS Challenge Indicator"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:488
+msgid "No Preference"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:489
+msgid "No Challenge Requested"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:490
+msgid "Challenge Requested"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:491
+msgid "Challenge Requested Mandate"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:494
+msgid "Specifies the preference for whether a challenge should be performed"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:498
+msgid "3DS Exemption"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:502
+msgid "No Exemption"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:503
+msgid "Low Value"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:504
+msgid "Trusted Listing"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:505
+msgid "Trusted Listing Prompt"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:506
+msgid "Transaction Risk Assessment"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:507
+msgid "3DS Outage"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:508
+msgid "SCA Delegation"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:509
+msgid "Out of SCA Scope"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:510
+msgid "Low Risk Program"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:511
+msgid "Recurring Operation"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:512
+msgid "Data Share"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:513
+msgid "Other"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:516
+msgid "Specifies the exemption type for 3DS authentication"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:520
+msgid "Allow 3DS Upgrade"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:528
+msgid "Allow 3DS to be upgraded to a higher version if available"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:532
+msgid "Enable Save Cards"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:544
+msgid "Require CVV For Saved Cards"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:556
+msgid "Card Holder Name"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:559
+msgid "Show Card holder name from their account"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:560
+msgid "Copy card holder name from billing address"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:566
+msgid "Cardholder Name Position"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:569
+msgid "Top"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:570
+msgid "Bottom"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:571
+msgid "Hidden"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:573
+msgid "Choose the position of the cardholder name field."
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:579
+msgid "Saved Payment Display Order"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:581
+msgid ""
+"Choose how to display payment options at checkout: \n"
+"\t\t\t\t\t- **Saved Cards First**: Show saved payment methods first and expand them by default when available. \n"
+"\t\t\t\t\t- **New Payment Methods First**: Show new payment options first and expand them by default."
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:587
+msgid "Saved Cards First (default expanded)"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:588
+msgid "New Payment Methods First (default expanded)"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:593
+msgid "Enable Dynamic Descriptor"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:601
+msgid "Dynamic Descriptor"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:605
+msgid "Descriptor Name"
+msgstr ""
+
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:607
-msgid "This is the title that customers will see on the checkout page. Choose a clear, recognizable name for the payment method (e.g., \"Apple Pay\" or \"Pay with Apple Pay\")."
+msgid "Maximum 25 characters)"
 msgstr ""
 
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:612
-msgid "Payment Method Description"
+msgid "Descriptor City"
 msgstr ""
 
 #: includes/settings/class-wc-checkoutcom-cards-settings.php:614
+msgid "Maximum 13 characters)"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:619
+msgid "Enable MADA Bin Check"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:627
+msgid "For processing MADA transactions, this option needs to be set to Yes"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:631
+msgid "Display Card Icons"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:644
+msgid "Card Icons"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:647
+msgid "Visa"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:648
+msgid "Mastercard"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:649
+msgid "American Express"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:650
+msgid "Diners Club International"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:651
+msgid "Discover"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:652
+msgid "JCB"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:653
+msgid "Cartes Bancaires"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:654
+msgid "Mada"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:662
+msgid "Language Support"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:666
+msgid "Predefined Translation"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:667
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1940
+msgid "Custom Translation"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:675
+msgid "Language Fallback"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:679
+msgid "English"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:680
+msgid "Dutch"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:681
+msgid "French"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:682
+msgid "German"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:683
+msgid "Italian"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:684
+msgid "Korean"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:685
+msgid "Spanish"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:693
+msgid "Card Number Placeholder"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:696
+msgid "Card number input box placeholder."
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:701
+msgid "Card Expiry Month Placeholder"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:704
+msgid "Card expiry month input box placeholder."
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:709
+msgid "Card Expiry Year Placeholder"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:712
+msgid "Card expiry year input box placeholder."
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:717
+msgid "Card CVV Placeholder"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:720
+msgid "Card CVV input box placeholder."
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:725
+msgid "Card Scheme Link Placeholder"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:728
+msgid "Card Scheme Link input box placeholder."
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:733
+msgid "Card Scheme Header Placeholder"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:736
+msgid "Card Scheme Header input box placeholder."
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:741
+msgid "Iframe Style"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:745
+msgid "Single Iframe"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:746
+msgid "Multiple Iframe"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:766
+msgid "Order Management settings"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:772
+msgid "Authorised Order Status"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:777
+msgid "Select the status that should be used for orders with successful payment authorisation"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:781
+msgid "Captured Order Status"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:786
+msgid "Select the status that should be used for orders with successful payment capture"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:790
+msgid "Void Order Status"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:795
+msgid "Select the status that should be used for orders that have been voided"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:799
+msgid "Flagged Order Status"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:804
+msgid "Select the status that should be used for flagged orders"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:808
+msgid "Refunded Order Status"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:813
+msgid "Select the status that should be used for new orders with successful payment refund"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:845
+msgid "Apple Pay Settings"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:851
+msgid "Enable Apple Pay"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:853
+msgid "Enable Apple Pay payment method"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:854
+msgid "Enable this option to activate Apple Pay as a payment method on your checkout page. When enabled, customers with compatible Apple devices can use Apple Pay to complete their purchase."
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:862
+msgid "This is the title that customers will see on the checkout page. Choose a clear, recognizable name for the payment method (e.g., \"Apple Pay\" or \"Pay with Apple Pay\")."
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:867
+msgid "Payment Method Description"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:869
 msgid "A short description that appears below the payment method title on the checkout page. This helps customers understand what Apple Pay is and how it works."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:621
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:876
 msgid "Step 1: Payment Processing Certificate Setup (for decryption)"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:623
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:878
 msgid "Set up your Apple Pay Payment Processing Certificate. This certificate is required for Checkout.com to decrypt Apple Pay payment tokens. Follow the steps below to generate and upload your certificate."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:626
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:881
 msgid "Step 1a: Generate Certificate Signing Request (CSR)"
 msgstr ""
 
 #. translators: 1: HTML anchor opening tag, 2: HTML anchor closing tag.
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:629
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:884
 msgid "First, create a Merchant ID in your %1$sApple Developer account%2$s if you haven't already. Then generate a Certificate Signing Request (CSR) file that you will upload to Apple Developer. This CSR is valid for 24 hours, so complete the certificate creation process promptly."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:633
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:888
 msgid "Step 1b: Upload Signed Certificate"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:635
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:890
 msgid "After generating the CSR above, upload it to Apple Developer and download the signed certificate (apple_pay.cer). Then upload that certificate here to complete the setup."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:641
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:896
 msgid "Step 2: Domain Association Setup"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:643
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:898
 msgid "Register your merchant domain with Apple. This is required to display the Apple Pay button on your website. You must have a valid TLS certificate on your domain."
 msgstr ""
 
 #. translators: 1: HTML anchor opening tag, 2: HTML anchor closing tag.
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:649
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:904
 msgid "After adding your domain in Apple Developer, download the domain association file (.txt) and upload it here. The file will be automatically saved to your server. Go to your %1$sApple Developer Merchant IDs%2$s to manage your domains."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:655
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:910
 msgid "Step 3: Merchant Identity Certificate Setup (for session signing)"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:657
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:912
 msgid "Create and set up your Apple Pay Merchant Identity Certificate. This certificate is used to sign merchant session responses during Apple Pay payment authorization. Generate a CSR and private key locally using OpenSSL, upload the CSR to Apple Developer, download the signed certificate, and convert it to PEM format."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:660
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:915
 msgid "Step 3a: Generate Merchant Identity CSR and Key"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:662
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:917
 msgid "Generate a Certificate Signing Request (CSR) and private key file using OpenSSL. Click the button below to generate these files on your server. The files will be downloaded automatically: uploadMe.csr and certificate_sandbox.key. Save the private key file securely on your server, then upload the CSR file to Apple Developer."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:666
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:921
 msgid "Step 3b: Upload and Convert Merchant Identity Certificate"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:668
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:923
 msgid "After uploading the CSR to Apple Developer and downloading the signed certificate (merchant_id.cer), upload it here. The certificate will be automatically converted from DER (.cer) format to PEM format and saved to your server. Make sure you have the certificate_sandbox.key file saved on your server from Step 3a."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:672
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:927
 msgid "Step 4: Test Certificate and Key (Final Verification)"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:674
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:929
 msgid "Test your Apple Pay certificate and private key by validating them with Apple's payment session endpoint. This will verify that your certificate and key are correctly configured and working. Make sure you have configured the Merchant Identifier, Domain Name, Display Name, and certificate/key paths above."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:680
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:935
 msgid "Express Checkout Settings"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:682
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:937
 msgid "Decide how buttons for digital wallets Apple Pay and Google Pay are displayed in your store. Depending on their web browser and their wallet configurations, your customers will see either Apple Pay or Google Pay, but not both."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:685
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:686
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:940
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:941
 msgid "Enable Apple Pay / Google Pay"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:688
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:943
 msgid "When enabled, customers who have configured Apple Pay or Google Pay enabled devices will be able to pay with their respective choice of Wallet."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:693
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:948
 msgid "Show express checkouts on"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:695
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:950
 msgid "Configure the display of Apple Pay and Google Pay buttons on your store."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:698
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:699
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:953
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:954
 msgid "Product page"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:701
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:956
 msgid "Display the Apple Pay button on individual product pages."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:706
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:707
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:961
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:962
 msgid "Shop & Category Pages"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:709
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:964
 msgid "Display the Apple Pay button on shop pages, category pages, tag archives, and other product listing pages."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:714
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:715
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:969
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:970
 msgid "Cart"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:717
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:972
 msgid "Display the Apple Pay button on the cart page."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:722
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:723
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:977
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:978
 msgid "Checkout"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:725
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:980
 msgid "Display the Apple Pay button on the checkout page."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:730
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1302
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:985
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1573
 msgid "Appearance"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:732
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:987
 msgid "Configure the appearance of Apple Pay and Google Pay buttons. Note: Some appearance settings may be overridden by the express payment section of the Cart & Checkout blocks."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:766
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1021
 msgid "Apple Pay Configuration"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:768
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1023
 msgid "Configure your Apple Pay merchant identifier and certificate settings. These are required for Apple Pay to function properly."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:771
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:923
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1026
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1178
 msgid "Merchant Identifier"
 msgstr ""
 
 #. translators: 1: HTML anchor opening tag, 2: HTML anchor closing tag.
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:774
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1029
 msgid "Your Apple Pay Merchant Identifier is a unique identifier registered with Apple. You can find this in your Apple Developer account under Certificates, Identifiers & Profiles > Identifiers. To create a new Merchant ID, follow this %1$s guide %2$s"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:780
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1035
 msgid "Merchant Identity Certificate Path"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:782
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1037
 msgid "Enter the absolute server path to your Apple Pay Merchant Identity Certificate file (.pem). This certificate is used to sign merchant session responses during Apple Pay payment authorization. This is the certificate from Step 3 (Merchant Identity Certificate Setup)."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:788
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1043
 msgid "Merchant Identity Certificate Key Path"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:790
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1045
 msgid "Enter the absolute server path to your Apple Pay Merchant Identity Certificate private key file (.key). This key is used alongside the certificate to sign merchant session responses. This is the private key from Step 3a (Generate Merchant Identity CSR and Key)."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:799
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1054
 msgid "Domain Name"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:801
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1056
 msgid "Enter the domain name where you will display the Apple Pay button (e.g., example.com or sandbox.example.com). This domain must match the domain where your Apple Pay button is displayed."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:807
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1062
 msgid "Display Name"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:809
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1064
 msgid "Enter a display name for your merchant account (e.g., \"merchant id for test environment\"). This name will be used during Apple Pay payment session validation."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:817
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1072
 msgid "Button Appearance"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:819
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1074
 msgid "Customize the appearance of Apple Pay buttons on your store. These settings control the style and language of the Apple Pay button."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:822
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1077
 msgid "Theme"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:824
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1079
 msgid "Choose the color theme for the Apple Pay button. Select a theme that contrasts well with your website design for optimal visibility."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:827
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1082
 msgid "Dark"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:827
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1082
 msgid "Recommended for white or light-colored backgrounds with high contrast."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:828
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1083
 msgid "Light"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:828
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1083
 msgid "Recommended for dark or colored backgrounds with high contrast."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:829
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1084
 msgid "Outline"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:829
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1084
 msgid "Recommended for white or light-colored backgrounds with insufficient contrast."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:834
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1089
 msgid "Button Language"
 msgstr ""
 
 #. translators: 1: HTML anchor opening tag, 2: HTML anchor closing tag.
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:837
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1092
 msgid "Enter the ISO 639-1 language code for the Apple Pay button (e.g., \"en\" for English, \"es\" for Spanish). If left empty, the button will use the browser default language. See supported languages %1$s here %2$s"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:845
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1100
 msgid "Merchant Certificate & Private Key Setup"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:847
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1102
 msgid "Generate a self-signed merchant certificate and private key pair for Apple Pay merchant validation. These certificates are used to sign merchant session responses during Apple Pay payment authorization. After generating, download both files and configure their paths in the \"Apple Pay Configuration\" section above."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:850
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1105
 msgid "Generate Merchant Certificate and Key"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:852
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1107
 msgid "Click the button below to generate a self-signed merchant certificate (.pem) and private key (.key) file pair. After generation, both files will be automatically downloaded. Save these files securely on your server and configure their paths in the \"Merchant Certificate Path\" and \"Merchant Certificate Key Path\" fields above."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:858
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1113
 msgid "Advanced Settings"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:860
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1115
 msgid "Additional configuration options for specialized use cases."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:864
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1119
 msgid "Enable MADA Support"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:865
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1120
 msgid "Enable MADA card support for Apple Pay"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:867
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1122
 msgid "Enable this option if your business is located in Saudi Arabia and you want to accept MADA (Saudi Payments Network) cards through Apple Pay. MADA is the national payment network of Saudi Arabia."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:893
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1148
 msgid "Google Pay Settings"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:901
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1054
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1184
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1156
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1309
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1439
 msgid "Enable Checkout.com"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:902
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1157
 msgid "This enables google pay as a payment method"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:908
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1061
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1191
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1163
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1316
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1446
 msgid "Title"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:916
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1069
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1171
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1324
 msgid "Description"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:918
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1071
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1173
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1326
 msgid "This controls the description which the user sees during checkout."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:925
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1180
 msgid "Your production merchant identifier."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:925
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1180
 msgid "For testing use the following value: 01234567890123456789"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:942
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1197
 msgid "Button Style"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:945
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1200
 msgid "Select button color."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:949
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1204
 msgid "Black"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:950
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1205
 msgid "White"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:954
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1209
 msgid "Google Pay Express"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:955
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1210
 msgid "Enable Google Pay Express"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:957
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1212
 msgid "Master toggle to activate Google Pay Express checkout. When enabled, use the options below to control where buttons appear."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:962
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1092
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1217
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1347
 msgid "Button Locations"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:964
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1219
 msgid "Control where Google Pay Express buttons appear on your store."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:967
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1097
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1222
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1352
 msgid "Show on Product Page"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:968
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1223
 msgid "Display Google Pay Express button on product detail pages"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:970
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1225
 msgid "Show Google Pay Express button on individual product pages."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:975
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1105
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1230
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1360
 msgid "Show on Shop/Category Pages"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:976
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1231
 msgid "Display Google Pay Express button on shop and category listing pages"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:978
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1233
 msgid "Show Google Pay Express button on shop, category, tag, and archive pages."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:983
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1113
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1238
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1368
 msgid "Show on Cart Page"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:984
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1239
 msgid "Display Google Pay Express button on cart page"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:986
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1241
 msgid "Show Google Pay Express button on the cart page."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1046
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1301
 msgid "PayPal Settings"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1055
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1310
 msgid "This enables PayPal as a payment method"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1076
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1331
 msgid "Merchant ID"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1078
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1333
 msgid "Your Paypal merchant ID."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1084
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1339
 msgid "PayPal Express"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1085
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1340
 msgid "Enable PayPal Express"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1087
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1342
 msgid "Master toggle to activate PayPal Express checkout. When enabled, use the options below to control where buttons appear."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1094
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1349
 msgid "Control where PayPal Express buttons appear on your store."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1098
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1353
 msgid "Display PayPal Express button on product detail pages"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1100
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1355
 msgid "Show PayPal Express button on individual product pages."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1106
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1361
 msgid "Display PayPal Express button on shop and category listing pages"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1108
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1363
 msgid "Show PayPal Express button on shop, category, tag, and archive pages."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1114
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1369
 msgid "Display PayPal Express button on cart page"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1116
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1371
 msgid "Show PayPal Express button on the cart page."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1176
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1431
 msgid "Alternative Payment Settings"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1185
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1440
 msgid "This enables alternative payment methods"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1199
-msgid "Alternative Payment Methods"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1204
-msgid "iDEAL"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1207
-msgid "Sepa Direct Debit"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1214
-msgid "Multibanco"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1239
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1494
 msgid "File Logging"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1243
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1498
 msgid "Check to enable file logging"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1247
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1502
 msgid "Console Logging"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1251
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1506
 msgid "Check to enable console logging"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1255
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1510
 msgid "Gateway Responses"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1259
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1514
 msgid "Check to show gateway response."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1275
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1518
+#: includes/settings/class-wc-checkoutcom-logging-settings.php:179
+msgid "Performance Logging"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1522
+msgid "Check to enable performance monitoring and logging. Track and log performance metrics for debugging and optimization."
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1526
+msgid "Terms Checkbox Guard"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1528
+msgid "Enable only if your checkout refreshes when the terms checkbox is toggled. Otherwise keep this disabled."
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1546
 msgid "Webhook Details"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1308
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1579
 msgid "Color Action"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1310
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1581
 msgid "Choose a color for the Pay Button"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1316
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1587
 msgid "Color Background"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1318
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1589
 msgid "Choose a color for the Background"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1324
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1595
 msgid "Color Border"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1326
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1597
 msgid "Choose a color for the Border"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1332
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1603
 msgid "Color Disabled"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1334
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1605
 msgid "Choose a color for the Disabled button"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1340
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1611
 msgid "Color Error"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1342
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1613
 msgid "Choose a color for the Error Notification"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1348
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1619
 msgid "Color Form Background"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1350
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1621
 msgid "Choose a color for the Form's Background"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1356
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1627
 msgid "Color Form Border"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1358
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1629
 msgid "Choose a color for the Form's Border"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1364
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1635
 msgid "Color Inverse"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1366
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1637
 msgid "Choose a color for the text on Pay Button"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1372
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1643
 msgid "Color Outline"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1374
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1645
 msgid "Choose a color for the outline"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1380
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1651
 msgid "Color Primary"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1382
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1653
 msgid "Choose a primary color for the flow container"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1388
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1659
 msgid "Color Secondary"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1390
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1661
 msgid "Choose a secondary color for the flow container"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1396
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1667
 msgid "Color Success"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1398
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1669
 msgid "Choose a color for success notifications"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1409
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1680
 msgid "Button Settings"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1415
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1467
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1519
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1571
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1686
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1738
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1790
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1842
 msgid "Font Family"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1417
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1469
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1521
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1573
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1688
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1740
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1792
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1844
 msgid "Set the font family"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1423
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1475
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1527
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1579
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1694
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1746
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1798
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1850
 msgid "Font Size"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1425
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1477
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1529
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1581
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1696
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1748
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1800
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1852
 msgid "Set the font size"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1431
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1483
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1535
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1587
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1702
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1754
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1806
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1858
 msgid "Font Weight"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1433
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1485
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1537
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1589
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1704
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1756
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1808
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1860
 msgid "Set the font weight (e.g., 400, 700)"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1439
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1491
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1543
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1595
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1710
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1762
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1814
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1866
 msgid "Letter Spacing"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1441
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1493
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1545
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1597
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1712
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1764
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1816
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1868
 msgid "Set letter spacing (px)"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1447
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1499
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1551
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1603
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1718
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1770
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1822
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1874
 msgid "Line Height"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1449
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1501
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1553
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1605
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1720
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1772
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1824
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1876
 msgid "Set line height"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1461
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1732
 msgid "Footnote Settings"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1513
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1784
 msgid "Label Settings"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1565
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1836
 msgid "Subheading Settings"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1617
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1888
 msgid "Border Settings"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1623
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1894
 msgid "Form Border Radius"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1625
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1896
 msgid "Enter Form border-radius value"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1631
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1902
 msgid "Button Border Radius"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1633
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1904
 msgid "Enter Button border-radius value"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1645
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1916
 msgid "Component Options"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1651
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1922
 msgid "Auto Expand"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1653
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1924
 msgid "Expand/Collapse First Payment Method"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1654
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1925
 msgid "Automatically expand the first available payment method if multiple methods exist."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1660
-msgid "Card Holder Name"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1662
-msgid "Show/Hide Card Holder Name"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1663
-msgid "Show Card holder name from their account"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1669
-msgid "Saved Payment Display Order"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1671
-msgid ""
-"Choose how to display payment options at checkout: \n"
-"\t\t\t\t\t\t- **Saved Cards First**: Show saved payment methods first and expand them by default when available. \n"
-"\t\t\t\t\t\t- **New Payment Methods First**: Show new payment options first and expand them by default."
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1677
-msgid "Saved Cards First (default expanded)"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1678
-msgid "New Payment Methods First (default expanded)"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1683
-msgid "Cardholder Name Position"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1686
-msgid "Top"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1687
-msgid "Bottom"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1688
-msgid "Hidden"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1690
-msgid "Choose the position of the cardholder name field."
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1696
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1931
 msgid "Locale"
 msgstr ""
 
 #. translators: 1: HTML anchor opening tag, 2: HTML anchor closing tag.
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1699
-msgid "You can %1$s check out locales here %2$s in the Checkout.com Hub"
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1934
+msgid "Flow component language. Defaults to WordPress site language if empty. You can %1$s check out locales here %2$s in the Checkout.com Hub"
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1935
+msgid "Leave empty to automatically use your WordPress site language, or enter a specific locale code (e.g., \"fr\", \"de\", \"es\") to override."
 msgstr ""
 
 #. translators: 1: HTML anchor opening tag, 2: HTML anchor closing tag.
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1707
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1943
 msgid "Add data in JSON format. You can %1$s check out about translations here %2$s in the Checkout.com Hub"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1721
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1957
 msgid "Flow Payment method"
 msgstr ""
 
 #. translators: 1: HTML anchor opening tag, 2: HTML anchor closing tag.
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1724
+#: includes/settings/class-wc-checkoutcom-cards-settings.php:1960
 msgid "You can %1$s read more about flow component name here %2$s in the Checkout.com Hub. \"flow\" option will render all the available payment methods."
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1729
-msgid "Enabled Payment Methods"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1733
-msgid "Select which payment methods to enable at checkout. Leave empty to enable all available methods. Select \"Card\" if you want only specific methods to show. Note: MOTO orders (admin-created orders) will always allow all payment methods regardless of this setting."
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1737
-msgid "💳 Card (Credit/Debit) - Global"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1738
-msgid "🔐 Stored Card (Checkout.com Network) - Global"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1741
-msgid "🟢 Google Pay - Global"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1742
-msgid "🍎 Apple Pay - Global"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1743
-msgid "🅿️ PayPal - Global"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1746
-msgid "🇳🇱 iDEAL - Netherlands"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1747
-msgid "🇦🇹 EPS - Austria"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1748
-msgid "🇧🇪 Bancontact - Belgium"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1749
-msgid "🇵🇱 Przelewy24 - Poland"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1750
-msgid "🇵🇹 Multibanco - Portugal"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1751
-msgid "🇵🇹 MB WAY - Portugal"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1752
-msgid "🇪🇺 Klarna - EU/Nordics/UK"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1753
-msgid "🇪🇺 SEPA Direct Debit - EU"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1754
-msgid "🇫🇷 Alma (Installments) - France"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1757
-msgid "🇰🇼 KNET - Kuwait"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1758
-msgid "🇧🇭 BenefitPay - Bahrain"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1759
-msgid "🇸🇦 STC Pay - Saudi Arabia"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1760
-msgid "🇦🇪 Tabby - UAE/Saudi Arabia"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1761
-msgid "🇦🇪 Tamara - UAE/Saudi Arabia"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1762
-msgid "🇶🇦 QPay - Qatar"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1765
-msgid "🇲🇾 Touch n Go - Malaysia"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1766
-msgid "🇹🇭 TrueMoney - Thailand"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1767
-msgid "🇮🇩 DANA - Indonesia"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1768
-msgid "🇵🇭 GCash - Philippines"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1769
-msgid "🇰🇷 KakaoPay - South Korea"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1772
-msgid "🇨🇳 Alipay CN - China"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1773
-msgid "🇭🇰 Alipay HK - Hong Kong"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1779
-msgid "Debug Logging"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1781
-msgid "Enable detailed console logging for debugging"
-msgstr ""
-
-#: includes/settings/class-wc-checkoutcom-cards-settings.php:1782
-msgid "When enabled, logs detailed debugging information to browser console including initialization, form submissions, and card saving. Shows performance metrics, 3DS flows, and payment processing steps. <strong>Disable in production</strong> to reduce console output. Critical errors, warnings, webhooks, and 3DS authentication will always be visible."
 msgstr ""
 
 #: includes/settings/class-wc-checkoutcom-logging-settings.php:30
@@ -3265,10 +3467,6 @@ msgstr ""
 msgid "Number of log entries to buffer before writing to disk."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-logging-settings.php:179
-msgid "Performance Logging"
-msgstr ""
-
 #: includes/settings/class-wc-checkoutcom-logging-settings.php:183
 msgid "Enable performance monitoring and logging"
 msgstr ""
@@ -3326,32 +3524,55 @@ msgstr ""
 msgid "Failed to clear logs."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-webhook.php:189
-#: includes/settings/class-wc-checkoutcom-webhook.php:293
-#: includes/settings/class-wc-checkoutcom-workflows.php:293
+#: includes/settings/class-wc-checkoutcom-webhook.php:181
+#: includes/settings/class-wc-checkoutcom-webhook.php:352
+msgid "Multiple webhooks registered. Please delete duplicates and keep only one."
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-webhook.php:191
+msgid "Webhook already registered for this URL. No action needed."
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-webhook.php:201
+msgid "Failed to create webhook. Response: "
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-webhook.php:213
+msgid "Failed to create workflow. Response: "
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-webhook.php:225
+msgid "Failed to register webhook. Please check logs for details."
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-webhook.php:229
+msgid "Webhook registered successfully."
+msgstr ""
+
+#: includes/settings/class-wc-checkoutcom-webhook.php:308
+#: includes/settings/class-wc-checkoutcom-workflows.php:472
 msgid "An error has occurred while processing webhook request."
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-webhook.php:220
-#: includes/settings/class-wc-checkoutcom-webhook.php:231
+#: includes/settings/class-wc-checkoutcom-webhook.php:343
 msgid "Webhook is configured at this URL:"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-webhook.php:226
+#: includes/settings/class-wc-checkoutcom-webhook.php:347
 msgid "Webhook is configured with this name:"
 msgstr ""
 
-#: includes/settings/class-wc-checkoutcom-webhook.php:235
+#: includes/settings/class-wc-checkoutcom-webhook.php:372
 msgid "Webhook is not configured with the current site or there is some issue with connection, Please check logs or try again."
 msgstr ""
 
 #. translators: %s: Payment result ID.
-#: includes/subscription/class-wc-checkoutcom-subscription.php:77
+#: includes/subscription/class-wc-checkoutcom-subscription.php:85
 msgid "Checkout.com Payment Authorised - Action ID : %s "
 msgstr ""
 
 #. translators: %s: Payment result ID.
-#: includes/subscription/class-wc-checkoutcom-subscription.php:87
+#: includes/subscription/class-wc-checkoutcom-subscription.php:95
 msgid "Checkout.com Payment Flagged - Action ID : %s "
 msgstr ""
 
@@ -3427,110 +3648,128 @@ msgstr ""
 msgid "Your rights regarding the above mandate are explained in a statement that you can obtain from your bank."
 msgstr ""
 
-#: woocommerce-gateway-checkout-com.php:435
-#: woocommerce-gateway-checkout-com.php:460
-#: woocommerce-gateway-checkout-com.php:485
-#: woocommerce-gateway-checkout-com.php:509
-#: woocommerce-gateway-checkout-com.php:531
-#: woocommerce-gateway-checkout-com.php:553
-#: woocommerce-gateway-checkout-com.php:575
+#: woocommerce-gateway-checkout-com.php:467
+#: woocommerce-gateway-checkout-com.php:500
+#: woocommerce-gateway-checkout-com.php:533
+#: woocommerce-gateway-checkout-com.php:565
+#: woocommerce-gateway-checkout-com.php:595
+#: woocommerce-gateway-checkout-com.php:625
+#: woocommerce-gateway-checkout-com.php:655
+msgid "Permission denied."
+msgstr ""
+
+#: woocommerce-gateway-checkout-com.php:474
+#: woocommerce-gateway-checkout-com.php:507
+#: woocommerce-gateway-checkout-com.php:540
+#: woocommerce-gateway-checkout-com.php:572
+#: woocommerce-gateway-checkout-com.php:602
+#: woocommerce-gateway-checkout-com.php:632
+#: woocommerce-gateway-checkout-com.php:662
 msgid "Apple Pay gateway class not found."
 msgstr ""
 
-#: woocommerce-gateway-checkout-com.php:721
-#: woocommerce-gateway-checkout-com.php:743
+#: woocommerce-gateway-checkout-com.php:750
+#: woocommerce-gateway-checkout-com.php:772
 msgctxt "Order status"
 msgid "Suspected Fraud"
 msgstr ""
 
 #. translators: %s: number of orders
-#: woocommerce-gateway-checkout-com.php:727
+#: woocommerce-gateway-checkout-com.php:756
 msgid "Suspected Fraud <span class=\"count\">(%s)</span>"
 msgid_plural "Suspected Frauds <span class=\"count\">(%s)</span>"
 msgstr[0] ""
 msgstr[1] ""
 
-#: woocommerce-gateway-checkout-com.php:767
+#: woocommerce-gateway-checkout-com.php:796
 msgid "Please enter a valid cvv."
 msgstr ""
 
-#: woocommerce-gateway-checkout-com.php:846
+#: woocommerce-gateway-checkout-com.php:875
 msgid "Billing email is required for Flow payments to work properly."
 msgstr ""
 
-#: woocommerce-gateway-checkout-com.php:856
+#: woocommerce-gateway-checkout-com.php:885
 msgid "Complete billing address is required for Flow payments to work properly."
 msgstr ""
 
-#: woocommerce-gateway-checkout-com.php:973
+#: woocommerce-gateway-checkout-com.php:1062
 msgid "Manual orders require a valid billing email address for Flow payments to work properly. Please add a billing email to this order."
 msgstr ""
 
-#: woocommerce-gateway-checkout-com.php:974
-#: woocommerce-gateway-checkout-com.php:984
+#: woocommerce-gateway-checkout-com.php:1063
+#: woocommerce-gateway-checkout-com.php:1073
 msgid "Edit Order"
 msgstr ""
 
-#: woocommerce-gateway-checkout-com.php:983
+#: woocommerce-gateway-checkout-com.php:1072
 msgid "Manual orders require a complete billing address for Flow payments to work properly. Please add billing address details to this order."
 msgstr ""
 
-#: woocommerce-gateway-checkout-com.php:1013
+#: woocommerce-gateway-checkout-com.php:1149
 msgid "An error occurred while fetching the webhooks. Please try again."
 msgstr ""
 
-#: woocommerce-gateway-checkout-com.php:1014
+#: woocommerce-gateway-checkout-com.php:1150
 msgid "An error occurred while registering the webhook. Please try again."
 msgstr ""
 
+#: woocommerce-gateway-checkout-com.php:1537
+msgid "Please fill in all required fields to continue with payment."
+msgstr ""
+
+#: woocommerce-gateway-checkout-com.php:1538
+msgid "Required fields: Email, Billing Address"
+msgstr ""
+
 #. translators: %s: Action id.
-#: woocommerce-gateway-checkout-com.php:1367
+#: woocommerce-gateway-checkout-com.php:1642
 msgid "Checkout.com Payment Captured from Admin - Action ID : %s"
 msgstr ""
 
 #. translators: %s: Action id.
-#: woocommerce-gateway-checkout-com.php:1394
+#: woocommerce-gateway-checkout-com.php:1669
 msgid "Checkout.com Payment Voided from Admin - Action ID : %s"
 msgstr ""
 
-#: woocommerce-gateway-checkout-com.php:1406
+#: woocommerce-gateway-checkout-com.php:1681
 msgid "An error has occurred."
 msgstr ""
 
-#: woocommerce-gateway-checkout-com.php:1426
+#: woocommerce-gateway-checkout-com.php:1701
 msgid "Fawry reference number: "
 msgstr ""
 
-#: woocommerce-gateway-checkout-com.php:1640
-#: woocommerce-gateway-checkout-com.php:1671
+#: woocommerce-gateway-checkout-com.php:1915
+#: woocommerce-gateway-checkout-com.php:1940
 msgid "Flow gateway class not found."
 msgstr ""
 
-#: woocommerce-gateway-checkout-com.php:1810
+#: woocommerce-gateway-checkout-com.php:2036
 msgid "Validation successful"
 msgstr ""
 
-#: woocommerce-gateway-checkout-com.php:1814
+#: woocommerce-gateway-checkout-com.php:2040
 msgid "Fatal error during validation: "
 msgstr ""
 
-#: woocommerce-gateway-checkout-com.php:1829
+#: woocommerce-gateway-checkout-com.php:2055
 msgid "Session ID is required"
 msgstr ""
 
-#: woocommerce-gateway-checkout-com.php:1845
+#: woocommerce-gateway-checkout-com.php:2071
 msgid "Payment gateway not properly configured"
 msgstr ""
 
-#: woocommerce-gateway-checkout-com.php:1868
+#: woocommerce-gateway-checkout-com.php:2094
 msgid "Could not retrieve payment session"
 msgstr ""
 
-#: woocommerce-gateway-checkout-com.php:1890
+#: woocommerce-gateway-checkout-com.php:2116
 msgid "Payment data not found"
 msgstr ""
 
-#: woocommerce-gateway-checkout-com.php:1894
+#: woocommerce-gateway-checkout-com.php:2120
 msgid "An error occurred while processing the payment session"
 msgstr ""
 
@@ -3566,26 +3805,31 @@ msgstr ""
 msgid "Loading PayPal..."
 msgstr ""
 
-#: flow-integration/assets/js/payment-session.js:1092
+#: flow-integration/assets/js/payment-session.js:985
 msgid "Please enter the email to proceed."
 msgstr ""
 
-#: flow-integration/assets/js/payment-session.js:1096
+#: flow-integration/assets/js/payment-session.js:989
 msgid "Please enter the phone number to proceed."
 msgstr ""
 
-#: flow-integration/assets/js/payment-session.js:1668
+#: flow-integration/assets/js/payment-session.js:1582
 msgid "Something went wrong. Please try again."
 msgstr ""
 
-#: flow-integration/assets/js/payment-session.js:1980
+#: flow-integration/assets/js/payment-session.js:1814
 msgid "The selected payment method is not available at this time."
 msgstr ""
 
-#: flow-integration/assets/js/payment-session.js:2010
+#: flow-integration/assets/js/payment-session.js:1844
 msgid "Error creating payment session."
 msgstr ""
 
-#: flow-integration/assets/js/payment-session.js:4834
+#: flow-integration/assets/js/payment-session.js:1914
+#: flow-integration/assets/js/payment-session.js:1966
+msgid "Unable to initialize payment form. Please refresh the page and try again."
+msgstr ""
+
+#: flow-integration/assets/js/payment-session.js:4364
 msgid "An error occurred. Please try again."
 msgstr ""
