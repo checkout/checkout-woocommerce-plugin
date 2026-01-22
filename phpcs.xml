@@ -1,40 +1,137 @@
 <?xml version="1.0"?>
-<ruleset name="WordPress Coding Standards">
-	<description>Checkout.com Woocommerce payment gateway dev PHP_CodeSniffer ruleset.</description>
+<ruleset name="Strict WordPress Plugin Quality">
+
+	<description>
+		Ultra-strict PHPCS ruleset for WordPress plugins:
+		WPCS + VIP + PHPCompatibility + Debug detection + Code quality enforcement.
+	</description>
+
+	<file>.</file>
 
 	<!-- Exclude paths -->
 	<exclude-pattern>./node_modules/*</exclude-pattern>
 	<exclude-pattern>./vendor/*</exclude-pattern>
-	<exclude-pattern>*\.(?!php$)</exclude-pattern>
+	<exclude-pattern>./dist/*</exclude-pattern>
+	<exclude-pattern>./build/*</exclude-pattern>
 
-	<!-- Configs -->
+	<!-- CLI behavior -->
+	<arg name="extensions" value="php"/>
+	<arg value="sp"/>
+	<arg name="colors"/>
+	<arg name="parallel" value="8"/>
+	<arg name="basepath" value="."/>
+
+	<!-- WP + PHP versions -->
 	<config name="minimum_supported_wp_version" value="6.1" />
-	<arg value="sp"/> <!-- Show sniff and progress -->
-	<arg name="colors"/> <!-- Show results with colors. Disable if working on Windows -->
-	<arg name="basepath" value="."/> <!-- Strip the file paths down to the relevant bit -->
-	<arg name="parallel" value="8"/> <!-- Enables parallel processing when available for faster results -->
-	<arg name="extensions" value="php,js"/> <!-- Limit to PHP and JS files -->
-
-	<rule ref="PHPCompatibilityWP"/>
 	<config name="testVersion" value="8.2-"/>
+
+	<!-- Compatibility -->
+	<rule ref="PHPCompatibilityWP"/>
+
+	<!-- WordPress standards -->
+	<rule ref="WordPress-Core"/>
+	<rule ref="WordPress-Docs"/>
+	<rule ref="WordPress-Extra"/>
+
+	<!-- VIP -->
+	<rule ref="WordPressVIPMinimum"/>
 	<rule ref="WordPress-VIP-Go"/>
 
+	<!-- Allow sessions explicitly -->
 	<rule ref="WordPressVIPMinimum">
 		<exclude name="WordPressVIPMinimum.Functions.RestrictedFunctions.session_session_id"/>
 		<exclude name="WordPressVIPMinimum.Functions.RestrictedFunctions.session_session_start"/>
 		<exclude name="WordPressVIPMinimum.Variables.RestrictedVariables.session___SESSION"/>
 	</rule>
 
-	<!-- Rules -->
+	<!-- I18n -->
+	<rule ref="WordPress.WP.I18n">
+		<properties>
+			<property name="text_domain" type="array" value="checkout-com-unified-payments-api"/>
+		</properties>
+	</rule>
+
+	<!-- Allow short arrays -->
 	<rule ref="WordPress-Core">
-		<!-- Disallow long array syntax -->
 		<exclude name="Generic.Arrays.DisallowShortArraySyntax.Found"/>
 		<exclude name="Universal.Arrays.DisallowShortArraySyntax"/>
 	</rule>
 
-	<rule ref="WordPress.WP.I18n">
+	<!-- ============================= -->
+	<!-- Debug & Logging Detection -->
+	<!-- ============================= -->
+
+	<rule ref="WordPress.PHP.DevelopmentFunctions.error_log"/>
+
+	<rule ref="Generic.PHP.ForbiddenFunctions">
 		<properties>
-			<property name="text_domain" type="array" value="checkout-com-unified-payments-api" />
+			<property name="forbiddenFunctions" type="array">
+				<element key="var_dump" value="Remove debug output."/>
+				<element key="print_r" value="Remove debug output."/>
+				<element key="die" value="Avoid abrupt termination."/>
+				<element key="exit" value="Avoid abrupt termination."/>
+				<element key="eval" value="eval() is forbidden."/>
+			</property>
 		</properties>
 	</rule>
+
+	<!-- ============================= -->
+	<!-- Code Quality (REAL sniffs only) -->
+	<!-- ============================= -->
+
+	<rule ref="Squiz.PHP.CommentedOutCode"/>
+
+	<!-- Catches empty blocks/functions -->
+	<rule ref="Generic.CodeAnalysis.EmptyStatement"/>
+
+	<!-- Discourage deeply nested logic -->
+	<rule ref="Generic.Metrics.NestingLevel">
+		<properties>
+			<property name="absoluteNestingLevel" value="5"/>
+		</properties>
+	</rule>
+
+	<!-- Discourage high complexity -->
+	<rule ref="Generic.Metrics.CyclomaticComplexity">
+		<properties>
+			<property name="complexity" value="10"/>
+		</properties>
+	</rule>
+
+	<!-- ============================= -->
+	<!-- Security -->
+	<!-- ============================= -->
+
+	<rule ref="WordPress.Security.EscapeOutput"/>
+	<rule ref="WordPress.Security.ValidatedSanitizedInput"/>
+	<rule ref="WordPress.Security.NonceVerification"/>
+	<rule ref="WordPress.DB.PreparedSQL"/>
+
+	<!-- ============================= -->
+	<!-- Logic safety -->
+	<!-- ============================= -->
+
+	<rule ref="Generic.CodeAnalysis.AssignmentInCondition"/>
+
+	<!-- ============================= -->
+	<!-- Files -->
+	<!-- ============================= -->
+
+	<rule ref="WordPress.Files.FileName"/>
+
+	<!-- ============================= -->
+	<!-- Naming -->
+	<!-- ============================= -->
+
+	<rule ref="WordPress.NamingConventions.ValidFunctionName"/>
+	<rule ref="WordPress.NamingConventions.ValidVariableName"/>
+	<rule ref="WordPress.NamingConventions.PrefixAllGlobals"/>
+
+	<!-- ============================= -->
+	<!-- Best Practices -->
+	<!-- ============================= -->
+
+	<rule ref="PSR12"/>
+	<rule ref="Generic.PHP.NoSilencedErrors"/>
+
 </ruleset>
