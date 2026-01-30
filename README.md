@@ -4,7 +4,7 @@ Checkout.com Payment Gateway plugin for WooCommerce with Flow integration suppor
 
 ## Version
 
-**Current Version:** 5.0.1
+**Current Version:** 5.0.2
 
 ## Features
 
@@ -470,6 +470,14 @@ For support and integration help:
 GPL v2 or later
 
 ## Changelog
+
+### Version 5.0.2
+- Implement idempotent Flow initialization to prevent duplicate payment session requests
+- Add generation tracking and single-flight lock mechanism for initialization
+- Add destruction confirmation to handle transient DOM churn
+- Optimize state logging to only log actual value changes
+- Fix name field changes triggering Flow reload after initialization
+- Production-ready improvements with comprehensive error handling
 
 ### Version 5.0.1
 - Flow module refactor for stability and 3DS return handling
