@@ -70,7 +70,13 @@
 			const oldValue = this[key];
 			this[key] = value;
 			
-			if (!silent && typeof window.ckoLogger !== 'undefined' && window.ckoLogger.debugEnabled) {
+			// Skip logging for initialized changes when both old and new are false (reduces log spam)
+			const shouldLog = !silent && 
+			                 typeof window.ckoLogger !== 'undefined' && 
+			                 window.ckoLogger.debugEnabled &&
+			                 !(key === 'initialized' && oldValue === false && value === false);
+			
+			if (shouldLog) {
 				window.ckoLogger.debug('[FLOW STATE] ' + key + ' changed:', {
 					old: oldValue,
 					new: value

@@ -1915,6 +1915,14 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					} else {
 						WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] ⚠️ Payment session ID NOT found in early fetch metadata' );
 					}
+					// Log cardholder name from payment details
+					if ( isset( $payment_details['source']['name'] ) ) {
+						WC_Checkoutcom_Utility::logger( '[CARDHOLDER NAME] Cardholder name from payment details (early fetch): ' . $payment_details['source']['name'] );
+					} elseif ( isset( $payment_details['source']['cardholder_name'] ) ) {
+						WC_Checkoutcom_Utility::logger( '[CARDHOLDER NAME] Cardholder name from payment details (early fetch): ' . $payment_details['source']['cardholder_name'] );
+					} else {
+						WC_Checkoutcom_Utility::logger( '[CARDHOLDER NAME] ⚠️ Cardholder name NOT found in payment details (early fetch). Available source keys: ' . ( isset( $payment_details['source'] ) ? implode( ', ', array_keys( $payment_details['source'] ) ) : 'source not set' ) );
+					}
 				}
 			} catch ( Exception $e ) {
 				WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] WARNING: Failed to fetch payment details early: ' . $e->getMessage() . ' - will retry later if needed' );
@@ -2296,6 +2304,15 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			$payment_details = $result;
 		} else {
 			$payment_details = $builder->getPaymentsClient()->getPaymentDetails( $flow_payment_id );
+			
+			// Log cardholder name from payment details
+			if ( isset( $payment_details['source']['name'] ) ) {
+				WC_Checkoutcom_Utility::logger( '[CARDHOLDER NAME] Cardholder name from payment details (3DS return): ' . $payment_details['source']['name'] );
+			} elseif ( isset( $payment_details['source']['cardholder_name'] ) ) {
+				WC_Checkoutcom_Utility::logger( '[CARDHOLDER NAME] Cardholder name from payment details (3DS return): ' . $payment_details['source']['cardholder_name'] );
+			} else {
+				WC_Checkoutcom_Utility::logger( '[CARDHOLDER NAME] ⚠️ Cardholder name NOT found in payment details (3DS return). Available source keys: ' . ( isset( $payment_details['source'] ) ? implode( ', ', array_keys( $payment_details['source'] ) ) : 'source not set' ) );
+			}
 			
 			// Convert to result format expected by the rest of the code
 			$result = array(

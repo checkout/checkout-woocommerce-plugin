@@ -1336,6 +1336,62 @@ var ckoFlow = {
 				 * Triggered when user submits the payment using Place Order Button of Woocommerce.
 				 */
 				const onSubmit = async (component) => {
+					// Update cardholder name right before payment submission to ensure latest billing name is used
+					// This is especially important when position is "hidden" and billing name changed after Flow initialized
+					if (typeof window.ckoSetCardholderName === 'function') {
+						const beforeValue = window.componentOptions?.card?.data?.cardholderName || '(not set)';
+						window.ckoSetCardholderName();
+						const afterValue = window.componentOptions?.card?.data?.cardholderName || '(not set)';
+						
+						// CRITICAL: Try to update component's internal data if method exists
+						// The SDK might cache cardholder name at creation, so we need to update it directly
+						if (component && typeof component.update === 'function') {
+							try {
+								component.update({ card: { data: { cardholderName: afterValue } } });
+								if (typeof ckoLogger !== 'undefined') {
+									ckoLogger.debug('[CARDHOLDER NAME] Updated component via update() method:', {
+										before: beforeValue,
+										after: afterValue
+									});
+								}
+							} catch (e) {
+								if (typeof ckoLogger !== 'undefined') {
+									ckoLogger.warn('[CARDHOLDER NAME] component.update() failed:', e);
+								}
+							}
+						} else if (component && component._options) {
+							// Fallback: Try to update component's internal options directly
+							try {
+								if (!component._options.card) {
+									component._options.card = {};
+								}
+								if (!component._options.card.data) {
+									component._options.card.data = {};
+								}
+								component._options.card.data.cardholderName = afterValue;
+								if (typeof ckoLogger !== 'undefined') {
+									ckoLogger.debug('[CARDHOLDER NAME] Updated component._options directly:', {
+										before: beforeValue,
+										after: afterValue
+									});
+								}
+							} catch (e) {
+								if (typeof ckoLogger !== 'undefined') {
+									ckoLogger.warn('[CARDHOLDER NAME] Failed to update component._options:', e);
+								}
+							}
+						}
+						
+						if (typeof ckoLogger !== 'undefined') {
+							ckoLogger.debug('[CARDHOLDER NAME] Before payment submission:', {
+								before: beforeValue,
+								after: afterValue,
+								componentHasUpdate: component && typeof component.update === 'function',
+								componentHasOptions: component && component._options !== undefined
+							});
+						}
+					}
+					
 					showLoadingOverlay(2);
 					return { continue: true };
 				};
@@ -1762,6 +1818,12 @@ var ckoFlow = {
 				// Ensure component name is defined
 				const componentName = window.componentName || 'flow';
 				ckoLogger.debug('Creating Flow component with name:', componentName);
+				
+				// Update cardholder name right before component creation to ensure latest billing name is used
+				// This ensures the cardholder name is up-to-date when the component is created
+				if (typeof window.ckoSetCardholderName === 'function') {
+					window.ckoSetCardholderName();
+				}
 				
 				let flowComponent;
 				try {
@@ -2649,6 +2711,12 @@ function reloadFlowComponent() {
 	});
 	ckoLogger.debug('Reloading Flow component due to field change');
 	
+	// Update cardholder name before reloading (if name fields changed)
+	if (typeof window.ckoSetCardholderName === 'function') {
+		window.ckoSetCardholderName();
+		ckoLogger.debug('Cardholder name updated before Flow reload');
+	}
+	
 	// Destroy existing component
 	destroyFlowComponent();
 	
@@ -2924,6 +2992,11 @@ function initializeFlowIfNeeded() {
 	
 	// Mark fields as filled
 	FlowState.set('fieldsWereFilled', true);
+	
+	// Update cardholder name before initializing Flow (ensures latest name is used)
+	if (typeof window.ckoSetCardholderName === 'function') {
+		window.ckoSetCardholderName();
+	}
 	
 	// Only initialize if not already initialized
 	if (!FlowState.get('initialized') || !ckoFlow.flowComponent) {
@@ -4108,6 +4181,12 @@ document.addEventListener("DOMContentLoaded", function () {
 								if (ckoFlow.flowComponent && typeof ckoFlow.flowComponent.isValid === 'function') {
 									const isValid = ckoFlow.flowComponent.isValid();
 									if (isValid) {
+										// Log cardholder name value right before submission
+										const cardholderNameValue = window.componentOptions?.card?.data?.cardholderName || '(not set)';
+										ckoLogger.debug('[CARDHOLDER NAME] Value in componentOptions at submission:', {
+											cardholderName: cardholderNameValue,
+											componentOptions: window.componentOptions?.card?.data
+										});
 										ckoLogger.debug('Flow component is valid, submitting...');
 										try {
 											ckoFlow.flowComponent.submit();
@@ -4121,6 +4200,12 @@ document.addEventListener("DOMContentLoaded", function () {
 									}
 								} else {
 									// Fallback: submit without validation check
+									// Log cardholder name value right before submission
+									const cardholderNameValue = window.componentOptions?.card?.data?.cardholderName || '(not set)';
+									ckoLogger.debug('[CARDHOLDER NAME] Value in componentOptions at submission (order-pay fallback):', {
+										cardholderName: cardholderNameValue,
+										componentOptions: window.componentOptions?.card?.data
+									});
 									ckoLogger.debug('Flow component validity check not available, submitting directly...');
 									try {
 										if (ckoFlow.flowComponent && typeof ckoFlow.flowComponent.submit === 'function') {
@@ -4219,6 +4304,12 @@ document.addEventListener("DOMContentLoaded", function () {
 							if (ckoFlow.flowComponent && typeof ckoFlow.flowComponent.isValid === 'function') {
 								const isValid = ckoFlow.flowComponent.isValid();
 								if (isValid) {
+									// Log cardholder name value right before submission
+									const cardholderNameValue = window.componentOptions?.card?.data?.cardholderName || '(not set)';
+									ckoLogger.debug('[CARDHOLDER NAME] Value in componentOptions at submission:', {
+										cardholderName: cardholderNameValue,
+										componentOptions: window.componentOptions?.card?.data
+									});
 									ckoLogger.debug('Flow component is valid, submitting...');
 									try {
 										ckoFlow.flowComponent.submit();
@@ -4232,6 +4323,12 @@ document.addEventListener("DOMContentLoaded", function () {
 								}
 							} else {
 								// Fallback: submit without validation check
+								// Log cardholder name value right before submission
+								const cardholderNameValue = window.componentOptions?.card?.data?.cardholderName || '(not set)';
+								ckoLogger.debug('[CARDHOLDER NAME] Value in componentOptions at submission (fallback):', {
+									cardholderName: cardholderNameValue,
+									componentOptions: window.componentOptions?.card?.data
+								});
 								ckoLogger.debug('Flow component validity check not available, submitting directly...');
 								try {
 									if (ckoFlow.flowComponent && typeof ckoFlow.flowComponent.submit === 'function') {

@@ -115,6 +115,8 @@
 
 				// Check if this is a critical field that requires Flow reload
 				const criticalFields = [
+					'billing_first_name',  // Cardholder name - requires Flow reload
+					'billing_last_name',   // Cardholder name - requires Flow reload
 					'billing_email',
 					'billing_country',
 					'billing_address_1',
@@ -132,45 +134,68 @@
 				);
 
 				// Store previous values to detect changes
+				// Flag to track if we should skip update_checkout (for name fields when position is hidden)
+				let shouldSkipUpdateCheckout = false;
+				
 				if (isCriticalField && ckoFlowInitialized) {
 					const currentValue = event.target.value || '';
 					const fieldKey = fieldId || fieldName;
-					const previousValue = window.ckoFlowFieldValues?.[fieldKey] || '';
+					
+					// Initialize storage if needed
+					if (!window.ckoFlowFieldValues) {
+						window.ckoFlowFieldValues = {};
+					}
+					
+					const previousValue = window.ckoFlowFieldValues[fieldKey] || '';
 
 					// If value actually changed (not just typing)
 					if (currentValue !== previousValue) {
 						// Update stored value
-						if (!window.ckoFlowFieldValues) {
-							window.ckoFlowFieldValues = {};
-						}
 						window.ckoFlowFieldValues[fieldKey] = currentValue;
 
-						// Debounce the reload check
-						debouncedCheckFlowReload(fieldKey, currentValue);
+						// Check if this is a name field
+						const isNameField = fieldKey.includes('first_name') || fieldKey.includes('last_name');
+						
+						if (isNameField) {
+							// When billing name changes, reload Flow to ensure cardholder name is set fresh at component creation
+							// This ensures the latest billing name is used, especially when cardholderNamePosition is "hidden"
+							// User will need to re-enter card details, but this guarantees correct cardholder name
+							debouncedCheckFlowReload(fieldKey, currentValue);
+						} else {
+							// For other fields, reload Flow
+							debouncedCheckFlowReload(fieldKey, currentValue);
+						}
 					}
 				}
 
 				// Only proceed if all required fields are filled.
 				if (requiredFieldsFilled()) {
-					// Debounce update_checkout triggers to prevent cascading reloads
-					if (!window.ckoUpdateCheckoutDebounce) {
-						window.ckoUpdateCheckoutDebounce = null;
-					}
+					// Skip update_checkout if this is a name field (prevents Flow reload)
+					if (!shouldSkipUpdateCheckout) {
+						// Debounce update_checkout triggers to prevent cascading reloads
+						if (!window.ckoUpdateCheckoutDebounce) {
+							window.ckoUpdateCheckoutDebounce = null;
+						}
 
-					// Clear existing debounce
-					if (window.ckoUpdateCheckoutDebounce) {
-						clearTimeout(window.ckoUpdateCheckoutDebounce);
-					}
+						// Clear existing debounce
+						if (window.ckoUpdateCheckoutDebounce) {
+							clearTimeout(window.ckoUpdateCheckoutDebounce);
+						}
 
-					// Debounce the trigger by 100ms to batch rapid field changes
-					window.ckoUpdateCheckoutDebounce = setTimeout(function () {
-						ckoLogger.debug('Triggering update_checkout after debounce', {
-							fieldName: event.target.name || 'unknown',
-							fieldId: event.target.id || 'unknown'
-						});
-						$('body').trigger('update_checkout');
-						window.ckoUpdateCheckoutDebounce = null;
-					}, 100);
+						// Debounce the trigger by 100ms to batch rapid field changes
+						window.ckoUpdateCheckoutDebounce = setTimeout(function () {
+							ckoLogger.debug('Triggering update_checkout after debounce', {
+								fieldName: event.target.name || 'unknown',
+								fieldId: event.target.id || 'unknown'
+							});
+							$('body').trigger('update_checkout');
+							window.ckoUpdateCheckoutDebounce = null;
+						}, 100);
+					} else {
+						if (typeof ckoLogger !== 'undefined') {
+							ckoLogger.debug('[CARDHOLDER NAME] Skipping update_checkout to prevent Flow reload');
+						}
+					}
 
 					// If the event is from checking 'ship to different address' or 'create account', return early.
 					if (
@@ -222,8 +247,24 @@
 			// Debounce the handler to limit how often it's triggered during typing.
 			const debouncedTyping = debounce(handleTyping, 2000);
 
-			// Attach debounced handler to key billing fields.
-			$('#billing_first_name, #billing_last_name, #billing_email, #billing_phone').on(
+			// Special handler for name fields - use 'blur' instead of 'input' to avoid reloading during typing
+			// This prevents clearing card details while user is still editing the name
+			$('#billing_first_name, #billing_last_name').on(
+				'blur',
+				function (e) {
+					// Only trigger if value actually changed
+					const fieldId = this.id;
+					const currentValue = this.value || '';
+					const previousValue = window.ckoFlowFieldValues?.[fieldId] || '';
+					
+					if (currentValue !== previousValue && currentValue.trim() !== '') {
+						debouncedTyping(e);
+					}
+				}
+			);
+
+			// Attach debounced handler to other key billing fields (email, phone) - still use 'input'
+			$('#billing_email, #billing_phone').on(
 				'input',
 				function (e) {
 					debouncedTyping(e);
