@@ -52,40 +52,48 @@
 				flowWasInitializedBefore: flowWasInitializedBefore
 			});
 
-			// Only remount if:
-			// 1. Flow payment method is selected
-			// 2. Container exists
-			// 3. Flow component is NOT mounted (was destroyed by updated_checkout)
-			// 4. Flow is NOT currently initializing
-			if (flowPayment && flowPayment.checked && flowContainer) {
-				if (!flowComponentActuallyMounted || flowWasInitializedBefore) {
-					// Component was destroyed by updated_checkout
-					if (ckoFlowInitializing) {
-						ckoLogger.debug('Flow component not mounted but initialization already in progress, skipping');
-						return;
-					}
-
-					ckoLogger.debug(
-						'🔄 Flow component needs remounting - container is ready, re-initializing...'
-					);
-
-					// Reset flag so Flow can be re-initialized
-					ckoFlowInitialized = false;
-					if (ckoFlow.flowComponent) {
-						// Component exists but was unmounted - destroy it so we can create a new one
-						try {
-							ckoFlow.flowComponent.destroy();
-						} catch (e) {
-							ckoLogger.debug('Error destroying Flow component:', e);
-						}
-						ckoFlow.flowComponent = null;
-					}
-					// Re-initialize
-					initializeFlowIfNeeded();
-				} else {
-					ckoLogger.debug('✅ Flow component still mounted, no remounting needed');
+		// Only remount if:
+		// 1. Flow payment method is selected
+		// 2. Container exists
+		// 3. Flow component WAS initialized but is now missing (was destroyed by updated_checkout)
+		// 4. Flow is NOT currently initializing
+		if (flowPayment && flowPayment.checked && flowContainer) {
+			// CRITICAL FIX: Only remount if component was initialized before but now missing
+			// Don't remount if component simply hasn't rendered yet (SDK takes 2-5 seconds)
+			if (flowWasInitializedBefore) {
+				// Component was destroyed by updated_checkout
+				if (ckoFlowInitializing) {
+					ckoLogger.debug('Flow component not mounted but initialization already in progress, skipping');
+					return;
 				}
+
+				ckoLogger.debug(
+					'🔄 Flow component needs remounting - container is ready, re-initializing...'
+				);
+
+				// Reset flag so Flow can be re-initialized
+				ckoFlowInitialized = false;
+				if (ckoFlow.flowComponent) {
+					// Component exists but was unmounted - unmount it so we can create a new one
+					try {
+						// CRITICAL: Flow SDK uses unmount(), not destroy()
+						if (typeof ckoFlow.flowComponent.unmount === 'function') {
+							ckoFlow.flowComponent.unmount();
+						} else if (typeof ckoFlow.flowComponent.destroy === 'function') {
+							// Fallback for older SDK versions
+							ckoFlow.flowComponent.destroy();
+						}
+					} catch (e) {
+						ckoLogger.debug('Error unmounting Flow component:', e);
+					}
+					ckoFlow.flowComponent = null;
+				}
+				// Re-initialize
+				initializeFlowIfNeeded();
+			} else {
+				ckoLogger.debug('✅ Flow component still mounted or never initialized, no remounting needed');
 			}
+		}
 		});
 	}
 

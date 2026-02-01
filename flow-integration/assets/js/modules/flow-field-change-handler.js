@@ -172,6 +172,23 @@
 				if (requiredFieldsFilled()) {
 					// Skip update_checkout if this is a name field (prevents Flow reload)
 					if (!shouldSkipUpdateCheckout) {
+						// CRITICAL: Don't trigger update_checkout immediately after Flow initialization
+						// This prevents the duplicate init cycle: init → update_checkout → container destroyed → remount
+						const flowJustInitialized = FlowState.get('initialized') && 
+							FlowState.get('lastInitTime') && 
+							(Date.now() - FlowState.get('lastInitTime')) < 3000; // 3 seconds
+						
+						if (flowJustInitialized) {
+							if (typeof ckoLogger !== 'undefined') {
+								ckoLogger.debug('[FIELD CHANGE] Skipping update_checkout - Flow just initialized', {
+									timeSinceInit: Date.now() - FlowState.get('lastInitTime'),
+									fieldName: event.target.name,
+									fieldId: event.target.id
+								});
+							}
+							return;
+						}
+						
 						// Debounce update_checkout triggers to prevent cascading reloads
 						if (!window.ckoUpdateCheckoutDebounce) {
 							window.ckoUpdateCheckoutDebounce = null;

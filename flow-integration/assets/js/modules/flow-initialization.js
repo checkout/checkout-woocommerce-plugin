@@ -55,6 +55,7 @@
 		
 		/**
 		 * Collects checkout data from cart info and form fields
+		 * CRITICAL: Always reads from DOM form fields first (not cached cartInfo) to ensure fresh data on reload
 		 * @returns {Object} Checkout data object
 		 */
 		collectCheckoutData: function() {
@@ -69,14 +70,16 @@
 			let currency = cartInfo["purchase_currency"];
 			let reference = "WOO" + (cko_flow_vars.ref_session || 'default');
 			
-			// Extract billing address
+			// CRITICAL: Read from DOM form fields FIRST (not cartInfo) to ensure fresh data
+			// cartInfo["billing_address"] is stale and only updates after WooCommerce's updated_checkout
+			// This ensures Flow reload gets the latest user-entered values
 			const billingAddress = cartInfo["billing_address"] || {};
-			let email = billingAddress["email"] || 
-				(document.getElementById("billing_email") ? document.getElementById("billing_email").value : '');
-			let family_name = billingAddress["family_name"] || 
-				(document.getElementById("billing_last_name") ? document.getElementById("billing_last_name").value : '');
-			let given_name = billingAddress["given_name"] || 
-				(document.getElementById("billing_first_name") ? document.getElementById("billing_first_name").value : '');
+			let email = (document.getElementById("billing_email") ? document.getElementById("billing_email").value : '') || 
+				billingAddress["email"];
+			let family_name = (document.getElementById("billing_last_name") ? document.getElementById("billing_last_name").value : '') || 
+				billingAddress["family_name"];
+			let given_name = (document.getElementById("billing_first_name") ? document.getElementById("billing_first_name").value : '') || 
+				billingAddress["given_name"];
 			
 			// Validate email
 			const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -91,15 +94,41 @@
 			}
 			
 			email = email.trim();
-			let phone = billingAddress["phone"] || 
-				(document.getElementById("billing_phone") ? document.getElementById("billing_phone").value : '');
+			let phone = (document.getElementById("billing_phone") ? document.getElementById("billing_phone").value : '') || 
+				billingAddress["phone"];
 			
-			// Extract address fields
-			let address1 = billingAddress["street_address"] || '';
-			let address2 = billingAddress["street_address2"] || '';
-			let city = billingAddress["city"] || '';
-			let zip = billingAddress["postal_code"] || '';
-			let country = billingAddress["country"] || '';
+			// Extract address fields - read from DOM first for fresh data
+			let address1 = (document.getElementById("billing_address_1") ? document.getElementById("billing_address_1").value : '') || 
+				billingAddress["street_address"] || '';
+			let address2 = (document.getElementById("billing_address_2") ? document.getElementById("billing_address_2").value : '') || 
+				billingAddress["street_address2"] || '';
+			let city = (document.getElementById("billing_city") ? document.getElementById("billing_city").value : '') || 
+				billingAddress["city"] || '';
+			let zip = (document.getElementById("billing_postcode") ? document.getElementById("billing_postcode").value : '') || 
+				billingAddress["postal_code"] || '';
+			let country = (document.getElementById("billing_country") ? document.getElementById("billing_country").value : '') || 
+				billingAddress["country"] || '';
+			
+			// Debug: Log data sources to verify fresh data
+			if (typeof window.ckoLogger !== 'undefined' && window.ckoLogger.debugEnabled) {
+				window.ckoLogger.debug('[collectCheckoutData] Reading from DOM (fresh) vs cartInfo (cached):', {
+					'email_dom': document.getElementById("billing_email") ? document.getElementById("billing_email").value : 'N/A',
+					'email_cartInfo': billingAddress["email"] || 'N/A',
+					'email_final': email,
+					'given_name_dom': document.getElementById("billing_first_name") ? document.getElementById("billing_first_name").value : 'N/A',
+					'given_name_cartInfo': billingAddress["given_name"] || 'N/A',
+					'given_name_final': given_name,
+					'family_name_dom': document.getElementById("billing_last_name") ? document.getElementById("billing_last_name").value : 'N/A',
+					'family_name_cartInfo': billingAddress["family_name"] || 'N/A',
+					'family_name_final': family_name,
+					'city_dom': document.getElementById("billing_city") ? document.getElementById("billing_city").value : 'N/A',
+					'city_cartInfo': billingAddress["city"] || 'N/A',
+					'city_final': city,
+					'country_dom': document.getElementById("billing_country") ? document.getElementById("billing_country").value : 'N/A',
+					'country_cartInfo': billingAddress["country"] || 'N/A',
+					'country_final': country
+				});
+			}
 			
 			// Initialize shipping address variables (default to billing address)
 			let shippingAddress1 = address1;
@@ -108,15 +137,20 @@
 			let shippingZip = zip;
 			let shippingCountry = country;
 			
-			// Check for shipping address
+			// Check for shipping address - read from DOM first for fresh data
 			let shippingElement = document.getElementById("ship-to-different-address-checkbox");
 			if (shippingElement && shippingElement.checked) {
 				const shippingAddress = cartInfo["shipping_address"] || {};
-				shippingAddress1 = shippingAddress["street_address"] || address1;
-				shippingAddress2 = shippingAddress["street_address2"] || address2;
-				shippingCity = shippingAddress["city"] || city;
-				shippingZip = shippingAddress["postal_code"] || zip;
-				shippingCountry = shippingAddress["country"] || country;
+				shippingAddress1 = (document.getElementById("shipping_address_1") ? document.getElementById("shipping_address_1").value : '') || 
+					shippingAddress["street_address"] || address1;
+				shippingAddress2 = (document.getElementById("shipping_address_2") ? document.getElementById("shipping_address_2").value : '') || 
+					shippingAddress["street_address2"] || address2;
+				shippingCity = (document.getElementById("shipping_city") ? document.getElementById("shipping_city").value : '') || 
+					shippingAddress["city"] || city;
+				shippingZip = (document.getElementById("shipping_postcode") ? document.getElementById("shipping_postcode").value : '') || 
+					shippingAddress["postal_code"] || zip;
+				shippingCountry = (document.getElementById("shipping_country") ? document.getElementById("shipping_country").value : '') || 
+					shippingAddress["country"] || country;
 			}
 			
 			// Extract order lines

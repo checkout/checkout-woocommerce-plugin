@@ -139,6 +139,9 @@ jQuery(document).on("updated_checkout", function () {
 		ckoLogger.debug('[FLOW CONTAINER] updated_checkout event fired');
 	}
 	
+	// Set flag to prevent MutationObserver from resetting state during DOM churn
+	window.ckoFlowUpdatedCheckoutInProgress = true;
+	
 	// Wait for WooCommerce to finish DOM updates
 	setTimeout(function() {
 		const paymentMethod = document.querySelector('.payment_method_wc_checkout_com_flow');
@@ -146,11 +149,23 @@ jQuery(document).on("updated_checkout", function () {
 		updateSavedCardsState(false);
 		
 		// If Flow payment method is selected but container is missing, create it
+		// CRITICAL: Don't recreate if Flow was just initialized (prevents duplicate init)
 		if (paymentMethod && !flowContainer) {
-			if (typeof ckoLogger !== 'undefined') {
-				ckoLogger.debug('[FLOW CONTAINER] Container missing after updated_checkout - recreating');
+			// Check if Flow is currently initializing or was very recently initialized
+			// The Flow SDK creates its own container during initialization
+			// If we recreate the container during this time, we'll trigger a duplicate init
+			const flowCurrentlyInitializing = window.ckoFlowInitializing || (typeof FlowState !== 'undefined' && FlowState.get('initializing'));
+			
+			if (flowCurrentlyInitializing) {
+				if (typeof ckoLogger !== 'undefined') {
+					ckoLogger.debug('[FLOW CONTAINER] Container missing but Flow currently initializing - skipping recreation');
+				}
+			} else {
+				if (typeof ckoLogger !== 'undefined') {
+					ckoLogger.debug('[FLOW CONTAINER] Container missing after updated_checkout - recreating');
+				}
+				addPaymentMethod(); // This will emit cko:flow-container-ready event
 			}
-			addPaymentMethod(); // This will emit cko:flow-container-ready event
 		} else if (flowContainer) {
 			if (flowContainer.classList) {
 				flowContainer.classList.add('cko-flow__container');
@@ -165,6 +180,11 @@ jQuery(document).on("updated_checkout", function () {
 				ckoLogger.debug('[FLOW CONTAINER] Container exists - emitted cko:flow-container-ready event');
 			}
 		}
+		
+		// Clear flag after a delay to ensure MutationObserver doesn't interfere
+		setTimeout(function() {
+			window.ckoFlowUpdatedCheckoutInProgress = false;
+		}, 500);
 	}, 100); // Wait for WooCommerce to finish DOM updates
 });
 

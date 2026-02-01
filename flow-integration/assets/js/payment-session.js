@@ -2005,6 +2005,7 @@ var ckoFlow = {
 			// Mark Flow as initialized and clear guard flag now that component is mounted
 			ckoFlowInitialized = true;
 			ckoFlowInitializing = false;
+			FlowState.set('lastInitTime', Date.now()); // Track init time to prevent immediate update_checkout
 
 			// Enable UI after successful mount
 			ckoFlow.enableUIAfterMount();
@@ -2345,9 +2346,17 @@ document.addEventListener("DOMContentLoaded", function () {
 			'[data-testid="checkout-web-component-root"]'
 		);
 
-		// If the element is not present, update ckoFlowInitialized.
+		// Only reset initialized flag if:
+		// 1. Element is missing from DOM AND
+		// 2. Component doesn't exist in memory AND  
+		// 3. NOT during updated_checkout (WooCommerce replaces DOM)
 		if (!element) {
-			ckoFlowInitialized = false;
+			const componentExistsInMemory = !!(ckoFlow && ckoFlow.flowComponent);
+			const duringUpdatedCheckout = window.ckoFlowUpdatedCheckoutInProgress || false;
+			
+			if (!componentExistsInMemory && !duringUpdatedCheckout) {
+				ckoFlowInitialized = false;
+			}
 		}
 	});
 
