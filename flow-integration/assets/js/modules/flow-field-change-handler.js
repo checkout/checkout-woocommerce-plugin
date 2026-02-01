@@ -25,6 +25,31 @@
 			return;
 		}
 
+		const storeFieldValue = function(fieldId, value) {
+			if (!window.ckoFlowFieldValues) {
+				window.ckoFlowFieldValues = {};
+			}
+			window.ckoFlowFieldValues[fieldId] = value;
+		};
+		
+		const triggerUpdateCheckoutDebounced = function(context) {
+			if (!window.ckoUpdateCheckoutDebounce) {
+				window.ckoUpdateCheckoutDebounce = null;
+			}
+			
+			if (window.ckoUpdateCheckoutDebounce) {
+				clearTimeout(window.ckoUpdateCheckoutDebounce);
+			}
+			
+			window.ckoUpdateCheckoutDebounce = setTimeout(function () {
+				if (typeof ckoLogger !== 'undefined') {
+					ckoLogger.debug('Triggering update_checkout after debounce', context || {});
+				}
+				jQuery('body').trigger('update_checkout');
+				window.ckoUpdateCheckoutDebounce = null;
+			}, 100);
+		};
+		
 		// Set up handlers for critical fields to immediately update ckoFlowFieldValues
 		const criticalFieldSelectors = [
 			'#billing_email',
@@ -37,10 +62,7 @@
 			jQuery(document).on('change', selector, function () {
 				const fieldId = this.id;
 				const value = jQuery(this).val();
-				if (!window.ckoFlowFieldValues) {
-					window.ckoFlowFieldValues = {};
-				}
-				window.ckoFlowFieldValues[fieldId] = value;
+				storeFieldValue(fieldId, value);
 				ckoLogger.debug(`Critical field ${fieldId} changed - stored value: ${value}`);
 			});
 		});
@@ -87,7 +109,7 @@
 			 *
 			 * @param {Event} event - The input or change event.
 			 */
-			const handleTyping = (event) => {
+		const handleTyping = (event) => {
 				let isShippingField = false;
 
 				// Check if the changed field belongs to shipping info.
@@ -99,17 +121,11 @@
 				// If the field is a shipping-related field, trigger WooCommerce checkout update and exit early.
 				if (isShippingField) {
 					ckoLogger.debug('Triggered by a shipping field, skipping...');
-					// Debounce to prevent rapid triggers
-					if (!window.ckoUpdateCheckoutDebounce) {
-						window.ckoUpdateCheckoutDebounce = null;
-					}
-					if (window.ckoUpdateCheckoutDebounce) {
-						clearTimeout(window.ckoUpdateCheckoutDebounce);
-					}
-					window.ckoUpdateCheckoutDebounce = setTimeout(function () {
-						$('body').trigger('update_checkout');
-						window.ckoUpdateCheckoutDebounce = null;
-					}, 100);
+					triggerUpdateCheckoutDebounced({
+						fieldName: event.target.name || 'unknown',
+						fieldId: event.target.id || 'unknown',
+						reason: 'shipping-field'
+					});
 					return;
 				}
 
@@ -137,21 +153,17 @@
 				// Flag to track if we should skip update_checkout (for name fields when position is hidden)
 				let shouldSkipUpdateCheckout = false;
 				
-				if (isCriticalField && ckoFlowInitialized) {
+				if (isCriticalField && FlowState.get('initialized')) {
 					const currentValue = event.target.value || '';
 					const fieldKey = fieldId || fieldName;
 					
 					// Initialize storage if needed
-					if (!window.ckoFlowFieldValues) {
-						window.ckoFlowFieldValues = {};
-					}
-					
-					const previousValue = window.ckoFlowFieldValues[fieldKey] || '';
+					const previousValue = (window.ckoFlowFieldValues || {})[fieldKey] || '';
 
 					// If value actually changed (not just typing)
 					if (currentValue !== previousValue) {
 						// Update stored value
-						window.ckoFlowFieldValues[fieldKey] = currentValue;
+						storeFieldValue(fieldKey, currentValue);
 
 						// Check if this is a name field
 						const isNameField = fieldKey.includes('first_name') || fieldKey.includes('last_name');
@@ -190,24 +202,11 @@
 						}
 						
 						// Debounce update_checkout triggers to prevent cascading reloads
-						if (!window.ckoUpdateCheckoutDebounce) {
-							window.ckoUpdateCheckoutDebounce = null;
-						}
-
-						// Clear existing debounce
-						if (window.ckoUpdateCheckoutDebounce) {
-							clearTimeout(window.ckoUpdateCheckoutDebounce);
-						}
-
-						// Debounce the trigger by 100ms to batch rapid field changes
-						window.ckoUpdateCheckoutDebounce = setTimeout(function () {
-							ckoLogger.debug('Triggering update_checkout after debounce', {
-								fieldName: event.target.name || 'unknown',
-								fieldId: event.target.id || 'unknown'
-							});
-							$('body').trigger('update_checkout');
-							window.ckoUpdateCheckoutDebounce = null;
-						}, 100);
+						triggerUpdateCheckoutDebounced({
+							fieldName: event.target.name || 'unknown',
+							fieldId: event.target.id || 'unknown',
+							reason: 'critical-field'
+						});
 					} else {
 						if (typeof ckoLogger !== 'undefined') {
 							ckoLogger.debug('[CARDHOLDER NAME] Skipping update_checkout to prevent Flow reload');
@@ -250,7 +249,7 @@
 
 				// Always check field status on any field change (for initialization)
 				// This ensures Flow initializes as soon as all fields are filled
-				if (!ckoFlowInitialized) {
+				if (!FlowState.get('initialized')) {
 					checkRequiredFieldsStatus();
 
 					// Also directly check if we can initialize now
@@ -340,7 +339,7 @@
 				jQuery(document).one('updated_checkout', function () {
 					// Small delay to ensure fields are updated
 					setTimeout(function () {
-						if (ckoFlowInitialized && ckoFlow.flowComponent) {
+						if (FlowState.get('initialized') && ckoFlow.flowComponent) {
 							// Store country value
 							const countryValue = jQuery('#billing_country').val();
 							if (!window.ckoFlowFieldValues) {

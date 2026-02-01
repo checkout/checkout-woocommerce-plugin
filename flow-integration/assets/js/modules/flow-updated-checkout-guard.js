@@ -117,7 +117,7 @@
 				city: cityBefore || 'EMPTY',
 				country: countryBefore || 'EMPTY',
 				flowPaymentChecked: flowPaymentBefore?.checked || false,
-				flowInitialized: ckoFlowInitialized
+				flowInitialized: FlowState.get('initialized')
 			});
 
 			// CRITICAL: Skip if we're handling a 3DS return (don't re-initialize Flow)
@@ -155,7 +155,7 @@
 
 					// Reload Flow if initialized (after a small delay to let checkout update complete)
 					setTimeout(function () {
-						if (ckoFlowInitialized && ckoFlow.flowComponent && canInitializeFlow()) {
+						if (FlowState.get('initialized') && ckoFlow.flowComponent && canInitializeFlow()) {
 							reloadFlowComponent();
 						}
 					}, 300);
@@ -164,7 +164,7 @@
 
 			ckoLogger.debug('updated_checkout event fired');
 			ckoLogger.debug('Flow state BEFORE updated_checkout:', {
-				flowInitialized: ckoFlowInitialized,
+				flowInitialized: FlowState.get('initialized'),
 				flowComponentExists: !!ckoFlow.flowComponent,
 				flowComponentRootExists: !!document.querySelector('[data-testid="checkout-web-component-root"]'),
 				flowContainerExists: !!document.getElementById('flow-container'),

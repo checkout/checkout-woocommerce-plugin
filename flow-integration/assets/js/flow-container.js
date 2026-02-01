@@ -154,7 +154,7 @@ jQuery(document).on("updated_checkout", function () {
 			// Check if Flow is currently initializing or was very recently initialized
 			// The Flow SDK creates its own container during initialization
 			// If we recreate the container during this time, we'll trigger a duplicate init
-			const flowCurrentlyInitializing = window.ckoFlowInitializing || (typeof FlowState !== 'undefined' && FlowState.get('initializing'));
+			const flowCurrentlyInitializing = (typeof FlowState !== 'undefined' && FlowState.get('initializing')) || false;
 			
 			if (flowCurrentlyInitializing) {
 				if (typeof ckoLogger !== 'undefined') {

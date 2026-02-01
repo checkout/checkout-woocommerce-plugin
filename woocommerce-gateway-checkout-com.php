@@ -1263,6 +1263,16 @@ function cko_enqueue_frontend_assets() {
 			WC_CHECKOUTCOM_PLUGIN_VERSION,
 			false // Load in header
 		);
+		
+		// REFACTORED: Enqueue checkout data normalizer (needs jQuery and logger)
+		// Must load before payment-session.js
+		wp_enqueue_script(
+			'checkout-com-flow-checkout-data-script',
+			WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/js/modules/flow-checkout-data.js',
+			array( 'jquery', 'checkout-com-flow-logger-script' ), // jQuery and logger are dependencies
+			WC_CHECKOUTCOM_PLUGIN_VERSION,
+			false // Load in header
+		);
 
 		// REFACTORED: Enqueue state management module (needs logger)
 		// Must load before payment-session.js to provide centralized state
@@ -1270,6 +1280,16 @@ function cko_enqueue_frontend_assets() {
 			'checkout-com-flow-state-script', 
 			WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/js/modules/flow-state.js', 
 			array( 'checkout-com-flow-logger-script' ), // Logger is dependency
+			WC_CHECKOUTCOM_PLUGIN_VERSION,
+			false // Load in header
+		);
+		
+		// REFACTORED: Enqueue session storage helper (no dependencies)
+		// Must load before payment-session.js to centralize storage access
+		wp_enqueue_script(
+			'checkout-com-flow-session-storage-script',
+			WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/js/modules/flow-session-storage.js',
+			array(), // No dependencies
 			WC_CHECKOUTCOM_PLUGIN_VERSION,
 			false // Load in header
 		);
@@ -1329,7 +1349,7 @@ function cko_enqueue_frontend_assets() {
 		wp_enqueue_script(
 			'checkout-com-flow-initialization-script', 
 			WC_CHECKOUTCOM_PLUGIN_URL . '/flow-integration/assets/js/modules/flow-initialization.js', 
-			array( 'jquery', 'checkout-com-flow-logger-script', 'checkout-com-flow-validation-script', 'checkout-com-flow-state-script' ), // jQuery, logger, validation, and state are dependencies
+			array( 'jquery', 'checkout-com-flow-logger-script', 'checkout-com-flow-validation-script', 'checkout-com-flow-state-script', 'checkout-com-flow-checkout-data-script' ), // jQuery, logger, validation, state, and checkout data are dependencies
 			WC_CHECKOUTCOM_PLUGIN_VERSION,
 			false // Load in header
 		);
@@ -1363,7 +1383,9 @@ function cko_enqueue_frontend_assets() {
 		'checkout-com-flow-container-script',
 		'checkout-com-flow-logger-script',
 		'checkout-com-flow-validation-script',
+		'checkout-com-flow-checkout-data-script',
 		'checkout-com-flow-state-script',
+		'checkout-com-flow-session-storage-script',
 		'checkout-com-flow-3ds-detection-script',
 		'checkout-com-flow-updated-checkout-guard-script',
 		'checkout-com-flow-container-ready-handler-script',

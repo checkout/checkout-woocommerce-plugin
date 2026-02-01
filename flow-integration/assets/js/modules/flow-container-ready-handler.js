@@ -16,7 +16,7 @@
 	function attachHandler() {
 		document.addEventListener('cko:flow-container-ready', function (event) {
 			// CRITICAL: Check for 3DS return
-			if (window.ckoFlow3DSReturn) {
+			if (FlowState.get('is3DSReturn')) {
 				ckoLogger.threeDS('Skipping container-ready handler - 3DS return in progress');
 				return;
 			}
@@ -40,14 +40,14 @@
 			// Check if Flow component is actually mounted
 			const flowComponentActuallyMounted = flowComponentRoot && flowComponentRoot.isConnected;
 			const flowWasInitializedBefore =
-				ckoFlowInitialized && ckoFlow.flowComponent && !flowComponentActuallyMounted;
+				FlowState.get('initialized') && ckoFlow.flowComponent && !flowComponentActuallyMounted;
 
 			ckoLogger.debug('🔔 Container-ready event received - checking if Flow needs remounting', {
 				flowPaymentChecked: flowPayment?.checked || false,
 				flowContainerExists: !!flowContainer,
 				flowComponentRootExists: !!flowComponentRoot,
 				flowComponentMounted: flowComponentActuallyMounted,
-				flowInitialized: ckoFlowInitialized,
+				flowInitialized: FlowState.get('initialized'),
 				flowComponentExists: !!ckoFlow.flowComponent,
 				flowWasInitializedBefore: flowWasInitializedBefore
 			});
@@ -62,7 +62,7 @@
 			// Don't remount if component simply hasn't rendered yet (SDK takes 2-5 seconds)
 			if (flowWasInitializedBefore) {
 				// Component was destroyed by updated_checkout
-				if (ckoFlowInitializing) {
+				if (FlowState.get('initializing')) {
 					ckoLogger.debug('Flow component not mounted but initialization already in progress, skipping');
 					return;
 				}
@@ -72,7 +72,7 @@
 				);
 
 				// Reset flag so Flow can be re-initialized
-				ckoFlowInitialized = false;
+				FlowState.set('initialized', false);
 				if (ckoFlow.flowComponent) {
 					// Component exists but was unmounted - unmount it so we can create a new one
 					try {

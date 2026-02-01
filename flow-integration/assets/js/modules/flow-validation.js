@@ -140,6 +140,24 @@
 		},
 		
 		/**
+		 * Validate checkout data needed for payment session
+		 * @param {Object} checkoutData - Normalized checkout data
+		 * @returns {Object} Validation result
+		 */
+		validateCheckoutData: function(checkoutData) {
+			if (!checkoutData) {
+				return { isValid: false, reason: 'MISSING_DATA' };
+			}
+			
+			const email = checkoutData.email || '';
+			if (!email || !this.isValidEmail(String(email).trim())) {
+				return { isValid: false, reason: 'INVALID_EMAIL', email: email };
+			}
+			
+			return { isValid: true };
+		},
+		
+		/**
 		 * Check if postcode is required for a country
 		 * @param {string} country - Country code
 		 * @returns {boolean} True if postcode is required
