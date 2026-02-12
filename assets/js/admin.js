@@ -384,27 +384,52 @@ jQuery( function ( $ ) {
 					}
 				} ).done( function ( response ) {
 					console.log( 'Checkout.com Webhook Register Response:', response );
-					if ( response && response.success ) {
+					
+					// Check for success response
+					if ( response && response.success && response.data && response.data.message ) {
+						console.log( 'Webhook registration successful:', response.data.message );
 						$( '#checkoutcom-register-webhook' ).siblings( '.dashicons-yes.hidden' ).removeClass( 'hidden' );
-						// After successful registration, refresh webhook status
+						
+						// After successful registration, refresh webhook status to verify
 						setTimeout( function() {
 							$( '#checkoutcom-is-register-webhook' ).trigger( 'click' );
 						}, 500 );
 					} else {
+						// Handle error response
 						var errorMessage = cko_admin_vars.webhook_register_error || 'An error occurred while registering the webhook. Please try again.';
+						
 						if ( response && response.data && response.data.message ) {
 							errorMessage = response.data.message;
+						} else if ( response && response.data ) {
+							errorMessage = 'Webhook registration failed. Please check your API credentials and try again.';
 						}
-						alert( errorMessage );
+						
+						console.error( 'Webhook registration failed:', errorMessage, response );
+						
+						// Ensure checkmark is hidden on error
+						$( '#checkoutcom-register-webhook' ).siblings( '.dashicons-yes' ).addClass( 'hidden' );
+						
+						// Show error message
+						alert( errorMessage + '\n\nPlease check the browser console and WordPress debug logs for more details.' );
 					}
 
 				} ).fail( function ( xhr, status, error ) {
-					console.error( 'Checkout.com Webhook Register Error:', status, error, xhr );
+					console.error( 'Checkout.com Webhook Register AJAX Error:', status, error, xhr );
+					
 					var errorMessage = cko_admin_vars.webhook_register_error || 'An error occurred while registering the webhook. Please try again.';
+					
 					if ( xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message ) {
 						errorMessage = xhr.responseJSON.data.message;
+					} else if ( xhr.status === 0 ) {
+						errorMessage = 'Network error: Unable to connect to server. Please check your connection and try again.';
+					} else if ( xhr.status >= 500 ) {
+						errorMessage = 'Server error: Please check WordPress debug logs for details.';
 					}
-					alert( errorMessage );
+					
+					// Ensure checkmark is hidden on error
+					$( '#checkoutcom-register-webhook' ).siblings( '.dashicons-yes' ).addClass( 'hidden' );
+					
+					alert( errorMessage + '\n\nPlease check the browser console and WordPress debug logs for more details.' );
 
 				} ).always( function () {
 					$( '#checkoutcom-register-webhook' ).prop( 'disabled', false );

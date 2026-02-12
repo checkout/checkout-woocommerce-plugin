@@ -1307,7 +1307,7 @@ class WC_Checkoutcom_Api_Request {
 		}
 
 		$chosen_methods  = wc_get_chosen_shipping_method_ids();
-		$chosen_shipping = $chosen_methods[0];
+		$chosen_shipping = ! empty( $chosen_methods[0] ) ? $chosen_methods[0] : 'shipping';
 
 		if ( 'free_shipping' !== $chosen_shipping ) {
 			$shipping_amount       = WC()->cart->get_shipping_total();
@@ -1466,7 +1466,7 @@ class WC_Checkoutcom_Api_Request {
 					'total_amount'          => ( $unit_price_cents * $quantity ) - $discount_total_cents,
 					'tax_amount'            => $total_tax_amount_cents,
 					'type'                  => 'physical',
-					'reference'             => $_product->get_sku(),
+					'reference'             => $_product->get_sku() ?: (string) $_product->get_id(),
 					'discount_amount'       => $discount_total_cents,
 				];
 				
@@ -1485,14 +1485,14 @@ class WC_Checkoutcom_Api_Request {
 					'total_amount'          => $unit_price_cents * $values['quantity'],
 					'total_tax_amount'      => $total_tax_amount_cents,
 					'type'                  => 'physical',
-					'reference'             => $_product->get_sku(),
+					'reference'             => $_product->get_sku() ?: (string) $_product->get_id(),
 					'total_discount_amount' => 0,
 				];
 			}
 		}
 
 		$chosen_methods  = wc_get_chosen_shipping_method_ids();
-		$chosen_shipping = $chosen_methods[0];
+		$chosen_shipping = ! empty( $chosen_methods[0] ) ? $chosen_methods[0] : 'shipping';
 
 		if ( 'free_shipping' !== $chosen_shipping ) {
 			$shipping_amount       = WC()->cart->get_shipping_total();
@@ -1653,7 +1653,7 @@ class WC_Checkoutcom_Api_Request {
 					'total_amount'          => $unit_price_cents * $quantity,
 					'tax_amount'            => $total_tax_amount_cents,
 					'type'                  => 'physical',
-					'reference'             => $product->get_sku() ?: $product->get_id(),
+					'reference'             => $product->get_sku() ?: (string) $product->get_id(),
 					'discount_amount'       => $discount_total_cents,
 				];
 				
@@ -1684,7 +1684,7 @@ class WC_Checkoutcom_Api_Request {
 					'total_amount'          => WC_Checkoutcom_Utility::value_to_decimal( $price_excl_tax, $order->get_currency() ),
 					'total_tax_amount'      => $total_tax_amount_cents,
 					'type'                  => 'physical',
-					'reference'             => $product->get_sku() ?: $product->get_id(),
+					'reference'             => $product->get_sku() ?: (string) $product->get_id(),
 					'total_discount_amount' => WC_Checkoutcom_Utility::value_to_decimal( $item->get_subtotal() - $item->get_total(), $order->get_currency() ),
 				];
 			}
