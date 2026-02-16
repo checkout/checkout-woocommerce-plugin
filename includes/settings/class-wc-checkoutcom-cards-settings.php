@@ -1521,6 +1521,14 @@ class WC_Checkoutcom_Cards_Settings {
 				'default'  => 'no',
 				'desc'     => __( 'Check to enable performance monitoring and logging. Track and log performance metrics for debugging and optimization.', 'checkout-com-unified-payments-api' ),
 			],
+			'cko_flow_reconciliation_logging' => [
+				'id'       => 'cko_flow_reconciliation_logging',
+				'title'    => __( 'Flow Reconciliation Logging', 'checkout-com-unified-payments-api' ),
+				'type'     => 'checkbox',
+				'desc_tip' => true,
+				'default'  => 'no',
+				'desc'     => __( 'Check to log Flow order line reconciliation mismatches (order amount vs line totals + tax) in minor units.', 'checkout-com-unified-payments-api' ),
+			],
 			'flow_terms_prevention_enabled' => [
 				'id'          => 'flow_terms_prevention_enabled',
 				'title'       => __( 'Terms Checkbox Guard', 'checkout-com-unified-payments-api' ),

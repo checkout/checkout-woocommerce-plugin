@@ -98,48 +98,8 @@
 			// Extract order lines
 			let orders = cartInfo["order_lines"];
 			
-			// Add missing shipping to order_lines if needed
-			if (orders && Array.isArray(orders) && cartInfo["order_amount"]) {
-				const productsTotal = orders.reduce((sum, item) => {
-					return sum + (parseInt(item.total_amount) || 0);
-				}, 0);
-				const orderAmountCents = parseInt(cartInfo["order_amount"]) || 0;
-				const shippingDifference = orderAmountCents - productsTotal;
-				
-				if (shippingDifference > 0) {
-					const hasShipping = orders.some(item => 
-						item.type === 'shipping_fee' || 
-						item.reference === 'shipping' || 
-						(item.name && item.name.toLowerCase().includes('shipping'))
-					);
-					
-					if (!hasShipping) {
-						let shippingMethodName = 'Shipping';
-						const shippingMethodElement = document.querySelector('.woocommerce-shipping-methods .shipping-method input:checked + label, .woocommerce-shipping-methods label');
-						if (shippingMethodElement) {
-							shippingMethodName = shippingMethodElement.textContent.trim() || 'Shipping';
-						}
-						
-						orders.push({
-							name: shippingMethodName,
-							quantity: 1,
-							unit_price: shippingDifference,
-							total_amount: shippingDifference,
-							tax_amount: 0,
-							type: 'shipping_fee',
-							reference: 'shipping',
-							discount_amount: 0
-						});
-						
-						if (typeof window.ckoLogger !== 'undefined') {
-							window.ckoLogger.debug('[FlowCheckoutData] Added missing shipping to order_lines', {
-								amount: shippingDifference,
-								name: shippingMethodName
-							});
-						}
-					}
-				}
-			}
+			// Trust backend-provided order lines/totals.
+			// Taxes, discounts, shipping, and fees are computed server-side by WooCommerce.
 			
 			// Build description
 			let products = orders ? orders.map(line => line.name).join(', ') : '';
