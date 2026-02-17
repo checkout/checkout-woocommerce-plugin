@@ -2,7 +2,7 @@
 Contributors: checkoutintegration
 Tags: checkout, payments, credit card, payment gateway, apple pay, google pay, payment request
 Requires at least: 5.0
-Stable tag: 5.0.2
+Stable tag: 5.0.3
 Requires PHP: 7.3
 Tested up to: 6.7.0
 License: GPLv2 or later
@@ -179,6 +179,10 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v5.0.3 17th February 2026
+- **[fix]** Use post-discount unit_price for Flow items to satisfy PayPal amount validation
+- **[fix]** Don't add shipping line when free shipping is selected (prevents charging for shipping when merchant has no shipping charge)
+
 v5.0.2 25th January 2026
 - **[feat]** Implement idempotent Flow initialization to prevent duplicate payment session requests
 - **[feat]** Add generation tracking and single-flight lock mechanism for initialization

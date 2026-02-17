@@ -4,7 +4,7 @@ Checkout.com Payment Gateway plugin for WooCommerce with Flow integration suppor
 
 ## Version
 
-**Current Version:** 5.0.2
+**Current Version:** 5.0.3
 
 ## Features
 
@@ -470,6 +470,10 @@ For support and integration help:
 GPL v2 or later
 
 ## Changelog
+
+### Version 5.0.3
+- Use post-discount unit_price for Flow items to satisfy PayPal amount validation
+- Don't add shipping line when free shipping is selected (prevents charging for shipping when merchant has no shipping charge)
 
 ### Version 5.0.2
 - Implement idempotent Flow initialization to prevent duplicate payment session requests

@@ -1490,9 +1490,12 @@ class WC_Checkoutcom_Api_Request {
 		$shipping_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $shipping_total, $currency );
 		$shipping_tax_cents    = WC_Checkoutcom_Utility::value_to_decimal( $shipping_tax, $currency );
 
-		if ( $shipping_amount_cents > 0 || $shipping_tax_cents > 0 ) {
-			$chosen_methods  = wc_get_chosen_shipping_method_ids();
-			$chosen_shipping = ! empty( $chosen_methods[0] ) ? $chosen_methods[0] : 'shipping';
+		$chosen_methods  = wc_get_chosen_shipping_method_ids();
+		$chosen_shipping = ! empty( $chosen_methods[0] ) ? $chosen_methods[0] : 'shipping';
+
+		// Don't add shipping line when free shipping is selected (matches Klarna path logic).
+		// Prevents adding shipping when merchant has no shipping charge.
+		if ( ( $shipping_amount_cents > 0 || $shipping_tax_cents > 0 ) && 'free_shipping' !== $chosen_shipping ) {
 			$shipping_tax_rate = 0;
 			if ( $shipping_total > 0 ) {
 				$shipping_tax_rate = round( ( $shipping_tax / $shipping_total ) * 100 );
