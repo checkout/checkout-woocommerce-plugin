@@ -1451,15 +1451,17 @@ class WC_Checkoutcom_Api_Request {
 
 		if( $flow ) {
 				// Flow-specific logic for cart items
+				// PayPal requires: amount = sum(unit_price × quantity). Use post-discount unit_price
+				// so the sum matches the actual charge. Pre-discount + discount_amount fails validation.
 				$product_data = [
 					'name'                  => $_product->get_title(),
 					'quantity'              => $quantity,
-					'unit_price'            => $unit_subtotal_price_cents,
+					'unit_price'            => $unit_price_cents,
 					'total_amount'          => $line_total_cents,
 					'tax_amount'            => $line_tax_cents,
 					'type'                  => 'physical',
 					'reference'             => $_product->get_sku() ?: (string) $_product->get_id(),
-					'discount_amount'       => $discount_total_cents,
+					'discount_amount'       => 0,
 				];
 				
 				// Add subscription flag to product data if it's a subscription product
@@ -1675,15 +1677,17 @@ class WC_Checkoutcom_Api_Request {
 			$discount_total_cents = WC_Checkoutcom_Utility::value_to_decimal( $discount_total, $currency );
 	
 			if ( $flow ) {
+				// PayPal requires: amount = sum(unit_price × quantity). Use post-discount unit_price
+				// so the sum matches the actual charge. Pre-discount + discount_amount fails validation.
 				$product_data = [
 					'name'                  => $item->get_name(),
 					'quantity'              => $quantity,
-					'unit_price'            => $unit_subtotal_price_cents,
+					'unit_price'            => $unit_price_cents,
 					'total_amount'          => $line_total_cents,
 					'tax_amount'            => $line_tax_cents,
 					'type'                  => 'physical',
 					'reference'             => $product->get_sku() ?: (string) $product->get_id(),
-					'discount_amount'       => $discount_total_cents,
+					'discount_amount'       => 0,
 				];
 				
 				// Add subscription flag to product data if it's a subscription product
