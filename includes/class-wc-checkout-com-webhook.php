@@ -87,11 +87,28 @@ class WC_Checkout_Com_Webhook {
 		}
 
 		$already_captured = $order->get_meta( 'cko_payment_captured' );
-		$current_status = $order->get_status();
+		$current_status   = $order->get_status();
 
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: authorize_payment - Current order status: ' . $current_status );
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: authorize_payment - Already captured: ' . ( $already_captured ? 'YES' : 'NO' ) );
+		}
+
+		// CRITICAL: Never downgrade completed or processing orders - check FIRST before any other logic
+		if ( in_array( $current_status, array( 'processing', 'completed' ), true ) ) {
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: authorize_payment - Order already completed/processing, skipping status update (payment authorised must never downgrade)' );
+			}
+			$payment_id = $webhook_data->id;
+			$action_id  = $webhook_data->action_id;
+			$amount     = isset( $webhook_data->amount ) ? $webhook_data->amount : 0;
+			$formatted_amount = $amount > 0 ? wc_price( WC_Checkoutcom_Utility::decimal_to_value( $amount, $order->get_currency() ), array( 'currency' => $order->get_currency() ) ) : '';
+			$message    = sprintf( 'Webhook received from checkout.com. Payment Authorized - Payment ID: %s, Action ID: %s%s', $payment_id, $action_id, $formatted_amount ? ', Amount: ' . $formatted_amount : '' );
+			$order->set_transaction_id( $action_id );
+			$order->update_meta_data( '_cko_payment_id', $payment_id );
+			$order->update_meta_data( 'cko_payment_authorized', true );
+			$order->add_order_note( $message );
+			return true;
 		}
 
 		$payment_id = $webhook_data->id;
@@ -123,21 +140,6 @@ class WC_Checkout_Com_Webhook {
 			if ( $webhook_debug_enabled ) {
 				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: authorize_payment - Already authorized with matching status, adding note only' );
 			}
-			$order->add_order_note( $message );
-			return true;
-		}
-
-		// Don't update status if order is already in a more advanced state (processing, completed)
-		// This prevents race conditions where capture webhook updated status but meta not saved yet
-		if ( in_array( $current_status, array( 'processing', 'completed' ), true ) ) {
-			if ( $webhook_debug_enabled ) {
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: authorize_payment - Order already in advanced state (' . $current_status . '), skipping status update to prevent downgrade' );
-			}
-			// Order is already processing/completed - don't downgrade to on-hold
-			// Just add note and update meta, but don't change status
-			$order->set_transaction_id( $action_id );
-			$order->update_meta_data( '_cko_payment_id', $payment_id );
-			$order->update_meta_data( 'cko_payment_authorized', true );
 			$order->add_order_note( $message );
 			return true;
 		}
@@ -205,6 +207,20 @@ class WC_Checkout_Com_Webhook {
 		}
 		
 		WC_Checkoutcom_Utility::logger( '[WEBHOOK PAYMENT TITLE] ========== CHECK COMPLETE (AUTHORIZE) ==========' );
+
+		// CRITICAL: Final guard before update_status - order may have been updated by capture webhook
+		// during Flow payment title processing (save/reload above). Never downgrade completed/processing.
+		$order = wc_get_order( $order_id );
+		if ( $order && in_array( $order->get_status(), array( 'processing', 'completed' ), true ) ) {
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: authorize_payment - Final guard: Order now in advanced state (' . $order->get_status() . '), skipping status update to prevent downgrade' );
+			}
+			$order->set_transaction_id( $action_id );
+			$order->update_meta_data( '_cko_payment_id', $payment_id );
+			$order->update_meta_data( 'cko_payment_authorized', true );
+			$order->add_order_note( $message );
+			return true;
+		}
 
 		$order->add_order_note( $message );
 		$order->update_status( $auth_status );
