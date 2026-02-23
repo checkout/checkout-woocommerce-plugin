@@ -63,7 +63,7 @@ class WC_Checkoutcom_Admin {
 		
 		// Determine if we're in advanced sub-tab
 		$advanced_subtab = '';
-		if ( in_array( $screen, array( 'webhook_queue', 'debug_settings' ), true ) ) {
+		if ( in_array( $screen, array( 'webhook_queue', 'debug_settings', 'diagnostics' ), true ) ) {
 			$advanced_subtab = $screen;
 			$screen          = 'advanced';
 		} elseif ( 'advanced' === $screen ) {
@@ -150,9 +150,9 @@ class WC_Checkoutcom_Admin {
 		}
 		
 		// Show sub-tabs for Advanced
-		if ( 'advanced' === $screen || in_array( $screen, array( 'webhook_queue', 'debug_settings' ), true ) ) {
+		if ( 'advanced' === $screen || in_array( $screen, array( 'webhook_queue', 'debug_settings', 'diagnostics' ), true ) ) {
 			// Determine active sub-tab
-			if ( in_array( $screen, array( 'webhook_queue', 'debug_settings' ), true ) ) {
+			if ( in_array( $screen, array( 'webhook_queue', 'debug_settings', 'diagnostics' ), true ) ) {
 				$advanced_subtab = $screen;
 			} else {
 				$advanced_subtab = ! empty( $_GET['subtab'] ) ? sanitize_text_field( wp_unslash( $_GET['subtab'] ) ) : 'webhook_queue';
@@ -166,6 +166,10 @@ class WC_Checkoutcom_Admin {
 				<a href="<?php echo esc_url( admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards&screen=advanced&subtab=debug_settings' ) ); ?>"
 					class="cko-sub-nav-tab <?php echo 'debug_settings' === $advanced_subtab ? 'active' : ''; ?>">
 					<?php esc_html_e( 'Debug Settings', 'checkout-com-unified-payments-api' ); ?>
+				</a>
+				<a href="<?php echo esc_url( admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards&screen=advanced&subtab=diagnostics' ) ); ?>"
+					class="cko-sub-nav-tab <?php echo 'diagnostics' === $advanced_subtab ? 'active' : ''; ?>">
+					<?php esc_html_e( 'Diagnostics', 'checkout-com-unified-payments-api' ); ?>
 				</a>
 			</div>
 			<?php

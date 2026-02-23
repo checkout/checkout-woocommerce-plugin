@@ -3700,11 +3700,16 @@ document.addEventListener("DOMContentLoaded", function () {
 		}
 		
 		try {
-			// Check if order already exists (for order-pay page) - check BEFORE form lookup
+			// Check if this is an order-pay page (existing order being paid for).
+			// ONLY skip order creation for order-pay pages - for regular checkout,
+			// ALWAYS call the server to validate if existing order can be reused.
+			const isOrderPayPage = window.location.pathname.includes('/order-pay/');
 			const orderIdField = jQuery('input[name="order_id"]');
-			if (orderIdField.length && orderIdField.val()) {
+			
+			if (isOrderPayPage && orderIdField.length && orderIdField.val()) {
+				// Order-pay page: order already exists, use it directly
 				const existingOrderId = orderIdField.val();
-				ckoLogger.debug('[CREATE ORDER] Order already exists (order-pay page) - Order ID: ' + existingOrderId);
+				ckoLogger.debug('[CREATE ORDER] Order-pay page detected - using existing Order ID: ' + existingOrderId);
 				// Clear lock flag and re-enable button before returning
 				FlowState.set('orderCreationInProgress', false);
 				if (placeOrderButton.length) {
@@ -3717,6 +3722,13 @@ document.addEventListener("DOMContentLoaded", function () {
 				}
 				return parseInt(existingOrderId);
 			}
+			
+			// For regular checkout: ALWAYS call server to decide if order should be reused or new one created.
+			// Server-side logic will check:
+			// 1. If existing order has _cko_security_check_failed flag → create new order
+			// 2. If existing order status is not suitable for reuse → create new order
+			// 3. If cart hash changed → create new order
+			// This fixes the bug where failed security check orders were incorrectly reused.
 		
 			// Try to find form - checkout form or order-pay form
 			let form = jQuery("form.checkout");
@@ -3829,9 +3841,28 @@ document.addEventListener("DOMContentLoaded", function () {
 			// Ensure nonce is included in form data
 			formDataObj['woocommerce-process-checkout-nonce'] = nonceValue;
 			
-			// Get payment session ID if available
+			// Get payment session ID - CRITICAL for order lookup after 3DS return.
+			// Try multiple sources: 1) hidden field, 2) window global, 3) force add field
+			let paymentSessionId = '';
 			const paymentSessionIdField = jQuery('input[name="cko-flow-payment-session-id"]');
-			const paymentSessionId = paymentSessionIdField.length > 0 ? paymentSessionIdField.val() : '';
+			
+			if (paymentSessionIdField.length > 0 && paymentSessionIdField.val()) {
+				paymentSessionId = paymentSessionIdField.val();
+				ckoLogger.debug('[CREATE ORDER] Payment session ID from hidden field: ' + paymentSessionId.substring(0, 20) + '...');
+			} else if (window.currentPaymentSessionId) {
+				// Fallback: use window global if hidden field not found
+				paymentSessionId = window.currentPaymentSessionId;
+				ckoLogger.debug('[CREATE ORDER] Payment session ID from window global: ' + paymentSessionId.substring(0, 20) + '...');
+				
+				// Also try to add the hidden field for subsequent use
+				if (window.ckoAddPaymentSessionIdField) {
+					window.ckoAddPaymentSessionIdField();
+					ckoLogger.debug('[CREATE ORDER] Added payment session ID hidden field (was missing)');
+				}
+			} else {
+				ckoLogger.error('[CREATE ORDER] ⚠️ Payment session ID NOT FOUND - order lookup after 3DS may fail');
+				ckoLogger.error('[CREATE ORDER] This can happen if: 1) Payment session not created yet, 2) Flow component not initialized');
+			}
 			
 			// Get save card preference
 			const saveCardField = jQuery('input[name="cko-flow-save-card-persist"]');

@@ -1089,7 +1089,7 @@ function cko_admin_enqueue_scripts( $hook ) {
 
 	$allowed_hooks = array(
 		'woocommerce_page_wc-settings',
-		'woocommerce_page_checkoutcom-diagnostics',
+		'woocommerce_page_checkoutcom-diagnostics', // Legacy standalone page
 		'woocommerce_page_checkout-com-webhook-queue',
 		'checkout-com-webhook-queue',
 	);
@@ -1527,9 +1527,21 @@ function cko_enqueue_frontend_assets() {
 			$sdk_env = 'production'; // SDK might need 'production' to construct URLs correctly
 		}
 		
+		// Pass order_amount (in cents) for cart total change detection when coupon is applied.
+		// Enables Flow to reload and create new payment session with correct amount.
+		// Uses cart total directly (lighter than full get_cart_info) per WooCommerce best practices.
+		$order_amount = 0;
+		if ( WC()->cart && WC()->cart->get_cart_contents_count() > 0 ) {
+			$order_amount = (int) WC_Checkoutcom_Utility::value_to_decimal(
+				(float) WC()->cart->get_total( 'raw' ),
+				get_woocommerce_currency()
+			);
+		}
+
 		$flow_vars = array(
 			'checkoutSlug' => get_post_field( 'post_name', get_option( 'woocommerce_checkout_page_id' ) ),
 			'orderPaySlug' => WC()->query->query_vars['order-pay'],
+			'order_amount' => $order_amount,
 			// Removed apiURL and SKey - payment session creation now handled securely via AJAX backend
 			'PKey'         => $core_settings['ckocom_pk'],
 			'env'          => $sdk_env, // Use mapped environment value

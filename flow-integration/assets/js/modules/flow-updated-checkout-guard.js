@@ -12,10 +12,11 @@
 (function () {
 	'use strict';
 
-	let previousCartTotal =
-		typeof cko_flow_vars !== 'undefined' && cko_flow_vars.cart_total
-			? parseFloat(cko_flow_vars.cart_total)
-			: 0;
+	// order_amount is in cents (minor units). Used to detect coupon/cart changes so Flow reloads with correct amount.
+	let previousOrderAmount =
+		typeof cko_flow_vars !== 'undefined' && cko_flow_vars.order_amount
+			? parseInt(cko_flow_vars.order_amount, 10)
+			: null;
 
 	let initialized = false;
 
@@ -139,27 +140,61 @@
 				return;
 			}
 
-			// Check if cart total changed
-			if (typeof cko_flow_vars !== 'undefined' && cko_flow_vars.cart_total) {
-				const currentCartTotal = parseFloat(cko_flow_vars.cart_total) || 0;
+			// Check if cart total changed (e.g. coupon applied/removed).
+			// Read from DOM - updated_checkout has replaced cart-info with fresh data from server.
+			// order_amount is in cents (minor units). Reload Flow so new payment session has correct amount.
+			const cartInfo = jQuery('#cart-info').data('cart');
+			const currentOrderAmount = cartInfo && typeof cartInfo.order_amount !== 'undefined'
+				? parseInt(cartInfo.order_amount, 10)
+				: null;
 
-				// Check if cart total changed significantly (> 0.01 to avoid floating point issues)
-				if (Math.abs(currentCartTotal - previousCartTotal) > 0.01) {
-					ckoLogger.debug('Cart total changed - will reload Flow', {
-						previous: previousCartTotal,
-						current: currentCartTotal
+			if (currentOrderAmount !== null && previousOrderAmount !== null && currentOrderAmount !== previousOrderAmount) {
+				if (typeof ckoLogger !== 'undefined') {
+					ckoLogger.debug('[CART CHANGE] Cart total changed (e.g. coupon applied/removed)', {
+						previous: previousOrderAmount,
+						current: currentOrderAmount
 					});
+				}
 
-					// Update stored total
-					previousCartTotal = currentCartTotal;
+				previousOrderAmount = currentOrderAmount;
 
-					// Reload Flow if initialized (after a small delay to let checkout update complete)
-					setTimeout(function () {
-						if (FlowState.get('initialized') && ckoFlow.flowComponent && canInitializeFlow()) {
+				// CRITICAL: Clear existing order data when cart changes.
+				// This ensures a NEW order is created with the correct amount.
+				// Prevents reusing an order created with the old (wrong) amount.
+				const orderIdField = jQuery('input[name="order_id"]');
+				if (orderIdField.length && orderIdField.val()) {
+					const oldOrderId = orderIdField.val();
+					if (typeof ckoLogger !== 'undefined') {
+						ckoLogger.debug('[CART CHANGE] Clearing stale order_id from form: ' + oldOrderId + ' (will create new order with correct amount)');
+					}
+					orderIdField.val('');
+				}
+
+				// Also clear from session storage
+				if (typeof FlowSessionStorage !== 'undefined') {
+					const sessionOrderId = FlowSessionStorage.getOrderId();
+					if (sessionOrderId) {
+						if (typeof ckoLogger !== 'undefined') {
+							ckoLogger.debug('[CART CHANGE] Clearing stale order_id from session storage: ' + sessionOrderId);
+						}
+						FlowSessionStorage.clearOrderData();
+					}
+				}
+
+				setTimeout(function () {
+					if (typeof FlowState !== 'undefined' && FlowState.get('initialized') &&
+						typeof ckoFlow !== 'undefined' && ckoFlow.flowComponent &&
+						typeof canInitializeFlow === 'function' && canInitializeFlow()) {
+						if (typeof reloadFlowComponent === 'function') {
+							if (typeof ckoLogger !== 'undefined') {
+								ckoLogger.debug('[CART CHANGE] Reloading Flow component for correct payment amount');
+							}
 							reloadFlowComponent();
 						}
-					}, 300);
-				}
+					}
+				}, 300);
+			} else if (currentOrderAmount !== null) {
+				previousOrderAmount = currentOrderAmount;
 			}
 
 			ckoLogger.debug('updated_checkout event fired');

@@ -86,6 +86,20 @@ class WC_Checkout_Com_Webhook {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order loaded successfully - Order ID: ' . $order->get_id() . ', Status: ' . $order->get_status() );
 		}
 
+		// CRITICAL: Never process webhooks if payment security check failed (amount/currency mismatch).
+		// Order was correctly set to Failed - webhooks must NOT override this.
+		$security_check_failed = $order->get_meta( '_cko_security_check_failed' );
+		if ( ! empty( $security_check_failed ) ) {
+			$payment_id = $webhook_data->id ?? 'N/A';
+			$order->add_order_note( sprintf(
+				/* translators: %s: reason for security check failure (e.g. amount_mismatch, currency_mismatch) */
+				__( 'Checkout.com webhook ignored: Payment security check previously failed (%s). Order status remains Failed.', 'checkout-com-unified-payments-api' ),
+				esc_html( $security_check_failed )
+			) );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: authorize_payment - Order has security check failure (' . $security_check_failed . '), rejecting webhook to preserve Failed status. Payment ID: ' . $payment_id );
+			return true; // Acknowledge webhook but do not change status.
+		}
+
 		$already_captured = $order->get_meta( 'cko_payment_captured' );
 		$current_status   = $order->get_status();
 
@@ -287,6 +301,20 @@ class WC_Checkout_Com_Webhook {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order loaded successfully - Order ID: ' . $order->get_id() . ', Status: ' . $order->get_status() );
 		}
 
+		// CRITICAL: Never process webhooks if payment security check failed (amount/currency mismatch).
+		// Order was correctly set to Failed - webhooks must NOT override this.
+		$security_check_failed = $order->get_meta( '_cko_security_check_failed' );
+		if ( ! empty( $security_check_failed ) ) {
+			$payment_id = $webhook_data->id ?? 'N/A';
+			$order->add_order_note( sprintf(
+				/* translators: %s: reason for security check failure (e.g. amount_mismatch, currency_mismatch) */
+				__( 'Checkout.com webhook ignored: Payment security check previously failed (%s). Order status remains Failed.', 'checkout-com-unified-payments-api' ),
+				esc_html( $security_check_failed )
+			) );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: card_verified - Order has security check failure (' . $security_check_failed . '), rejecting webhook to preserve Failed status. Payment ID: ' . $payment_id );
+			return true; // Acknowledge webhook but do not change status.
+		}
+
 		$payment_id = $webhook_data->id;
 		$order->add_order_note( sprintf( __( 'Checkout.com Card verified webhook received - Payment ID: %s, Action ID: %s', 'checkout-com-unified-payments-api' ), $payment_id, $action_id ) );
 		// Set action id as woo transaction id.
@@ -359,6 +387,20 @@ class WC_Checkout_Com_Webhook {
 		$order_id = $order->get_id();
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order loaded successfully - Order ID: ' . $order_id . ', Status: ' . $order->get_status() );
+		}
+
+		// CRITICAL: Never process webhooks if payment security check failed (amount/currency mismatch).
+		// Order was correctly set to Failed - webhooks must NOT override this.
+		$security_check_failed = $order->get_meta( '_cko_security_check_failed' );
+		if ( ! empty( $security_check_failed ) ) {
+			$payment_id = $webhook_data->id ?? 'N/A';
+			$order->add_order_note( sprintf(
+				/* translators: %s: reason for security check failure (e.g. amount_mismatch, currency_mismatch) */
+				__( 'Checkout.com webhook ignored: Payment security check previously failed (%s). Order status remains Failed.', 'checkout-com-unified-payments-api' ),
+				esc_html( $security_check_failed )
+			) );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: capture_payment - Order has security check failure (' . $security_check_failed . '), rejecting webhook to preserve Failed status. Payment ID: ' . $payment_id );
+			return true; // Acknowledge webhook but do not change status.
 		}
 
 		// Check if payment is already captured.

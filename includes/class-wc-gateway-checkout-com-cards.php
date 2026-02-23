@@ -247,7 +247,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		}
 
 		// Handle advanced sub-tabs
-		if ( in_array( $screen, array( 'webhook_queue', 'debug_settings' ), true ) ) {
+		if ( in_array( $screen, array( 'webhook_queue', 'debug_settings', 'diagnostics' ), true ) ) {
 			$subtab = $screen;
 			$screen  = 'advanced';
 		} elseif ( 'advanced' === $screen && empty( $subtab ) ) {
@@ -313,6 +313,13 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 				echo '<table class="form-table">';
 				WC_Admin_Settings::output_fields( WC_Checkoutcom_Cards_Settings::debug_settings() );
 				echo '</table>';
+			} elseif ( 'diagnostics' === $subtab ) {
+				// Render diagnostics page
+				if ( class_exists( 'WC_Checkoutcom_Diagnostics' ) ) {
+					WC_Checkoutcom_Diagnostics::render_page();
+				} else {
+					echo '<div class="notice notice-error"><p>' . esc_html__( 'Diagnostics class not found.', 'checkout-com-unified-payments-api' ) . '</p></div>';
+				}
 			}
 		} elseif ( 'debug_settings' === $screen ) {
 			// Legacy support - redirect to advanced
@@ -321,6 +328,10 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		} elseif ( 'webhook_queue' === $screen ) {
 			// Legacy support - redirect to advanced
 			wp_safe_redirect( admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards&screen=advanced&subtab=webhook_queue' ) );
+			exit;
+		} elseif ( 'diagnostics' === $screen ) {
+			// Legacy support - redirect to advanced
+			wp_safe_redirect( admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wc_checkout_com_cards&screen=advanced&subtab=diagnostics' ) );
 			exit;
 		} elseif ( 'webhook' === $screen ) {
 			echo '<table class="form-table">';

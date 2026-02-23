@@ -103,6 +103,11 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// AJAX handler for saving payment session ID to order immediately after payment session creation
 		add_action( 'wp_ajax_cko_flow_save_payment_session_id', [ $this, 'ajax_save_payment_session_id' ] );
 		add_action( 'wp_ajax_nopriv_cko_flow_save_payment_session_id', [ $this, 'ajax_save_payment_session_id' ] );
+		
+		// CRITICAL: Hook to prevent WooCommerce from resuming failed orders.
+		// This runs early in the checkout process, BEFORE WooCommerce's create_order() is called.
+		// Priority 5 ensures this runs before other checkout hooks.
+		add_action( 'woocommerce_before_checkout_process', [ $this, 'prevent_failed_order_reuse' ], 5 );
 	}
 
 	/**
@@ -5098,6 +5103,14 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				WC_Checkoutcom_Utility::logger( '[CREATE MINIMAL ORDER] Payment ID already exists in order - Order ID: ' . $order_id . ', Existing Payment ID: ' . substr( $existing_flow_payment_id, 0, 20 ) . '..., New Payment ID: ' . substr( $payment_id, 0, 20 ) . '... (skipping save to prevent overwrite)' );
 			}
 			
+			// Save payment session ID if available in payment details metadata.
+			// This allows webhooks to find this order by payment_session_id.
+			if ( isset( $payment_details['metadata']['cko_payment_session_id'] ) ) {
+				$payment_session_id = $payment_details['metadata']['cko_payment_session_id'];
+				$order->update_meta_data( '_cko_payment_session_id', $payment_session_id );
+				WC_Checkoutcom_Utility::logger( '[CREATE MINIMAL ORDER] Saved payment session ID: ' . substr( $payment_session_id, 0, 25 ) . '...' );
+			}
+			
 			// Mark as minimal order (created from payment details)
 			$order->update_meta_data( '_cko_minimal_order', 'yes' );
 			$order->update_meta_data( '_cko_minimal_order_reason', 'Order lookup failed during 3DS callback' );
@@ -6325,8 +6338,16 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		
 		WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Nonce validated successfully' );
 		
-		// Get payment session ID if available (used for duplicate prevention).
+		// Get payment session ID - CRITICAL for order lookup after 3DS return.
+		// This links the order to the payment session so we can find it when user returns from 3DS.
 		$payment_session_id = isset( $_POST['cko-flow-payment-session-id'] ) ? sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-session-id'] ) ) : '';
+		
+		if ( empty( $payment_session_id ) ) {
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ⚠️ WARNING: payment_session_id is EMPTY - order lookup after 3DS return will rely on fallback methods (email+amount)' );
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ⚠️ This can cause "payment succeeded but no order" issues if fallbacks fail' );
+		} else {
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Payment session ID received: ' . substr( $payment_session_id, 0, 25 ) . '...' );
+		}
 		
 		// Ensure WooCommerce is available.
 		if ( ! function_exists( 'WC' ) || ! WC() ) {
@@ -6335,32 +6356,49 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			return;
 		}
 		
-		// Prevent duplicate order creation for the same payment session.
-		if ( ! empty( $payment_session_id ) ) {
-			$existing_orders = wc_get_orders(
-				array(
-					'meta_key'   => '_cko_payment_session_id',
-					'meta_value' => $payment_session_id,
-					'status'     => array( 'pending', 'failed', 'on-hold', 'processing' ),
-					'limit'      => 1,
-					'return'     => 'ids',
-				)
-			);
+		// Check for existing order that can be reused.
+		// This follows WooCommerce standard pattern: order_awaiting_payment session key.
+		$existing_order_id = $this->get_reusable_order_id( $payment_session_id );
+		
+		if ( $existing_order_id ) {
+			$existing_order = wc_get_order( $existing_order_id );
 			
-			if ( ! empty( $existing_orders ) ) {
-				$existing_order_id = $existing_orders[0];
-				$existing_order = wc_get_order( $existing_order_id );
+			if ( $existing_order ) {
+				// Validate if this order can be reused for the current checkout.
+				$reuse_validation = $this->validate_order_reuse( $existing_order );
 				
-				if ( $existing_order ) {
-					WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ✅ Existing order found with payment_session_id - Order ID: ' . $existing_order_id );
+				if ( $reuse_validation['can_reuse'] ) {
+					WC_Checkoutcom_Utility::logger(
+						sprintf(
+							'[CREATE ORDER] ✅ REUSING existing order - Order ID: %d, Reason: %s',
+							$existing_order_id,
+							$reuse_validation['reason']
+						)
+					);
+					
+					// Update payment session ID if it changed (new payment attempt on same order).
+					if ( ! empty( $payment_session_id ) ) {
+						$old_session_id = $existing_order->get_meta( '_cko_payment_session_id' );
+						if ( $old_session_id !== $payment_session_id ) {
+							WC_Checkoutcom_Utility::logger(
+								sprintf(
+									'[CREATE ORDER] Updating payment session ID on reused order - Old: %s, New: %s',
+									$old_session_id ?: '(none)',
+									$payment_session_id
+								)
+							);
+							$existing_order->update_meta_data( '_cko_payment_session_id', $payment_session_id );
+						}
+					}
 					
 					// Store save card preference if available (update existing order).
 					$save_card_preference = isset( $_POST['cko-flow-save-card-persist'] ) ? sanitize_text_field( wp_unslash( $_POST['cko-flow-save-card-persist'] ) ) : '';
 					if ( 'true' === $save_card_preference || 'yes' === $save_card_preference ) {
 						$existing_order->update_meta_data( '_cko_save_card_preference', 'yes' );
-						$existing_order->save();
-						WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Save card preference updated on existing order: YES' );
+						WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Save card preference updated on reused order: YES' );
 					}
+					
+					$existing_order->save();
 					
 					wp_send_json_success(
 						array(
@@ -6368,11 +6406,46 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 							'order_key'      => $existing_order->get_order_key(),
 							'message'        => __( 'Using existing order.', 'checkout-com-unified-payments-api' ),
 							'existing_order' => true,
+							'reuse_reason'   => $reuse_validation['reason'],
 						)
 					);
 					return;
+				} else {
+					// Cannot reuse - log reason and create new order.
+					WC_Checkoutcom_Utility::logger(
+						sprintf(
+							'[CREATE ORDER] ⚠️ CANNOT reuse existing order %d - Reason: %s - Will create NEW order',
+							$existing_order_id,
+							$reuse_validation['reason']
+						)
+					);
+					
+					// Add note to old order explaining why it was not reused.
+					$existing_order->add_order_note(
+						sprintf(
+							/* translators: %s: reason for not reusing */
+							__( 'Order not reused for new payment attempt. Reason: %s. A new order was created.', 'checkout-com-unified-payments-api' ),
+							esc_html( $reuse_validation['reason'] )
+						)
+					);
+					$existing_order->save();
+					
+					// CRITICAL: Clear WooCommerce session to prevent create_order() from resuming the old order.
+					// WooCommerce's create_order() internally checks 'order_awaiting_payment' and will resume
+					// that order (changing it back to pending) unless we clear it.
+					if ( WC()->session ) {
+						WC()->session->set( 'order_awaiting_payment', null );
+						WC_Checkoutcom_Utility::logger(
+							sprintf(
+								'[CREATE ORDER] Cleared order_awaiting_payment session to prevent WooCommerce from resuming order %d',
+								$existing_order_id
+							)
+						);
+					}
 				}
 			}
+		} else {
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] No existing reusable order found - creating new order' );
 		}
 		
 		// Use WooCommerce public checkout flow (no Reflection).
@@ -6454,19 +6527,352 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			do_action( 'woocommerce_checkout_order_processed', $order_id, $posted_data, $order );
 		}
 
+		// Ensure order status is pending (use update_status to fire hooks properly).
 		if ( 'pending' !== $order->get_status() ) {
-			$order->set_status( 'pending' );
+			$order->update_status( 'pending', __( 'Order created for Flow payment.', 'checkout-com-unified-payments-api' ) );
 		}
+
+		// Store cart hash for future reuse validation.
+		if ( WC()->cart ) {
+			$cart_hash = WC()->cart->get_cart_hash();
+			if ( ! empty( $cart_hash ) && $order->get_cart_hash() !== $cart_hash ) {
+				$order->set_cart_hash( $cart_hash );
+			}
+		}
+
 		$order->save();
 
-		WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ✅ Order created successfully - Order ID: ' . $order_id );
+		// Comprehensive logging for new order creation.
+		WC_Checkoutcom_Utility::logger(
+			sprintf(
+				'[CREATE ORDER] ✅ NEW order created - ID: %d, Total: %s %s, Status: %s, Payment Session: %s, Customer: %s',
+				$order_id,
+				$order->get_total(),
+				$order->get_currency(),
+				$order->get_status(),
+				$payment_session_id ?: '(not set)',
+				$order->get_billing_email() ?: '(guest)'
+			)
+		);
+
+		// Add order note documenting order creation for audit trail.
+		$order->add_order_note(
+			sprintf(
+				/* translators: %s: payment session ID */
+				__( 'Order created for Flow 3DS payment. Payment Session: %s', 'checkout-com-unified-payments-api' ),
+				$payment_session_id ?: __( '(pending)', 'checkout-com-unified-payments-api' )
+			)
+		);
+		$order->save();
 
 		wp_send_json_success(
 			array(
-				'order_id'  => $order_id,
-				'order_key' => $order->get_order_key(),
-				'message'   => __( 'Order created successfully.', 'checkout-com-unified-payments-api' ),
+				'order_id'       => $order_id,
+				'order_key'      => $order->get_order_key(),
+				'message'        => __( 'Order created successfully.', 'checkout-com-unified-payments-api' ),
+				'existing_order' => false,
 			)
+		);
+	}
+
+	/**
+	 * Prevent WooCommerce from resuming failed orders during checkout.
+	 *
+	 * This method runs early in the checkout process (woocommerce_before_checkout_process)
+	 * to check if the order_awaiting_payment session contains a failed order.
+	 * If so, it clears the session to force WooCommerce to create a new order.
+	 *
+	 * This is critical because WooCommerce's create_order() method automatically resumes
+	 * any order found in the order_awaiting_payment session, which would change a failed
+	 * order back to pending status.
+	 *
+	 * @since 5.0.3
+	 *
+	 * @return void
+	 */
+	public function prevent_failed_order_reuse() {
+		// Only apply to Flow payment method.
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce verified by WooCommerce checkout process.
+		$payment_method = isset( $_POST['payment_method'] ) ? sanitize_text_field( wp_unslash( $_POST['payment_method'] ) ) : '';
+		if ( 'wc_checkout_com_flow' !== $payment_method ) {
+			return;
+		}
+		
+		// Verify nonce for additional security (WooCommerce also verifies, but we verify explicitly for WordPress standards).
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce verified below.
+		$nonce_value = isset( $_POST['woocommerce-process-checkout-nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['woocommerce-process-checkout-nonce'] ) ) : '';
+		if ( empty( $nonce_value ) || ! wp_verify_nonce( $nonce_value, 'woocommerce-process_checkout' ) ) {
+			// Nonce invalid - this shouldn't happen if WooCommerce checkout process is working correctly,
+			// but we return early to prevent any issues.
+			WC_Checkoutcom_Utility::logger( '[PREVENT ORDER REUSE] ⚠️ Nonce verification failed - skipping order reuse prevention' );
+			return;
+		}
+		
+		if ( ! WC()->session ) {
+			return;
+		}
+		
+		$session_order_id = absint( WC()->session->get( 'order_awaiting_payment' ) );
+		if ( ! $session_order_id ) {
+			return;
+		}
+		
+		$existing_order = wc_get_order( $session_order_id );
+		if ( ! $existing_order ) {
+			return;
+		}
+		
+		$order_status = $existing_order->get_status();
+		
+		// Check if order has failed or has security check failure flag.
+		$security_check_failed = $existing_order->get_meta( '_cko_security_check_failed' );
+		$should_prevent_reuse = false;
+		$reason = '';
+		
+		if ( 'failed' === $order_status ) {
+			$should_prevent_reuse = true;
+			$reason = sprintf( 'Order %d has failed status', $session_order_id );
+		} elseif ( ! empty( $security_check_failed ) ) {
+			$should_prevent_reuse = true;
+			$reason = sprintf( 'Order %d has security check failed flag', $session_order_id );
+		}
+		
+		// Also check cart hash mismatch (cart contents changed).
+		if ( ! $should_prevent_reuse && WC()->cart ) {
+			$current_cart_hash = WC()->cart->get_cart_hash();
+			$order_cart_hash = $existing_order->get_cart_hash();
+			
+			if ( ! empty( $current_cart_hash ) && ! empty( $order_cart_hash ) && $current_cart_hash !== $order_cart_hash ) {
+				$should_prevent_reuse = true;
+				$reason = sprintf( 'Order %d has cart hash mismatch (cart changed)', $session_order_id );
+			}
+		}
+		
+		if ( $should_prevent_reuse ) {
+			// Clear the session to prevent WooCommerce from resuming this order.
+			WC()->session->set( 'order_awaiting_payment', null );
+			
+			WC_Checkoutcom_Utility::logger(
+				sprintf(
+					'[PREVENT ORDER REUSE] ⚠️ Cleared order_awaiting_payment session - %s. WooCommerce will now create a NEW order instead of resuming the old one.',
+					$reason
+				)
+			);
+			
+			// Add note to the old order explaining what happened.
+			$existing_order->add_order_note(
+				sprintf(
+					/* translators: %s: reason for not reusing */
+					__( 'This order was not resumed for a new payment attempt. Reason: %s. A new order was created for the retry.', 'checkout-com-unified-payments-api' ),
+					esc_html( $reason )
+				)
+			);
+			$existing_order->save();
+		} else {
+			WC_Checkoutcom_Utility::logger(
+				sprintf(
+					'[PREVENT ORDER REUSE] ✅ Order %d in session can be reused (status: %s, no security check failure, cart unchanged)',
+					$session_order_id,
+					$order_status
+				)
+			);
+		}
+	}
+
+	/**
+	 * Get an existing order ID that may be reused for the current checkout.
+	 *
+	 * Follows WooCommerce pattern: checks order_awaiting_payment session key
+	 * and payment_session_id meta as fallback.
+	 *
+	 * @since 5.0.3
+	 *
+	 * @param string $payment_session_id Optional payment session ID to search for.
+	 * @return int|null Order ID if found, null otherwise.
+	 */
+	private function get_reusable_order_id( $payment_session_id = '' ) {
+		$order_id = null;
+
+		// Method 1: Check WooCommerce session (standard WooCommerce pattern).
+		if ( WC()->session ) {
+			$session_order_id = absint( WC()->session->get( 'order_awaiting_payment' ) );
+			if ( $session_order_id > 0 ) {
+				WC_Checkoutcom_Utility::logger(
+					sprintf( '[ORDER REUSE CHECK] Found order_awaiting_payment in session: %d', $session_order_id )
+				);
+				$order_id = $session_order_id;
+			}
+		}
+
+		// Method 2: If payment session ID provided, search by meta.
+		if ( ! $order_id && ! empty( $payment_session_id ) ) {
+			$existing_orders = wc_get_orders(
+				array(
+					'meta_key'   => '_cko_payment_session_id',
+					'meta_value' => $payment_session_id,
+					'status'     => array( 'pending', 'failed', 'on-hold' ),
+					'limit'      => 1,
+					'return'     => 'ids',
+					'orderby'    => 'date',
+					'order'      => 'DESC',
+				)
+			);
+
+			if ( ! empty( $existing_orders ) ) {
+				$order_id = $existing_orders[0];
+				WC_Checkoutcom_Utility::logger(
+					sprintf(
+						'[ORDER REUSE CHECK] Found order by payment_session_id (%s): %d',
+						$payment_session_id,
+						$order_id
+					)
+				);
+			}
+		}
+
+		return $order_id;
+	}
+
+	/**
+	 * Validate if an existing order can be reused for a new payment attempt.
+	 *
+	 * An order CANNOT be reused if:
+	 * - It has _cko_security_check_failed flag (amount mismatch detected)
+	 * - Its status is completed, cancelled, or refunded
+	 * - The cart contents have changed (different cart hash)
+	 *
+	 * @since 5.0.3
+	 *
+	 * @param WC_Order $order The order to validate.
+	 * @return array {
+	 *     @type bool   $can_reuse Whether the order can be reused.
+	 *     @type string $reason    Explanation for the decision.
+	 * }
+	 */
+	private function validate_order_reuse( $order ) {
+		if ( ! $order || ! is_a( $order, 'WC_Order' ) ) {
+			return array(
+				'can_reuse' => false,
+				'reason'    => 'Invalid order object',
+			);
+		}
+
+		$order_id = $order->get_id();
+
+		// Check 1: Security check failed flag.
+		// If order failed security check (amount mismatch), it should NOT be reused.
+		// A new order with correct amount should be created.
+		$security_check_failed = $order->get_meta( '_cko_security_check_failed' );
+		if ( ! empty( $security_check_failed ) ) {
+			WC_Checkoutcom_Utility::logger(
+				sprintf(
+					'[ORDER REUSE CHECK] Order %d has security check failed flag - Reason: %s',
+					$order_id,
+					$security_check_failed
+				)
+			);
+			return array(
+				'can_reuse' => false,
+				'reason'    => 'Previous payment failed security check (amount mismatch)',
+			);
+		}
+
+		// Check 2: Order status must be suitable for reuse.
+		// IMPORTANT: Only 'pending' status orders can be reused.
+		// 'failed' orders should NOT be reused - a new order should be created for retry.
+		// This prevents confusion from multiple payment attempts on the same order.
+		$status = $order->get_status();
+		$reusable_statuses = array( 'pending' );
+
+		/**
+		 * Filter the list of order statuses that allow order reuse.
+		 *
+		 * Default: only 'pending' orders can be reused.
+		 * 'failed' orders are excluded because they indicate a previous payment failure,
+		 * and a new order should be created for retry attempts.
+		 *
+		 * @since 5.0.3
+		 *
+		 * @param array    $reusable_statuses Array of status slugs (without 'wc-' prefix).
+		 * @param WC_Order $order             The order being checked.
+		 */
+		$reusable_statuses = apply_filters( 'cko_flow_order_reusable_statuses', $reusable_statuses, $order );
+
+		if ( ! in_array( $status, $reusable_statuses, true ) ) {
+			WC_Checkoutcom_Utility::logger(
+				sprintf(
+					'[ORDER REUSE CHECK] Order %d status "%s" cannot be reused (only pending orders can be reused)',
+					$order_id,
+					$status
+				)
+			);
+			return array(
+				'can_reuse' => false,
+				'reason'    => sprintf( 'Order status is "%s" - failed orders cannot be reused, creating new order', $status ),
+			);
+		}
+
+		// Check 3: Cart hash comparison (cart contents must match).
+		// This ensures the customer hasn't changed their cart since the order was created.
+		if ( WC()->cart ) {
+			$current_cart_hash  = WC()->cart->get_cart_hash();
+			$order_cart_hash    = $order->get_cart_hash();
+
+			if ( ! empty( $current_cart_hash ) && ! empty( $order_cart_hash ) && $current_cart_hash !== $order_cart_hash ) {
+				WC_Checkoutcom_Utility::logger(
+					sprintf(
+						'[ORDER REUSE CHECK] Order %d cart hash mismatch - Order: %s, Current: %s',
+						$order_id,
+						$order_cart_hash,
+						$current_cart_hash
+					)
+				);
+				return array(
+					'can_reuse' => false,
+					'reason'    => 'Cart contents changed since order was created',
+				);
+			}
+		}
+
+		// Check 4: Order total must match current cart total.
+		// Additional safeguard in case cart hash doesn't catch amount changes (e.g., coupons).
+		if ( WC()->cart ) {
+			$current_cart_total = WC()->cart->get_total( 'edit' );
+			$order_total        = $order->get_total();
+
+			// Allow small floating point variance (1 cent).
+			if ( abs( (float) $current_cart_total - (float) $order_total ) > 0.01 ) {
+				WC_Checkoutcom_Utility::logger(
+					sprintf(
+						'[ORDER REUSE CHECK] Order %d total mismatch - Order: %s, Current Cart: %s',
+						$order_id,
+						$order_total,
+						$current_cart_total
+					)
+				);
+				return array(
+					'can_reuse' => false,
+					'reason'    => sprintf(
+						'Order total (%s) differs from current cart total (%s)',
+						wc_price( $order_total ),
+						wc_price( $current_cart_total )
+					),
+				);
+			}
+		}
+
+		// All checks passed - order can be reused.
+		WC_Checkoutcom_Utility::logger(
+			sprintf(
+				'[ORDER REUSE CHECK] Order %d passed all reuse validation checks (status: %s)',
+				$order_id,
+				$status
+			)
+		);
+
+		return array(
+			'can_reuse' => true,
+			'reason'    => sprintf( 'Order status is "%s" and cart matches', $status ),
 		);
 	}
 
