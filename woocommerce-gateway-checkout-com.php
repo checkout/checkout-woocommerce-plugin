@@ -292,6 +292,7 @@ add_action( 'plugins_loaded', 'init_checkout_com_gateway_class', 0 );
 		if ( is_admin() ) {
 			include_once 'includes/admin/class-wc-checkoutcom-webhook-queue-admin.php';
 			include_once 'includes/admin/class-wc-checkoutcom-diagnostics.php';
+			include_once 'includes/admin/class-wc-checkoutcom-order-columns.php';
 		}
 		
 		// Note: You can also access the webhook queue table directly using:

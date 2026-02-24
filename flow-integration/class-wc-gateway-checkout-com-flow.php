@@ -77,6 +77,9 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		add_action( 'woocommerce_checkout_create_order', [ $this, 'store_save_card_preference_in_order' ], 10, 2 );
 		// Store payment session ID in order metadata when order is created (public checkout flow)
 		add_action( 'woocommerce_checkout_create_order', [ $this, 'store_payment_session_id_in_order' ], 10, 2 );
+		
+		// Add order note with payment session ID after order is saved to database
+		add_action( 'woocommerce_checkout_order_created', [ $this, 'add_payment_session_id_order_note' ], 10, 1 );
 
 		// Preserve payment method title after order status changes (webhooks may overwrite it)
 		add_action( 'woocommerce_order_status_changed', [ $this, 'preserve_payment_method_title' ], 20, 4 );
@@ -675,6 +678,36 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 		$order->update_meta_data( '_cko_payment_session_id', $payment_session_id );
 		WC_Checkoutcom_Utility::logger( '[FLOW PAYMENT SESSION] Stored payment session ID in order metadata: ' . substr( $payment_session_id, 0, 20 ) . '... (Order ID: ' . $order->get_id() . ')' );
+	}
+	
+	/**
+	 * Add order note with payment session ID after order is saved.
+	 *
+	 * This runs on woocommerce_checkout_order_created hook which fires AFTER
+	 * the order is saved to the database, ensuring the note is persisted.
+	 *
+	 * @param WC_Order $order Order object.
+	 * @return void
+	 */
+	public function add_payment_session_id_order_note( $order ) {
+		// Only process if this is a Flow payment.
+		if ( $this->id !== $order->get_payment_method() ) {
+			return;
+		}
+		
+		$payment_session_id = $order->get_meta( '_cko_payment_session_id' );
+		if ( empty( $payment_session_id ) ) {
+			return;
+		}
+		
+		// Add order note with payment session ID for tracking
+		$order->add_order_note(
+			sprintf(
+				/* translators: %s: payment session ID */
+				__( 'Order created with Payment Session ID: %s', 'checkout-com-unified-payments-api' ),
+				esc_html( $payment_session_id )
+			)
+		);
 	}
 
 	public function add_payment_meta_field( $payment_meta, $subscription ) {
@@ -5841,6 +5874,108 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			}
 		}
 		
+		// Method 4: Fuzzy match by Session ID + Amount for pristine orders (fallback for browser-close scenario)
+		// CRITICAL SAFETY: Only match if order is completely untouched (no payment ID, no notes, pending status)
+		// This catches cases where customer closed browser immediately after clicking "Place Order"
+		// before the payment response could save the payment_id to the order.
+		if ( ! $order && ! empty( $data->data->metadata->cko_payment_session_id ) && ! empty( $data->data->id ) ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Trying METHOD 4 (FUZZY: Session ID + Amount for pristine orders)' );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Session ID: ' . $data->data->metadata->cko_payment_session_id );
+			
+			// Find orders by session ID only (pending status)
+			$candidate_orders = wc_get_orders( array(
+				'meta_key'   => '_cko_payment_session_id',
+				'meta_value' => $data->data->metadata->cko_payment_session_id,
+				'status'     => 'pending',
+				'limit'      => 2, // Get 2 to detect duplicates - we only proceed if exactly 1 match
+				'return'     => 'objects',
+			) );
+			
+			if ( count( $candidate_orders ) === 1 ) {
+				$candidate = $candidate_orders[0];
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: METHOD 4 - Found exactly 1 candidate order: ' . $candidate->get_id() );
+				
+				// Safety check 1: Order must NOT have a payment ID already
+				$existing_payment_id = $candidate->get_meta( '_cko_flow_payment_id' );
+				$existing_payment_id_alt = $candidate->get_meta( '_cko_payment_id' );
+				$has_payment_id = ! empty( $existing_payment_id ) || ! empty( $existing_payment_id_alt );
+				
+				// Safety check 2: Order must NOT have any notes (completely untouched)
+				$order_notes = wc_get_order_notes( array(
+					'order_id' => $candidate->get_id(),
+					'limit'    => 1,
+				) );
+				$has_notes = ! empty( $order_notes );
+				
+				// Safety check 3: Amount must match (compare in minor units)
+				$webhook_amount = isset( $data->data->amount ) ? (int) $data->data->amount : 0;
+				$order_total = $candidate->get_total();
+				// Convert order total to minor units (cents) - WooCommerce stores as decimal
+				$order_amount_minor = (int) round( $order_total * 100 );
+				$amount_matches = ( $webhook_amount === $order_amount_minor );
+				
+				// Safety check 4: Currency must match
+				$webhook_currency = isset( $data->data->currency ) ? strtoupper( $data->data->currency ) : '';
+				$order_currency = strtoupper( $candidate->get_currency() );
+				$currency_matches = ( $webhook_currency === $order_currency );
+				
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: METHOD 4 - Safety checks:' );
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING:   - Has payment ID: ' . ( $has_payment_id ? 'YES (FAIL)' : 'NO (PASS)' ) );
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING:   - Has notes: ' . ( $has_notes ? 'YES (FAIL)' : 'NO (PASS)' ) );
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING:   - Amount matches: ' . ( $amount_matches ? 'YES (PASS)' : 'NO (FAIL)' ) . ' (Webhook: ' . $webhook_amount . ', Order: ' . $order_amount_minor . ')' );
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING:   - Currency matches: ' . ( $currency_matches ? 'YES (PASS)' : 'NO (FAIL)' ) . ' (Webhook: ' . $webhook_currency . ', Order: ' . $order_currency . ')' );
+				
+				// All safety checks must pass
+				if ( ! $has_payment_id && ! $has_notes && $amount_matches && $currency_matches ) {
+					$order = $candidate;
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ✅ MATCHED BY METHOD 4 (FUZZY: Session ID + Amount) - Order ID: ' . $order->get_id() );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ✅ All safety checks passed - Order is pristine (no payment ID, no notes, pending status)' );
+					
+					// CRITICAL: Save payment ID to order so future webhooks can find it via Method 2/3
+					$order->update_meta_data( '_cko_flow_payment_id', $data->data->id );
+					$order->save();
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ✅ Saved payment ID to order - Payment ID: ' . $data->data->id );
+					
+					// Add order_id to metadata so processing functions can find it
+					if ( isset( $data->data->metadata ) && is_object( $data->data->metadata ) ) {
+						$data->data->metadata->order_id = $order->get_id();
+					} else {
+						$data->data->metadata = (object) array( 'order_id' => $order->get_id() );
+					}
+					
+					// Add order note explaining the fuzzy match
+					$order->add_order_note(
+						sprintf(
+							/* translators: %s: payment ID */
+							__( 'Order matched via webhook (Method 4 - fuzzy match). Customer likely closed browser before payment confirmation. Payment ID: %s', 'checkout-com-unified-payments-api' ),
+							esc_html( $data->data->id )
+						)
+					);
+				} else {
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ❌ METHOD 4 FAILED - Safety checks did not pass for Order ID: ' . $candidate->get_id() );
+					if ( $has_payment_id ) {
+						WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ❌ Reason: Order already has payment ID: ' . ( $existing_payment_id ?: $existing_payment_id_alt ) );
+					}
+					if ( $has_notes ) {
+						WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ❌ Reason: Order has notes (not pristine)' );
+					}
+					if ( ! $amount_matches ) {
+						WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ❌ Reason: Amount mismatch' );
+					}
+					if ( ! $currency_matches ) {
+						WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ❌ Reason: Currency mismatch' );
+					}
+				}
+			} elseif ( count( $candidate_orders ) > 1 ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ❌ METHOD 4 FAILED - Multiple orders found with same session ID (ambiguous): ' . count( $candidate_orders ) );
+				foreach ( $candidate_orders as $idx => $candidate_order ) {
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING:   - Candidate ' . ( $idx + 1 ) . ': Order ID ' . $candidate_order->get_id() );
+				}
+			} else {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ❌ METHOD 4 FAILED - No pending order found with session ID: ' . $data->data->metadata->cko_payment_session_id );
+			}
+		}
+		
 		WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ========== ORDER LOOKUP COMPLETE ==========' );
 
 		if ( $order ) {
@@ -6645,6 +6780,34 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			if ( ! empty( $current_cart_hash ) && ! empty( $order_cart_hash ) && $current_cart_hash !== $order_cart_hash ) {
 				$should_prevent_reuse = true;
 				$reason = sprintf( 'Order %d has cart hash mismatch (cart changed)', $session_order_id );
+			}
+		}
+		
+		// Check payment session ID mismatch (new payment session = new order).
+		// This ensures each payment attempt gets its own order for clean tracking.
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Already verified above.
+		if ( ! $should_prevent_reuse ) {
+			$current_payment_session_id = isset( $_POST['cko-flow-payment-session-id'] ) 
+				? sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-session-id'] ) ) 
+				: '';
+			$order_payment_session_id = $existing_order->get_meta( '_cko_payment_session_id' );
+			
+			// If both exist and don't match, this is a new payment attempt - create new order
+			if ( ! empty( $current_payment_session_id ) 
+				 && ! empty( $order_payment_session_id ) 
+				 && $current_payment_session_id !== $order_payment_session_id ) {
+				$should_prevent_reuse = true;
+				$reason = sprintf( 
+					'Order %d has different payment session ID (new payment attempt)', 
+					$session_order_id
+				);
+				WC_Checkoutcom_Utility::logger(
+					sprintf(
+						'[PREVENT ORDER REUSE] Payment session ID mismatch - Order: %s, Current: %s',
+						substr( $order_payment_session_id, 0, 25 ) . '...',
+						substr( $current_payment_session_id, 0, 25 ) . '...'
+					)
+				);
 			}
 		}
 		
