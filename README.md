@@ -4,7 +4,7 @@ Checkout.com Payment Gateway plugin for WooCommerce with Flow integration suppor
 
 ## Version
 
-**Current Version:** 5.0.3
+**Current Version:** 5.0.4
 
 ## Features
 
@@ -470,6 +470,13 @@ For support and integration help:
 GPL v2 or later
 
 ## Changelog
+
+### Version 5.0.4
+- Prevent Flow reload on address changes - send updates via handleSubmit API
+- Add state/county and phone fields to dynamic address updates
+- Coupon/discount amounts now read from live DOM instead of stale data
+- Fixed order-pay page address validation errors
+- Removed verbose debug logs to reduce log noise
 
 ### Version 5.0.3
 - Use post-discount unit_price for Flow items to satisfy PayPal amount validation

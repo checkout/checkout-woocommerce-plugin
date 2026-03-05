@@ -5,7 +5,7 @@
  * Description: Extends WooCommerce by Adding the Checkout.com Gateway.
  * Author: Checkout.com
  * Author URI: https://www.checkout.com/
- * Version: 5.0.3
+ * Version: 5.0.4
  * Requires at least: 5.0
  * Tested up to: 6.7.0
  * WC requires at least: 3.0
@@ -146,7 +146,7 @@ add_action( 'woocommerce_new_order', 'cko_update_order_id_in_session', 5 );
 /**
  * Constants.
  */
-define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '5.0.3' );
+define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '5.0.4' );
 define( 'WC_CHECKOUTCOM_PLUGIN_URL', untrailingslashit( plugins_url( basename( plugin_dir_path( __FILE__ ) ), basename( __FILE__ ) ) ) );
 define( 'WC_CHECKOUTCOM_PLUGIN_PATH', untrailingslashit( plugin_dir_path( __FILE__ ) ) );
 
