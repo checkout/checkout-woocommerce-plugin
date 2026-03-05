@@ -33,6 +33,13 @@
 				return;
 			}
 
+			// CRITICAL: Check if dynamic amount update is in progress (coupon operation)
+			// The payment methods section is preserved by PHP filter, so we skip remounting
+			if (window.ckoFlowAmountUpdateInProgress) {
+				ckoLogger.debug('🛡️ Skipping container-ready handler - dynamic amount update in progress (payment section preserved by PHP)');
+				return;
+			}
+
 			const flowContainer = event.detail?.container || document.getElementById('flow-container');
 			const flowPayment = document.getElementById('payment_method_wc_checkout_com_flow');
 			const flowComponentRoot = document.querySelector('[data-testid="checkout-web-component-root"]');

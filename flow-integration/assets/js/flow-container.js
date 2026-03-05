@@ -134,9 +134,20 @@ if (document.readyState === 'loading') {
 
 // EVENT-DRIVEN DESIGN: Listen for updated_checkout and ensure container exists
 // When container is ready, emit event for payment-session.js to handle Flow lifecycle
+// NOTE: Payment methods section is now preserved by PHP filter (exclude_payment_method_from_fragments)
+// so we don't need complex detach/reattach logic anymore
 jQuery(document).on("updated_checkout", function () {
 	if (typeof ckoLogger !== 'undefined') {
 		ckoLogger.debug('[FLOW CONTAINER] updated_checkout event fired');
+	}
+	
+	// Check if dynamic amount update is in progress (coupon being applied)
+	// The payment methods section is preserved by PHP, so we just skip container recreation
+	if (window.ckoFlowAmountUpdateInProgress) {
+		if (typeof ckoLogger !== 'undefined') {
+			ckoLogger.debug('[FLOW CONTAINER] 🛡️ Dynamic amount update in progress - payment section preserved by PHP');
+		}
+		return;
 	}
 	
 	// Set flag to prevent MutationObserver from resetting state during DOM churn

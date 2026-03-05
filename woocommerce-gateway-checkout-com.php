@@ -1569,8 +1569,22 @@ function cko_enqueue_frontend_assets() {
 		'debug_logging' => $debug_logging ? true : false,
 		// Enabled payment methods
 		'enabled_payment_methods' => $enabled_payment_methods,
-			'waiting_message_title' => esc_html__( 'Please fill in all required fields to continue with payment.', 'checkout-com-unified-payments-api' ),
-			'waiting_message_fields' => esc_html__( 'Required fields: Email, Billing Address', 'checkout-com-unified-payments-api' ),
+		'waiting_message_title' => esc_html__( 'Please fill in the required fields to continue with payment.', 'checkout-com-unified-payments-api' ),
+		// Translated field labels for missing fields message
+		'i18n' => array(
+			'field_email'           => esc_html__( 'Email', 'checkout-com-unified-payments-api' ),
+			'field_email_invalid'   => esc_html__( 'Email (invalid format)', 'checkout-com-unified-payments-api' ),
+			'field_first_name'      => esc_html__( 'First Name', 'checkout-com-unified-payments-api' ),
+			'field_last_name'       => esc_html__( 'Last Name', 'checkout-com-unified-payments-api' ),
+			'field_address'         => esc_html__( 'Street Address', 'checkout-com-unified-payments-api' ),
+			'field_city'            => esc_html__( 'City', 'checkout-com-unified-payments-api' ),
+			'field_country'         => esc_html__( 'Country', 'checkout-com-unified-payments-api' ),
+			'field_state'           => esc_html__( 'State/Province', 'checkout-com-unified-payments-api' ),
+			'field_postcode'        => esc_html__( 'Postcode/ZIP', 'checkout-com-unified-payments-api' ),
+			'missing_field'         => esc_html__( 'Missing field:', 'checkout-com-unified-payments-api' ),
+			'missing_fields'        => esc_html__( 'Missing fields:', 'checkout-com-unified-payments-api' ),
+			'all_fields_complete'   => esc_html__( 'All fields are complete', 'checkout-com-unified-payments-api' ),
+		),
 		);
 
 		wp_set_script_translations( 'checkout-com-flow-payment-session-script', 'checkout-com-unified-payments-api' );

@@ -106,11 +106,21 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// AJAX handler for saving payment session ID to order immediately after payment session creation
 		add_action( 'wp_ajax_cko_flow_save_payment_session_id', [ $this, 'ajax_save_payment_session_id' ] );
 		add_action( 'wp_ajax_nopriv_cko_flow_save_payment_session_id', [ $this, 'ajax_save_payment_session_id' ] );
+
+		// AJAX handler for submitting payment session with modified amount (dynamic amount adjustment)
+		// This enables cart changes without full Flow component reload
+		add_action( 'wp_ajax_cko_flow_submit_payment_session', [ $this, 'ajax_submit_payment_session' ] );
+		add_action( 'wp_ajax_nopriv_cko_flow_submit_payment_session', [ $this, 'ajax_submit_payment_session' ] );
 		
 		// CRITICAL: Hook to prevent WooCommerce from resuming failed orders.
 		// This runs early in the checkout process, BEFORE WooCommerce's create_order() is called.
 		// Priority 5 ensures this runs before other checkout hooks.
 		add_action( 'woocommerce_before_checkout_process', [ $this, 'prevent_failed_order_reuse' ], 5 );
+		
+		// CRITICAL: Exclude payment methods section from checkout fragment updates during coupon operations.
+		// This preserves the Flow component (and entered card details) when cart total changes.
+		// The payment amount is handled via handleSubmit callback instead of component reload.
+		add_filter( 'woocommerce_update_order_review_fragments', [ $this, 'exclude_payment_method_from_fragments' ], 10, 1 );
 	}
 
 	/**
@@ -638,7 +648,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		
 		// Store in order metadata
 		$order->update_meta_data( '_cko_save_card_preference', $save_card_preference );
-		WC_Checkoutcom_Utility::logger( '[FLOW SAVE CARD] Stored save card preference in order metadata: ' . $save_card_preference . ' (Order ID: ' . $order->get_id() . ')' );
+		WC_Checkoutcom_Utility::logger( '[FLOW INFO] Save card preference queued for order metadata: ' . $save_card_preference );
 	}
 
 	/**
@@ -677,7 +687,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		}
 
 		$order->update_meta_data( '_cko_payment_session_id', $payment_session_id );
-		WC_Checkoutcom_Utility::logger( '[FLOW PAYMENT SESSION] Stored payment session ID in order metadata: ' . substr( $payment_session_id, 0, 20 ) . '... (Order ID: ' . $order->get_id() . ')' );
+		WC_Checkoutcom_Utility::logger( '[FLOW INFO] Payment session ID queued for order metadata: ' . $payment_session_id );
 	}
 	
 	/**
@@ -700,11 +710,17 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			return;
 		}
 		
-		// Add order note with payment session ID for tracking
+		$order_id = $order->get_id();
+		
+		// Log order creation with real Order ID
+		WC_Checkoutcom_Utility::logger( '[FLOW INFO] Order created successfully - Order ID: ' . $order_id . ', Payment Session ID: ' . $payment_session_id );
+		
+		// Add order note with payment session ID and order ID for tracking
 		$order->add_order_note(
 			sprintf(
-				/* translators: %s: payment session ID */
-				__( 'Order created with Payment Session ID: %s', 'checkout-com-unified-payments-api' ),
+				/* translators: 1: order ID, 2: payment session ID */
+				__( 'Order #%1$s created with Payment Session ID: %2$s', 'checkout-com-unified-payments-api' ),
+				$order_id,
 				esc_html( $payment_session_id )
 			)
 		);
@@ -6295,6 +6311,37 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	}
 
 	/**
+	 * Mask email for logging (privacy protection).
+	 * Example: john.doe@example.com => j***e@example.com
+	 *
+	 * @param string $email The email to mask.
+	 * @return string Masked email.
+	 */
+	private function mask_email( $email ) {
+		if ( empty( $email ) || ! is_string( $email ) ) {
+			return '(invalid)';
+		}
+		
+		$parts = explode( '@', $email );
+		if ( count( $parts ) !== 2 ) {
+			return '(invalid)';
+		}
+		
+		$local  = $parts[0];
+		$domain = $parts[1];
+		
+		// Mask local part: show first and last char, mask the rest
+		$local_len = strlen( $local );
+		if ( $local_len <= 2 ) {
+			$masked_local = $local[0] . '***';
+		} else {
+			$masked_local = $local[0] . '***' . $local[ $local_len - 1 ];
+		}
+		
+		return $masked_local . '@' . $domain;
+	}
+
+	/**
 	 * Helper to send response with proper HTTP status and exit.
 	 */
 	private function send_response($status_code, $message) {
@@ -6604,6 +6651,31 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 		$posted_data = $checkout->get_posted_data();
 
+		// Log posted data for debugging (sanitized - no sensitive card details)
+		$debug_logging = 'yes' === WC_Admin_Settings::get_option( 'cko_flow_debug_logging', 'no' );
+		if ( $debug_logging ) {
+			$safe_posted_data = array(
+				'billing_first_name'  => isset( $posted_data['billing_first_name'] ) ? $posted_data['billing_first_name'] : '(not set)',
+				'billing_last_name'   => isset( $posted_data['billing_last_name'] ) ? $posted_data['billing_last_name'] : '(not set)',
+				'billing_email'       => isset( $posted_data['billing_email'] ) && ! empty( $posted_data['billing_email'] ) ? $this->mask_email( $posted_data['billing_email'] ) : '(not set)',
+				'billing_phone'       => isset( $posted_data['billing_phone'] ) ? ( ! empty( $posted_data['billing_phone'] ) ? 'SET' : 'EMPTY' ) : '(not set)',
+				'billing_address_1'   => isset( $posted_data['billing_address_1'] ) ? ( ! empty( $posted_data['billing_address_1'] ) ? 'SET' : 'EMPTY' ) : '(not set)',
+				'billing_city'        => isset( $posted_data['billing_city'] ) ? $posted_data['billing_city'] : '(not set)',
+				'billing_state'       => isset( $posted_data['billing_state'] ) ? $posted_data['billing_state'] : '(not set)',
+				'billing_postcode'    => isset( $posted_data['billing_postcode'] ) ? $posted_data['billing_postcode'] : '(not set)',
+				'billing_country'     => isset( $posted_data['billing_country'] ) ? $posted_data['billing_country'] : '(not set)',
+				'shipping_first_name' => isset( $posted_data['shipping_first_name'] ) ? ( ! empty( $posted_data['shipping_first_name'] ) ? 'SET' : 'EMPTY' ) : '(not set)',
+				'shipping_address_1'  => isset( $posted_data['shipping_address_1'] ) ? ( ! empty( $posted_data['shipping_address_1'] ) ? 'SET' : 'EMPTY' ) : '(not set)',
+				'shipping_city'       => isset( $posted_data['shipping_city'] ) ? ( ! empty( $posted_data['shipping_city'] ) ? 'SET' : 'EMPTY' ) : '(not set)',
+				'shipping_country'    => isset( $posted_data['shipping_country'] ) ? ( ! empty( $posted_data['shipping_country'] ) ? $posted_data['shipping_country'] : 'EMPTY' ) : '(not set)',
+				'payment_method'      => isset( $posted_data['payment_method'] ) ? $posted_data['payment_method'] : '(not set)',
+				'ship_to_different'   => isset( $posted_data['ship_to_different_address'] ) ? ( $posted_data['ship_to_different_address'] ? 'YES' : 'NO' ) : '(not set)',
+				'order_comments'      => isset( $posted_data['order_comments'] ) ? ( ! empty( $posted_data['order_comments'] ) ? 'SET' : 'EMPTY' ) : '(not set)',
+				'terms'               => isset( $posted_data['terms'] ) ? ( $posted_data['terms'] ? 'ACCEPTED' : 'NOT ACCEPTED' ) : '(not set)',
+			);
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Posted data for order creation: ' . wp_json_encode( $safe_posted_data ) );
+		}
+
 		// Create order using WooCommerce checkout processing to preserve full hook behavior
 		// (subscriptions, fees, coupons, taxes, shipping, and extension integrations).
 		if ( ! is_callable( array( $checkout, 'create_order' ) ) ) {
@@ -6708,6 +6780,45 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				'existing_order' => false,
 			)
 		);
+	}
+
+	/**
+	 * Exclude payment methods section from checkout fragment updates.
+	 *
+	 * This filter prevents WooCommerce from replacing the payment methods HTML
+	 * during checkout updates (e.g., when a coupon is applied or cart total changes).
+	 * This preserves the Flow component and any entered card details.
+	 *
+	 * The payment amount is handled via the handleSubmit callback which sends
+	 * the correct amount to the server when payment is submitted.
+	 *
+	 * @since 5.0.3
+	 *
+	 * @param array $fragments Array of HTML fragments to update.
+	 *
+	 * @return array Modified fragments array.
+	 */
+	public function exclude_payment_method_from_fragments( $fragments ) {
+		// Only exclude when Flow payment method is active/selected.
+		// Check if this is a checkout page with Flow payment method.
+		if ( ! is_checkout() ) {
+			return $fragments;
+		}
+
+		// Check if Flow payment method is available.
+		$available_gateways = WC()->payment_gateways()->get_available_payment_gateways();
+		if ( ! isset( $available_gateways['wc_checkout_com_flow'] ) ) {
+			return $fragments;
+		}
+
+		// Remove the payment methods fragment to prevent it from being replaced.
+		// This preserves the Flow component and entered card details.
+		if ( isset( $fragments['.woocommerce-checkout-payment'] ) ) {
+			unset( $fragments['.woocommerce-checkout-payment'] );
+			WC_Checkoutcom_Utility::logger( '[FLOW FRAGMENTS] Excluded .woocommerce-checkout-payment from fragment update to preserve Flow component' );
+		}
+
+		return $fragments;
 	}
 
 	/**
@@ -7109,6 +7220,215 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			'message' => __( 'Payment session ID saved successfully.', 'checkout-com-unified-payments-api' ),
 			'order_id' => $order_id,
 		) );
+	}
+
+	/**
+	 * AJAX handler to submit payment session with modified amount (dynamic amount adjustment).
+	 * 
+	 * This enables cart changes (coupon, shipping) without full Flow component reload.
+	 * When cart total changes, instead of reloading the Flow component, we:
+	 * 1. Store the new amount client-side
+	 * 2. Call this endpoint with session_data from handleSubmit callback
+	 * 3. This endpoint calls Checkout.com Submit Payment Session API with modified amount
+	 * 4. Returns response to Flow for 3DS handling if needed
+	 * 
+	 * Works for card, Apple Pay, and Google Pay payments.
+	 *
+	 * @return void
+	 */
+	public function ajax_submit_payment_session() {
+		// Verify nonce for security
+		if ( ! isset( $_POST['nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ) ), 'cko_flow_payment_session' ) ) {
+			wp_send_json_error( array(
+				'message' => __( 'Security check failed. Please refresh the page and try again.', 'checkout-com-unified-payments-api' ),
+			) );
+			return;
+		}
+
+		// Get parameters from POST
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- payment_session_id is alphanumeric ID from Checkout.com
+		$payment_session_id = isset( $_POST['payment_session_id'] ) ? sanitize_text_field( wp_unslash( $_POST['payment_session_id'] ) ) : '';
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- session_data is opaque token from Checkout.com SDK, must be passed as-is
+		$session_data       = isset( $_POST['session_data'] ) ? wp_unslash( $_POST['session_data'] ) : '';
+		$amount             = isset( $_POST['amount'] ) ? absint( $_POST['amount'] ) : 0;
+		$order_id           = isset( $_POST['order_id'] ) ? absint( $_POST['order_id'] ) : 0;
+		
+		// Get billing/shipping address updates (JSON strings from JavaScript)
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- billing is JSON that will be decoded and sanitized
+		$billing_json  = isset( $_POST['billing'] ) ? wp_unslash( $_POST['billing'] ) : '';
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- shipping is JSON that will be decoded and sanitized
+		$shipping_json = isset( $_POST['shipping'] ) ? wp_unslash( $_POST['shipping'] ) : '';
+
+		WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Request received - Payment Session ID: ' . substr( $payment_session_id, 0, 20 ) . '..., Amount: ' . $amount . ', Order ID: ' . $order_id . ', Billing: ' . ( $billing_json ? 'provided' : 'not provided' ) . ', Shipping: ' . ( $shipping_json ? 'provided' : 'not provided' ) );
+
+		// Validate required parameters
+		if ( empty( $payment_session_id ) || empty( $session_data ) ) {
+			WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] ❌ Missing required parameters - payment_session_id: ' . ( $payment_session_id ? 'present' : 'missing' ) . ', session_data: ' . ( $session_data ? 'present' : 'missing' ) );
+			wp_send_json_error( array(
+				'message' => __( 'Missing required parameters.', 'checkout-com-unified-payments-api' ),
+			) );
+			return;
+		}
+
+		// Build the request body for Submit Payment Session API
+		$request_body = array(
+			'session_data' => $session_data,
+		);
+
+		// Add amount if provided (dynamic amount adjustment)
+		if ( $amount > 0 ) {
+			$request_body['amount'] = $amount;
+			WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Including modified amount in request: ' . $amount );
+		}
+		
+		// Add billing address if provided (dynamic address adjustment)
+		if ( ! empty( $billing_json ) ) {
+			$billing_data = json_decode( $billing_json, true );
+			if ( json_last_error() === JSON_ERROR_NONE && is_array( $billing_data ) ) {
+				$request_body['billing'] = array(
+					'address' => array(
+						'address_line1' => isset( $billing_data['address_line1'] ) ? sanitize_text_field( $billing_data['address_line1'] ) : '',
+						'address_line2' => isset( $billing_data['address_line2'] ) ? sanitize_text_field( $billing_data['address_line2'] ) : '',
+						'city'          => isset( $billing_data['city'] ) ? sanitize_text_field( $billing_data['city'] ) : '',
+						'zip'           => isset( $billing_data['zip'] ) ? sanitize_text_field( $billing_data['zip'] ) : '',
+						'country'       => isset( $billing_data['country'] ) ? sanitize_text_field( $billing_data['country'] ) : '',
+					),
+				);
+				WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Including modified billing address in request: ' . wp_json_encode( $request_body['billing'] ) );
+			}
+		}
+		
+		// Add shipping address if provided (dynamic address adjustment)
+		if ( ! empty( $shipping_json ) ) {
+			$shipping_data = json_decode( $shipping_json, true );
+			if ( json_last_error() === JSON_ERROR_NONE && is_array( $shipping_data ) ) {
+				$request_body['shipping'] = array(
+					'address' => array(
+						'address_line1' => isset( $shipping_data['address_line1'] ) ? sanitize_text_field( $shipping_data['address_line1'] ) : '',
+						'address_line2' => isset( $shipping_data['address_line2'] ) ? sanitize_text_field( $shipping_data['address_line2'] ) : '',
+						'city'          => isset( $shipping_data['city'] ) ? sanitize_text_field( $shipping_data['city'] ) : '',
+						'zip'           => isset( $shipping_data['zip'] ) ? sanitize_text_field( $shipping_data['zip'] ) : '',
+						'country'       => isset( $shipping_data['country'] ) ? sanitize_text_field( $shipping_data['country'] ) : '',
+					),
+				);
+				WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Including modified shipping address in request: ' . wp_json_encode( $request_body['shipping'] ) );
+			}
+		}
+
+		// Enable 3DS
+		$request_body['3ds'] = array(
+			'enabled' => true,
+		);
+
+		// If order exists, update success/failure URLs to include order_id
+		if ( $order_id > 0 ) {
+			$order = wc_get_order( $order_id );
+			if ( $order ) {
+				$order_key   = $order->get_order_key();
+				$success_url = add_query_arg(
+					array(
+						'wc-api'   => 'wc_checkoutcom_flow_process',
+						'order_id' => $order_id,
+						'key'      => $order_key,
+					),
+					home_url( '/' )
+				);
+				$failure_url = $success_url;
+
+				$request_body['success_url'] = $success_url;
+				$request_body['failure_url'] = $failure_url;
+
+				WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Updated URLs with order_id: ' . $order_id );
+			}
+		}
+
+		// Get Checkout.com API credentials
+		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$environment   = ! empty( $core_settings['ckocom_environment'] ) ? $core_settings['ckocom_environment'] : 'sandbox';
+		
+		// Get secret key - single key is used for both environments (determined by the key itself)
+		$secret_key_raw = ! empty( $core_settings['ckocom_sk'] ) ? $core_settings['ckocom_sk'] : '';
+		
+		if ( empty( $secret_key_raw ) ) {
+			WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] ❌ Secret key not configured' );
+			wp_send_json_error( array(
+				'message' => __( 'Payment gateway not properly configured.', 'checkout-com-unified-payments-api' ),
+			) );
+			return;
+		}
+		
+		// Add Bearer prefix for NAS accounts
+		$secret_key = cko_is_nas_account() ? 'Bearer ' . $secret_key_raw : $secret_key_raw;
+
+		// Build API URL
+		$api_base_url = 'sandbox' === $environment
+			? 'https://api.sandbox.checkout.com'
+			: 'https://api.checkout.com';
+		$api_url      = $api_base_url . '/payment-sessions/' . $payment_session_id . '/submit';
+
+		WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Calling Checkout.com API - URL: ' . $api_url );
+		WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Request body: ' . wp_json_encode( $request_body ) );
+
+		// Make API request
+		$response = wp_remote_post(
+			$api_url,
+			array(
+				'timeout' => 60,
+				'headers' => array(
+					'Authorization' => $secret_key, // Already includes 'Bearer ' prefix for NAS accounts
+					'Content-Type'  => 'application/json',
+				),
+				'body'    => wp_json_encode( $request_body ),
+			)
+		);
+
+		// Check for WP error
+		if ( is_wp_error( $response ) ) {
+			WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] ❌ WP Error: ' . $response->get_error_message() );
+			wp_send_json_error( array(
+				'message' => __( 'Failed to connect to payment gateway.', 'checkout-com-unified-payments-api' ),
+			) );
+			return;
+		}
+
+		// Parse response
+		$response_code = wp_remote_retrieve_response_code( $response );
+		$response_body = wp_remote_retrieve_body( $response );
+		$response_data = json_decode( $response_body, true );
+
+		WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] API Response - Code: ' . $response_code . ', Body: ' . $response_body );
+
+		// Check for API error
+		if ( $response_code >= 400 ) {
+			$error_codes   = isset( $response_data['error_codes'] ) && is_array( $response_data['error_codes'] )
+				? array_map( 'sanitize_text_field', $response_data['error_codes'] )
+				: array();
+			$error_message = isset( $response_data['error_type'] )
+				? sanitize_text_field( $response_data['error_type'] ) . ': ' . implode( ', ', $error_codes )
+				: __( 'Payment submission failed.', 'checkout-com-unified-payments-api' );
+
+			WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] ❌ API Error: ' . $error_message );
+			wp_send_json_error( array(
+				'message' => esc_html( $error_message ),
+				'data'    => $response_data,
+			) );
+			return;
+		}
+
+		// Success - return the response for Flow to handle
+		WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] ✅ Payment submitted successfully - Payment ID: ' . ( $response_data['id'] ?? 'N/A' ) . ', Status: ' . ( $response_data['status'] ?? 'N/A' ) );
+
+		// Save payment ID to order if available
+		if ( $order_id > 0 && ! empty( $response_data['id'] ) ) {
+			$order = wc_get_order( $order_id );
+			if ( $order ) {
+				$order->update_meta_data( '_cko_payment_id', $response_data['id'] );
+				$order->save();
+				WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Payment ID saved to order: ' . $order_id );
+			}
+		}
+
+		wp_send_json_success( $response_data );
 	}
 	
 	/**

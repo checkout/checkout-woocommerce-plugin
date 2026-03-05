@@ -14,6 +14,10 @@
 
 	let initialized = false;
 	let virtual = false;
+	
+	// Global flag to prevent update_checkout during initial page load
+	// This prevents infinite loops caused by field change events during initialization
+	let pageInitializationComplete = false;
 
 	function initHandlers() {
 		if (typeof jQuery === 'undefined') {
@@ -24,6 +28,15 @@
 			ckoLogger.warn('FlowFieldChangeHandler: debounce not available');
 			return;
 		}
+		
+		// Mark page initialization as complete after a delay
+		// This allows all initial field population and WooCommerce setup to complete
+		setTimeout(function() {
+			pageInitializationComplete = true;
+			if (typeof ckoLogger !== 'undefined') {
+				ckoLogger.debug('[FIELD HANDLER] Page initialization complete - update_checkout now enabled');
+			}
+		}, 3000);
 
 		const storeFieldValue = function(fieldId, value) {
 			if (!window.ckoFlowFieldValues) {
@@ -33,6 +46,14 @@
 		};
 		
 		const triggerUpdateCheckoutDebounced = function(context) {
+			// Don't trigger update_checkout during page initialization
+			if (!pageInitializationComplete) {
+				if (typeof ckoLogger !== 'undefined') {
+					ckoLogger.debug('[FIELD HANDLER] SKIPPING update_checkout - page still initializing', context || {});
+				}
+				return;
+			}
+			
 			if (!window.ckoUpdateCheckoutDebounce) {
 				window.ckoUpdateCheckoutDebounce = null;
 			}
@@ -110,6 +131,30 @@
 			 * @param {Event} event - The input or change event.
 			 */
 		const handleTyping = (event) => {
+				// Early return for hidden fields and cko-flow internal fields to prevent infinite loops
+				if (event && event.target) {
+					const targetType = event.target.type || '';
+					const targetId = event.target.id || '';
+					const targetName = event.target.name || '';
+					
+					// Skip hidden fields entirely
+					if (targetType === 'hidden') {
+						return;
+					}
+					
+					// Skip cko-flow internal fields (e.g., cko-flow-save-card-persist)
+					if (targetId.startsWith('cko-flow') || targetName.startsWith('cko-flow') ||
+					    targetId.startsWith('cko_flow') || targetName.startsWith('cko_flow')) {
+						return;
+					}
+					
+					// Skip coupon fields - WooCommerce handles coupon application separately
+					// and our field handler shouldn't trigger additional update_checkout calls
+					if (targetId === 'coupon_code' || targetName === 'coupon_code') {
+						return;
+					}
+				}
+				
 				let isShippingField = false;
 
 				// Check if the changed field belongs to shipping info.
@@ -225,10 +270,11 @@
 					const targetName = event.target.name || '';
 
 					// If the event is not from billing fields or key checkboxes, exit early.
+					// Note: coupon_code is now excluded at the top of handleTyping - WooCommerce handles it separately
 					if (
 						!targetName.startsWith('billing') &&
 						!jQuery(event.target).is(
-							'#ship-to-different-address-checkbox, #terms, #createaccount, #coupon_code'
+							'#ship-to-different-address-checkbox, #terms, #createaccount'
 						)
 					) {
 						const cartData = $('#cart-info').data('cart');
@@ -289,15 +335,17 @@
 
 			// Attach to all other inputs/selects, excluding the key billing fields above.
 			// EXCLUDE CHECKBOXES - they don't need to trigger Flow updates and cause form reload issues
+			// EXCLUDE hidden fields and cko-flow-* fields to prevent infinite loops
 			$(
-				"input:not(#billing_first_name, #billing_last_name, #billing_email, #billing_phone):not([type='checkbox']), select"
+				"input:not(#billing_first_name, #billing_last_name, #billing_email, #billing_phone):not([type='checkbox']):not([type='hidden']):not([id^='cko-flow']):not([name^='cko-flow']), select"
 			).on('input change', function (e) {
 				debouncedTyping(e);
 			});
 
 			// Attach handler to all input/selects, but ignore payment method fields.
 			// EXCLUDE CHECKBOXES - they don't need to trigger Flow updates and cause form reload issues
-			$(document).on('input change', "input:not([type='checkbox']), select", function (e) {
+			// EXCLUDE hidden fields and cko-flow-* fields to prevent infinite loops
+			$(document).on('input change', "input:not([type='checkbox']):not([type='hidden']):not([id^='cko-flow']):not([name^='cko-flow']), select", function (e) {
 				if ($(this).closest('.wc_payment_method').length === 0) {
 					debouncedTyping(e);
 				}
@@ -317,10 +365,34 @@
 			// Handle checkboxes that legitimately need to trigger update_checkout
 			// These checkboxes change the checkout form structure (shipping fields, account creation)
 			// Note: Terms checkboxes are handled separately above and do NOT trigger update_checkout
+			// Use a flag to prevent triggering during page initialization
+			let checkboxHandlersReady = false;
+			setTimeout(function() {
+				checkboxHandlersReady = true;
+			}, 3000); // Wait 3 seconds after page load before enabling checkbox handlers
+			
 			jQuery(document).on(
 				'change',
 				'#ship-to-different-address-checkbox, #createaccount',
-				function () {
+				function (e) {
+					// Skip if this is during page initialization (not user-triggered)
+					if (!checkboxHandlersReady) {
+						ckoLogger.debug('Checkbox change detected during initialization - SKIPPING update_checkout', {
+							checkboxId: this.id,
+							checked: this.checked
+						});
+						return;
+					}
+					
+					// Also skip if this wasn't triggered by user interaction (isTrusted check)
+					if (e.originalEvent && !e.originalEvent.isTrusted) {
+						ckoLogger.debug('Checkbox change detected (programmatic) - SKIPPING update_checkout', {
+							checkboxId: this.id,
+							checked: this.checked
+						});
+						return;
+					}
+					
 					ckoLogger.debug('Checkbox change detected - triggering update_checkout', {
 						checkboxId: this.id,
 						checked: this.checked
