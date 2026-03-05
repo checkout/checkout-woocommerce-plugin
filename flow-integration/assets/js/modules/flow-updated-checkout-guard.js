@@ -674,6 +674,7 @@
 			attachHandler();
 			setupAjaxOverlayHandler();
 		},
-		removeOverlay: removeWooCommerceOverlay
+		removeOverlay: removeWooCommerceOverlay,
+		getCurrentOrderTotalFromDOM: getCurrentOrderTotalFromDOM
 	};
 })();

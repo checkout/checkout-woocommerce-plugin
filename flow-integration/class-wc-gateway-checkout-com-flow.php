@@ -363,21 +363,8 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	 * @param WC_Order $order Order object.
 	 */
 	public function preserve_payment_method_title( $order_id, $old_status, $new_status, $order ) {
-		$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
-		
-		if ( $gateway_debug ) {
-			WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE PRESERVE] ========== HOOK TRIGGERED ==========' );
-			WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE PRESERVE] Order ID: ' . $order_id );
-			WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE PRESERVE] Old status: ' . $old_status . ', New status: ' . $new_status );
-			WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE PRESERVE] Order payment method: ' . $order->get_payment_method() );
-			WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE PRESERVE] Gateway ID: ' . $this->id );
-		}
-		
 		// Only process orders for this gateway
 		if ( $order->get_payment_method() !== $this->id ) {
-			if ( $gateway_debug ) {
-				WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE PRESERVE] ❌ Skipping - Not a Flow gateway order' );
-			}
 			return;
 		}
 
@@ -385,50 +372,15 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		$payment_type = $order->get_meta( '_cko_flow_payment_type' );
 		$current_title = $order->get_payment_method_title();
 		
-		if ( $gateway_debug ) {
-			WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE PRESERVE] Payment type from meta: ' . ( $payment_type ?: 'EMPTY' ) );
-			WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE PRESERVE] Current payment method title: ' . $current_title );
-		}
-		
 		// If we have a payment type stored, ensure the title matches
 		if ( ! empty( $payment_type ) ) {
-			// Get the correct title for this payment type
 			$correct_title = $this->get_payment_method_title_by_type( $order, null );
-			
-			if ( $gateway_debug ) {
-				WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE PRESERVE] Correct title from helper: ' . $correct_title );
-				WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE PRESERVE] Titles match: ' . ( $correct_title === $current_title ? 'YES' : 'NO' ) );
-			}
 			
 			// Only update if the title doesn't match
 			if ( $correct_title !== $current_title ) {
-				if ( $gateway_debug ) {
-					WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE PRESERVE] ✅ UPDATING - Old title: ' . $current_title . ', New title: ' . $correct_title );
-				}
 				$order->set_payment_method_title( $correct_title );
 				$order->save();
-				
-				if ( $gateway_debug ) {
-					WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE PRESERVE] ✅ Title updated and saved - Order ID: ' . $order_id );
-					// Reload to verify
-					$reloaded_order = wc_get_order( $order_id );
-					if ( $reloaded_order ) {
-						WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE PRESERVE] ✅ Verified after reload: ' . $reloaded_order->get_payment_method_title() );
-					}
-				}
-			} else {
-				if ( $gateway_debug ) {
-					WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE PRESERVE] ⏭️ Skipping - Title already correct' );
-				}
 			}
-		} else {
-			if ( $gateway_debug ) {
-				WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE PRESERVE] ❌ No payment type metadata found - Cannot determine correct title' );
-			}
-		}
-		
-		if ( $gateway_debug ) {
-			WC_Checkoutcom_Utility::logger( '[PAYMENT METHOD TITLE PRESERVE] ========== HOOK COMPLETE ==========' );
 		}
 	}
 
@@ -444,17 +396,8 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	 * @return array Filtered note data.
 	 */
 	public function filter_order_note_payment_method_title( $note_data, $args ) {
-		// Always log to see if filter is being called at all
-		WC_Checkoutcom_Utility::logger( '[ORDER NOTE FILTER] ========== FILTER CALLED ==========' );
-		WC_Checkoutcom_Utility::logger( '[ORDER NOTE FILTER] Note data keys: ' . ( is_array( $note_data ) ? implode( ', ', array_keys( $note_data ) ) : 'NOT ARRAY' ) );
-		WC_Checkoutcom_Utility::logger( '[ORDER NOTE FILTER] Args keys: ' . ( is_array( $args ) ? implode( ', ', array_keys( $args ) ) : 'NOT ARRAY' ) );
-		WC_Checkoutcom_Utility::logger( '[ORDER NOTE FILTER] Note content: ' . ( isset( $note_data['comment_content'] ) ? $note_data['comment_content'] : 'NOT SET' ) );
-		
-		$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
-		
 		// Only process if note content contains "Payment via"
 		if ( ! isset( $note_data['comment_content'] ) || strpos( $note_data['comment_content'], 'Payment via' ) === false ) {
-			WC_Checkoutcom_Utility::logger( '[ORDER NOTE FILTER] ⏭️ Skipping - Note does not contain "Payment via"' );
 			return $note_data;
 		}
 		
@@ -475,36 +418,13 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		$current_title = $order->get_payment_method_title();
 		$gateway_default_title = $this->get_title();
 		
-		if ( $gateway_debug ) {
-			WC_Checkoutcom_Utility::logger( '[ORDER NOTE FILTER] ========== FILTERING ORDER NOTE ==========' );
-			WC_Checkoutcom_Utility::logger( '[ORDER NOTE FILTER] Order ID: ' . $order_id );
-			WC_Checkoutcom_Utility::logger( '[ORDER NOTE FILTER] Payment type: ' . ( $payment_type ?: 'EMPTY' ) );
-			WC_Checkoutcom_Utility::logger( '[ORDER NOTE FILTER] Current title: ' . $current_title );
-			WC_Checkoutcom_Utility::logger( '[ORDER NOTE FILTER] Gateway default title: ' . $gateway_default_title );
-			WC_Checkoutcom_Utility::logger( '[ORDER NOTE FILTER] Original note: ' . $note_data['comment_content'] );
-		}
-		
 		// Only replace if we have a payment type and the note contains the gateway default title
 		if ( ! empty( $payment_type ) && ! empty( $current_title ) && $current_title !== $gateway_default_title ) {
-			// Replace gateway default title with correct title in the note
 			$note_data['comment_content'] = str_replace( 
 				'Payment via ' . $gateway_default_title,
 				'Payment via ' . $current_title,
 				$note_data['comment_content']
 			);
-			
-			if ( $gateway_debug ) {
-				WC_Checkoutcom_Utility::logger( '[ORDER NOTE FILTER] ✅ Replaced title in note' );
-				WC_Checkoutcom_Utility::logger( '[ORDER NOTE FILTER] Updated note: ' . $note_data['comment_content'] );
-			}
-		} else {
-			if ( $gateway_debug ) {
-				WC_Checkoutcom_Utility::logger( '[ORDER NOTE FILTER] ⏭️ Skipping - No payment type or title already correct' );
-			}
-		}
-		
-		if ( $gateway_debug ) {
-			WC_Checkoutcom_Utility::logger( '[ORDER NOTE FILTER] ========== FILTER COMPLETE ==========' );
 		}
 		
 		return $note_data;
@@ -519,18 +439,8 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	 * @return bool
 	 */
 	public function is_available() {
-		// Log availability check start (only in debug mode to reduce log spam)
-		$is_debug = defined( 'WP_DEBUG' ) && WP_DEBUG;
-		if ( $is_debug ) {
-			WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Checking if Flow gateway is available...' );
-			WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Gateway enabled setting: ' . ( isset( $this->enabled ) ? $this->enabled : 'NOT SET' ) );
-		}
-		
-		// First check if gateway is enabled
+		// Check if gateway is enabled
 		if ( 'yes' !== $this->enabled ) {
-			if ( $is_debug ) {
-				WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Gateway is NOT available - enabled setting is not "yes"' );
-			}
 			return false;
 		}
 
@@ -538,38 +448,12 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$checkout_mode = isset( $checkout_setting['ckocom_checkout_mode'] ) ? $checkout_setting['ckocom_checkout_mode'] : 'classic';
 		
-		if ( $is_debug ) {
-			WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Checkout mode: ' . $checkout_mode );
-		}
-		
 		if ( 'flow' !== $checkout_mode ) {
-			if ( $is_debug ) {
-				WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Gateway is NOT available - checkout mode is not "flow" (current: ' . $checkout_mode . ')' );
-			}
 			return false;
-		}
-
-		// Check if API credentials are set
-		$secret_key = isset( $checkout_setting['ckocom_secret_key'] ) ? $checkout_setting['ckocom_secret_key'] : '';
-		$public_key = isset( $checkout_setting['ckocom_public_key'] ) ? $checkout_setting['ckocom_public_key'] : '';
-		
-		if ( $is_debug ) {
-			WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Secret key: ' . ( ! empty( $secret_key ) ? 'SET (' . substr( $secret_key, 0, 10 ) . '...)' : 'NOT SET' ) );
-			WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Public key: ' . ( ! empty( $public_key ) ? 'SET (' . substr( $public_key, 0, 10 ) . '...)' : 'NOT SET' ) );
-		}
-		
-		if ( empty( $secret_key ) || empty( $public_key ) ) {
-			// Log warning but don't block availability (credentials might be set later)
-			if ( $is_debug ) {
-				WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] WARNING: API credentials not set, but gateway is still available' );
-			}
 		}
 
 		// Gateway is available if enabled and checkout mode is 'flow'
 		// We bypass currency/country restrictions as Flow supports all currencies/countries
-		if ( $is_debug ) {
-			WC_Checkoutcom_Utility::logger( '[FLOW AVAILABILITY] Gateway IS available - all checks passed' );
-		}
 		return true;
 	}
 
@@ -583,13 +467,8 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	 * @return bool
 	 */
 	public function valid_for_use() {
-		// Log valid_for_use check start
-		WC_Checkoutcom_Utility::logger( '[FLOW VALID FOR USE] Checking if Flow gateway is valid for use...' );
-		WC_Checkoutcom_Utility::logger( '[FLOW VALID FOR USE] Gateway enabled setting: ' . ( isset( $this->enabled ) ? $this->enabled : 'NOT SET' ) );
-		
 		// Check if gateway is enabled
 		if ( 'yes' !== $this->enabled ) {
-			WC_Checkoutcom_Utility::logger( '[FLOW VALID FOR USE] Gateway is NOT valid - enabled setting is not "yes"' );
 			return false;
 		}
 
@@ -597,16 +476,11 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$checkout_mode = isset( $checkout_setting['ckocom_checkout_mode'] ) ? $checkout_setting['ckocom_checkout_mode'] : 'classic';
 		
-		WC_Checkoutcom_Utility::logger( '[FLOW VALID FOR USE] Checkout mode: ' . $checkout_mode );
-		
 		if ( 'flow' !== $checkout_mode ) {
-			WC_Checkoutcom_Utility::logger( '[FLOW VALID FOR USE] Gateway is NOT valid - checkout mode is not "flow" (current: ' . $checkout_mode . ')' );
 			return false;
 		}
 
 		// Flow supports all currencies and countries, so always return true
-		// This bypasses WooCommerce's default currency/country restrictions
-		WC_Checkoutcom_Utility::logger( '[FLOW VALID FOR USE] Gateway IS valid for use - all checks passed' );
 		return true;
 	}
 
@@ -712,8 +586,8 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		
 		$order_id = $order->get_id();
 		
-		// Log order creation with real Order ID
-		WC_Checkoutcom_Utility::logger( '[FLOW INFO] Order created successfully - Order ID: ' . $order_id . ', Payment Session ID: ' . $payment_session_id );
+		// Log order creation with real Order ID and billing email for debugging email mismatches
+		WC_Checkoutcom_Utility::logger( '[FLOW INFO] Order created successfully - Order ID: ' . $order_id . ', Payment Session ID: ' . $payment_session_id . ', Billing Email: ' . ( $order->get_billing_email() ?: '(not set)' ) );
 		
 		// Add order note with payment session ID and order ID for tracking
 		$order->add_order_note(
@@ -6345,9 +6219,6 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	 * Helper to send response with proper HTTP status and exit.
 	 */
 	private function send_response($status_code, $message) {
-		// WP-friendly way.
-		WC_Checkoutcom_Utility::logger("WEBHOOK DEBUG: Preparing to send response - Status: $status_code, Message: $message");
-		
 		status_header($status_code);
 		if ( ! headers_sent() ) {
 			header('Content-Type: application/json; charset=utf-8');
@@ -6358,12 +6229,8 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			'message' => $message,
 		];
 		
-		WC_Checkoutcom_Utility::logger("WEBHOOK DEBUG: Response data: " . wp_json_encode($response_data));
 		echo wp_json_encode($response_data);
-
-		WC_Checkoutcom_Utility::logger("WEBHOOK DEBUG: Sent HTTP status: $status_code with message: $message");
-		WC_Checkoutcom_Utility::logger("=== WEBHOOK DEBUG: Flow webhook handler completed ===");
-		exit; // Prevent WP from sending 200.
+		exit;
 	}
 
 	/**
@@ -6412,6 +6279,10 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			) );
 			return;
 		}
+		
+		// Log the email being sent to Checkout.com for debugging email mismatches
+		$customer_email_for_payment = isset( $payment_session_request['customer']['email'] ) ? $payment_session_request['customer']['email'] : '(not set)';
+		WC_Checkoutcom_Utility::logger( '[PAYMENT SESSION] Creating payment session with Email: ' . $customer_email_for_payment );
 
 		// Determine API URL based on environment
 		$api_url = 'https://api.checkout.com/payment-sessions';
@@ -7290,10 +7161,17 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 						'address_line1' => isset( $billing_data['address_line1'] ) ? sanitize_text_field( $billing_data['address_line1'] ) : '',
 						'address_line2' => isset( $billing_data['address_line2'] ) ? sanitize_text_field( $billing_data['address_line2'] ) : '',
 						'city'          => isset( $billing_data['city'] ) ? sanitize_text_field( $billing_data['city'] ) : '',
+						'state'         => isset( $billing_data['state'] ) ? sanitize_text_field( $billing_data['state'] ) : '',
 						'zip'           => isset( $billing_data['zip'] ) ? sanitize_text_field( $billing_data['zip'] ) : '',
 						'country'       => isset( $billing_data['country'] ) ? sanitize_text_field( $billing_data['country'] ) : '',
 					),
 				);
+				// Add phone if provided (Checkout.com expects phone as separate object under billing)
+				if ( ! empty( $billing_data['phone'] ) ) {
+					$request_body['billing']['phone'] = array(
+						'number' => sanitize_text_field( $billing_data['phone'] ),
+					);
+				}
 				WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Including modified billing address in request: ' . wp_json_encode( $request_body['billing'] ) );
 			}
 		}
@@ -7307,10 +7185,17 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 						'address_line1' => isset( $shipping_data['address_line1'] ) ? sanitize_text_field( $shipping_data['address_line1'] ) : '',
 						'address_line2' => isset( $shipping_data['address_line2'] ) ? sanitize_text_field( $shipping_data['address_line2'] ) : '',
 						'city'          => isset( $shipping_data['city'] ) ? sanitize_text_field( $shipping_data['city'] ) : '',
+						'state'         => isset( $shipping_data['state'] ) ? sanitize_text_field( $shipping_data['state'] ) : '',
 						'zip'           => isset( $shipping_data['zip'] ) ? sanitize_text_field( $shipping_data['zip'] ) : '',
 						'country'       => isset( $shipping_data['country'] ) ? sanitize_text_field( $shipping_data['country'] ) : '',
 					),
 				);
+				// Add phone if provided
+				if ( ! empty( $shipping_data['phone'] ) ) {
+					$request_body['shipping']['phone'] = array(
+						'number' => sanitize_text_field( $shipping_data['phone'] ),
+					);
+				}
 				WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Including modified shipping address in request: ' . wp_json_encode( $request_body['shipping'] ) );
 			}
 		}
@@ -7419,10 +7304,13 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] ✅ Payment submitted successfully - Payment ID: ' . ( $response_data['id'] ?? 'N/A' ) . ', Status: ' . ( $response_data['status'] ?? 'N/A' ) );
 
 		// Save payment ID to order if available
+		// CRITICAL: Save to BOTH _cko_payment_id AND _cko_flow_payment_id
+		// METHOD 2 webhook matching requires _cko_flow_payment_id to exist
 		if ( $order_id > 0 && ! empty( $response_data['id'] ) ) {
 			$order = wc_get_order( $order_id );
 			if ( $order ) {
 				$order->update_meta_data( '_cko_payment_id', $response_data['id'] );
+				$order->update_meta_data( '_cko_flow_payment_id', $response_data['id'] );
 				$order->save();
 				WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Payment ID saved to order: ' . $order_id );
 			}

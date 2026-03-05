@@ -277,11 +277,13 @@ var ckoFlow = {
 		let address1 = checkoutData.address1;
 		let address2 = checkoutData.address2;
 		let city = checkoutData.city;
+		let state = checkoutData.state;
 		let zip = checkoutData.zip;
 		let country = checkoutData.country;
 		let shippingAddress1 = checkoutData.shippingAddress1;
 		let shippingAddress2 = checkoutData.shippingAddress2;
 		let shippingCity = checkoutData.shippingCity;
+		let shippingState = checkoutData.shippingState;
 		let shippingZip = checkoutData.shippingZip;
 		let shippingCountry = checkoutData.shippingCountry;
 		let orders = checkoutData.orders;
@@ -1644,11 +1646,23 @@ var ckoFlow = {
 					paymentSessionId: window.currentPaymentSessionId
 				});
 
-				// Get current cart amount from DOM (most up-to-date)
-				const cartInfo = jQuery('#cart-info').data('cart');
-				const currentCartAmount = cartInfo && typeof cartInfo.order_amount !== 'undefined'
-					? parseInt(cartInfo.order_amount, 10)
-					: null;
+				// Get current cart amount from DOM (most up-to-date after coupon changes)
+				// Use getCurrentOrderTotalFromDOM() which reads from WooCommerce's displayed order total
+				// This is more reliable than cart-info data attribute which may be stale
+				let currentCartAmount = null;
+				if (typeof window.FlowUpdatedCheckoutGuard !== 'undefined' && 
+					typeof window.FlowUpdatedCheckoutGuard.getCurrentOrderTotalFromDOM === 'function') {
+					currentCartAmount = window.FlowUpdatedCheckoutGuard.getCurrentOrderTotalFromDOM();
+				}
+				
+				// Fallback to cart-info if DOM read fails (shouldn't happen normally)
+				if (currentCartAmount === null) {
+					const cartInfo = jQuery('#cart-info').data('cart');
+					currentCartAmount = cartInfo && typeof cartInfo.order_amount !== 'undefined'
+						? parseInt(cartInfo.order_amount, 10)
+						: null;
+					ckoLogger.debug('[HANDLE SUBMIT] Using fallback cart-info amount:', currentCartAmount);
+				}
 
 				// Check if amount has changed from initial session
 				const amountChanged = currentCartAmount !== null && 
@@ -1658,19 +1672,50 @@ var ckoFlow = {
 				// Use pending amount update if set, otherwise use current cart amount if changed
 				const finalAmount = ckoFlow.pendingAmountUpdate || (amountChanged ? currentCartAmount : null);
 
-				// Helper function to get current address from checkout form
+				// Helper function to get current address from checkout form or order-pay data
 				const getCurrentBillingAddress = () => {
+					// Check if we're on order-pay page
+					const isOrderPayPage = window.location.pathname.includes('/order-pay/');
+					
+					if (isOrderPayPage) {
+						// On order-pay pages, form fields don't exist - use order data
+						const orderPayInfo = jQuery("#order-pay-info")?.data("order-pay");
+						if (orderPayInfo && orderPayInfo.billing_address) {
+							const billing = orderPayInfo.billing_address;
+							return {
+								address_line1: billing.street_address || '',
+								address_line2: billing.street_address2 || '',
+								city: billing.city || '',
+								state: billing.state || '',
+								zip: billing.postal_code || '',
+								country: billing.country || '',
+								phone: billing.phone || ''
+							};
+						}
+					}
+					
+					// Regular checkout - read from form fields
 					return {
 						address_line1: getCheckoutFieldValue('billing_address_1') || '',
 						address_line2: getCheckoutFieldValue('billing_address_2') || '',
 						city: getCheckoutFieldValue('billing_city') || '',
+						state: getCheckoutFieldValue('billing_state') || '',
 						zip: getCheckoutFieldValue('billing_postcode') || '',
-						country: getCheckoutFieldValue('billing_country') || ''
+						country: getCheckoutFieldValue('billing_country') || '',
+						phone: getCheckoutFieldValue('billing_phone') || ''
 					};
 				};
 				
 				const getCurrentShippingAddress = () => {
-					// Check if shipping to different address is enabled
+					// Check if we're on order-pay page
+					const isOrderPayPage = window.location.pathname.includes('/order-pay/');
+					
+					if (isOrderPayPage) {
+						// On order-pay pages, use billing address for shipping (order already has addresses set)
+						return getCurrentBillingAddress();
+					}
+					
+					// Regular checkout - check if shipping to different address is enabled
 					const shipToDifferent = jQuery('#ship-to-different-address-checkbox').is(':checked');
 					if (!shipToDifferent) {
 						// Use billing address for shipping
@@ -1680,8 +1725,10 @@ var ckoFlow = {
 						address_line1: getCheckoutFieldValue('shipping_address_1') || '',
 						address_line2: getCheckoutFieldValue('shipping_address_2') || '',
 						city: getCheckoutFieldValue('shipping_city') || '',
+						state: getCheckoutFieldValue('shipping_state') || '',
 						zip: getCheckoutFieldValue('shipping_postcode') || '',
-						country: getCheckoutFieldValue('shipping_country') || ''
+						country: getCheckoutFieldValue('shipping_country') || '',
+						phone: getCheckoutFieldValue('billing_phone') || ''  // Shipping uses billing phone
 					};
 				};
 				
@@ -1691,8 +1738,10 @@ var ckoFlow = {
 					return addr1.address_line1 === addr2.address_line1 &&
 						addr1.address_line2 === addr2.address_line2 &&
 						addr1.city === addr2.city &&
+						addr1.state === addr2.state &&
 						addr1.zip === addr2.zip &&
-						addr1.country === addr2.country;
+						addr1.country === addr2.country &&
+						addr1.phone === addr2.phone;
 				};
 				
 				// Get current addresses and check for changes
@@ -2051,16 +2100,26 @@ var ckoFlow = {
 			address_line1: address1,
 			address_line2: address2,
 			city: city,
+			state: state,
 			zip: zip,
-			country: country
+			country: country,
+			phone: phone
 		};
 		ckoFlow.initialShippingAddress = {
 			address_line1: shippingAddress1,
 			address_line2: shippingAddress2,
 			city: shippingCity,
+			state: shippingState,
 			zip: shippingZip,
-			country: shippingCountry
+			country: shippingCountry,
+			phone: phone  // Shipping uses billing phone
 		};
+		
+		// Log initial addresses stored for comparison (helps debug address change detection)
+		ckoLogger.debug('[INIT] Initial addresses stored for handleSubmit comparison:', {
+			billing: ckoFlow.initialBillingAddress,
+			shipping: ckoFlow.initialShippingAddress
+		});
 
 		// Log SDK initialization (debug mode only)
 		ckoLogger.debug('SDK initialized:', {
@@ -3162,6 +3221,17 @@ function debouncedCheckFlowReload(fieldName, newValue) {
 	FlowState.set('reloadFlowTimeout', setTimeout(() => {
 		// Only reload if Flow is initialized and field is actually filled
 		if (!FlowState.get('initialized') || !ckoFlow.flowComponent) {
+			return;
+		}
+		
+		// CRITICAL FIX: Don't reload if Flow was just initialized (within 3 seconds)
+		// This prevents the double initialization when filling the last required field
+		const lastInitTime = FlowState.get('lastInitTime');
+		if (lastInitTime && (Date.now() - lastInitTime) < 3000) {
+			ckoLogger.debug(`🔄 Skipping reload for "${fieldName}" - Flow just initialized`, {
+				timeSinceInit: Date.now() - lastInitTime,
+				threshold: 3000
+			});
 			return;
 		}
 		

@@ -81,64 +81,13 @@ function cko_force_flow_gateway_available( $available_gateways ) {
 		$checkout_mode = isset( $checkout_setting['ckocom_checkout_mode'] ) ? $checkout_setting['ckocom_checkout_mode'] : 'classic';
 		
 		if ( 'flow' === $checkout_mode ) {
-			// Log environment versions for debugging (only once per request to avoid spam)
-			static $version_logged = false;
-			if ( ! $version_logged && ( is_checkout() || is_wc_endpoint_url( 'order-pay' ) ) ) {
-				global $wp_version;
-				WC_Checkoutcom_Utility::logger( '[FLOW DEBUG] ========== ENVIRONMENT INFO ==========' );
-				WC_Checkoutcom_Utility::logger( '[FLOW DEBUG] WordPress Version: ' . ( isset( $wp_version ) ? $wp_version : 'UNKNOWN' ) );
-				WC_Checkoutcom_Utility::logger( '[FLOW DEBUG] WooCommerce Version: ' . ( defined( 'WC_VERSION' ) ? WC_VERSION : ( function_exists( 'WC' ) && method_exists( WC(), 'version' ) ? WC()->version : 'UNKNOWN' ) ) );
-				WC_Checkoutcom_Utility::logger( '[FLOW DEBUG] PHP Version: ' . PHP_VERSION );
-				WC_Checkoutcom_Utility::logger( '[FLOW DEBUG] ========================================' );
-				$version_logged = true;
-			}
-			
-			// Log during checkout processing
-			if ( isset( $_POST['payment_method'] ) && 'wc_checkout_com_flow' === $_POST['payment_method'] ) {
-				WC_Checkoutcom_Utility::logger( '[FLOW DEBUG] ========== CHECKOUT PROCESSING ==========' );
-				WC_Checkoutcom_Utility::logger( '[FLOW DEBUG] Payment method in POST: ' . sanitize_text_field( $_POST['payment_method'] ) );
-				WC_Checkoutcom_Utility::logger( '[FLOW DEBUG] Available payment gateways count: ' . count( $available_gateways ) );
-			}
-			
-			// Always ensure Flow gateway is in the list if checkout mode is 'flow' and gateway is enabled
-			// This bypasses ALL other checks (country, currency, etc.) to ensure Flow is always available
+			// Ensure Flow gateway is in the list if checkout mode is 'flow' and gateway is enabled
 			$all_gateways = WC()->payment_gateways()->payment_gateways();
 			if ( isset( $all_gateways['wc_checkout_com_flow'] ) ) {
 				$flow_gateway = $all_gateways['wc_checkout_com_flow'];
 				
-				// Check if gateway is enabled (basic check)
-				$is_enabled = isset( $flow_gateway->enabled ) && 'yes' === $flow_gateway->enabled;
-				
-				if ( $is_enabled ) {
-					// Force add Flow gateway to available list REGARDLESS of other checks
-					// This ensures Flow is always available when enabled and checkout mode is 'flow'
+				if ( isset( $flow_gateway->enabled ) && 'yes' === $flow_gateway->enabled ) {
 					$available_gateways['wc_checkout_com_flow'] = $flow_gateway;
-					
-					if ( isset( $_POST['payment_method'] ) && 'wc_checkout_com_flow' === $_POST['payment_method'] ) {
-						WC_Checkoutcom_Utility::logger( '[FLOW DEBUG] FORCING Flow gateway into available gateways list!' );
-						WC_Checkoutcom_Utility::logger( '[FLOW DEBUG] Flow gateway enabled: ' . ( $is_enabled ? 'YES' : 'NO' ) );
-						WC_Checkoutcom_Utility::logger( '[FLOW DEBUG] Flow gateway is_available() result: ' . ( method_exists( $flow_gateway, 'is_available' ) ? ( $flow_gateway->is_available() ? 'TRUE' : 'FALSE' ) : 'METHOD NOT FOUND' ) );
-						if ( method_exists( $flow_gateway, 'valid_for_use' ) ) {
-							WC_Checkoutcom_Utility::logger( '[FLOW DEBUG] Flow gateway valid_for_use() result: ' . ( $flow_gateway->valid_for_use() ? 'TRUE' : 'FALSE' ) );
-						}
-					}
-				} else {
-					if ( isset( $_POST['payment_method'] ) && 'wc_checkout_com_flow' === $_POST['payment_method'] ) {
-						WC_Checkoutcom_Utility::logger( '[FLOW DEBUG] Flow gateway is NOT enabled - not adding to available list' );
-					}
-				}
-			} else {
-				if ( isset( $_POST['payment_method'] ) && 'wc_checkout_com_flow' === $_POST['payment_method'] ) {
-					WC_Checkoutcom_Utility::logger( '[FLOW DEBUG] ERROR: Flow gateway does NOT exist in all gateways!' );
-				}
-			}
-			
-			// Log final state
-			if ( isset( $_POST['payment_method'] ) && 'wc_checkout_com_flow' === $_POST['payment_method'] ) {
-				if ( isset( $available_gateways['wc_checkout_com_flow'] ) ) {
-					WC_Checkoutcom_Utility::logger( '[FLOW DEBUG] SUCCESS: Flow gateway IS in available gateways list!' );
-				} else {
-					WC_Checkoutcom_Utility::logger( '[FLOW DEBUG] CRITICAL: Flow gateway NOT in available gateways list after filter!' );
 				}
 			}
 		}
@@ -163,11 +112,7 @@ function cko_backup_force_flow_gateway_available( $available_gateways ) {
 		if ( isset( $all_gateways['wc_checkout_com_flow'] ) ) {
 			$flow_gateway = $all_gateways['wc_checkout_com_flow'];
 			if ( isset( $flow_gateway->enabled ) && 'yes' === $flow_gateway->enabled ) {
-				// Force add Flow gateway - this is a backup in case it was removed by WooCommerce or other plugins
 				$available_gateways['wc_checkout_com_flow'] = $flow_gateway;
-				if ( isset( $_POST['payment_method'] ) && 'wc_checkout_com_flow' === $_POST['payment_method'] ) {
-					WC_Checkoutcom_Utility::logger( '[FLOW DEBUG] BACKUP FILTER: Re-adding Flow gateway at priority 999' );
-				}
 			}
 		}
 	}
@@ -176,73 +121,6 @@ function cko_backup_force_flow_gateway_available( $available_gateways ) {
 }
 add_filter( 'woocommerce_available_payment_gateways', 'cko_backup_force_flow_gateway_available', 999 );
 
-/**
- * Log before checkout process starts for Flow payments.
- */
-function cko_log_before_checkout_process() {
-	try {
-		if ( isset( $_POST['payment_method'] ) && 'wc_checkout_com_flow' === $_POST['payment_method'] ) {
-			WC_Checkoutcom_Utility::logger( '[FLOW SERVER] ========== BEFORE CHECKOUT PROCESS ==========' );
-			WC_Checkoutcom_Utility::logger( '[FLOW SERVER] Payment method in POST: ' . sanitize_text_field( $_POST['payment_method'] ) );
-			
-			// Check available gateways at this point to see if our filter is working
-			if ( function_exists( 'WC' ) && WC() && method_exists( WC(), 'payment_gateways' ) ) {
-				$available_gateways = WC()->payment_gateways()->get_available_payment_gateways();
-				WC_Checkoutcom_Utility::logger( '[FLOW SERVER] Available gateways before validation: ' . count( $available_gateways ) );
-				if ( isset( $available_gateways['wc_checkout_com_flow'] ) ) {
-					WC_Checkoutcom_Utility::logger( '[FLOW SERVER] SUCCESS: Flow gateway IS available before validation' );
-				} else {
-					WC_Checkoutcom_Utility::logger( '[FLOW SERVER] WARNING: Flow gateway NOT available before validation' );
-				}
-			}
-		}
-	} catch ( Exception $e ) {
-		WC_Checkoutcom_Utility::logger( '[FLOW SERVER] ERROR in before_checkout_process hook: ' . $e->getMessage() );
-		WC_Checkoutcom_Utility::logger( '[FLOW SERVER] ERROR stack trace: ' . $e->getTraceAsString() );
-	}
-}
-add_action( 'woocommerce_before_checkout_process', 'cko_log_before_checkout_process', 1 );
-
-/**
- * Log when WooCommerce validates payment method during checkout processing.
- */
-function cko_log_checkout_process() {
-	try {
-		if ( isset( $_POST['payment_method'] ) && 'wc_checkout_com_flow' === $_POST['payment_method'] ) {
-			WC_Checkoutcom_Utility::logger( '[FLOW SERVER] ========== WOOCOMMERCE CHECKOUT PROCESS ==========' );
-			WC_Checkoutcom_Utility::logger( '[FLOW SERVER] Payment method in POST: ' . sanitize_text_field( $_POST['payment_method'] ) );
-			
-			// Check if WooCommerce is available
-			if ( ! function_exists( 'WC' ) || ! WC() ) {
-				WC_Checkoutcom_Utility::logger( '[FLOW SERVER] WARNING: WooCommerce not available in checkout_process hook' );
-				return;
-			}
-			
-			// Check if payment gateways is available
-			if ( ! method_exists( WC(), 'payment_gateways' ) ) {
-				WC_Checkoutcom_Utility::logger( '[FLOW SERVER] WARNING: payment_gateways() method not available' );
-				return;
-			}
-			
-			// Check available gateways at this point
-			$available_gateways = WC()->payment_gateways()->get_available_payment_gateways();
-			WC_Checkoutcom_Utility::logger( '[FLOW SERVER] Available payment gateways count: ' . count( $available_gateways ) );
-			
-			if ( isset( $available_gateways['wc_checkout_com_flow'] ) ) {
-				WC_Checkoutcom_Utility::logger( '[FLOW SERVER] SUCCESS: Flow gateway IS available during checkout process' );
-			} else {
-				WC_Checkoutcom_Utility::logger( '[FLOW SERVER] ERROR: Flow gateway is NOT available during checkout process!' );
-				WC_Checkoutcom_Utility::logger( '[FLOW SERVER] This is a SERVER-SIDE (PHP) validation error' );
-				WC_Checkoutcom_Utility::logger( '[FLOW SERVER] Available gateways: ' . implode( ', ', array_keys( $available_gateways ) ) );
-			}
-		}
-	} catch ( Exception $e ) {
-		WC_Checkoutcom_Utility::logger( '[FLOW SERVER] ERROR in checkout_process hook: ' . $e->getMessage() );
-		WC_Checkoutcom_Utility::logger( '[FLOW SERVER] ERROR stack trace: ' . $e->getTraceAsString() );
-		// Don't throw - just log the error to prevent breaking checkout
-	}
-}
-add_action( 'woocommerce_checkout_process', 'cko_log_checkout_process', 5 );
 
 /**
  * Update order ID in session after order creation for Classic Cards payments.

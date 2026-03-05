@@ -174,25 +174,40 @@
 					return;
 				}
 
-				// Check if this is a critical field that requires Flow reload
-				const criticalFields = [
+				// Fields that REQUIRE Flow reload (cardholder name is set at component creation)
+				const reloadRequiredFields = [
 					'billing_first_name',  // Cardholder name - requires Flow reload
 					'billing_last_name',   // Cardholder name - requires Flow reload
-					'billing_email',
+					'billing_email'        // Email is in payment session, requires reload
+				];
+				
+				// Address fields that do NOT require Flow reload (sent via handleSubmit)
+				// These are handled dynamically via Submit Payment Session API
+				const addressFields = [
 					'billing_country',
 					'billing_address_1',
 					'billing_city',
 					'billing_postcode',
-					'billing_state'
+					'billing_state',
+					'billing_phone'
 				];
 
 				const fieldName = event.target.name || event.target.id || '';
 				const fieldId = event.target.id || '';
-				const isCriticalField = criticalFields.some(
+				
+				const requiresReload = reloadRequiredFields.some(
 					(field) =>
 						fieldName.includes(field.replace('billing_', '')) ||
 						fieldId.includes(field.replace('billing_', ''))
 				);
+				
+				const isAddressField = addressFields.some(
+					(field) =>
+						fieldName.includes(field.replace('billing_', '')) ||
+						fieldId.includes(field.replace('billing_', ''))
+				);
+				
+				const isCriticalField = requiresReload || isAddressField;
 
 				// Store previous values to detect changes
 				// Flag to track if we should skip update_checkout (for name fields when position is hidden)
@@ -210,16 +225,43 @@
 						// Update stored value
 						storeFieldValue(fieldKey, currentValue);
 
-						// Check if this is a name field
-						const isNameField = fieldKey.includes('first_name') || fieldKey.includes('last_name');
+						// CRITICAL FIX: Don't trigger reload if Flow was just initialized (within 3 seconds)
+						// This prevents double payment session creation when filling the last required field
+						const lastInitTime = FlowState.get('lastInitTime');
+						const flowJustInitialized = lastInitTime && (Date.now() - lastInitTime) < 3000;
 						
-						if (isNameField) {
-							// When billing name changes, reload Flow to ensure cardholder name is set fresh at component creation
-							// This ensures the latest billing name is used, especially when cardholderNamePosition is "hidden"
-							// User will need to re-enter card details, but this guarantees correct cardholder name
-							debouncedCheckFlowReload(fieldKey, currentValue);
-						} else {
-							// For other fields, reload Flow
+						if (flowJustInitialized) {
+							if (typeof ckoLogger !== 'undefined') {
+								ckoLogger.debug(`[FIELD CHANGE] Skipping reload for "${fieldKey}" - Flow just initialized`, {
+									timeSinceInit: Date.now() - lastInitTime,
+									threshold: 3000
+								});
+							}
+							return;
+						}
+
+						// Address fields do NOT require Flow reload - they are sent via handleSubmit
+						// to the Submit Payment Session API dynamically
+						if (isAddressField) {
+							if (typeof ckoLogger !== 'undefined') {
+								ckoLogger.debug(`[FIELD CHANGE] Address field "${fieldKey}" changed - will be sent via handleSubmit, no reload needed`, {
+									newValue: currentValue,
+									previousValue: previousValue
+								});
+							}
+							// Store the change but don't reload Flow
+							// The address will be sent to Checkout.com via handleSubmit when payment is submitted
+							return;
+						}
+
+						// Only reload Flow for fields that require it (name, email)
+						if (requiresReload) {
+							if (typeof ckoLogger !== 'undefined') {
+								ckoLogger.debug(`[FIELD CHANGE] Field "${fieldKey}" requires Flow reload`, {
+									newValue: currentValue,
+									previousValue: previousValue
+								});
+							}
 							debouncedCheckFlowReload(fieldKey, currentValue);
 						}
 					}

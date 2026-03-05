@@ -46,6 +46,8 @@
 				billingAddress["street_address2"] || '';
 			let city = (document.getElementById("billing_city") ? document.getElementById("billing_city").value : '') || 
 				billingAddress["city"] || '';
+			let state = (document.getElementById("billing_state") ? document.getElementById("billing_state").value : '') || 
+				billingAddress["state"] || '';
 			let zip = (document.getElementById("billing_postcode") ? document.getElementById("billing_postcode").value : '') || 
 				billingAddress["postal_code"] || '';
 			let country = (document.getElementById("billing_country") ? document.getElementById("billing_country").value : '') || 
@@ -76,6 +78,7 @@
 			let shippingAddress1 = address1;
 			let shippingAddress2 = address2;
 			let shippingCity = city;
+			let shippingState = state;
 			let shippingZip = zip;
 			let shippingCountry = country;
 			
@@ -89,6 +92,8 @@
 					shippingAddress["street_address2"] || address2;
 				shippingCity = (document.getElementById("shipping_city") ? document.getElementById("shipping_city").value : '') || 
 					shippingAddress["city"] || city;
+				shippingState = (document.getElementById("shipping_state") ? document.getElementById("shipping_state").value : '') || 
+					shippingAddress["state"] || state;
 				shippingZip = (document.getElementById("shipping_postcode") ? document.getElementById("shipping_postcode").value : '') || 
 					shippingAddress["postal_code"] || zip;
 				shippingCountry = (document.getElementById("shipping_country") ? document.getElementById("shipping_country").value : '') || 
@@ -133,11 +138,13 @@
 				address1: address1,
 				address2: address2,
 				city: city,
+				state: state,
 				zip: zip,
 				country: country,
 				shippingAddress1: shippingAddress1,
 				shippingAddress2: shippingAddress2,
 				shippingCity: shippingCity,
+				shippingState: shippingState,
 				shippingZip: shippingZip,
 				shippingCountry: shippingCountry,
 				orders: orders,
