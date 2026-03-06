@@ -1670,19 +1670,68 @@ var ckoFlow = {
 				}
 				};
 
-					/*
-					 * Triggered on component click.
-					 */
-					const handleClick = (component) => {
+				/*
+				 * Triggered on component click (APM buttons: Apple Pay, Google Pay, PayPal, etc.)
+				 * 
+				 * CRITICAL: For APM payments, we create the WooCommerce order BEFORE the payment proceeds.
+				 * This ensures the order exists even if the user closes the browser after payment approval.
+				 * Without this, webhooks cannot find the order if the user abandons before form submission.
+				 */
+				const handleClick = (component) => {
+					ckoLogger.debug('[handleClick] Triggered for component type:', component.type);
 
-						if(component.type==="applepay") {
-							return {continue: true};
-						}
+					// APM types that need order creation before payment
+					const apmTypes = ['applepay', 'googlepay', 'paypal', 'klarna', 'sofort', 'ideal', 'giropay', 'bancontact', 'eps', 'p24', 'knet', 'fawry', 'qpay', 'multibanco', 'stcpay', 'alipay', 'wechatpay', 'octopus', 'twint', 'venmo', 'alma'];
+					const isAPMPayment = apmTypes.includes(component.type);
 
-						if ( orderId ) {
-							return {continue: true};
-						}
+					// If order already exists (order-pay page), proceed immediately
+					if (orderId) {
+						ckoLogger.debug('[handleClick] Order already exists (order-pay page) - proceeding immediately');
+						return { continue: true };
+					}
 
+					// Check if order was already created in this session
+					const existingOrderId = jQuery('input[name="order_id"]').val() || FlowSessionStorage.getOrderId();
+					if (existingOrderId) {
+						ckoLogger.debug('[handleClick] Order already created in session - Order ID:', existingOrderId);
+						return { continue: true };
+					}
+
+					// For APM payments, create order BEFORE payment proceeds
+					if (isAPMPayment) {
+						ckoLogger.debug('[handleClick] APM payment (' + component.type + ') - creating order before payment');
+						
+						return new Promise((resolve) => {
+							const form = jQuery("form.checkout");
+							
+							// First validate the checkout form
+							validateCheckout(form, async function (response) {
+								try {
+									// Create order before APM payment proceeds
+									// Use window.createOrderBeforePayment since it's defined in DOMContentLoaded scope
+									ckoLogger.debug('[handleClick] Checkout validated - creating order for APM payment');
+									const createdOrderId = await window.createOrderBeforePayment();
+									
+									if (!createdOrderId) {
+										ckoLogger.error('[handleClick] Failed to create order for APM payment - blocking payment');
+										showError('Failed to create order. Please try again.');
+										resolve({ continue: false });
+										return;
+									}
+									
+									ckoLogger.debug('[handleClick] Order created successfully for APM - Order ID:', createdOrderId);
+									resolve({ continue: true });
+								} catch (error) {
+									ckoLogger.error('[handleClick] Error creating order for APM payment:', error);
+									showError('Failed to create order. Please try again.');
+									resolve({ continue: false });
+								}
+							});
+						});
+					}
+
+					// For non-APM payments (card), just validate checkout
+					// Order will be created when Place Order button is clicked
 					return new Promise((resolve) => {
 						const form = jQuery("form.checkout");
 				
@@ -4615,6 +4664,9 @@ document.addEventListener("DOMContentLoaded", function () {
 			}
 		}
 	}
+	
+	// Expose createOrderBeforePayment globally so it can be called from handleClick (inside ckoFlow.loadFlow)
+	window.createOrderBeforePayment = createOrderBeforePayment;
 	
 	document.addEventListener("click", function (event) {
 		const flowPayment = document.getElementById(
