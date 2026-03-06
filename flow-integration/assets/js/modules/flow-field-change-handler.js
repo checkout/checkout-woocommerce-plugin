@@ -72,8 +72,9 @@
 		};
 		
 		// Set up handlers for critical fields to immediately update ckoFlowFieldValues
+		// NOTE: billing_email is NOT included here - it has its own handler with debouncing
+		// that needs to compare old vs new values before the value is stored
 		const criticalFieldSelectors = [
-			'#billing_email',
 			'#billing_country',
 			'#billing_address_1',
 			'#billing_city',
@@ -214,11 +215,28 @@
 				let shouldSkipUpdateCheckout = false;
 				
 				if (isCriticalField && FlowState.get('initialized')) {
-					const currentValue = event.target.value || '';
 					const fieldKey = fieldId || fieldName;
 					
-					// Initialize storage if needed
-					const previousValue = (window.ckoFlowFieldValues || {})[fieldKey] || '';
+					// Special handling for email - use captured context from event time
+					// This is needed because the debounce delay means stored values might change
+					let currentValue, previousValue;
+					
+					if (event.ckoEmailContext && fieldKey === 'billing_email') {
+						// Use the context captured at the moment of the input event
+						currentValue = event.ckoEmailContext.currentValue;
+						previousValue = event.ckoEmailContext.previousValue;
+						ckoLogger.debug('[EMAIL HANDLER] Using captured context in handleTyping', {
+							currentValue: currentValue,
+							previousValue: previousValue,
+							capturedAt: event.ckoEmailContext.capturedAt,
+							processedAt: Date.now(),
+							debounceDelay: Date.now() - event.ckoEmailContext.capturedAt
+						});
+					} else {
+						// Standard behavior for other fields
+						currentValue = event.target.value || '';
+						previousValue = (window.ckoFlowFieldValues || {})[fieldKey] || '';
+					}
 
 					// If value actually changed (not just typing)
 					if (currentValue !== previousValue) {
@@ -263,6 +281,15 @@
 								});
 							}
 							debouncedCheckFlowReload(fieldKey, currentValue);
+						}
+					} else {
+						// Log when no change detected (helps debug)
+						if (fieldKey === 'billing_email') {
+							ckoLogger.debug('[EMAIL HANDLER] No change detected - skipping reload', {
+								currentValue: currentValue,
+								previousValue: previousValue,
+								hadContext: !!event.ckoEmailContext
+							});
 						}
 					}
 				}
@@ -367,8 +394,46 @@
 				}
 			);
 
-			// Attach debounced handler to other key billing fields (email, phone) - still use 'input'
-			$('#billing_email, #billing_phone').on(
+			// Special handler for billing_email - use 'blur' instead of 'input' (like name fields)
+			// This prevents clearing card details while user is still typing their email
+			// and ensures reliable detection of value changes
+			$('#billing_email').on(
+				'blur',
+				function (e) {
+					const fieldId = this.id;
+					const currentValue = this.value || '';
+					const previousValue = window.ckoFlowFieldValues?.[fieldId] || '';
+					
+					ckoLogger.debug('[EMAIL HANDLER] Blur event - checking for changes', {
+						fieldId: fieldId,
+						previousValue: previousValue,
+						currentValue: currentValue,
+						changed: currentValue !== previousValue
+					});
+					
+					// Only trigger if value actually changed and is not empty
+					if (currentValue !== previousValue && currentValue.trim() !== '') {
+						// Store context with the event for later use in handleTyping
+						e.ckoEmailContext = {
+							fieldId: fieldId,
+							currentValue: currentValue,
+							previousValue: previousValue,
+							capturedAt: Date.now()
+						};
+						
+						ckoLogger.debug('[EMAIL HANDLER] Email changed - triggering Flow reload', {
+							fieldId: fieldId,
+							previousValue: previousValue,
+							currentValue: currentValue
+						});
+						
+						debouncedTyping(e);
+					}
+				}
+			);
+			
+			// Attach debounced handler to billing_phone - still use 'input'
+			$('#billing_phone').on(
 				'input',
 				function (e) {
 					debouncedTyping(e);
@@ -387,7 +452,8 @@
 			// Attach handler to all input/selects, but ignore payment method fields.
 			// EXCLUDE CHECKBOXES - they don't need to trigger Flow updates and cause form reload issues
 			// EXCLUDE hidden fields and cko-flow-* fields to prevent infinite loops
-			$(document).on('input change', "input:not([type='checkbox']):not([type='hidden']):not([id^='cko-flow']):not([name^='cko-flow']), select", function (e) {
+			// EXCLUDE billing_email - it has its own dedicated handler that captures context for debouncing
+			$(document).on('input change', "input:not([type='checkbox']):not([type='hidden']):not([id^='cko-flow']):not([name^='cko-flow']):not(#billing_email), select", function (e) {
 				if ($(this).closest('.wc_payment_method').length === 0) {
 					debouncedTyping(e);
 				}

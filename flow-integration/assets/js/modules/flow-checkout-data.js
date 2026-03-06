@@ -24,7 +24,9 @@
 			}
 			
 			// Extract basic information
-			let amount = cartInfo["order_amount"];
+			// CRITICAL: Read amount from DOM first (most up-to-date after coupon changes)
+			// The #cart-info data attribute may have stale amount if coupon was applied
+			let amount = this.getAmountFromDOM() || cartInfo["order_amount"];
 			let currency = cartInfo["purchase_currency"];
 			let reference = "WOO" + (cko_flow_vars.ref_session || 'default');
 			
@@ -154,6 +156,43 @@
 				metadata: metadata,
 				isSubscription: isSubscription
 			};
+		},
+		
+		/**
+		 * Read current order amount from DOM (.order-total display)
+		 * This is more reliable than cached #cart-info after coupon changes
+		 * @returns {number|null} Amount in minor units (cents) or null if not found
+		 */
+		getAmountFromDOM: function() {
+			// Try to read from WooCommerce order total display
+			let orderTotalEl = jQuery('.order-total .woocommerce-Price-amount bdi');
+			
+			if (orderTotalEl.length === 0) {
+				orderTotalEl = jQuery('.order-total .woocommerce-Price-amount');
+			}
+			if (orderTotalEl.length === 0) {
+				orderTotalEl = jQuery('.order-total .amount');
+			}
+			
+			if (orderTotalEl.length > 0) {
+				let totalText = orderTotalEl.last().text().trim();
+				// Remove currency symbols and non-numeric chars except decimal
+				let numericValue = totalText.replace(/[^0-9.,]/g, '').replace(',', '.');
+				let parsedValue = parseFloat(numericValue);
+				if (!isNaN(parsedValue)) {
+					const amountInCents = Math.round(parsedValue * 100);
+					if (typeof window.ckoLogger !== 'undefined') {
+						window.ckoLogger.debug('[FlowCheckoutData] Read amount from DOM:', {
+							displayedText: totalText,
+							parsedValue: parsedValue,
+							minorUnits: amountInCents
+						});
+					}
+					return amountInCents;
+				}
+			}
+			
+			return null;
 		}
 	};
 	

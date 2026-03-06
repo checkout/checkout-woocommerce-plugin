@@ -282,9 +282,56 @@
 				const currentOrderAmount = getCurrentOrderTotalFromDOM();
 				
 				if (currentOrderAmount && typeof ckoFlow !== 'undefined') {
-					ckoFlow.pendingAmountUpdate = currentOrderAmount;
-					if (typeof ckoLogger !== 'undefined') {
-						ckoLogger.debug('[COUPON GUARD] ✅ Updated pendingAmountUpdate after coupon action:', currentOrderAmount);
+					// Check if current payment type is an APM that doesn't support amount updates
+					// Only Card, Apple Pay, and Google Pay support dynamic amount adjustment
+					const paymentType = ckoFlow.selectedPaymentType?.toLowerCase() || '';
+					const typesWithAmountSupport = ['card', 'applepay', 'googlepay'];
+					const isAPMWithoutSupport = paymentType && !typesWithAmountSupport.includes(paymentType);
+					const amountChanged = ckoFlow.initialSessionAmount !== null && 
+						currentOrderAmount !== ckoFlow.initialSessionAmount;
+					
+					if (isAPMWithoutSupport && amountChanged) {
+						// APM selected that doesn't support amount updates - trigger reload
+						if (typeof ckoLogger !== 'undefined') {
+							ckoLogger.debug('[COUPON GUARD] APM detected without amount support:', paymentType);
+							ckoLogger.debug('[COUPON GUARD] Triggering Flow reload for amount change');
+						}
+						
+						// Don't set pending amount - we're reloading
+						ckoFlow.pendingAmountUpdate = null;
+						
+						// Trigger Flow reload
+						setTimeout(function() {
+							if (typeof reloadFlowComponent === 'function') {
+								reloadFlowComponent();
+							} else if (typeof window.reloadFlowComponent === 'function') {
+								window.reloadFlowComponent();
+							}
+						}, 100);
+					} else {
+						// Card/Apple Pay/Google Pay or no payment selected - use pending amount
+						ckoFlow.pendingAmountUpdate = currentOrderAmount;
+						if (typeof ckoLogger !== 'undefined') {
+							ckoLogger.debug('[COUPON GUARD] ✅ Updated pendingAmountUpdate after coupon action:', currentOrderAmount);
+						}
+						
+						// CRITICAL: For Apple Pay and Google Pay, also call checkout.update() 
+						// to update the payment sheet amount shown to the customer
+						if ((paymentType === 'applepay' || paymentType === 'googlepay') && 
+							ckoFlow.checkoutInstance && 
+							typeof ckoFlow.checkoutInstance.update === 'function') {
+							ckoFlow.checkoutInstance.update({ amount: currentOrderAmount })
+								.then(function() {
+									if (typeof ckoLogger !== 'undefined') {
+										ckoLogger.debug('[COUPON GUARD] ✅ checkout.update() succeeded for', paymentType);
+									}
+								})
+								.catch(function(error) {
+									if (typeof ckoLogger !== 'undefined') {
+										ckoLogger.debug('[COUPON GUARD] checkout.update() failed:', error?.message || 'unknown');
+									}
+								});
+						}
 					}
 				}
 				
@@ -334,9 +381,48 @@
 				const currentOrderAmount = getCurrentOrderTotalFromDOM();
 				
 				if (currentOrderAmount && typeof ckoFlow !== 'undefined') {
-					ckoFlow.pendingAmountUpdate = currentOrderAmount;
-					if (typeof ckoLogger !== 'undefined') {
-						ckoLogger.debug('[COUPON GUARD] Updated pendingAmountUpdate:', currentOrderAmount);
+					// Check if current payment type is an APM that doesn't support amount updates
+					const paymentType = ckoFlow.selectedPaymentType?.toLowerCase() || '';
+					const typesWithAmountSupport = ['card', 'applepay', 'googlepay'];
+					const isAPMWithoutSupport = paymentType && !typesWithAmountSupport.includes(paymentType);
+					const amountChanged = ckoFlow.initialSessionAmount !== null && 
+						currentOrderAmount !== ckoFlow.initialSessionAmount;
+					
+					if (isAPMWithoutSupport && amountChanged) {
+						// APM selected - trigger reload instead of setting pending amount
+						if (typeof ckoLogger !== 'undefined') {
+							ckoLogger.debug('[COUPON GUARD] APM detected in reattachment - triggering reload');
+						}
+						ckoFlow.pendingAmountUpdate = null;
+						setTimeout(function() {
+							if (typeof reloadFlowComponent === 'function') {
+								reloadFlowComponent();
+							} else if (typeof window.reloadFlowComponent === 'function') {
+								window.reloadFlowComponent();
+							}
+						}, 100);
+					} else {
+						ckoFlow.pendingAmountUpdate = currentOrderAmount;
+						if (typeof ckoLogger !== 'undefined') {
+							ckoLogger.debug('[COUPON GUARD] Updated pendingAmountUpdate:', currentOrderAmount);
+						}
+						
+						// CRITICAL: For Apple Pay and Google Pay, also call checkout.update()
+						if ((paymentType === 'applepay' || paymentType === 'googlepay') && 
+							ckoFlow.checkoutInstance && 
+							typeof ckoFlow.checkoutInstance.update === 'function') {
+							ckoFlow.checkoutInstance.update({ amount: currentOrderAmount })
+								.then(function() {
+									if (typeof ckoLogger !== 'undefined') {
+										ckoLogger.debug('[COUPON GUARD] ✅ checkout.update() succeeded for', paymentType);
+									}
+								})
+								.catch(function(error) {
+									if (typeof ckoLogger !== 'undefined') {
+										ckoLogger.debug('[COUPON GUARD] checkout.update() failed:', error?.message || 'unknown');
+									}
+								});
+						}
 					}
 				}
 			}

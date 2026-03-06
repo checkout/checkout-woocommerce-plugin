@@ -108,8 +108,10 @@ var ckoFlow = {
 	checkoutInstance: null, // Holds the CheckoutWebComponents instance for dynamic updates (checkout.update())
 	pendingAmountUpdate: null, // Stores pending amount update (in minor units/cents) for handleSubmit
 	initialSessionAmount: null, // Stores the original amount when payment session was created
+	initialSessionEmail: null, // Stores the original email when payment session was created (cannot be modified)
 	initialBillingAddress: null, // Stores the original billing address when payment session was created
 	initialShippingAddress: null, // Stores the original shipping address when payment session was created
+	selectedPaymentType: null, // Stores currently selected payment type (card, paypal, applepay, googlepay, etc.)
 	performanceMetrics: {
 		pageLoadTime: null,
 		flowInitStartTime: null,
@@ -1385,6 +1387,38 @@ var ckoFlow = {
 				 * Triggered when user submits the payment using Place Order Button of Woocommerce.
 				 */
 				const onSubmit = async (component) => {
+					// CRITICAL CHECK: Verify billing email hasn't changed since payment session was created
+					// If email changed, we MUST reload Flow to create new payment session
+					// Email is baked into payment session and cannot be modified via handleSubmit
+					const currentEmail = jQuery('#billing_email').val()?.trim().toLowerCase() || '';
+					const sessionEmail = (ckoFlow.initialSessionEmail || '').trim().toLowerCase();
+					
+					if (currentEmail && sessionEmail && currentEmail !== sessionEmail) {
+						ckoLogger.warn('[ONSUBMIT] ⚠️ Email changed since payment session created!', {
+							sessionEmail: sessionEmail,
+							currentEmail: currentEmail
+						});
+						
+						// Show user-friendly error message
+						const errorMessage = 'Your email address has changed. Please wait a moment while we update your payment details.';
+						
+						// Display error using WooCommerce's notice system
+						if (typeof wc_checkout_params !== 'undefined') {
+							jQuery('.woocommerce-error').remove();
+							jQuery('form.checkout').prepend('<div class="woocommerce-error">' + errorMessage + '</div>');
+							jQuery('html, body').animate({
+								scrollTop: jQuery('form.checkout').offset().top - 100
+							}, 500);
+						}
+						
+						// Trigger Flow reload
+						ckoLogger.debug('[ONSUBMIT] Triggering Flow reload due to email mismatch');
+						reloadFlowComponent();
+						
+						// Return false to prevent submission
+						return { continue: false };
+					}
+					
 					// Update cardholder name right before payment submission to ensure latest billing name is used
 					// This is especially important when position is "hidden" and billing name changed after Flow initialized
 					if (typeof window.ckoSetCardholderName === 'function') {
@@ -1498,6 +1532,41 @@ var ckoFlow = {
 			ckoLogger.debug('onChange - Component valid:', component.isValid ? component.isValid() : 'unknown');
 			ckoLogger.debug('onChange - User interacted flag:', FlowState.get('userInteracted'));
 			ckoLogger.debug('onChange - Body has cko-flow--ready class:', document.body.classList.contains('cko-flow--ready'));
+			
+			// Store selected payment type for use in updateFlowAmount (PayPal needs special handling)
+			const previousPaymentType = ckoFlow.selectedPaymentType;
+			ckoFlow.selectedPaymentType = component.selectedType;
+			ckoLogger.debug('onChange - Stored selectedPaymentType:', ckoFlow.selectedPaymentType, 'previous:', previousPaymentType);
+			
+			// CRITICAL: If user selects an APM that doesn't support amount updates
+			// and there's a pending amount change, we need to reload the session.
+			// Only Card, Apple Pay, and Google Pay support dynamic amount adjustment.
+			// This handles cases like:
+			//   - card selected → coupon applied → switch to PayPal/Klarna/etc.
+			//   - no selection → coupon applied → select PayPal/Klarna/etc.
+			const currentType = component.selectedType?.toLowerCase() || '';
+			const typesWithAmountSupport = ['card', 'applepay', 'googlepay'];
+			
+			const isAPMWithoutAmountSupport = currentType && !typesWithAmountSupport.includes(currentType);
+			const hasPendingAmountChange = ckoFlow.pendingAmountUpdate !== null && 
+				ckoFlow.pendingAmountUpdate !== ckoFlow.initialSessionAmount;
+			
+			if (isAPMWithoutAmountSupport && hasPendingAmountChange) {
+				ckoLogger.debug('onChange - APM selected without amount support:', currentType);
+				ckoLogger.debug('onChange - Original amount:', ckoFlow.initialSessionAmount, 'pending amount:', ckoFlow.pendingAmountUpdate);
+				
+				// Clear pending amount - we're going to reload with correct amount
+				ckoFlow.pendingAmountUpdate = null;
+				
+				// Trigger Flow reload to create new session with correct amount
+				setTimeout(() => {
+					ckoLogger.debug('onChange - Reloading Flow for', currentType, 'with pending amount change');
+					reloadFlowComponent();
+				}, 100);
+				
+				// Return early - onChange will be called again after reload
+				return;
+			}
 			
 			// CRITICAL: Auto-deselect saved card when user interacts with Flow
 			// Check if a saved card is currently selected and Flow is de-emphasized
@@ -2092,7 +2161,12 @@ var ckoFlow = {
 		// This enables updating payment amount without full component reload
 		ckoFlow.checkoutInstance = checkout;
 		ckoFlow.initialSessionAmount = amount; // Store initial amount for comparison
+		ckoFlow.initialSessionEmail = email; // Store initial email (cannot be modified via handleSubmit)
 		ckoFlow.pendingAmountUpdate = null; // Reset any pending updates
+		
+		ckoLogger.debug('[INIT] Stored initial session email for comparison:', {
+			email: email
+		});
 		
 		// Store initial billing/shipping addresses for comparison during handleSubmit
 		// This enables detecting address changes and updating via Submit Payment Session API
@@ -3025,10 +3099,41 @@ async function updateFlowAmount(newAmountInCents) {
 	ckoLogger.debug('[UPDATE AMOUNT] Updating payment amount', {
 		newAmount: newAmountInCents,
 		previousAmount: ckoFlow.initialSessionAmount,
-		pendingUpdate: ckoFlow.pendingAmountUpdate
+		pendingUpdate: ckoFlow.pendingAmountUpdate,
+		selectedPaymentType: ckoFlow.selectedPaymentType
 	});
 
-	// Store the pending amount for handleSubmit callback
+	// Check if amount actually changed
+	const amountChanged = ckoFlow.initialSessionAmount !== null && 
+		newAmountInCents !== ckoFlow.initialSessionAmount;
+
+	// CRITICAL: Only Card, Apple Pay, and Google Pay support dynamic amount adjustment
+	// Per Checkout.com docs: "You can only modify the payment sheet amount for Apple Pay and Google Pay payments."
+	// - Apple Pay / Google Pay: checkout.update() works
+	// - Card: handleSubmit with Submit Payment Session API works
+	// - ALL other APMs (PayPal, Klarna, etc.): Amount is locked at session creation, need full reload
+	const paymentType = ckoFlow.selectedPaymentType?.toLowerCase() || '';
+	const supportsAmountUpdate = ['card', 'applepay', 'googlepay'].includes(paymentType);
+
+	if (!supportsAmountUpdate && amountChanged && paymentType) {
+		ckoLogger.debug('[UPDATE AMOUNT] APM detected that does not support amount update:', paymentType);
+		ckoLogger.debug('[UPDATE AMOUNT] Original:', ckoFlow.initialSessionAmount, 'new:', newAmountInCents);
+		
+		// Don't store pending amount - we're going to reload
+		// This prevents handleSubmit from being called with wrong amount
+		ckoFlow.pendingAmountUpdate = null;
+		
+		// Trigger Flow reload to create new session with correct amount
+		// Use setTimeout to avoid blocking the current update cycle
+		setTimeout(() => {
+			ckoLogger.debug('[UPDATE AMOUNT] Reloading Flow for', paymentType, 'amount change');
+			reloadFlowComponent();
+		}, 100);
+		
+		return true;
+	}
+
+	// For Card/Apple Pay/Google Pay, store the pending amount for handleSubmit callback
 	ckoFlow.pendingAmountUpdate = newAmountInCents;
 
 	// Try to update wallet payment sheets (Apple Pay, Google Pay)
@@ -3071,12 +3176,14 @@ function destroyFlowComponent() {
 		ckoFlow.flowComponent = null;
 	}
 
-	// Clear checkout instance and amount/address tracking
+	// Clear checkout instance and amount/address/email tracking
 	ckoFlow.checkoutInstance = null;
 	ckoFlow.pendingAmountUpdate = null;
 	ckoFlow.initialSessionAmount = null;
+	ckoFlow.initialSessionEmail = null;
 	ckoFlow.initialBillingAddress = null;
 	ckoFlow.initialShippingAddress = null;
+	ckoFlow.selectedPaymentType = null;
 	
 	// Clear component root
 	const flowComponentRoot = document.querySelector('[data-testid="checkout-web-component-root"]');

@@ -6284,6 +6284,31 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		$customer_email_for_payment = isset( $payment_session_request['customer']['email'] ) ? $payment_session_request['customer']['email'] : '(not set)';
 		WC_Checkoutcom_Utility::logger( '[PAYMENT SESSION] Creating payment session with Email: ' . $customer_email_for_payment );
 
+		// CRITICAL: Recalculate amount and items from fresh WooCommerce cart
+		// Client-side #cart-info may have stale data after coupon changes
+		// The server always has the most up-to-date cart state
+		if ( WC()->cart && ! WC()->cart->is_empty() ) {
+			$fresh_cart_info = WC_Checkoutcom_Api_Request::get_cart_info( true );
+			
+			if ( ! empty( $fresh_cart_info['order_amount'] ) ) {
+				$client_amount = isset( $payment_session_request['amount'] ) ? $payment_session_request['amount'] : 0;
+				$server_amount = $fresh_cart_info['order_amount'];
+				
+				// Only override if amounts differ (coupon was applied after page load)
+				if ( $client_amount !== $server_amount ) {
+					WC_Checkoutcom_Utility::logger( '[PAYMENT SESSION] Amount mismatch detected - using fresh server value. Client: ' . $client_amount . ', Server: ' . $server_amount );
+					$payment_session_request['amount'] = $server_amount;
+				}
+			}
+			
+			// Always use fresh items from server to ensure PayPal validation passes
+			// PayPal requires amount = sum(items.unit_price × quantity)
+			if ( ! empty( $fresh_cart_info['order_lines'] ) ) {
+				$payment_session_request['items'] = $fresh_cart_info['order_lines'];
+				WC_Checkoutcom_Utility::logger( '[PAYMENT SESSION] Using fresh items from server cart: ' . count( $fresh_cart_info['order_lines'] ) . ' items' );
+			}
+		}
+
 		// Determine API URL based on environment
 		$api_url = 'https://api.checkout.com/payment-sessions';
 		if ( isset( $core_settings['ckocom_environment'] ) && 'sandbox' === $core_settings['ckocom_environment'] ) {
