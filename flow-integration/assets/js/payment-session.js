@@ -1967,6 +1967,29 @@ var ckoFlow = {
 					return result.data;
 				} catch (error) {
 					ckoLogger.error('[HANDLE SUBMIT] Error submitting payment', error);
+					
+					// CRITICAL: Reset UI state on error to prevent "page stuck on loading"
+					// Hide loading overlays
+					hideLoadingOverlay();
+					hideLoadingOverlay(2);
+					
+					// Re-enable Place Order button
+					const placeOrderBtn = document.getElementById("place_order");
+					if (placeOrderBtn) {
+						placeOrderBtn.disabled = false;
+						placeOrderBtn.classList.remove("cko-flow--loading", "processing");
+					}
+					
+					// Also handle jQuery-based button state (WooCommerce may use this)
+					jQuery('#place_order').prop('disabled', false).removeClass('processing');
+					
+					// Reset order creation flag to allow retry
+					FlowState.set('orderCreationInProgress', false);
+					
+					// Clear pending amount update to ensure clean state on retry
+					ckoFlow.pendingAmountUpdate = null;
+					
+					// Show error message to user
 					showError(error.message || 'Payment submission failed. Please try again.');
 					throw error;
 				}

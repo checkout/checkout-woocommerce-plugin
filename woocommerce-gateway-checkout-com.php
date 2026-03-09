@@ -1882,11 +1882,38 @@ if ( ! function_exists( 'cko_ajax_flow_create_payment_session' ) ) {
 }
 
 /**
+ * AJAX handler wrapper for Flow submit payment session (dynamic amount adjustment).
+ * This ensures the handler is always available, even if the gateway class isn't fully instantiated.
+ */
+if ( ! function_exists( 'cko_ajax_flow_submit_payment_session' ) ) {
+	function cko_ajax_flow_submit_payment_session() {
+		if ( ! class_exists( 'WC_Gateway_Checkout_Com_Flow' ) ) {
+			wp_send_json_error( array(
+				'message' => __( 'Flow gateway class not found.', 'checkout-com-unified-payments-api' ),
+			) );
+			return;
+		}
+
+		// Get the gateway instance
+		$gateways = WC()->payment_gateways()->payment_gateways();
+		if ( isset( $gateways['wc_checkout_com_flow'] ) ) {
+			$gateways['wc_checkout_com_flow']->ajax_submit_payment_session();
+		} else {
+			// Fallback: create a temporary instance
+			$gateway = new WC_Gateway_Checkout_Com_Flow();
+			$gateway->ajax_submit_payment_session();
+		}
+	}
+}
+
+/**
  * Register Flow AJAX handlers VERY early (before gateway class instantiation).
  */
 function cko_register_flow_ajax_handlers() {
 	add_action( 'wp_ajax_cko_flow_create_order', 'cko_ajax_flow_create_order', 1 );
 	add_action( 'wp_ajax_nopriv_cko_flow_create_order', 'cko_ajax_flow_create_order', 1 );
+	add_action( 'wp_ajax_cko_flow_submit_payment_session', 'cko_ajax_flow_submit_payment_session', 1 );
+	add_action( 'wp_ajax_nopriv_cko_flow_submit_payment_session', 'cko_ajax_flow_submit_payment_session', 1 );
 }
 // Use 'init' hook with priority 0 to ensure registration happens as early as possible
 add_action( 'init', 'cko_register_flow_ajax_handlers', 0 );
@@ -1896,6 +1923,8 @@ add_action( 'wp_ajax_cko_flow_create_payment_session', 'cko_ajax_flow_create_pay
 add_action( 'wp_ajax_nopriv_cko_flow_create_payment_session', 'cko_ajax_flow_create_payment_session' );
 add_action( 'wp_ajax_cko_flow_create_order', 'cko_ajax_flow_create_order', 1 );
 add_action( 'wp_ajax_nopriv_cko_flow_create_order', 'cko_ajax_flow_create_order', 1 );
+add_action( 'wp_ajax_cko_flow_submit_payment_session', 'cko_ajax_flow_submit_payment_session' );
+add_action( 'wp_ajax_nopriv_cko_flow_submit_payment_session', 'cko_ajax_flow_submit_payment_session' );
 
 /**
  * Validates the WooCommerce checkout form via AJAX.

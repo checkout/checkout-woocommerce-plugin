@@ -5764,10 +5764,11 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			}
 		}
 		
-		// Method 4: Fuzzy match by Session ID + Amount for pristine orders (fallback for browser-close scenario)
-		// CRITICAL SAFETY: Only match if order is completely untouched (no payment ID, no notes, pending status)
+		// Method 4: Fuzzy match by Session ID + Amount (fallback for browser-close scenario)
+		// SAFETY: Match if order has no payment ID, pending status, and amount/currency match
 		// This catches cases where customer closed browser immediately after clicking "Place Order"
 		// before the payment response could save the payment_id to the order.
+		// Note: "has_notes" check was removed in v5.0.3 - see inline comment for rationale.
 		if ( ! $order && ! empty( $data->data->metadata->cko_payment_session_id ) && ! empty( $data->data->id ) ) {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Trying METHOD 4 (FUZZY: Session ID + Amount for pristine orders)' );
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Session ID: ' . $data->data->metadata->cko_payment_session_id );
@@ -5790,36 +5791,34 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				$existing_payment_id_alt = $candidate->get_meta( '_cko_payment_id' );
 				$has_payment_id = ! empty( $existing_payment_id ) || ! empty( $existing_payment_id_alt );
 				
-				// Safety check 2: Order must NOT have any notes (completely untouched)
-				$order_notes = wc_get_order_notes( array(
-					'order_id' => $candidate->get_id(),
-					'limit'    => 1,
-				) );
-				$has_notes = ! empty( $order_notes );
+				// NOTE: "has_notes" check was removed in v5.0.3 because:
+				// 1. Flow plugin adds notes during order creation, making this check self-defeating
+				// 2. Session ID uniqueness + Amount + Currency + No Payment ID + Pending status = sufficient safety
+				// 3. Payment sessions are cryptographically unique from Checkout.com API
+				// 4. Failed payments change status to 'failed' (excluded by pending filter)
 				
-				// Safety check 3: Amount must match (compare in minor units)
+				// Safety check 2: Amount must match (compare in minor units)
 				$webhook_amount = isset( $data->data->amount ) ? (int) $data->data->amount : 0;
 				$order_total = $candidate->get_total();
 				// Convert order total to minor units (cents) - WooCommerce stores as decimal
 				$order_amount_minor = (int) round( $order_total * 100 );
 				$amount_matches = ( $webhook_amount === $order_amount_minor );
 				
-				// Safety check 4: Currency must match
+				// Safety check 3: Currency must match
 				$webhook_currency = isset( $data->data->currency ) ? strtoupper( $data->data->currency ) : '';
 				$order_currency = strtoupper( $candidate->get_currency() );
 				$currency_matches = ( $webhook_currency === $order_currency );
 				
 				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: METHOD 4 - Safety checks:' );
 				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING:   - Has payment ID: ' . ( $has_payment_id ? 'YES (FAIL)' : 'NO (PASS)' ) );
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING:   - Has notes: ' . ( $has_notes ? 'YES (FAIL)' : 'NO (PASS)' ) );
 				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING:   - Amount matches: ' . ( $amount_matches ? 'YES (PASS)' : 'NO (FAIL)' ) . ' (Webhook: ' . $webhook_amount . ', Order: ' . $order_amount_minor . ')' );
 				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING:   - Currency matches: ' . ( $currency_matches ? 'YES (PASS)' : 'NO (FAIL)' ) . ' (Webhook: ' . $webhook_currency . ', Order: ' . $order_currency . ')' );
 				
-				// All safety checks must pass
-				if ( ! $has_payment_id && ! $has_notes && $amount_matches && $currency_matches ) {
+				// All safety checks must pass (no payment ID, amount match, currency match)
+				if ( ! $has_payment_id && $amount_matches && $currency_matches ) {
 					$order = $candidate;
 					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ✅ MATCHED BY METHOD 4 (FUZZY: Session ID + Amount) - Order ID: ' . $order->get_id() );
-					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ✅ All safety checks passed - Order is pristine (no payment ID, no notes, pending status)' );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ✅ All safety checks passed - Order has no payment ID, amount and currency match, pending status' );
 					
 					// CRITICAL: Save payment ID to order so future webhooks can find it via Method 2/3
 					$order->update_meta_data( '_cko_flow_payment_id', $data->data->id );
@@ -5845,9 +5844,6 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ❌ METHOD 4 FAILED - Safety checks did not pass for Order ID: ' . $candidate->get_id() );
 					if ( $has_payment_id ) {
 						WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ❌ Reason: Order already has payment ID: ' . ( $existing_payment_id ?: $existing_payment_id_alt ) );
-					}
-					if ( $has_notes ) {
-						WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ❌ Reason: Order has notes (not pristine)' );
 					}
 					if ( ! $amount_matches ) {
 						WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ❌ Reason: Amount mismatch' );
@@ -7133,13 +7129,22 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	 * @return void
 	 */
 	public function ajax_submit_payment_session() {
+		$nonce = isset( $_POST['nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['nonce'] ) ) : '';
+		$nonce_valid = wp_verify_nonce( $nonce, 'cko_flow_payment_session' );
+		
+		WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Nonce verification - Nonce: ' . substr( $nonce, 0, 10 ) . '..., Valid: ' . ( $nonce_valid ? 'YES (' . $nonce_valid . ')' : 'NO' ) . ', User ID: ' . get_current_user_id() );
+		
 		// Verify nonce for security
-		if ( ! isset( $_POST['nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ) ), 'cko_flow_payment_session' ) ) {
+		// wp_verify_nonce returns 1 if valid and created 0-12 hours ago, 2 if valid and 12-24 hours ago, false if invalid
+		if ( empty( $nonce ) || ! $nonce_valid ) {
+			WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] ❌ Nonce verification FAILED - Nonce: ' . ( $nonce ?: 'EMPTY' ) . ', Result: ' . var_export( $nonce_valid, true ) );
 			wp_send_json_error( array(
 				'message' => __( 'Security check failed. Please refresh the page and try again.', 'checkout-com-unified-payments-api' ),
 			) );
 			return;
 		}
+		
+		WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] ✅ Nonce verification PASSED' );
 
 		// Get parameters from POST
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- payment_session_id is alphanumeric ID from Checkout.com
