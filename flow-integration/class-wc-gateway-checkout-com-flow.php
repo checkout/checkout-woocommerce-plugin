@@ -117,10 +117,15 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// Priority 5 ensures this runs before other checkout hooks.
 		add_action( 'woocommerce_before_checkout_process', [ $this, 'prevent_failed_order_reuse' ], 5 );
 		
-		// CRITICAL: Exclude payment methods section from checkout fragment updates during coupon operations.
+		// OPTIONAL: Exclude payment methods section from checkout fragment updates during coupon operations.
 		// This preserves the Flow component (and entered card details) when cart total changes.
 		// The payment amount is handled via handleSubmit callback instead of component reload.
-		add_filter( 'woocommerce_update_order_review_fragments', [ $this, 'exclude_payment_method_from_fragments' ], 10, 1 );
+		// Only enabled if the admin toggle is ON (default is OFF for compatibility).
+		$flow_settings = get_option( 'woocommerce_wc_checkout_com_flow_settings', array() );
+		$preserve_card_enabled = isset( $flow_settings['flow_preserve_card_on_update'] ) && 'yes' === $flow_settings['flow_preserve_card_on_update'];
+		if ( $preserve_card_enabled ) {
+			add_filter( 'woocommerce_update_order_review_fragments', [ $this, 'exclude_payment_method_from_fragments' ], 10, 1 );
+		}
 	}
 
 	/**

@@ -1463,6 +1463,8 @@ function cko_enqueue_frontend_assets() {
 			'missing_fields'        => esc_html__( 'Missing fields:', 'checkout-com-unified-payments-api' ),
 			'all_fields_complete'   => esc_html__( 'All fields are complete', 'checkout-com-unified-payments-api' ),
 		),
+		// Preserve card details on checkout updates (coupon apply, address change)
+		'preserve_card_on_update' => ( isset( $flow_settings['flow_preserve_card_on_update'] ) && 'yes' === $flow_settings['flow_preserve_card_on_update'] ),
 		);
 
 		wp_set_script_translations( 'checkout-com-flow-payment-session-script', 'checkout-com-unified-payments-api' );

@@ -3270,6 +3270,15 @@ function destroyFlowComponent() {
  * Reload Flow component
  */
 function reloadFlowComponent() {
+	// Debounce reloads - prevent multiple reloads within 2 seconds
+	const now = Date.now();
+	const lastReload = window.ckoLastReloadTime || 0;
+	if (now - lastReload < 2000) {
+		ckoLogger.debug('[FLOW RELOAD] Debounced - reload already in progress');
+		return;
+	}
+	window.ckoLastReloadTime = now;
+	
 	if (!ckoFlow.flowComponent) {
 		try {
 			initializeFlowIfNeeded();
@@ -3300,6 +3309,9 @@ function reloadFlowComponent() {
 	
 	// Reset initialization flag
 	FlowState.set('initialized', false);
+	
+	// Reset init time to allow immediate re-initialization (this is intentional reload)
+	window.ckoLastInitTime = 0;
 	
 	// Re-initialize Flow
 	try {
@@ -3442,6 +3454,23 @@ function debouncedCheckFlowReload(fieldName, newValue) {
  * 4. All required fields are filled (NEW)
  */
 function initializeFlowIfNeeded() {
+	// EARLY EXIT: If Flow component already exists, don't reinitialize
+	// This prevents duplicate initialization from multiple triggers (observer, updated_checkout, etc.)
+	if (ckoFlow && ckoFlow.flowComponent) {
+		ckoLogger.debug('[FLOW AUTO-INIT] SKIPPED - Flow component already exists');
+		return;
+	}
+	
+	// DEBOUNCE: Prevent rapid re-initialization within 2 seconds
+	// This handles cases where multiple triggers fire in quick succession
+	const now = Date.now();
+	const lastInit = window.ckoLastInitTime || 0;
+	if (now - lastInit < 2000) {
+		ckoLogger.debug('[FLOW AUTO-INIT] DEBOUNCED - recent init at', lastInit, 'current:', now);
+		return;
+	}
+	window.ckoLastInitTime = now;
+	
 	// CRITICAL FIX: Clear old order data from sessionStorage when starting a new checkout
 	// This prevents reusing old order IDs from previous checkouts
 	// BUT: Only clear if we're NOT on a checkout page with an active order (to prevent clearing during payment processing)
@@ -3554,6 +3583,7 @@ function initializeFlowIfNeeded() {
 	});
 	
 	if (!canInit) {
+		ckoLogger.debug('[FLOW AUTO-INIT] canInitializeFlow() returned FALSE - showing waiting message');
 		ckoLogger.debug('❌ BLOCKED - Cannot initialize Flow - validation failed', {
 			requiredFieldsFilled: requiredFieldsFilled(),
 			requiredFieldsValid: requiredFieldsFilledAndValid(),
@@ -3566,6 +3596,8 @@ function initializeFlowIfNeeded() {
 		setupFieldWatchersForInitialization();
 		return;
 	}
+	
+	ckoLogger.debug('[FLOW AUTO-INIT] canInitializeFlow() returned TRUE - proceeding');
 	
 	// Hide waiting message if it was shown
 	hideFlowWaitingMessage();
@@ -3588,6 +3620,7 @@ function initializeFlowIfNeeded() {
 	
 	// Only initialize if not already initialized
 	if (!FlowState.get('initialized') || !ckoFlow.flowComponent) {
+		ckoLogger.debug('[FLOW AUTO-INIT] About to call ckoFlow.init()...');
 		ckoLogger.debug('🚀 STARTING - Calling ckoFlow.init()...', {
 			alreadyInitialized: FlowState.get('initialized'),
 			componentExists: !!ckoFlow.flowComponent,
@@ -3596,18 +3629,18 @@ function initializeFlowIfNeeded() {
 		FlowState.set('initializing', true);
 		
 		try {
-			ckoLogger.debug('Calling ckoFlow.init()...');
+			ckoLogger.debug('[FLOW AUTO-INIT] Calling ckoFlow.init() NOW');
 			ckoFlow.init();
+			ckoLogger.debug('[FLOW AUTO-INIT] ckoFlow.init() returned');
 		} catch (error) {
-			console.error('[FLOW INIT] ❌ ERROR - Error during Flow initialization:', error);
+			ckoLogger.error('[FLOW AUTO-INIT] Error during Flow initialization:', error);
 			ckoLogger.debug('Error during Flow initialization:', error);
 			FlowState.set('initialized', false);
 			FlowState.set('initializing', false);
 			throw error;
 		}
 	} else {
-		ckoLogger.debug('⏭️ SKIPPED - Already initialized, skipping ckoFlow.init()');
-		ckoLogger.debug('Skipping ckoFlow.init() - already initialized');
+		ckoLogger.debug('[FLOW AUTO-INIT] SKIPPED - already initialized');
 	}
 }
 
@@ -3852,6 +3885,17 @@ document.addEventListener("DOMContentLoaded", function () {
 		logCheckoutFieldSnapshot('updated_checkout');
 		normalizeFlowPaymentLabelText();
 		checkRequiredFieldsStatus();
+		
+		// CRITICAL FIX: Try to initialize Flow on updated_checkout
+		// This handles environments where payment methods are rendered AFTER DOMContentLoaded
+		// (e.g., WooCommerce Blocks checkout, async payment method loading, 503 script errors)
+		// Only run this ONCE during initial page load - not on subsequent checkout updates
+		const flowPayment = document.getElementById("payment_method_wc_checkout_com_flow");
+		const componentExists = ckoFlow && ckoFlow.flowComponent;
+		if (flowPayment && flowPayment.checked && !FlowState.get('initialized') && !FlowState.get('initializing') && !componentExists) {
+			ckoLogger.debug('[FLOW AUTO-INIT] updated_checkout - Payment method now available, attempting init');
+			initializeFlowIfNeeded();
+		}
 	});
 	
 	// Keep only last 10 timestamps
@@ -3893,11 +3937,46 @@ if (FlowState.get('is3DSReturn')) {
 	// Check if Flow payment method is selected on page load
 	const flowPayment = document.getElementById("payment_method_wc_checkout_com_flow");
 	
+	ckoLogger.debug('[FLOW AUTO-INIT] DOMContentLoaded - flowPayment:', !!flowPayment, 'checked:', flowPayment?.checked);
+	
+	// CRITICAL FIX: If payment method doesn't exist yet, set up an observer to detect when it's added
+	// This handles environments where payment methods are rendered AFTER DOMContentLoaded
+	if (!flowPayment) {
+		ckoLogger.debug('[FLOW AUTO-INIT] Payment method not found at DOMContentLoaded - setting up observer');
+		const paymentObserver = new MutationObserver(function(mutations, observer) {
+			const flowPaymentNow = document.getElementById("payment_method_wc_checkout_com_flow");
+			if (flowPaymentNow) {
+				ckoLogger.debug('[FLOW AUTO-INIT] Payment method appeared in DOM via observer, checked:', flowPaymentNow.checked);
+				observer.disconnect(); // Stop observing
+				
+				const componentExists = ckoFlow && ckoFlow.flowComponent;
+				if (flowPaymentNow.checked && !FlowState.get('initialized') && !FlowState.get('initializing') && !componentExists) {
+					ckoLogger.debug('[FLOW AUTO-INIT] Initializing Flow via observer');
+					initializeFlowIfNeeded();
+					
+					if (!FlowState.get('initialized')) {
+						setupFieldWatchersForInitialization();
+					}
+				}
+			}
+		});
+		
+		// Observe the body for added nodes
+		paymentObserver.observe(document.body, { childList: true, subtree: true });
+		
+		// Stop observer after 30 seconds to prevent indefinite watching
+		setTimeout(function() {
+			paymentObserver.disconnect();
+			ckoLogger.debug('[FLOW AUTO-INIT] Observer timeout - disconnected');
+		}, 30000);
+	}
+	
 	// If Flow is selected, check if we can initialize it
 	if (flowPayment && flowPayment.checked) {
-		ckoLogger.debug('DOMContentLoaded: Flow payment method is selected');
+		ckoLogger.debug('[FLOW AUTO-INIT] Payment selected, calling initializeFlowIfNeeded...');
 		// Try to initialize - validation will happen inside initializeFlowIfNeeded()
 		initializeFlowIfNeeded();
+		ckoLogger.debug('[FLOW AUTO-INIT] After initializeFlowIfNeeded, initialized:', FlowState.get('initialized'));
 		
 		// Also setup field watchers in case fields aren't filled yet
 		if (!FlowState.get('initialized')) {

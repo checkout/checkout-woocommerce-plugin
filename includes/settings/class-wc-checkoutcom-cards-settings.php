@@ -1971,6 +1971,26 @@ class WC_Checkoutcom_Cards_Settings {
 			)
 		);
 
+		// Flow Advanced settings.
+		$settings = array_merge(
+			$settings,
+			array(
+				'flow_advanced_settings'           => array(
+					'title'       => __( 'Advanced Settings', 'checkout-com-unified-payments-api' ),
+					'type'        => 'title',
+					'description' => '',
+				),
+				'flow_preserve_card_on_update'     => array(
+					'id'          => 'flow_preserve_card_on_update',
+					'title'       => __( 'Preserve Card Details', 'checkout-com-unified-payments-api' ),
+					'type'        => 'checkbox',
+					'label'       => __( 'Keep card details when applying coupons or changing address', 'checkout-com-unified-payments-api' ),
+					'description' => __( 'When enabled, card details entered by the customer will be preserved when they apply a coupon or change their billing address. Disable this if you experience issues with payment methods not appearing on the checkout page.', 'checkout-com-unified-payments-api' ),
+					'desc_tip'    => true,
+					'default'     => 'no',
+				),
+			)
+		);
 
 		return apply_filters( 'wc_checkout_com_flow_settings', $settings );
 	}

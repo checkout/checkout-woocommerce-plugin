@@ -5,6 +5,9 @@
  * Key mechanism: Detaches Flow container from DOM before WooCommerce replaces fragments,
  * then reattaches it after. This preserves card details during coupon operations.
  *
+ * NOTE: The detach/reattach feature is controlled by admin toggle "Preserve Card Details".
+ * When disabled (default), card details will be cleared on coupon apply for maximum compatibility.
+ *
  * Dependencies: jQuery, flow-logger.js, flow-state.js
  *
  * @module FlowUpdatedCheckoutGuard
@@ -12,6 +15,9 @@
 
 (function () {
 	'use strict';
+
+	// Check if preserve card feature is enabled (admin toggle)
+	const preserveCardEnabled = typeof cko_flow_vars !== 'undefined' && cko_flow_vars.preserve_card_on_update === true;
 
 	// order_amount is in cents (minor units). Used to detect coupon/cart changes so Flow reloads with correct amount.
 	let previousOrderAmount =
@@ -112,8 +118,17 @@
 	/**
 	 * Detach Flow container from DOM to protect it from WooCommerce fragment replacement.
 	 * Called BEFORE WooCommerce AJAX request to ensure container is safe.
+	 * Only operates when preserve_card_on_update is enabled.
 	 */
 	function detachFlowContainer() {
+		// Skip if feature is disabled
+		if (!preserveCardEnabled) {
+			if (typeof ckoLogger !== 'undefined') {
+				ckoLogger.debug('[COUPON GUARD] Preserve card feature disabled - skipping detach');
+			}
+			return false;
+		}
+
 		const flowContainer = document.getElementById('flow-container');
 		if (!flowContainer) {
 			if (typeof ckoLogger !== 'undefined') {
@@ -157,8 +172,14 @@
 
 	/**
 	 * Reattach Flow container after WooCommerce finishes DOM updates.
+	 * Only operates when preserve_card_on_update is enabled.
 	 */
 	function reattachFlowContainer() {
+		// Skip if feature is disabled
+		if (!preserveCardEnabled) {
+			return false;
+		}
+
 		if (!detachedFlowContainer) {
 			if (typeof ckoLogger !== 'undefined') {
 				ckoLogger.debug('[COUPON GUARD] No detached container to reattach');
@@ -218,9 +239,10 @@
 	/**
 	 * Intercept coupon application to track amount changes.
 	 * 
-	 * NOTE: WooCommerce no longer replaces the payment methods section due to PHP filter
-	 * (exclude_payment_method_from_fragments). This interceptor now just tracks the
-	 * coupon action so we can update the pending amount for handleSubmit.
+	 * NOTE: When preserve_card_on_update is enabled, WooCommerce no longer replaces 
+	 * the payment methods section due to PHP filter (exclude_payment_method_from_fragments). 
+	 * This interceptor tracks the coupon action so we can update the pending amount for handleSubmit.
+	 * When disabled, Flow will reload normally after coupon apply.
 	 */
 	function attachCouponInterceptor() {
 		if (typeof jQuery === 'undefined') {
@@ -229,6 +251,14 @@
 
 		// Helper function to handle coupon action
 		function handleCouponAction(actionName) {
+			// Only set flag if preserve card feature is enabled
+			if (!preserveCardEnabled) {
+				if (typeof ckoLogger !== 'undefined') {
+					ckoLogger.debug('[COUPON] Preserve card feature disabled - Flow will reload after ' + actionName);
+				}
+				return;
+			}
+
 			// Check if Flow is initialized
 			if (typeof ckoFlow !== 'undefined' && ckoFlow.flowComponent && 
 			    typeof FlowState !== 'undefined' && FlowState.get('initialized')) {
@@ -348,8 +378,14 @@
 	/**
 	 * Handle reattachment after WooCommerce finishes DOM updates.
 	 * Called from the main updated_checkout handler.
+	 * Only operates when preserve_card_on_update is enabled.
 	 */
 	function handleReattachmentIfNeeded() {
+		// Skip if feature is disabled
+		if (!preserveCardEnabled) {
+			return false;
+		}
+
 		if (typeof ckoLogger !== 'undefined') {
 			ckoLogger.debug('[COUPON GUARD] handleReattachmentIfNeeded called', {
 				amountUpdateInProgress: window.ckoFlowAmountUpdateInProgress,
