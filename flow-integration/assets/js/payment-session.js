@@ -1618,14 +1618,16 @@ var ckoFlow = {
 					// Pre-validate for apple pay.
 					if ( component.selectedType === "applepay" ) {
 						const applePayButton = document.querySelector('button[aria-label="Apple Pay"]');
-						applePayButton.disabled = true;
+						if (applePayButton) {
+							applePayButton.disabled = true;
 
-						const form = jQuery("form.checkout");
+							const form = jQuery("form.checkout");
 
-						if ( ! orderId ) {
-							validateCheckout(form, function (response) {
-								applePayButton.disabled = false;
-							});
+							if ( ! orderId ) {
+								validateCheckout(form, function (response) {
+									if (applePayButton) applePayButton.disabled = false;
+								});
+							}
 						}
 					}
 
