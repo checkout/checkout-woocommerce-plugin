@@ -3464,8 +3464,49 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		$order_id   = isset( $_GET['order_id'] ) ? absint( wp_unslash( $_GET['order_id'] ) ) : 0;
 		$order_key  = isset( $_GET['key'] ) ? sanitize_text_field( wp_unslash( $_GET['key'] ) ) : '';
 		
-		if ( $is_debug ) {
-			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment ID: ' . $payment_id . ', Order ID: ' . $order_id );
+		// CRITICAL: Check for status parameter from Checkout.com redirect
+		// Checkout.com adds status=failed or status=succeeded to the redirect URL
+		$cko_status = isset( $_GET['status'] ) ? sanitize_text_field( wp_unslash( $_GET['status'] ) ) : '';
+		
+		// ALWAYS log this for debugging 3DS issues - critical for troubleshooting
+		WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment ID: ' . $payment_id . ', Order ID: ' . $order_id . ', CKO Status: ' . ( $cko_status ?: 'NOT SET' ) . ', Full URL params: ' . wp_json_encode( array_keys( $_GET ) ) );
+		
+		// EARLY EXIT: If Checkout.com explicitly tells us payment failed, handle it immediately
+		if ( 'failed' === $cko_status ) {
+			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ❌ Checkout.com returned status=failed - Payment was declined' );
+			
+			// Try to load order if we have order_id
+			$order = null;
+			if ( ! empty( $order_id ) ) {
+				$order = wc_get_order( $order_id );
+			}
+			
+			// Update order status if found
+			if ( $order ) {
+				$order->update_status( 'failed', __( 'Payment was declined by Checkout.com (3DS failure)', 'checkout-com-unified-payments-api' ) );
+				if ( ! empty( $payment_id ) ) {
+					$order->update_meta_data( '_cko_payment_id', $payment_id );
+					$order->update_meta_data( '_cko_flow_payment_id', $payment_id );
+				}
+				$order->save();
+			}
+			
+			// Show error and redirect to checkout
+			WC_Checkoutcom_Utility::wc_add_notice_self( __( 'Payment was declined. Please try again with a different payment method.', 'checkout-com-unified-payments-api' ), 'error' );
+			
+			if ( ! empty( $order_id ) && ! empty( $order_key ) ) {
+				$redirect_url = wc_get_endpoint_url( 'order-pay', $order_id, wc_get_checkout_url() );
+				$redirect_url = add_query_arg( array(
+					'pay_for_order'  => 'true',
+					'key'            => $order_key,
+					'payment_failed' => '1',
+				), $redirect_url );
+			} else {
+				$redirect_url = add_query_arg( 'payment_failed', '1', wc_get_checkout_url() );
+			}
+			
+			wp_safe_redirect( $redirect_url );
+			exit;
 		}
 		
 		if ( empty( $payment_id ) ) {
@@ -4039,12 +4080,49 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		}
 		
 		// PERFORMANCE: Check if payment is already processed BEFORE fetching payment details
+		// CRITICAL: Refresh order from database first to get latest webhook updates
+		if ( $order && $order_id ) {
+			$order = wc_get_order( $order_id );
+		}
 		$existing_payment = $order->get_meta( '_cko_payment_id' );
 		
 		if ( $existing_payment === $payment_id ) {
-			$return_url = $this->get_return_url( $order );
-			wp_safe_redirect( $return_url );
-			exit;
+			// CRITICAL FIX: Check order status before redirecting
+			// If webhook already processed this as declined/failed, redirect to checkout with error
+			$current_order_status = $order->get_status();
+			
+			if ( 'failed' === $current_order_status ) {
+				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment already processed as FAILED - Order ID: ' . $order_id . ', Payment ID: ' . $payment_id . ' - Redirecting to checkout with error' );
+				WC_Checkoutcom_Utility::wc_add_notice_self( __( 'Payment was declined. Please try again with a different payment method.', 'checkout-com-unified-payments-api' ), 'error' );
+				
+				// Determine redirect URL based on context
+				if ( ! empty( $order_id ) && ! empty( $order_key ) ) {
+					$redirect_url = wc_get_endpoint_url( 'order-pay', $order_id, wc_get_checkout_url() );
+					$redirect_url = add_query_arg( array(
+						'pay_for_order' => 'true',
+						'key'           => $order_key,
+						'payment_failed' => '1',
+					), $redirect_url );
+				} else {
+					$redirect_url = add_query_arg( 'payment_failed', '1', wc_get_checkout_url() );
+				}
+				
+				wp_safe_redirect( $redirect_url );
+				exit;
+			}
+			
+			// CRITICAL: Only redirect to thank you page if order is ACTUALLY successful
+			// Status must be processing, completed, or on-hold (NOT pending)
+			// If status is pending, payment hasn't been confirmed yet - continue processing
+			if ( in_array( $current_order_status, array( 'processing', 'completed', 'on-hold' ), true ) ) {
+				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment already processed successfully - Order ID: ' . $order_id . ', Status: ' . $current_order_status . ' - Redirecting to thank you page' );
+				$return_url = $this->get_return_url( $order );
+				wp_safe_redirect( $return_url );
+				exit;
+			}
+			
+			// Status is pending - continue processing to verify payment status with Checkout.com API
+			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order has payment ID but status is still pending - continuing to verify payment status. Order ID: ' . $order_id );
 		}
 		
 		// PERFORMANCE: Use cached payment details if available, otherwise fetch
@@ -4080,15 +4158,42 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		
 		// Check if payment is approved
 		try {
-			// If payment_details is null (SDK not available), check if we have a payment ID
-			// For Flow payments, if payment ID exists, payment was processed by Flow component
-			// and we should assume it's approved (webhooks will handle final status)
+			// CRITICAL FIX: Refresh order from database to get latest status
+			// The webhook may have updated the order status while we were processing
+			// WooCommerce caches the order object, so we need to force a fresh read
+			if ( $order && $order_id ) {
+				// Clear any cached data and reload from database
+				$order = wc_get_order( $order_id );
+				if ( $is_debug ) {
+					WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Refreshed order from database - Order ID: ' . $order_id . ', Status: ' . ( $order ? $order->get_status() : 'ORDER NOT FOUND' ) );
+				}
+			}
+			
+			// CRITICAL FIX: Before assuming approval, check if webhook already processed this payment
+			// Webhook may have already marked the order as failed before this 3DS return handler runs
+			$webhook_order_status = $order ? $order->get_status() : '';
+			
+			// If payment_details is null (SDK not available), check webhook status first
 			if ( empty( $payment_details ) && ! empty( $payment_id ) ) {
 				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment details not available (SDK missing), but payment ID exists: ' . $payment_id );
-				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Assuming payment approved - Flow component handles approval client-side, webhooks will verify' );
-				$is_approved = true; // Assume approved if payment ID exists and SDK unavailable
+				
+				// Check if webhook already marked this as failed
+				if ( 'failed' === $webhook_order_status ) {
+					WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Webhook already marked order as FAILED - NOT assuming approved. Order ID: ' . $order_id );
+					$is_approved = false;
+				} else {
+					// Only assume approved if order is not failed (pending or already processing/on-hold)
+					WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order status is "' . $webhook_order_status . '" - assuming payment approved (webhooks will verify)' );
+					$is_approved = true;
+				}
 			} else {
 				$is_approved = isset( $payment_details['approved'] ) ? $payment_details['approved'] : false;
+				
+				// Double-check: even if API says approved, if webhook marked as failed, respect that
+				if ( $is_approved && 'failed' === $webhook_order_status ) {
+					WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] API says approved but webhook marked order as FAILED - trusting webhook. Order ID: ' . $order_id );
+					$is_approved = false;
+				}
 			}
 			
 			if ( ! $is_approved ) {
