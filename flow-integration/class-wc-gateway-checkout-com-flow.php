@@ -2072,6 +2072,25 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				}
 			}
 			
+			// CRITICAL FIX: Update order status if still 'failed' (retry payment scenario)
+			// When a retry payment succeeds, duplicate prevention triggers but order is still 'failed' from first attempt
+			$current_order_status_txn = $order->get_status();
+			if ( 'failed' === $current_order_status_txn || 'pending' === $current_order_status_txn ) {
+				$payment_authorized = $order->get_meta( 'cko_payment_authorized' );
+				$payment_captured = $order->get_meta( 'cko_payment_captured' );
+				
+				if ( $payment_authorized || $payment_captured ) {
+					$auth_status = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
+					$new_status = $payment_captured ? 'processing' : $auth_status;
+					$order->update_status( $new_status, __( 'Order status updated after successful retry payment (transaction ID duplicate prevention).', 'checkout-com-unified-payments-api' ) );
+					WC_Checkoutcom_Utility::logger( '[DUPLICATE PREVENTION] ✅ Updated order status from ' . $current_order_status_txn . ' to ' . $new_status . ' (transaction ID check) - Order ID: ' . $order_id );
+				} else {
+					$auth_status = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
+					$order->update_status( $auth_status, __( 'Payment authorized (retry payment - transaction ID duplicate prevention).', 'checkout-com-unified-payments-api' ) );
+					WC_Checkoutcom_Utility::logger( '[DUPLICATE PREVENTION] ✅ Updated order status from ' . $current_order_status_txn . ' to ' . $auth_status . ' (no webhook yet, transaction ID check) - Order ID: ' . $order_id );
+				}
+			}
+			
 			// Return success to prevent error, but don't process again
 			return array(
 				'result'   => 'success',
@@ -2171,6 +2190,36 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					WC()->session->__unset( 'wc-wc_checkout_com_flow-new-payment-method' );
 				} else {
 					WC_Checkoutcom_Utility::logger( '[FLOW SAVE CARD] [DUPLICATE PREVENTION] ❌ Conditions NOT met - Payment type: ' . $flow_payment_type_for_save . ' (expected: card), Save enabled: ' . ( $save_card_enabled ? 'YES' : 'NO' ) . ', Checkbox: ' . ( $save_card_checkbox ? 'YES' : 'NO' ) );
+				}
+				
+				// CRITICAL FIX: Clear any error notices from previous failed payment attempts
+				// This prevents stale error messages from showing on the success page after a retry payment succeeds
+				if ( function_exists( 'wc_clear_notices' ) ) {
+					wc_clear_notices();
+					WC_Checkoutcom_Utility::logger( '[DUPLICATE PREVENTION] Cleared WooCommerce notices before success redirect (prevents stale error messages from failed retries)' );
+				}
+				
+				// CRITICAL FIX: Update order status if still 'failed' (retry payment scenario)
+				// When a retry payment succeeds, duplicate prevention triggers but order is still 'failed' from first attempt
+				// This causes WooCommerce to show "payment declined" message on order-received page
+				$current_order_status = $order->get_status();
+				if ( 'failed' === $current_order_status || 'pending' === $current_order_status ) {
+					// Check if payment was actually approved (via order meta set by webhook or API verification)
+					$payment_authorized = $order->get_meta( 'cko_payment_authorized' );
+					$payment_captured = $order->get_meta( 'cko_payment_captured' );
+					
+					if ( $payment_authorized || $payment_captured ) {
+						$auth_status = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
+						$new_status = $payment_captured ? 'processing' : $auth_status;
+						$order->update_status( $new_status, __( 'Order status updated after successful retry payment (duplicate prevention).', 'checkout-com-unified-payments-api' ) );
+						WC_Checkoutcom_Utility::logger( '[DUPLICATE PREVENTION] ✅ Updated order status from ' . $current_order_status . ' to ' . $new_status . ' - Order ID: ' . $order_id );
+					} else {
+						// No webhook received yet - set to authorized status anyway since payment ID exists and we're returning success
+						// Webhook will update to processing when captured
+						$auth_status = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
+						$order->update_status( $auth_status, __( 'Payment authorized (retry payment - duplicate prevention).', 'checkout-com-unified-payments-api' ) );
+						WC_Checkoutcom_Utility::logger( '[DUPLICATE PREVENTION] ✅ Updated order status from ' . $current_order_status . ' to ' . $auth_status . ' (no webhook yet) - Order ID: ' . $order_id );
+					}
 				}
 				
 				// Return success to prevent error, but don't process again
@@ -4527,6 +4576,13 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// Redirect after card saving logic completes
 			if ( isset( $result['result'] ) && 'success' === $result['result'] && isset( $result['redirect'] ) ) {
 				$redirect_url = $result['redirect'];
+				
+				// CRITICAL FIX: Clear any error notices from previous failed payment attempts
+				// This prevents stale error messages from showing on the success page after a retry payment succeeds
+				if ( function_exists( 'wc_clear_notices' ) ) {
+					wc_clear_notices();
+					WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Cleared WooCommerce notices before success redirect (prevents stale error messages from failed retries)' );
+				}
 				
 				// CRITICAL FIX: Ensure order key is always in redirect URL, even for logged-in users
 				// WooCommerce may require the order key for validation even for logged-in users
