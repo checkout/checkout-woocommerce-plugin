@@ -74,6 +74,11 @@
 		 * @returns {Object} Result with canInitialize flag and reason if not
 		 */
 		canInitialize: function() {
+			// Check if Flow component already exists (strongest guard)
+			if (window.ckoFlow && window.ckoFlow.flowComponent) {
+				return { canInitialize: false, reason: 'COMPONENT_EXISTS' };
+			}
+			
 			// Check if already initializing
 			if (window.FlowState && window.FlowState.get('initializing')) {
 				return { canInitialize: false, reason: 'ALREADY_INITIALIZING' };
@@ -109,11 +114,19 @@
 				return { canInitialize: false, reason: 'CONTAINER_NOT_FOUND' };
 			}
 			
-			// Check if already initialized
-			if (window.FlowState && window.FlowState.get('initialized') && window.ckoFlow && window.ckoFlow.flowComponent) {
+			// Check if already initialized (with DOM verification)
+			if (window.FlowState && window.FlowState.get('initialized')) {
 				const flowComponentRoot = document.querySelector('[data-testid="checkout-web-component-root"]');
 				if (flowComponentRoot) {
 					return { canInitialize: false, reason: 'ALREADY_INITIALIZED' };
+				}
+			}
+			
+			// Check if required fields are filled (prevents premature init that will just fail)
+			if (typeof window.requiredFieldsFilledAndValid === 'function') {
+				const fieldsValid = window.requiredFieldsFilledAndValid();
+				if (!fieldsValid) {
+					return { canInitialize: false, reason: 'FIELDS_NOT_FILLED' };
 				}
 			}
 			

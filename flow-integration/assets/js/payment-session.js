@@ -151,7 +151,16 @@ var ckoFlow = {
 			if (validation.reason === 'FIELDS_NOT_FILLED') {
 				ckoLogger.debug('loadFlow: Required fields not filled - showing waiting message and aborting');
 				showFlowWaitingMessage();
-				// Reset initialization state so Flow can retry when fields are filled
+				// Reset initialized (should already be false)
+				FlowState.set('initialized', false);
+				// Delay reset of initializing flag to prevent immediate duplicate calls
+				// This gives time for the UI to settle before allowing retry
+				setTimeout(() => {
+					FlowState.set('initializing', false);
+					ckoLogger.debug('loadFlow: Initializing flag reset after delay');
+				}, 500);
+			} else {
+				// For other validation failures, reset immediately
 				FlowState.set('initialized', false);
 				FlowState.set('initializing', false);
 			}
@@ -160,7 +169,7 @@ var ckoFlow = {
 		
 		ckoLogger.debug('loadFlow: Validation passed - proceeding with payment session creation');
 		
-		ckoLogger.version('2025-10-13-FINAL-E2E');
+		ckoLogger.version('5.0.4');
 		
 		// Check if we're on a redirect page with payment parameters - if so, don't initialize Flow
 		const urlParams = new URLSearchParams(window.location.search);
@@ -804,14 +813,21 @@ var ckoFlow = {
 				if (!fieldsValidCheck) {
 					ckoLogger.debug('Required fields not filled - showing waiting message instead of error');
 					showFlowWaitingMessage();
-					// Reset initialization state so Flow can retry when fields are filled
+					// Reset initialized flag (should already be false)
 					FlowState.set('initialized', false);
-					FlowState.set('initializing', false);
+					// Delay reset of initializing flag to prevent immediate duplicate calls
+					setTimeout(() => {
+						FlowState.set('initializing', false);
+						ckoLogger.debug('Email validation: Initializing flag reset after delay');
+					}, 500);
 					return; // Exit - don't call API
 				} else {
 					// Fields are filled but email is invalid - show error
 					ckoLogger.debug('Fields are filled but email is invalid - showing error message');
 					showError('Please enter a valid email address to continue with payment.');
+					// Reset flags for retry
+					FlowState.set('initialized', false);
+					FlowState.set('initializing', false);
 					return; // Exit - don't call API
 				}
 			}
@@ -2470,6 +2486,9 @@ var ckoFlow = {
 			FlowState.set('initialized', true);
 			FlowState.set('initializing', false);
 			FlowState.set('lastInitTime', Date.now()); // Track init time to prevent immediate update_checkout
+			
+			// Reset field watcher flag - watchers are no longer needed once initialized
+			window.ckoFieldWatchersSetup = false;
 
 			// Enable UI after successful mount
 			ckoFlow.enableUIAfterMount();
@@ -3265,6 +3284,9 @@ function destroyFlowComponent() {
 		flowComponentRoot.innerHTML = '';
 	}
 	
+	// Reset field watcher flag so they can be re-setup when Flow needs to reinitialize
+	window.ckoFieldWatchersSetup = false;
+	
 	ckoLogger.debug('Flow component destroyed');
 }
 
@@ -3381,6 +3403,8 @@ function checkRequiredFieldsStatus() {
 			destroyFlowComponent();
 			showFlowWaitingMessage();
 			FlowState.set('initialized', false);
+			// Reset field watcher flag so it can be re-setup when fields are filled again
+			window.ckoFieldWatchersSetup = false;
 		}
 	} else if (!wereFilled && areFilled) {
 		// Fields became filled - initialize Flow
@@ -3456,6 +3480,7 @@ function debouncedCheckFlowReload(fieldName, newValue) {
  * 4. All required fields are filled (NEW)
  */
 function initializeFlowIfNeeded() {
+	
 	// EARLY EXIT: If Flow component already exists, don't reinitialize
 	// This prevents duplicate initialization from multiple triggers (observer, updated_checkout, etc.)
 	if (ckoFlow && ckoFlow.flowComponent) {
@@ -3463,15 +3488,9 @@ function initializeFlowIfNeeded() {
 		return;
 	}
 	
-	// DEBOUNCE: Prevent rapid re-initialization within 2 seconds
-	// This handles cases where multiple triggers fire in quick succession
+	// NOTE: Debounce check moved AFTER guard checks
+	// This allows retries when container becomes available
 	const now = Date.now();
-	const lastInit = window.ckoLastInitTime || 0;
-	if (now - lastInit < 2000) {
-		ckoLogger.debug('[FLOW AUTO-INIT] DEBOUNCED - recent init at', lastInit, 'current:', now);
-		return;
-	}
-	window.ckoLastInitTime = now;
 	
 	// CRITICAL FIX: Clear old order data from sessionStorage when starting a new checkout
 	// This prevents reusing old order IDs from previous checkouts
@@ -3508,7 +3527,9 @@ function initializeFlowIfNeeded() {
 			ckoLogger.debug(`⏭️ ATTEMPT #${attemptNumber} BLOCKED - Reason: ${guardCheck.reason}`, {
 				timestamp: new Date().toLocaleTimeString()
 			});
-			if (guardCheck.reason === 'ALREADY_INITIALIZING') {
+			if (guardCheck.reason === 'COMPONENT_EXISTS') {
+				ckoLogger.debug('Flow component already exists, skipping duplicate initialization');
+			} else if (guardCheck.reason === 'ALREADY_INITIALIZING') {
 				ckoLogger.debug('Flow initialization already in progress, skipping duplicate call');
 			} else if (guardCheck.reason === '3DS_RETURN' || guardCheck.reason === '3DS_RETURN_URL') {
 				ckoLogger.threeDS('⚠️ initializeFlowIfNeeded: Blocked by 3DS return');
@@ -3517,6 +3538,27 @@ function initializeFlowIfNeeded() {
 				ckoLogger.debug('Flow payment method not selected, skipping initialization');
 			} else if (guardCheck.reason === 'CONTAINER_NOT_FOUND') {
 				ckoLogger.debug('Flow container not found, skipping initialization');
+				// Show waiting message since payment is selected but container isn't ready
+				document.body.classList.add("cko-flow--method-selected");
+				showFlowWaitingMessage();
+				// Only setup watchers if not already setup - prevents infinite loop
+				if (!window.ckoFieldWatchersSetup) {
+					setupFieldWatchersForInitialization();
+				}
+			} else if (guardCheck.reason === 'FIELDS_NOT_FILLED') {
+				// Throttle FIELDS_NOT_FILLED logs to prevent console spam
+				const lastFieldsNotFilledLog = window.ckoLastFieldsNotFilledLog || 0;
+				if (now - lastFieldsNotFilledLog > 5000) {
+					ckoLogger.debug('Required fields not filled, showing waiting message');
+					window.ckoLastFieldsNotFilledLog = now;
+				}
+				// Show waiting message and setup field watchers (only once)
+				document.body.classList.add("cko-flow--method-selected");
+				showFlowWaitingMessage();
+				// Only setup watchers if not already setup - prevents infinite loop
+				if (!window.ckoFieldWatchersSetup) {
+					setupFieldWatchersForInitialization();
+				}
 			} else if (guardCheck.reason === 'ALREADY_INITIALIZED') {
 				// Already initialized - just ensure UI is correct
 				const elements = window.FlowInitialization.getFlowElements();
@@ -3530,8 +3572,22 @@ function initializeFlowIfNeeded() {
 			}
 			return;
 		}
+		
+		// DEBOUNCE: Now that guard check passed, apply debounce to prevent duplicate init
+		const lastInit = window.ckoLastInitTime || 0;
+		if (now - lastInit < 2000) {
+			ckoLogger.debug('[FLOW AUTO-INIT] DEBOUNCED - recent init at', lastInit, 'current:', now);
+			return;
+		}
+		window.ckoLastInitTime = now;
 	} else {
 		// Fallback to original checks if helper not available
+		
+		// Check if component already exists (strongest guard)
+		if (ckoFlow && ckoFlow.flowComponent) {
+			ckoLogger.debug('Flow component already exists, skipping duplicate initialization');
+			return;
+		}
 		if (FlowState.get('initializing')) {
 			ckoLogger.debug('Flow initialization already in progress, skipping duplicate call');
 			return;
@@ -3548,8 +3604,37 @@ function initializeFlowIfNeeded() {
 		const flowContainer = document.getElementById("flow-container");
 		if (!flowContainer) {
 			ckoLogger.debug('Flow container not found, skipping initialization');
+			// Show waiting message since payment is selected but container isn't ready
+			document.body.classList.add("cko-flow--method-selected");
+			showFlowWaitingMessage();
+			// Only setup watchers if not already setup - prevents infinite loop
+			if (!window.ckoFieldWatchersSetup) {
+				setupFieldWatchersForInitialization();
+			}
 			return;
 		}
+		// Check if required fields are filled (prevents premature init)
+		if (typeof window.requiredFieldsFilledAndValid === 'function') {
+			const fieldsValid = window.requiredFieldsFilledAndValid();
+			if (!fieldsValid) {
+				ckoLogger.debug('Required fields not filled, showing waiting message');
+				document.body.classList.add("cko-flow--method-selected");
+				showFlowWaitingMessage();
+				// Only setup watchers if not already setup - prevents infinite loop
+				if (!window.ckoFieldWatchersSetup) {
+					setupFieldWatchersForInitialization();
+				}
+				return;
+			}
+		}
+		
+		// DEBOUNCE: Now that guard check passed, apply debounce to prevent duplicate init
+		const lastInit = window.ckoLastInitTime || 0;
+		if (now - lastInit < 2000) {
+			ckoLogger.debug('[FLOW AUTO-INIT] DEBOUNCED - recent init at', lastInit, 'current:', now);
+			return;
+		}
+		window.ckoLastInitTime = now;
 	}
 	
 	// Get Flow elements
@@ -3636,7 +3721,6 @@ function initializeFlowIfNeeded() {
 			ckoLogger.debug('[FLOW AUTO-INIT] ckoFlow.init() returned');
 		} catch (error) {
 			ckoLogger.error('[FLOW AUTO-INIT] Error during Flow initialization:', error);
-			ckoLogger.debug('Error during Flow initialization:', error);
 			FlowState.set('initialized', false);
 			FlowState.set('initializing', false);
 			throw error;
@@ -3653,8 +3737,19 @@ function initializeFlowIfNeeded() {
 function setupFieldWatchersForInitialization() {
 	// Only setup if Flow is not initialized
 	if (FlowState.get('initialized')) {
+		window.ckoFieldWatchersSetup = false; // Reset flag when Flow is initialized
 		return;
 	}
+	
+	// Prevent duplicate watcher setup - this prevents infinite loops
+	if (window.ckoFieldWatchersSetup) {
+		ckoLogger.debug('Field watchers already setup, skipping duplicate setup');
+		return;
+	}
+	
+	// Set flag to prevent duplicate setup
+	window.ckoFieldWatchersSetup = true;
+	ckoLogger.debug('Setting up field watchers for initialization (first time)');
 	
 	// Get all required field selectors
 	const requiredLabels = document.querySelectorAll(".woocommerce-checkout label .required");
@@ -3715,17 +3810,23 @@ function setupFieldWatchersForInitialization() {
 		}
 	});
 	
-	// Setup watchers with debouncing
+	// Setup watchers with debouncing - increased debounce to prevent rapid firing
 	const debouncedCheck = debounce(() => {
 		ckoLogger.debug('Field watcher triggered - checking if Flow can initialize');
-		checkRequiredFieldsStatus();
 		
-		// Also directly check if we can initialize now
-		if (!FlowState.get('initialized') && canInitializeFlow()) {
+		// Only call checkRequiredFieldsStatus and try to initialize if fields are actually valid
+		// This prevents the infinite loop where FIELDS_NOT_FILLED keeps triggering
+		if (canInitializeFlow()) {
 			ckoLogger.debug('Field watcher - all fields valid, initializing Flow');
+			checkRequiredFieldsStatus();
 			initializeFlowIfNeeded();
+		} else {
+			// Just check field status for state tracking, don't try to init
+			const areFilled = requiredFieldsFilledAndValid();
+			FlowState.set('fieldsWereFilled', areFilled);
+			ckoLogger.debug('Field watcher - fields not valid yet, waiting...', { areFilled });
 		}
-	}, 300); // Reduced debounce to 300ms for faster response
+	}, 500); // Increased debounce to 500ms to prevent rapid firing
 	
 	// Attach watchers to all required fields
 	fieldSelectors.forEach(selector => {
@@ -3750,13 +3851,13 @@ function setupFieldWatchersForInitialization() {
 	
 	ckoLogger.debug('Field watchers setup for initialization', { fieldCount: fieldSelectors.length });
 	
-	// Also check immediately if fields are already filled
+	// Also check immediately if fields are already filled (with a slightly longer delay)
 	setTimeout(() => {
 		if (!FlowState.get('initialized') && canInitializeFlow()) {
 			ckoLogger.debug('Immediate check after watcher setup - fields already filled, initializing Flow');
 			initializeFlowIfNeeded();
 		}
-	}, 100);
+	}, 200);
 }
 
 /**
@@ -3883,6 +3984,7 @@ document.addEventListener("DOMContentLoaded", function () {
 	window.ckoPageLoadTimestamps.push(loadTime);
 
 	normalizeFlowPaymentLabelText();
+	
 	jQuery(document.body).on('updated_checkout', function() {
 		logCheckoutFieldSnapshot('updated_checkout');
 		normalizeFlowPaymentLabelText();
@@ -3894,6 +3996,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		// Only run this ONCE during initial page load - not on subsequent checkout updates
 		const flowPayment = document.getElementById("payment_method_wc_checkout_com_flow");
 		const componentExists = ckoFlow && ckoFlow.flowComponent;
+		
 		if (flowPayment && flowPayment.checked && !FlowState.get('initialized') && !FlowState.get('initializing') && !componentExists) {
 			ckoLogger.debug('[FLOW AUTO-INIT] updated_checkout - Payment method now available, attempting init');
 			initializeFlowIfNeeded();
@@ -3930,6 +4033,7 @@ if (FlowState.get('is3DSReturn')) {
 	const sessionId = urlParams.get("cko-session-id");
 	const paymentSessionId = urlParams.get("cko-payment-session-id");
 	
+	
 	if (paymentId || sessionId || paymentSessionId) {
 		ckoLogger.threeDS('DOMContentLoaded: 3DS return detected in URL, skipping Flow initialization');
 		FlowState.set('is3DSReturn', true);
@@ -3938,6 +4042,7 @@ if (FlowState.get('is3DSReturn')) {
 	
 	// Check if Flow payment method is selected on page load
 	const flowPayment = document.getElementById("payment_method_wc_checkout_com_flow");
+	
 	
 	ckoLogger.debug('[FLOW AUTO-INIT] DOMContentLoaded - flowPayment:', !!flowPayment, 'checked:', flowPayment?.checked);
 	
@@ -3952,6 +4057,7 @@ if (FlowState.get('is3DSReturn')) {
 				observer.disconnect(); // Stop observing
 				
 				const componentExists = ckoFlow && ckoFlow.flowComponent;
+				
 				if (flowPaymentNow.checked && !FlowState.get('initialized') && !FlowState.get('initializing') && !componentExists) {
 					ckoLogger.debug('[FLOW AUTO-INIT] Initializing Flow via observer');
 					initializeFlowIfNeeded();
@@ -3986,13 +4092,18 @@ if (FlowState.get('is3DSReturn')) {
 			
 			// Set up periodic check as fallback (every 2 seconds)
 			// This ensures Flow initializes even if field watchers don't trigger
+			let periodicCheckCount = 0;
 			const periodicCheck = setInterval(() => {
+				periodicCheckCount++;
+				
 				if (FlowState.get('initialized')) {
 					clearInterval(periodicCheck);
 					return;
 				}
 				
-				if (canInitializeFlow()) {
+				const canInit = canInitializeFlow();
+				
+				if (canInit) {
 					ckoLogger.debug('Periodic check - Flow can initialize, initializing now');
 					initializeFlowIfNeeded();
 					clearInterval(periodicCheck);
@@ -4018,6 +4129,7 @@ if (FlowState.get('is3DSReturn')) {
 			ckoLogger.debug('DOMContentLoaded: Order-pay page detected, but Flow payment method not selected');
 		}
 	}
+	
 });
 
 /**

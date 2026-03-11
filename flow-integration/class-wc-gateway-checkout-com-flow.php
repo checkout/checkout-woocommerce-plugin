@@ -4088,32 +4088,10 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		
 		if ( $existing_payment === $payment_id ) {
 			// CRITICAL FIX: Check order status before redirecting
-			// If webhook already processed this as declined/failed, redirect to checkout with error
 			$current_order_status = $order->get_status();
 			
-			if ( 'failed' === $current_order_status ) {
-				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment already processed as FAILED - Order ID: ' . $order_id . ', Payment ID: ' . $payment_id . ' - Redirecting to checkout with error' );
-				WC_Checkoutcom_Utility::wc_add_notice_self( __( 'Payment was declined. Please try again with a different payment method.', 'checkout-com-unified-payments-api' ), 'error' );
-				
-				// Determine redirect URL based on context
-				if ( ! empty( $order_id ) && ! empty( $order_key ) ) {
-					$redirect_url = wc_get_endpoint_url( 'order-pay', $order_id, wc_get_checkout_url() );
-					$redirect_url = add_query_arg( array(
-						'pay_for_order' => 'true',
-						'key'           => $order_key,
-						'payment_failed' => '1',
-					), $redirect_url );
-				} else {
-					$redirect_url = add_query_arg( 'payment_failed', '1', wc_get_checkout_url() );
-				}
-				
-				wp_safe_redirect( $redirect_url );
-				exit;
-			}
-			
 			// CRITICAL: Only redirect to thank you page if order is ACTUALLY successful
-			// Status must be processing, completed, or on-hold (NOT pending)
-			// If status is pending, payment hasn't been confirmed yet - continue processing
+			// Status must be processing, completed, or on-hold (NOT pending or failed)
 			if ( in_array( $current_order_status, array( 'processing', 'completed', 'on-hold' ), true ) ) {
 				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment already processed successfully - Order ID: ' . $order_id . ', Status: ' . $current_order_status . ' - Redirecting to thank you page' );
 				$return_url = $this->get_return_url( $order );
@@ -4121,8 +4099,19 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				exit;
 			}
 			
-			// Status is pending - continue processing to verify payment status with Checkout.com API
-			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order has payment ID but status is still pending - continuing to verify payment status. Order ID: ' . $order_id );
+			// RETRY PAYMENT FIX: If order is failed or pending, DON'T assume it's a failure
+			// This could be a retry payment where the order was previously failed but new payment succeeded
+			// Continue processing to verify actual payment status from Checkout.com API
+			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order has payment ID but status is ' . $current_order_status . ' - continuing to verify payment status from API. Order ID: ' . $order_id );
+			
+			// Update payment session ID if provided in URL (ensures webhook matching works)
+			$payment_session_id_from_url = isset( $_GET['cko-payment-session-id'] ) ? sanitize_text_field( wp_unslash( $_GET['cko-payment-session-id'] ) ) : '';
+			$order_payment_session_id = $order->get_meta( '_cko_payment_session_id' );
+			if ( ! empty( $payment_session_id_from_url ) && $payment_session_id_from_url !== $order_payment_session_id ) {
+				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Updating payment session ID for webhook matching. Old: ' . $order_payment_session_id . ', New: ' . $payment_session_id_from_url );
+				$order->update_meta_data( '_cko_payment_session_id', $payment_session_id_from_url );
+				$order->save();
+			}
 		}
 		
 		// PERFORMANCE: Use cached payment details if available, otherwise fetch
@@ -4169,31 +4158,17 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				}
 			}
 			
-			// CRITICAL FIX: Before assuming approval, check if webhook already processed this payment
-			// Webhook may have already marked the order as failed before this 3DS return handler runs
-			$webhook_order_status = $order ? $order->get_status() : '';
-			
-			// If payment_details is null (SDK not available), check webhook status first
+			// If payment_details is null (SDK not available), we can't verify - assume approved and let webhooks handle
 			if ( empty( $payment_details ) && ! empty( $payment_id ) ) {
 				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment details not available (SDK missing), but payment ID exists: ' . $payment_id );
-				
-				// Check if webhook already marked this as failed
-				if ( 'failed' === $webhook_order_status ) {
-					WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Webhook already marked order as FAILED - NOT assuming approved. Order ID: ' . $order_id );
-					$is_approved = false;
-				} else {
-					// Only assume approved if order is not failed (pending or already processing/on-hold)
-					WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order status is "' . $webhook_order_status . '" - assuming payment approved (webhooks will verify)' );
-					$is_approved = true;
-				}
+				// Assume approved - webhooks will handle final status
+				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Assuming payment approved (webhooks will verify final status)' );
+				$is_approved = true;
 			} else {
+				// TRUST THE API RESPONSE - payment_details['approved'] is the authoritative status for THIS payment
+				// Don't override based on order status - order may be 'failed' from a PREVIOUS payment attempt (retry scenario)
 				$is_approved = isset( $payment_details['approved'] ) ? $payment_details['approved'] : false;
-				
-				// Double-check: even if API says approved, if webhook marked as failed, respect that
-				if ( $is_approved && 'failed' === $webhook_order_status ) {
-					WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] API says approved but webhook marked order as FAILED - trusting webhook. Order ID: ' . $order_id );
-					$is_approved = false;
-				}
+				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment details available - API approved status: ' . ( $is_approved ? 'TRUE' : 'FALSE' ) . ', Payment ID: ' . $payment_id );
 			}
 			
 			if ( ! $is_approved ) {
@@ -7443,16 +7418,27 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// Success - return the response for Flow to handle
 		WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] ✅ Payment submitted successfully - Payment ID: ' . ( $response_data['id'] ?? 'N/A' ) . ', Status: ' . ( $response_data['status'] ?? 'N/A' ) );
 
-		// Save payment ID to order if available
+		// Save payment ID and payment session ID to order if available
 		// CRITICAL: Save to BOTH _cko_payment_id AND _cko_flow_payment_id
 		// METHOD 2 webhook matching requires _cko_flow_payment_id to exist
+		// RETRY FIX: Also update _cko_payment_session_id for retry payments so webhooks can match
 		if ( $order_id > 0 && ! empty( $response_data['id'] ) ) {
 			$order = wc_get_order( $order_id );
 			if ( $order ) {
+				// Check if this is a retry payment (order already has a different session ID)
+				$existing_session_id = $order->get_meta( '_cko_payment_session_id' );
+				$is_retry = ! empty( $existing_session_id ) && $existing_session_id !== $payment_session_id;
+				
+				if ( $is_retry ) {
+					WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] RETRY PAYMENT - Updating session ID. Old: ' . $existing_session_id . ', New: ' . $payment_session_id );
+				}
+				
 				$order->update_meta_data( '_cko_payment_id', $response_data['id'] );
 				$order->update_meta_data( '_cko_flow_payment_id', $response_data['id'] );
+				// Always update payment session ID to ensure webhook matching works for retries
+				$order->update_meta_data( '_cko_payment_session_id', $payment_session_id );
 				$order->save();
-				WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Payment ID saved to order: ' . $order_id );
+				WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Payment ID saved to order: ' . $order_id . ( $is_retry ? ' (RETRY - session ID also updated)' : '' ) );
 			}
 		}
 
