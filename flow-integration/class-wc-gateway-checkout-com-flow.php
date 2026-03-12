@@ -6844,11 +6844,37 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			return $fragments;
 		}
 
+		// CRITICAL FIX: Only exclude fragments when we have EXPLICIT signals.
+		// Some themes/environments use AJAX fragments to render payment methods on initial page load.
+		// If we exclude the fragment on initial load, payment methods never appear ("no payment methods available").
+		// 
+		// We ONLY exclude when:
+		// 1. JavaScript explicitly tells us Flow is initialized (cko_flow_initialized flag)
+		// 2. User performed an explicit action (coupon add/remove, shipping method change)
+		//
+		// This ensures the initial AJAX load always includes the payment fragment.
+		
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- This is a fragment filter, nonce verified by WooCommerce
+		$has_coupon_action = ! empty( $_POST['coupon_code'] ) || isset( $_POST['remove_coupon'] );
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$has_shipping_change = ! empty( $_POST['shipping_method'] );
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$flow_initialized = ! empty( $_POST['cko_flow_initialized'] ) || ! empty( $_REQUEST['cko_flow_initialized'] );
+		
+		// Only exclude if we have explicit signals - no heuristics
+		$should_exclude = $flow_initialized || $has_coupon_action || $has_shipping_change;
+		
+		if ( ! $should_exclude ) {
+			WC_Checkoutcom_Utility::logger( '[FLOW FRAGMENTS] Allowing payment fragment - no explicit exclude signal. flow_initialized=' . ( $flow_initialized ? 'yes' : 'no' ) . ', coupon=' . ( $has_coupon_action ? 'yes' : 'no' ) . ', shipping=' . ( $has_shipping_change ? 'yes' : 'no' ) );
+			return $fragments;
+		}
+
 		// Remove the payment methods fragment to prevent it from being replaced.
 		// This preserves the Flow component and entered card details.
 		if ( isset( $fragments['.woocommerce-checkout-payment'] ) ) {
 			unset( $fragments['.woocommerce-checkout-payment'] );
-			WC_Checkoutcom_Utility::logger( '[FLOW FRAGMENTS] Excluded .woocommerce-checkout-payment from fragment update to preserve Flow component' );
+			WC_Checkoutcom_Utility::logger( '[FLOW FRAGMENTS] Excluded .woocommerce-checkout-payment from fragment update to preserve Flow component. Reason: ' . 
+				( $flow_initialized ? 'flow_initialized' : ( $has_coupon_action ? 'coupon_action' : ( $has_shipping_change ? 'shipping_change' : 'user_interaction' ) ) ) );
 		}
 
 		return $fragments;

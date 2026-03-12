@@ -175,12 +175,24 @@
 					return;
 				}
 
-				// Fields that REQUIRE Flow reload (cardholder name is set at component creation)
+				// Fields that REQUIRE Flow reload
+				// NOTE: Name fields only require reload when cardholder name position is "hidden"
+				// (i.e., cardholder name is pre-populated from billing fields)
+				// When position is "top" or "bottom", user enters name directly in Flow component
+				const cardholderNamePosition = typeof cko_flow_customization_vars !== 'undefined' 
+					? cko_flow_customization_vars.flow_component_cardholder_name_position 
+					: 'top';
+				const nameRequiresReload = cardholderNamePosition === 'hidden';
+				
 				const reloadRequiredFields = [
-					'billing_first_name',  // Cardholder name - requires Flow reload
-					'billing_last_name',   // Cardholder name - requires Flow reload
-					'billing_email'        // Email is in payment session, requires reload
+					'billing_email'        // Email is in payment session, always requires reload
 				];
+				
+				// Only add name fields to reload list if cardholder name position is "hidden"
+				if (nameRequiresReload) {
+					reloadRequiredFields.push('billing_first_name');  // Cardholder name - requires reload when hidden
+					reloadRequiredFields.push('billing_last_name');   // Cardholder name - requires reload when hidden
+				}
 				
 				// Address fields that do NOT require Flow reload (sent via handleSubmit)
 				// These are handled dynamically via Submit Payment Session API

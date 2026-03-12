@@ -787,6 +787,46 @@
 		ckoLogger.debug('[OVERLAY GUARD] AJAX complete handler attached');
 	}
 
+	/**
+	 * Setup AJAX prefilter to add cko_flow_initialized flag to WooCommerce checkout AJAX requests.
+	 * This tells the PHP fragment filter that Flow is already initialized and it's safe to
+	 * exclude the payment methods fragment from updates.
+	 */
+	function setupAjaxPrefilter() {
+		if (typeof jQuery === 'undefined') return;
+		
+		jQuery.ajaxPrefilter(function(options, originalOptions, jqXHR) {
+			// Only modify WooCommerce checkout-related AJAX requests
+			if (!options.url || options.url.indexOf('wc-ajax') === -1) {
+				return;
+			}
+			
+			// Only add flag if Flow is initialized
+			if (typeof FlowState === 'undefined' || !FlowState.get('initialized')) {
+				return;
+			}
+			
+			// Add the flag to the request data
+			if (options.type && options.type.toUpperCase() === 'POST') {
+				if (typeof options.data === 'string') {
+					// URL-encoded data
+					options.data += '&cko_flow_initialized=1';
+				} else if (typeof options.data === 'object' && options.data !== null) {
+					// Object data
+					options.data.cko_flow_initialized = '1';
+				}
+				
+				if (typeof ckoLogger !== 'undefined') {
+					ckoLogger.debug('[AJAX PREFILTER] Added cko_flow_initialized flag to WooCommerce AJAX request');
+				}
+			}
+		});
+		
+		if (typeof ckoLogger !== 'undefined') {
+			ckoLogger.debug('[AJAX PREFILTER] WooCommerce AJAX prefilter registered');
+		}
+	}
+
 	window.FlowUpdatedCheckoutGuard = {
 		init: function () {
 			if (initialized) {
@@ -795,6 +835,7 @@
 			initialized = true;
 			attachHandler();
 			setupAjaxOverlayHandler();
+			setupAjaxPrefilter();
 		},
 		removeOverlay: removeWooCommerceOverlay,
 		getCurrentOrderTotalFromDOM: getCurrentOrderTotalFromDOM
