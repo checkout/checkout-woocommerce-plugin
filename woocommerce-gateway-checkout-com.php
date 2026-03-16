@@ -1925,8 +1925,6 @@ add_action( 'wp_ajax_cko_flow_create_payment_session', 'cko_ajax_flow_create_pay
 add_action( 'wp_ajax_nopriv_cko_flow_create_payment_session', 'cko_ajax_flow_create_payment_session' );
 add_action( 'wp_ajax_cko_flow_create_order', 'cko_ajax_flow_create_order', 1 );
 add_action( 'wp_ajax_nopriv_cko_flow_create_order', 'cko_ajax_flow_create_order', 1 );
-add_action( 'wp_ajax_cko_flow_submit_payment_session', 'cko_ajax_flow_submit_payment_session' );
-add_action( 'wp_ajax_nopriv_cko_flow_submit_payment_session', 'cko_ajax_flow_submit_payment_session' );
 
 /**
  * Validates the WooCommerce checkout form via AJAX.

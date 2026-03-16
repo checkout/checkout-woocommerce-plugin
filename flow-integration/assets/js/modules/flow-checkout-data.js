@@ -177,7 +177,7 @@
 			if (orderTotalEl.length > 0) {
 				let totalText = orderTotalEl.last().text().trim();
 				// Remove currency symbols and non-numeric chars except decimal
-				let numericValue = totalText.replace(/[^0-9.,]/g, '').replace(',', '.');
+				let numericValue = totalText.replace(/[^0-9.,]/g, '').replace(/,/g, '.');
 				let parsedValue = parseFloat(numericValue);
 				if (!isNaN(parsedValue)) {
 					const amountInCents = Math.round(parsedValue * 100);
