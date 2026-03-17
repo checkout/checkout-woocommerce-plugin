@@ -1957,6 +1957,9 @@ var ckoFlow = {
 					const orderIdToUse = formOrderId || sessionOrderId || orderId;
 					if (orderIdToUse) {
 						formData.append('order_id', orderIdToUse);
+						// Include reference with WooCommerce order ID for better tracking in Checkout.com dashboard
+						formData.append('reference', orderIdToUse);
+						ckoLogger.debug('[HANDLE SUBMIT] ✅ Reference with order ID being sent:', orderIdToUse);
 					}
 
 					const response = await fetch(cko_flow_vars.ajax_url, {

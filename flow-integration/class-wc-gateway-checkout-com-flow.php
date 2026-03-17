@@ -7320,6 +7320,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		$session_data       = isset( $_POST['session_data'] ) ? wp_unslash( $_POST['session_data'] ) : '';
 		$amount             = isset( $_POST['amount'] ) ? absint( $_POST['amount'] ) : 0;
 		$order_id           = isset( $_POST['order_id'] ) ? absint( $_POST['order_id'] ) : 0;
+		$reference          = isset( $_POST['reference'] ) ? sanitize_text_field( wp_unslash( $_POST['reference'] ) ) : '';
 		
 		// Get billing/shipping address updates (JSON strings from JavaScript)
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- billing is JSON that will be decoded and sanitized
@@ -7327,7 +7328,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- shipping is JSON that will be decoded and sanitized
 		$shipping_json = isset( $_POST['shipping'] ) ? wp_unslash( $_POST['shipping'] ) : '';
 
-		WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Request received - Payment Session ID: ' . substr( $payment_session_id, 0, 20 ) . '..., Amount: ' . $amount . ', Order ID: ' . $order_id . ', Billing: ' . ( $billing_json ? 'provided' : 'not provided' ) . ', Shipping: ' . ( $shipping_json ? 'provided' : 'not provided' ) );
+		WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Request received - Payment Session ID: ' . substr( $payment_session_id, 0, 20 ) . '..., Amount: ' . $amount . ', Order ID: ' . $order_id . ', Reference: ' . ( $reference ?: 'not provided' ) . ', Billing: ' . ( $billing_json ? 'provided' : 'not provided' ) . ', Shipping: ' . ( $shipping_json ? 'provided' : 'not provided' ) );
 
 		// Validate required parameters
 		if ( empty( $payment_session_id ) || empty( $session_data ) ) {
@@ -7347,6 +7348,12 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		if ( $amount > 0 ) {
 			$request_body['amount'] = $amount;
 			WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Including modified amount in request: ' . $amount );
+		}
+		
+		// Add reference if provided (WooCommerce order ID for tracking in Checkout.com dashboard)
+		if ( ! empty( $reference ) ) {
+			$request_body['reference'] = $reference;
+			WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Including reference: ' . $reference );
 		}
 		
 		// Add billing address if provided (dynamic address adjustment)
