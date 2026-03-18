@@ -161,8 +161,10 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		
 		// Try to get payment type from multiple sources (priority order)
 		WC_Checkoutcom_Utility::logger( '[GET PAYMENT METHOD TITLE] ========== CHECKING PAYMENT TYPE SOURCES ==========' );
-		WC_Checkoutcom_Utility::logger( '[GET PAYMENT METHOD TITLE] POST[cko-flow-payment-type]: ' . ( isset( $_POST['cko-flow-payment-type'] ) ? $_POST['cko-flow-payment-type'] : 'NOT SET' ) );
-		WC_Checkoutcom_Utility::logger( '[GET PAYMENT METHOD TITLE] GET[cko-payment-type]: ' . ( isset( $_GET['cko-payment-type'] ) ? $_GET['cko-payment-type'] : 'NOT SET' ) );
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Just logging, actual usage is sanitized below
+		WC_Checkoutcom_Utility::logger( '[GET PAYMENT METHOD TITLE] POST[cko-flow-payment-type]: ' . ( isset( $_POST['cko-flow-payment-type'] ) ? sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-type'] ) ) : 'NOT SET' ) );
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Just logging, actual usage is sanitized below
+		WC_Checkoutcom_Utility::logger( '[GET PAYMENT METHOD TITLE] GET[cko-payment-type]: ' . ( isset( $_GET['cko-payment-type'] ) ? sanitize_text_field( wp_unslash( $_GET['cko-payment-type'] ) ) : 'NOT SET' ) );
 		if ( ! empty( $payment_details ) ) {
 			WC_Checkoutcom_Utility::logger( '[GET PAYMENT METHOD TITLE] payment_details[payment_type]: ' . ( isset( $payment_details['payment_type'] ) ? $payment_details['payment_type'] : 'NOT SET' ) );
 			if ( isset( $payment_details['source'] ) && is_array( $payment_details['source'] ) ) {
@@ -3645,92 +3647,92 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					// Don't die yet - try fallback methods
 				} else {
 					
-					// PERFORMANCE OPTIMIZATION Phase 2: Combined query - Look up by payment_session_id OR payment_id in single query
-					// This reduces database queries from 2 to 1
+					// PERFORMANCE FIX: Use sequential single-key queries instead of OR meta_query
+					// OR meta_query causes severe performance issues on large HPOS tables (253K+ orders)
+					// Test results: OR query = 2173+ seconds, Sequential queries = 3ms
+					// See: https://github.com/woocommerce/woocommerce/issues/32557
 					if ( $is_debug ) {
-						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Looking up order by payment session ID or payment ID...' );
+						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Looking up order by payment session ID (sequential query)...' );
 					}
 					
-					// Build meta_query with OR conditions for both payment_session_id and payment_id
-					$meta_query = array(
-						'relation' => 'OR',
-					);
+					$orders = array();
+					$found_order = null;
+					$found_by_payment_session = false;
 					
+					// First query: Look up by payment_session_id (primary lookup)
 					if ( ! empty( $payment_session_id ) ) {
-						$meta_query[] = array(
-							'key'   => '_cko_payment_session_id',
-							'value' => $payment_session_id,
-						);
-					}
-					
-					// Always include payment_id lookup (fallback)
-					$meta_query[] = array(
-						'key'   => '_cko_payment_id',
-						'value' => $payment_id,
-					);
-					
-					$orders = wc_get_orders( array(
-						'meta_query' => $meta_query,
-						'limit'      => 5, // Get up to 5 to check statuses
-						'orderby'    => 'date',
-						'order'      => 'DESC',
-					) );
-					
-					// Process results - prioritize payment_session_id matches, then payment_id matches
-					if ( ! empty( $orders ) ) {
-						$found_order = null;
-						$found_by_payment_session = false;
+						$orders = wc_get_orders( array(
+							'meta_query' => array(
+								array(
+									'key'   => '_cko_payment_session_id',
+									'value' => $payment_session_id,
+								),
+							),
+							'limit'   => 5,
+							'orderby' => 'date',
+							'order'   => 'DESC',
+						) );
 						
-						foreach ( $orders as $potential_order ) {
-							$order_payment_session_id = $potential_order->get_meta( '_cko_payment_session_id' );
-							$order_payment_id = $potential_order->get_meta( '_cko_payment_id' );
-							$order_status = $potential_order->get_status();
-							
-							// Prioritize payment_session_id match
-							if ( ! empty( $payment_session_id ) && $order_payment_session_id === $payment_session_id ) {
+						if ( ! empty( $orders ) ) {
+							foreach ( $orders as $potential_order ) {
+								$order_status = $potential_order->get_status();
 								if ( in_array( $order_status, array( 'pending', 'failed' ), true ) ) {
 									$found_order = $potential_order;
 									$found_by_payment_session = true;
 									if ( $is_debug ) {
 										WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order found by payment session ID - Order ID: ' . $found_order->get_id() . ', Status: ' . $order_status );
 									}
-									break; // Found best match, exit loop
+									break;
 								}
 							}
 						}
+					}
+					
+					// Second query: Fallback to payment_id if no match found
+					if ( ! $found_order && ! empty( $payment_id ) ) {
+						if ( $is_debug ) {
+							WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Fallback: Looking up order by payment ID (sequential query)...' );
+						}
 						
-						// If no payment_session_id match found, check payment_id matches
-						if ( ! $found_order ) {
+						$orders = wc_get_orders( array(
+							'meta_query' => array(
+								array(
+									'key'   => '_cko_payment_id',
+									'value' => $payment_id,
+								),
+							),
+							'limit'   => 5,
+							'orderby' => 'date',
+							'order'   => 'DESC',
+						) );
+						
+						if ( ! empty( $orders ) ) {
 							foreach ( $orders as $potential_order ) {
-								$order_payment_id = $potential_order->get_meta( '_cko_payment_id' );
 								$order_status = $potential_order->get_status();
 								$existing_transaction_id = $potential_order->get_transaction_id();
 								
-								if ( $order_payment_id === $payment_id ) {
-									// Check if order already has a transaction ID (means it was already fully processed)
-									if ( ! empty( $existing_transaction_id ) ) {
-										if ( $is_debug ) {
-											WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ⚠️ Order found by payment ID already has transaction ID: ' . $existing_transaction_id . ' - NOT reusing (already processed)' );
-										}
-										continue; // Skip this order, check next
-									} elseif ( in_array( $order_status, array( 'pending', 'failed' ), true ) ) {
-										// Only use this order if it's in pending or failed status AND has no transaction ID (reusable)
-										$found_order = $potential_order;
-										if ( $is_debug ) {
-											WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order found by payment ID - Order ID: ' . $found_order->get_id() . ', Status: ' . $order_status );
-										}
-										break; // Found reusable order, exit loop
+								// Check if order already has a transaction ID (means it was already fully processed)
+								if ( ! empty( $existing_transaction_id ) ) {
+									if ( $is_debug ) {
+										WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ⚠️ Order found by payment ID already has transaction ID: ' . $existing_transaction_id . ' - NOT reusing (already processed)' );
 									}
+									continue;
+								} elseif ( in_array( $order_status, array( 'pending', 'failed' ), true ) ) {
+									$found_order = $potential_order;
+									if ( $is_debug ) {
+										WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order found by payment ID - Order ID: ' . $found_order->get_id() . ', Status: ' . $order_status );
+									}
+									break;
 								}
 							}
 						}
-						
-						if ( $found_order ) {
-							$order = $found_order;
-							$order_id = $order->get_id();
-							if ( $is_debug ) {
-								WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ✅ Using order found by ' . ( $found_by_payment_session ? 'payment session ID' : 'payment ID' ) . ' (status: ' . $found_order->get_status() . ') - Order ID: ' . $order_id );
-							}
+					}
+					
+					if ( $found_order ) {
+						$order = $found_order;
+						$order_id = $order->get_id();
+						if ( $is_debug ) {
+							WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ✅ Using order found by ' . ( $found_by_payment_session ? 'payment session ID' : 'payment ID' ) . ' (status: ' . $found_order->get_status() . ') - Order ID: ' . $order_id );
 						}
 					}
 					
@@ -4611,8 +4613,10 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				
 				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ========== FINAL REDIRECT DEBUG ==========' );
 				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Payment processed successfully, redirecting to: ' . $redirect_url );
-				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order ID from GET: ' . ( isset( $_GET['order_id'] ) ? $_GET['order_id'] : 'NOT SET' ) );
-				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order key from GET: ' . ( isset( $_GET['key'] ) ? $_GET['key'] : 'NOT SET' ) );
+				// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Just logging, value is sanitized
+				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order ID from GET: ' . ( isset( $_GET['order_id'] ) ? absint( $_GET['order_id'] ) : 'NOT SET' ) );
+				// Do not log order key - it's sensitive data that allows order access
+				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order key from GET: ' . ( isset( $_GET['key'] ) ? '(present)' : 'NOT SET' ) );
 				if ( $order ) {
 					$order_customer_id = $order->get_customer_id();
 					$current_user_id = get_current_user_id();
@@ -6418,7 +6422,8 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		}
 		
 		// Log the email being sent to Checkout.com for debugging email mismatches
-		$customer_email_for_payment = isset( $payment_session_request['customer']['email'] ) ? $payment_session_request['customer']['email'] : '(not set)';
+		// Sanitize email before logging to prevent log injection
+		$customer_email_for_payment = isset( $payment_session_request['customer']['email'] ) ? sanitize_email( $payment_session_request['customer']['email'] ) : '(not set)';
 		WC_Checkoutcom_Utility::logger( '[PAYMENT SESSION] Creating payment session with Email: ' . $customer_email_for_payment );
 
 		// CRITICAL: Recalculate amount and items from fresh WooCommerce cart
@@ -6514,8 +6519,10 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// Log entry point.
 		if ( function_exists( 'WC_Checkoutcom_Utility' ) && method_exists( 'WC_Checkoutcom_Utility', 'logger' ) ) {
 			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ========== ENTRY POINT ==========' );
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] POST data keys: ' . implode( ', ', array_keys( $_POST ) ) );
-			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Action: ' . ( isset( $_POST['action'] ) ? $_POST['action'] : 'NOT SET' ) );
+			// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Just logging keys, nonce verified below
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] POST data keys: ' . implode( ', ', array_map( 'sanitize_key', array_keys( $_POST ) ) ) );
+			// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Just logging, nonce verified below
+			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Action: ' . ( isset( $_POST['action'] ) ? sanitize_text_field( wp_unslash( $_POST['action'] ) ) : 'NOT SET' ) );
 		}
 		
 		// Verify nonce for security - check multiple possible locations.
@@ -7246,6 +7253,41 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			return;
 		}
 		
+		// SECURITY: Verify order ownership - order must belong to current user/session
+		$current_user_id = get_current_user_id();
+		$order_customer_id = $order->get_customer_id();
+		
+		// For logged-in users, verify order belongs to them
+		if ( $current_user_id > 0 && $order_customer_id > 0 && $current_user_id !== $order_customer_id ) {
+			WC_Checkoutcom_Utility::logger( '[SAVE PAYMENT SESSION ID] ❌ SECURITY: User ID mismatch - Current: ' . $current_user_id . ', Order Customer: ' . $order_customer_id );
+			wp_send_json_error( array(
+				'message' => __( 'You do not have permission to modify this order.', 'checkout-com-unified-payments-api' ),
+			) );
+			return;
+		}
+		
+		// For guest orders, verify order is pending and matches current checkout session
+		if ( 0 === $current_user_id || 0 === $order_customer_id ) {
+			// Only allow pending orders to be linked
+			if ( ! in_array( $order->get_status(), array( 'pending', 'failed' ), true ) ) {
+				WC_Checkoutcom_Utility::logger( '[SAVE PAYMENT SESSION ID] ❌ SECURITY: Guest order not in pending/failed status - Order ID: ' . $order_id . ', Status: ' . $order->get_status() );
+				wp_send_json_error( array(
+					'message' => __( 'Order is not in a valid state for payment processing.', 'checkout-com-unified-payments-api' ),
+				) );
+				return;
+			}
+			
+			// Verify order key if provided (additional security for guest orders)
+			$provided_order_key = isset( $_POST['order_key'] ) ? sanitize_text_field( wp_unslash( $_POST['order_key'] ) ) : '';
+			if ( ! empty( $provided_order_key ) && $provided_order_key !== $order->get_order_key() ) {
+				WC_Checkoutcom_Utility::logger( '[SAVE PAYMENT SESSION ID] ❌ SECURITY: Order key mismatch - Order ID: ' . $order_id );
+				wp_send_json_error( array(
+					'message' => __( 'Invalid order key.', 'checkout-com-unified-payments-api' ),
+				) );
+				return;
+			}
+		}
+		
 		// CRITICAL: Check if payment session ID already saved (prevent overwriting)
 		$existing_payment_session_id = $order->get_meta( '_cko_payment_session_id' );
 		
@@ -7543,9 +7585,12 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	public function ajax_create_failed_order() {
 		// Log entry point
 		WC_Checkoutcom_Utility::logger( '[CREATE FAILED ORDER] ========== ENTRY POINT ==========' );
-		WC_Checkoutcom_Utility::logger( '[CREATE FAILED ORDER] POST data keys: ' . implode( ', ', array_keys( $_POST ) ) );
-		WC_Checkoutcom_Utility::logger( '[CREATE FAILED ORDER] REQUEST data keys: ' . implode( ', ', array_keys( $_REQUEST ) ) );
-		WC_Checkoutcom_Utility::logger( '[CREATE FAILED ORDER] Action: ' . ( isset( $_POST['action'] ) ? $_POST['action'] : 'NOT SET' ) );
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Just logging keys, nonce verified below
+		WC_Checkoutcom_Utility::logger( '[CREATE FAILED ORDER] POST data keys: ' . implode( ', ', array_map( 'sanitize_key', array_keys( $_POST ) ) ) );
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Just logging keys, nonce verified below
+		WC_Checkoutcom_Utility::logger( '[CREATE FAILED ORDER] REQUEST data keys: ' . implode( ', ', array_map( 'sanitize_key', array_keys( $_REQUEST ) ) ) );
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Just logging, nonce verified below
+		WC_Checkoutcom_Utility::logger( '[CREATE FAILED ORDER] Action: ' . ( isset( $_POST['action'] ) ? sanitize_text_field( wp_unslash( $_POST['action'] ) ) : 'NOT SET' ) );
 		
 		// Verify nonce for security - check multiple possible locations
 		$nonce_value = '';

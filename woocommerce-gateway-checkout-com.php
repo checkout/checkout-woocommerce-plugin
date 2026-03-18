@@ -74,7 +74,9 @@ function cko_cleanup_old_webhooks_handler() {
  */
 function cko_force_flow_gateway_available( $available_gateways ) {
 	// Process on checkout page, order-pay page, and during checkout processing (when POST data exists)
-	$is_checkout_context = is_checkout() || is_wc_endpoint_url( 'order-pay' ) || ( defined( 'DOING_AJAX' ) && DOING_AJAX ) || ( isset( $_POST['payment_method'] ) && 'wc_checkout_com_flow' === $_POST['payment_method'] );
+	// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce verified by WooCommerce checkout
+	$payment_method = isset( $_POST['payment_method'] ) ? sanitize_text_field( wp_unslash( $_POST['payment_method'] ) ) : '';
+	$is_checkout_context = is_checkout() || is_wc_endpoint_url( 'order-pay' ) || ( defined( 'DOING_AJAX' ) && DOING_AJAX ) || ( 'wc_checkout_com_flow' === $payment_method );
 	
 	if ( $is_checkout_context ) {
 		$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
@@ -129,7 +131,9 @@ add_filter( 'woocommerce_available_payment_gateways', 'cko_backup_force_flow_gat
  */
 function cko_update_order_id_in_session( $order_id ) {
 	// Only apply to Classic Cards payment method
-	if ( ! isset( $_POST['payment_method'] ) || 'wc_checkout_com_cards' !== wp_unslash( $_POST['payment_method'] ) ) {
+	// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce verified by WooCommerce checkout
+	$payment_method = isset( $_POST['payment_method'] ) ? sanitize_text_field( wp_unslash( $_POST['payment_method'] ) ) : '';
+	if ( 'wc_checkout_com_cards' !== $payment_method ) {
 		return;
 	}
 	
@@ -657,25 +661,30 @@ add_action( 'woocommerce_checkout_process', 'cko_check_if_empty' );
 
 /**
  * Validate cvv on checkout page.
+ * Nonce is verified by WooCommerce checkout process before this hook runs.
  */
 function cko_check_if_empty() {
-	// phpcs:disable WordPress.Security.NonceVerification.Missing
-	if ( isset( $_POST['payment_method'] ) && 'wc_checkout_com_cards' === $_POST['payment_method'] ) {
-
+	// phpcs:disable WordPress.Security.NonceVerification.Missing -- Nonce verified by WooCommerce checkout process
+	$payment_method = isset( $_POST['payment_method'] ) ? sanitize_text_field( wp_unslash( $_POST['payment_method'] ) ) : '';
+	
+	if ( 'wc_checkout_com_cards' === $payment_method ) {
+		$payment_token = isset( $_POST['wc-wc_checkout_com_cards-payment-token'] ) ? sanitize_text_field( wp_unslash( $_POST['wc-wc_checkout_com_cards-payment-token'] ) ) : '';
+		$cvv = isset( $_POST['wc_checkout_com_cards-card-cvv'] ) ? sanitize_text_field( wp_unslash( $_POST['wc_checkout_com_cards-card-cvv'] ) ) : '';
+		
 		// Check if require cvv is enabled in module setting.
 		if (
 			WC_Admin_Settings::get_option( 'ckocom_card_saved' )
 			&& WC_Admin_Settings::get_option( 'ckocom_card_require_cvv' )
-			&& isset( $_POST['wc-wc_checkout_com_cards-payment-token'] )
-			&& 'new' !== $_POST['wc-wc_checkout_com_cards-payment-token']
+			&& ! empty( $payment_token )
+			&& 'new' !== $payment_token
 		) {
 			// check if cvv is empty on checkout page.
-			if ( empty( $_POST['wc_checkout_com_cards-card-cvv'] ) ) {
-                // phpcs:enable
+			if ( empty( $cvv ) ) {
 				wc_add_notice( esc_html__( 'Please enter a valid cvv.', 'checkout-com-unified-payments-api' ), 'error' );
 			}
 		}
 	}
+	// phpcs:enable
 }
 
 // Hook into order creation and updates
@@ -771,22 +780,33 @@ function cko_validate_manual_order_on_save( $post_id ) {
 		WC_Checkoutcom_Utility::logger( 'BLOCKING order creation due to validation errors: ' . implode( ', ', $validation_errors ) );
 		
 		// Show error message and stop execution
-		$error_message = '<h2>❌ Order Creation Blocked</h2>';
-		$error_message .= '<p><strong>Checkout.com Flow:</strong> Cannot create order with missing required information.</p>';
+		$error_message = '<h2>' . esc_html__( 'Order Creation Blocked', 'checkout-com-unified-payments-api' ) . '</h2>';
+		$error_message .= '<p><strong>' . esc_html__( 'Checkout.com Flow:', 'checkout-com-unified-payments-api' ) . '</strong> ' . esc_html__( 'Cannot create order with missing required information.', 'checkout-com-unified-payments-api' ) . '</p>';
 		$error_message .= '<ul>';
 		foreach ( $validation_errors as $error ) {
 			$error_message .= '<li>' . esc_html( $error ) . '</li>';
 		}
 		$error_message .= '</ul>';
-		$error_message .= '<p><strong>Please:</strong></p>';
+		$error_message .= '<p><strong>' . esc_html__( 'Please:', 'checkout-com-unified-payments-api' ) . '</strong></p>';
 		$error_message .= '<ol>';
-		$error_message .= '<li>Go back to the order form</li>';
-		$error_message .= '<li>Add the missing billing email and address</li>';
-		$error_message .= '<li>Try creating the order again</li>';
+		$error_message .= '<li>' . esc_html__( 'Go back to the order form', 'checkout-com-unified-payments-api' ) . '</li>';
+		$error_message .= '<li>' . esc_html__( 'Add the missing billing email and address', 'checkout-com-unified-payments-api' ) . '</li>';
+		$error_message .= '<li>' . esc_html__( 'Try creating the order again', 'checkout-com-unified-payments-api' ) . '</li>';
 		$error_message .= '</ol>';
-		$error_message .= '<p><a href="javascript:history.back()">← Go Back</a></p>';
+		$error_message .= '<p><a href="javascript:history.back()">' . esc_html__( 'Go Back', 'checkout-com-unified-payments-api' ) . '</a></p>';
 		
-		wp_die( $error_message, 'Order Creation Blocked', array( 'response' => 400 ) );
+		// Define allowed HTML for wp_kses
+		$allowed_html = array(
+			'h2'     => array(),
+			'p'      => array(),
+			'strong' => array(),
+			'ul'     => array(),
+			'ol'     => array(),
+			'li'     => array(),
+			'a'      => array( 'href' => array() ),
+		);
+		
+		wp_die( wp_kses( $error_message, $allowed_html ), esc_html__( 'Order Creation Blocked', 'checkout-com-unified-payments-api' ), array( 'response' => 400 ) );
 	}
 }
 
@@ -1629,12 +1649,13 @@ function cko_add_fawry_number( $order_id ) {
 	$fawry_number = $order->get_meta( 'cko_fawry_reference_number' );
 	$fawry        = __( 'Fawry reference number: ', 'checkout-com-unified-payments-api' );
 	if ( $fawry_number ) {
+		// Escape values for safe JavaScript output to prevent XSS
+		$fawry_escaped        = esc_js( $fawry );
+		$fawry_number_escaped = esc_js( $fawry_number );
 		wc_enqueue_js(
-			"
-			jQuery( function(){
-				jQuery('.woocommerce-thankyou-order-details.order_details').append('<li class=\"woocommerce-order-overview\">$fawry<strong>$fawry_number</strong></li>')
-			})
-		"
+			"jQuery( function(){
+				jQuery('.woocommerce-thankyou-order-details.order_details').append('<li class=\"woocommerce-order-overview\">" . $fawry_escaped . "<strong>" . $fawry_number_escaped . "</strong></li>')
+			});"
 		);
 	}
 }
@@ -2004,11 +2025,25 @@ add_action( 'wp_ajax_nopriv_cko_get_payment_session', 'cko_get_payment_session' 
  * Retrieves payment session details from Checkout.com via AJAX.
  */
 function cko_get_payment_session() {
+	// Verify nonce for security
+	$nonce = isset( $_REQUEST['nonce'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['nonce'] ) ) : '';
+	if ( empty( $nonce ) || ! wp_verify_nonce( $nonce, 'cko_flow_payment_session' ) ) {
+		wp_send_json_error( array( 'message' => __( 'Security check failed. Please refresh the page and try again.', 'checkout-com-unified-payments-api' ) ) );
+		return;
+	}
+	
 	// Get the session ID from the request
-	$session_id = isset( $_REQUEST['session_id'] ) ? sanitize_text_field( $_REQUEST['session_id'] ) : '';
+	$session_id = isset( $_REQUEST['session_id'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['session_id'] ) ) : '';
 	
 	if ( empty( $session_id ) ) {
 		wp_send_json_error( array( 'message' => __( 'Session ID is required', 'checkout-com-unified-payments-api' ) ) );
+		return;
+	}
+	
+	// Validate session ID format to prevent path traversal/SSRF - Checkout.com uses alphanumeric IDs with underscores
+	if ( ! preg_match( '/^[a-zA-Z0-9_-]+$/', $session_id ) ) {
+		wp_send_json_error( array( 'message' => __( 'Invalid session ID format.', 'checkout-com-unified-payments-api' ) ) );
+		return;
 	}
 	
 	WC_Checkoutcom_Utility::logger( '=== GET PAYMENT SESSION ===' );
@@ -2089,11 +2124,32 @@ add_action(
 			array(
 				'methods'             => 'GET',
 				'callback'            => 'cko_get_payment_status',
-				'permission_callback' => '__return_true',
+				'permission_callback' => 'cko_payment_status_permission_check',
 			)
 		);
 	}
 );
+
+/**
+ * Permission callback for payment status REST endpoint.
+ * Verifies nonce to ensure request is from a valid checkout session.
+ *
+ * @param WP_REST_Request $request The REST API request object.
+ * @return bool|WP_Error True if permitted, WP_Error otherwise.
+ */
+function cko_payment_status_permission_check( $request ) {
+	$nonce = $request->get_param( 'nonce' );
+	
+	if ( empty( $nonce ) || ! wp_verify_nonce( $nonce, 'cko_flow_payment_session' ) ) {
+		return new WP_Error(
+			'rest_forbidden',
+			__( 'Security check failed. Please refresh the page and try again.', 'checkout-com-unified-payments-api' ),
+			array( 'status' => 403 )
+		);
+	}
+	
+	return true;
+}
 
 /**
  * Callback function to get payment status from Checkout.com API.
@@ -2104,18 +2160,21 @@ add_action(
 function cko_get_payment_status( $request ) {
 	$payment_id    = sanitize_text_field( $request->get_param( 'paymentId' ) );
 	$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
-	$env           = $core_settings['ckocom_environment'];
-	$secret_key    = $core_settings['ckocom_sk'];
+	$env           = ! empty( $core_settings['ckocom_environment'] ) ? $core_settings['ckocom_environment'] : 'sandbox';
+	
+	// Use correct secret key based on environment
+	$secret_key = ( 'sandbox' === $env )
+		? ( ! empty( $core_settings['ckocom_sk'] ) ? $core_settings['ckocom_sk'] : '' )
+		: ( ! empty( $core_settings['ckocom_sk_live'] ) ? $core_settings['ckocom_sk_live'] : '' );
 
 	if ( empty( $payment_id ) ) {
 		return new WP_REST_Response( array( 'error' => 'Missing paymentId' ), 400 );
 	}
 
-	$url = "https://api.checkout.com/payments/{$payment_id}";
-
-	if ( 'sandbox' === $env ) {
-		$url = "https://api.sandbox.checkout.com/payments/{$payment_id}";
-	}
+	// Use correct API URL based on environment
+	$url = ( 'sandbox' === $env )
+		? "https://api.sandbox.checkout.com/payments/{$payment_id}"
+		: "https://api.checkout.com/payments/{$payment_id}";
 
 	// Send the GET request to Checkout.com.
 	$response = wp_remote_get(
@@ -2147,6 +2206,13 @@ function cko_get_payment_status( $request ) {
  * @return void
  */
 function cko_get_updated_cart_info() {
+	// Verify nonce for security
+	$nonce = isset( $_REQUEST['nonce'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['nonce'] ) ) : '';
+	if ( empty( $nonce ) || ! wp_verify_nonce( $nonce, 'cko_flow_payment_session' ) ) {
+		wp_send_json_error( array( 'message' => __( 'Security check failed. Please refresh the page and try again.', 'checkout-com-unified-payments-api' ) ) );
+		return;
+	}
+	
 	wp_send_json_success( WC_Checkoutcom_Api_Request::get_cart_info(true) );
 }
 

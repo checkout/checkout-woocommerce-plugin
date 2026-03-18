@@ -2616,7 +2616,8 @@ let showError = function (error_message) {
 
 	if (Array.isArray(error_message)) {
 		jQuery.each(error_message, function (index, value) {
-			jQuery(ulWrapper).append(jQuery("<li>").html(value));
+			// Use .text() instead of .html() to prevent XSS from server responses
+			jQuery(ulWrapper).append(jQuery("<li>").text(value));
 		});
 	}
 
