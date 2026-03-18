@@ -7386,10 +7386,44 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			'session_data' => $session_data,
 		);
 
-		// Add amount if provided (dynamic amount adjustment)
-		if ( $amount > 0 ) {
-			$request_body['amount'] = $amount;
-			WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Including modified amount in request: ' . $amount );
+		// CRITICAL: Always get the correct amount from WooCommerce order or cart
+		// This ensures coupons/discounts are properly applied even if client-side tracking fails
+		$final_amount = $amount; // Start with client-provided amount
+		
+		// If order_id is provided, get amount from order (most reliable - includes coupons, taxes, etc.)
+		if ( $order_id > 0 ) {
+			$order = wc_get_order( $order_id );
+			if ( $order ) {
+				$order_currency = $order->get_currency();
+				$order_total_decimal = (float) $order->get_total();
+				$order_amount_minor = (int) WC_Checkoutcom_Utility::value_to_decimal( $order_total_decimal, $order_currency );
+				
+				WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Order amount check - Order ID: ' . $order_id . ', Order total: ' . $order_total_decimal . ' ' . $order_currency . ', Minor units: ' . $order_amount_minor . ', Client amount: ' . $amount );
+				
+				// Use order amount (always has correct discounted total)
+				$final_amount = $order_amount_minor;
+			}
+		} elseif ( WC()->cart && ! WC()->cart->is_empty() ) {
+			// Fallback to cart if no order (shouldn't happen in normal flow)
+			$cart_total = WC()->cart->get_total( 'edit' );
+			$cart_currency = get_woocommerce_currency();
+			$cart_amount_minor = (int) WC_Checkoutcom_Utility::value_to_decimal( (float) $cart_total, $cart_currency );
+			
+			WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Cart amount check - Cart total: ' . $cart_total . ' ' . $cart_currency . ', Minor units: ' . $cart_amount_minor . ', Client amount: ' . $amount );
+			
+			$final_amount = $cart_amount_minor;
+		}
+
+		// Add amount to request (always include to ensure correct discounted amount)
+		if ( $final_amount > 0 ) {
+			$request_body['amount'] = $final_amount;
+			WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Including amount in request: ' . $final_amount );
+		}
+		
+		// Add reference if provided (WooCommerce order ID for tracking in Checkout.com dashboard)
+		if ( ! empty( $reference ) ) {
+			$request_body['reference'] = $reference;
+			WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Including reference: ' . $reference );
 		}
 		
 		// Add reference if provided (WooCommerce order ID for tracking in Checkout.com dashboard)
