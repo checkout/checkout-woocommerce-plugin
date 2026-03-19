@@ -538,6 +538,11 @@ var ckoFlow = {
 					...(exemption && { exemption: exemption }),
 					allow_upgrade: cko_flow_vars.allow_upgrade === true || cko_flow_vars.allow_upgrade === "true" || cko_flow_vars.allow_upgrade === "yes",
 				},
+				// Disable customer retry - only one payment attempt per session
+				// If payment fails, user must reload checkout to get new payment session
+				customer_retry: {
+					max_attempts: 0,
+				},
 			};
 			
 			// Check if this is a MOTO order (admin-created order + order-pay page + guest customer)
@@ -4645,10 +4650,12 @@ document.addEventListener("DOMContentLoaded", function () {
 			const saveCardValue = saveCardField.length > 0 ? saveCardField.val() : '';
 			
 			// Build data object ensuring nonce is included
+			// Note: isOrderPayPage is already defined at the start of the try block (line 4487)
 			const ajaxData = {
 				cko_flow_precreate_order: '1',
 				'cko-flow-payment-session-id': paymentSessionId,
-				'cko-flow-save-card-persist': saveCardValue
+				'cko-flow-save-card-persist': saveCardValue,
+				'is_order_pay': isOrderPayPage ? 'yes' : 'no'
 			};
 			
 			// Add all form data (including nonce)

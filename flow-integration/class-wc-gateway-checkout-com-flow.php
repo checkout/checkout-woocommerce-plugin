@@ -84,6 +84,9 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// Preserve payment method title after order status changes (webhooks may overwrite it)
 		add_action( 'woocommerce_order_status_changed', [ $this, 'preserve_payment_method_title' ], 20, 4 );
 		
+		// CRITICAL: Prevent order status downgrades (completed→on-hold, processing→on-hold)
+		add_filter( 'woocommerce_order_status_changed', [ $this, 'prevent_status_downgrade' ], 5, 4 );
+		
 		// Filter order notes to use correct payment method title instead of gateway default
 		add_filter( 'woocommerce_new_order_note_data', [ $this, 'filter_order_note_payment_method_title' ], 10, 2 );
 
@@ -116,6 +119,20 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// This runs early in the checkout process, BEFORE WooCommerce's create_order() is called.
 		// Priority 5 ensures this runs before other checkout hooks.
 		add_action( 'woocommerce_before_checkout_process', [ $this, 'prevent_failed_order_reuse' ], 5 );
+		
+		// CRITICAL: Hook into woocommerce_resume_order which fires WHEN WooCommerce is about to resume an order
+		// This is our last chance to prevent order reuse - if payment session IDs don't match, clear session
+		add_action( 'woocommerce_resume_order', [ $this, 'check_payment_session_on_resume' ], 1 );
+		
+		// CRITICAL: Clear order_awaiting_payment session BEFORE WooCommerce creates/reuses order
+		// Hook into REST API pre-dispatch to clear session BEFORE Store API processes the request
+		add_filter( 'rest_pre_dispatch', [ $this, 'clear_session_before_store_api_checkout' ], 1, 3 );
+		
+		// Also hook into wp_loaded for early session clearing (catches both classic and blocks checkout)
+		add_action( 'wp_loaded', [ $this, 'early_clear_order_session_for_new_payment' ], 1 );
+		
+		// Keep classic checkout hook as backup
+		add_filter( 'woocommerce_checkout_get_value', [ $this, 'maybe_clear_order_awaiting_payment' ], 5, 2 );
 		
 		// OPTIONAL: Exclude payment methods section from checkout fragment updates during coupon operations.
 		// This preserves the Flow component (and entered card details) when cart total changes.
@@ -392,6 +409,65 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	}
 
 	/**
+	 * Prevent order status downgrades for this gateway.
+	 * 
+	 * This is a critical safety guard that prevents:
+	 * - completed → on-hold (NEVER allowed)
+	 * - completed → processing (NEVER allowed)
+	 * - processing → on-hold (NEVER allowed)
+	 * 
+	 * This can happen when webhooks arrive out of order or when process_payment()
+	 * runs after webhooks have already updated the order to a final state.
+	 *
+	 * @param int      $order_id   Order ID.
+	 * @param string   $old_status Old order status (without wc- prefix).
+	 * @param string   $new_status New order status (without wc- prefix).
+	 * @param WC_Order $order      Order object.
+	 */
+	public function prevent_status_downgrade( $order_id, $old_status, $new_status, $order ) {
+		// Only process orders for this gateway
+		if ( $order->get_payment_method() !== $this->id ) {
+			return;
+		}
+
+		// Define status hierarchy (higher number = more "complete")
+		$status_hierarchy = array(
+			'pending'    => 1,
+			'failed'     => 2,
+			'on-hold'    => 3,
+			'processing' => 4,
+			'completed'  => 5,
+		);
+
+		$old_rank = isset( $status_hierarchy[ $old_status ] ) ? $status_hierarchy[ $old_status ] : 0;
+		$new_rank = isset( $status_hierarchy[ $new_status ] ) ? $status_hierarchy[ $new_status ] : 0;
+
+		// Detect downgrade attempt
+		if ( $old_rank > $new_rank && $old_rank >= 3 ) {
+			// This is a downgrade from on-hold or higher - block it
+			WC_Checkoutcom_Utility::logger( 
+				sprintf(
+					'[STATUS GUARD] ❌ BLOCKED status downgrade: Order %d from "%s" to "%s" - reverting to "%s"',
+					$order_id,
+					$old_status,
+					$new_status,
+					$old_status
+				)
+			);
+
+			// Revert the status change by setting it back
+			// We need to remove this filter temporarily to avoid infinite loop
+			remove_filter( 'woocommerce_order_status_changed', [ $this, 'prevent_status_downgrade' ], 5 );
+			
+			$order->set_status( $old_status, __( 'Status downgrade prevented by payment gateway.', 'checkout-com-unified-payments-api' ) );
+			$order->save();
+			
+			// Re-add the filter
+			add_filter( 'woocommerce_order_status_changed', [ $this, 'prevent_status_downgrade' ], 5, 4 );
+		}
+	}
+
+	/**
 	 * Filter order note data to use correct payment method title.
 	 * 
 	 * WooCommerce generates "Payment via [gateway title]" notes when order status changes.
@@ -534,7 +610,12 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 	/**
 	 * Store payment session ID in order metadata when order is created.
-	 * Uses public checkout hooks so Reflection is not required.
+	 * 
+	 * MULTI-TAB SUPPORT: This function now tracks ALL payment session IDs for an order.
+	 * When WooCommerce reuses an order (e.g., in Blocks checkout), multiple payment sessions
+	 * may be created for the same order. We track all of them so webhooks can match correctly.
+	 * The FIRST payment session ID remains as the primary (_cko_payment_session_id),
+	 * and all sessions are tracked in _cko_payment_attempts.
 	 *
 	 * @param WC_Order $order The order object.
 	 * @param array    $data  The order data.
@@ -546,29 +627,90 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			return;
 		}
 
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce verified by WooCommerce checkout
 		$payment_session_id = isset( $_POST['cko-flow-payment-session-id'] ) ? sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-session-id'] ) ) : '';
 		if ( empty( $payment_session_id ) ) {
 			return;
 		}
 
-		// Ensure payment_session_id is unique (avoid duplicate order linkage).
-		$existing_orders = wc_get_orders(
-			array(
-				'meta_key'   => '_cko_payment_session_id',
-				'meta_value' => $payment_session_id,
-				'status'     => array( 'pending', 'failed', 'on-hold', 'processing' ),
-				'limit'      => 1,
-				'return'     => 'ids',
-			)
-		);
-
-		if ( ! empty( $existing_orders ) && (int) $existing_orders[0] !== (int) $order->get_id() ) {
-			WC_Checkoutcom_Utility::logger( '[FLOW PAYMENT SESSION] Duplicate payment_session_id detected - skipping save. Order ID: ' . $order->get_id() );
+		$order_id = $order->get_id();
+		$existing_order_ps = $order->get_meta( '_cko_payment_session_id' );
+		
+		// Get existing payment attempts array
+		$payment_attempts = $order->get_meta( '_cko_payment_attempts' );
+		if ( empty( $payment_attempts ) || ! is_array( $payment_attempts ) ) {
+			$payment_attempts = array();
+		}
+		
+		// Check if this payment session is already tracked
+		$session_already_tracked = false;
+		foreach ( $payment_attempts as $attempt ) {
+			if ( isset( $attempt['session_id'] ) && $attempt['session_id'] === $payment_session_id ) {
+				$session_already_tracked = true;
+				break;
+			}
+		}
+		
+		// If order already has a DIFFERENT payment session ID (multi-tab scenario)
+		if ( ! empty( $existing_order_ps ) && $existing_order_ps !== $payment_session_id ) {
+			WC_Checkoutcom_Utility::logger(
+				sprintf(
+					'[FLOW PAYMENT SESSION] ⚠️ MULTI-TAB DETECTED: Order %d already has payment session %s, new attempt with session %s',
+					$order_id,
+					substr( $existing_order_ps, 0, 25 ),
+					substr( $payment_session_id, 0, 25 )
+				)
+			);
+			
+			// Track this additional payment attempt (don't overwrite primary)
+			if ( ! $session_already_tracked ) {
+				$payment_attempts[] = array(
+					'session_id'  => $payment_session_id,
+					'payment_id'  => '', // Will be filled when payment is submitted
+					'timestamp'   => current_time( 'mysql' ),
+					'is_primary'  => false,
+					'status'      => 'initiated',
+				);
+				$order->update_meta_data( '_cko_payment_attempts', $payment_attempts );
+				
+				// Add order note about multi-tab attempt
+				$order->add_order_note(
+					sprintf(
+						__( 'Additional payment attempt detected (multi-tab). New Session: %s. Primary Session: %s', 'checkout-com-unified-payments-api' ),
+						$payment_session_id,
+						$existing_order_ps
+					)
+				);
+				
+				WC_Checkoutcom_Utility::logger(
+					sprintf(
+						'[FLOW PAYMENT SESSION] Added secondary payment attempt to order %d. Total attempts: %d',
+						$order_id,
+						count( $payment_attempts )
+					)
+				);
+			}
 			return;
 		}
 
-		$order->update_meta_data( '_cko_payment_session_id', $payment_session_id );
-		WC_Checkoutcom_Utility::logger( '[FLOW INFO] Payment session ID queued for order metadata: ' . $payment_session_id );
+		// First payment session for this order - set as primary
+		if ( empty( $existing_order_ps ) ) {
+			$order->update_meta_data( '_cko_payment_session_id', $payment_session_id );
+			
+			// Initialize payment attempts array with this as the primary
+			if ( ! $session_already_tracked ) {
+				$payment_attempts[] = array(
+					'session_id'  => $payment_session_id,
+					'payment_id'  => '', // Will be filled when payment is submitted
+					'timestamp'   => current_time( 'mysql' ),
+					'is_primary'  => true,
+					'status'      => 'initiated',
+				);
+				$order->update_meta_data( '_cko_payment_attempts', $payment_attempts );
+			}
+			
+			WC_Checkoutcom_Utility::logger( '[FLOW INFO] Payment session ID queued for order metadata: ' . $payment_session_id );
+		}
 	}
 	
 	/**
@@ -2001,6 +2143,59 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			WC_Checkoutcom_Utility::logger( 'DUPLICATE PREVENTION: Order ' . $order_id . ' already has transaction ID: ' . $existing_transaction_id . ' - skipping processing' );
 			WC_Checkoutcom_Utility::logger( '[FLOW SAVE CARD] [DUPLICATE PREVENTION] Payment ID check - POST: ' . ( isset( $_POST['cko-flow-payment-id'] ) ? sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-id'] ) ) : 'NOT SET' ) . ', Order meta _cko_flow_payment_id: ' . $order->get_meta( '_cko_flow_payment_id' ) . ', Order meta _cko_payment_id: ' . $order->get_meta( '_cko_payment_id' ) . ', Final flow_payment_id: ' . $flow_payment_id );
 			
+			// MULTI-TAB DETECTION: Check if this is a different payment attempt
+			// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Just reading payment session ID
+			$current_payment_session_id = isset( $_GET['cko-payment-session-id'] ) ? sanitize_text_field( wp_unslash( $_GET['cko-payment-session-id'] ) ) : '';
+			$order_payment_session_id = $order->get_meta( '_cko_payment_session_id' );
+			$incoming_payment_id = $flow_payment_id;
+			$order_primary_payment_id = $order->get_meta( '_cko_payment_id' );
+			
+			// If this payment attempt has a different payment session ID or payment ID, it's from another tab
+			$is_different_tab = false;
+			if ( ! empty( $current_payment_session_id ) && ! empty( $order_payment_session_id ) && $current_payment_session_id !== $order_payment_session_id ) {
+				$is_different_tab = true;
+			}
+			if ( ! empty( $incoming_payment_id ) && ! empty( $order_primary_payment_id ) && $incoming_payment_id !== $order_primary_payment_id ) {
+				$is_different_tab = true;
+			}
+			
+			if ( $is_different_tab ) {
+				WC_Checkoutcom_Utility::logger( 
+					sprintf(
+						'[DUPLICATE PREVENTION] ⚠️ MULTI-TAB: Different payment attempt detected. Order PS: %s, Incoming PS: %s, Order Payment: %s, Incoming Payment: %s',
+						$order_payment_session_id ? substr( $order_payment_session_id, 0, 20 ) : '(none)',
+						$current_payment_session_id ? substr( $current_payment_session_id, 0, 20 ) : '(none)',
+						$order_primary_payment_id ? substr( $order_primary_payment_id, 0, 20 ) : '(none)',
+						$incoming_payment_id ? substr( $incoming_payment_id, 0, 20 ) : '(none)'
+					)
+				);
+				
+				// Add order note about the duplicate payment attempt from different tab
+				$order->add_order_note(
+					sprintf(
+						__( 'Duplicate payment attempt from different tab/session blocked. This payment (ID: %s, Session: %s) was processed after another payment already completed for this order. The customer may have opened multiple checkout tabs.', 'checkout-com-unified-payments-api' ),
+						$incoming_payment_id ? $incoming_payment_id : 'unknown',
+						$current_payment_session_id ? $current_payment_session_id : 'unknown'
+					)
+				);
+				
+				// Update the payment attempt status in our tracking array
+				$payment_attempts = $order->get_meta( '_cko_payment_attempts' );
+				if ( ! empty( $payment_attempts ) && is_array( $payment_attempts ) ) {
+					foreach ( $payment_attempts as $index => $attempt ) {
+						if ( isset( $attempt['payment_id'] ) && $attempt['payment_id'] === $incoming_payment_id ) {
+							$payment_attempts[ $index ]['status'] = 'duplicate_blocked';
+							$payment_attempts[ $index ]['blocked_at'] = current_time( 'mysql' );
+							$payment_attempts[ $index ]['blocked_reason'] = 'Order already processed by another payment';
+							break;
+						}
+					}
+					$order->update_meta_data( '_cko_payment_attempts', $payment_attempts );
+				}
+				
+				$order->save();
+			}
+			
 				// Still check for card saving even when duplicate prevention kicks in
 				// The payment may have been processed by webhook, but card saving might not have run yet
 			if ( ! empty( $flow_payment_id ) ) {
@@ -2074,21 +2269,40 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				}
 			}
 			
-			// CRITICAL FIX: Update order status if still 'failed' (retry payment scenario)
+			// CRITICAL FIX: Update order status if still 'failed' or 'pending'
 			// When a retry payment succeeds, duplicate prevention triggers but order is still 'failed' from first attempt
+			// IMPORTANT: Refresh order from database to get latest status (webhooks may have updated it)
+			$order = wc_get_order( $order_id );
 			$current_order_status_txn = $order->get_status();
-			if ( 'failed' === $current_order_status_txn || 'pending' === $current_order_status_txn ) {
+			
+			// NEVER downgrade orders that are already in a final/successful state
+			$protected_statuses = array( 'processing', 'completed', 'on-hold' );
+			if ( in_array( $current_order_status_txn, $protected_statuses, true ) ) {
+				WC_Checkoutcom_Utility::logger( '[DUPLICATE PREVENTION] Order already in protected status: ' . $current_order_status_txn . ' - skipping status update to prevent downgrade. Order ID: ' . $order_id );
+			} elseif ( 'failed' === $current_order_status_txn || 'pending' === $current_order_status_txn ) {
 				$payment_authorized = $order->get_meta( 'cko_payment_authorized' );
 				$payment_captured = $order->get_meta( 'cko_payment_captured' );
+				
+				// Determine if this is a retry payment (from failed) or just normal processing (from pending)
+				$is_retry_payment_txn = ( 'failed' === $current_order_status_txn );
 				
 				if ( $payment_authorized || $payment_captured ) {
 					$auth_status = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
 					$new_status = $payment_captured ? 'processing' : $auth_status;
-					$order->update_status( $new_status, __( 'Order status updated after successful retry payment (transaction ID duplicate prevention).', 'checkout-com-unified-payments-api' ) );
+					if ( $is_retry_payment_txn ) {
+						$order->update_status( $new_status, __( 'Order status updated after successful retry payment.', 'checkout-com-unified-payments-api' ) );
+					}
+					// Don't add a note for pending->on-hold, the webhook note is sufficient
 					WC_Checkoutcom_Utility::logger( '[DUPLICATE PREVENTION] ✅ Updated order status from ' . $current_order_status_txn . ' to ' . $new_status . ' (transaction ID check) - Order ID: ' . $order_id );
 				} else {
 					$auth_status = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
-					$order->update_status( $auth_status, __( 'Payment authorized (retry payment - transaction ID duplicate prevention).', 'checkout-com-unified-payments-api' ) );
+					if ( $is_retry_payment_txn ) {
+						$order->update_status( $auth_status, __( 'Payment authorized (retry after previous failure).', 'checkout-com-unified-payments-api' ) );
+					} else {
+						// For pending orders, silently update status - the Checkout.com payment note is sufficient
+						$order->set_status( $auth_status );
+						$order->save();
+					}
 					WC_Checkoutcom_Utility::logger( '[DUPLICATE PREVENTION] ✅ Updated order status from ' . $current_order_status_txn . ' to ' . $auth_status . ' (no webhook yet, transaction ID check) - Order ID: ' . $order_id );
 				}
 			}
@@ -2201,25 +2415,44 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					WC_Checkoutcom_Utility::logger( '[DUPLICATE PREVENTION] Cleared WooCommerce notices before success redirect (prevents stale error messages from failed retries)' );
 				}
 				
-				// CRITICAL FIX: Update order status if still 'failed' (retry payment scenario)
+				// CRITICAL FIX: Update order status if still 'failed' or 'pending'
 				// When a retry payment succeeds, duplicate prevention triggers but order is still 'failed' from first attempt
 				// This causes WooCommerce to show "payment declined" message on order-received page
+				// IMPORTANT: Refresh order from database to get latest status (webhooks may have updated it)
+				$order = wc_get_order( $order_id );
 				$current_order_status = $order->get_status();
-				if ( 'failed' === $current_order_status || 'pending' === $current_order_status ) {
+				
+				// NEVER downgrade orders that are already in a final/successful state
+				$protected_statuses = array( 'processing', 'completed', 'on-hold' );
+				if ( in_array( $current_order_status, $protected_statuses, true ) ) {
+					WC_Checkoutcom_Utility::logger( '[DUPLICATE PREVENTION] Order already in protected status: ' . $current_order_status . ' - skipping status update to prevent downgrade. Order ID: ' . $order_id );
+				} elseif ( 'failed' === $current_order_status || 'pending' === $current_order_status ) {
 					// Check if payment was actually approved (via order meta set by webhook or API verification)
 					$payment_authorized = $order->get_meta( 'cko_payment_authorized' );
 					$payment_captured = $order->get_meta( 'cko_payment_captured' );
 					
+					// Determine if this is a retry payment (from failed) or just normal processing (from pending)
+					$is_retry_payment = ( 'failed' === $current_order_status );
+					
 					if ( $payment_authorized || $payment_captured ) {
 						$auth_status = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
 						$new_status = $payment_captured ? 'processing' : $auth_status;
-						$order->update_status( $new_status, __( 'Order status updated after successful retry payment (duplicate prevention).', 'checkout-com-unified-payments-api' ) );
+						if ( $is_retry_payment ) {
+							$order->update_status( $new_status, __( 'Order status updated after successful retry payment.', 'checkout-com-unified-payments-api' ) );
+						}
+						// Don't add a note for pending->on-hold, the webhook note is sufficient
 						WC_Checkoutcom_Utility::logger( '[DUPLICATE PREVENTION] ✅ Updated order status from ' . $current_order_status . ' to ' . $new_status . ' - Order ID: ' . $order_id );
 					} else {
 						// No webhook received yet - set to authorized status anyway since payment ID exists and we're returning success
 						// Webhook will update to processing when captured
 						$auth_status = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
-						$order->update_status( $auth_status, __( 'Payment authorized (retry payment - duplicate prevention).', 'checkout-com-unified-payments-api' ) );
+						if ( $is_retry_payment ) {
+							$order->update_status( $auth_status, __( 'Payment authorized (retry after previous failure).', 'checkout-com-unified-payments-api' ) );
+						} else {
+							// For pending orders, silently update status - the Checkout.com payment note is sufficient
+							$order->set_status( $auth_status );
+							$order->save();
+						}
 						WC_Checkoutcom_Utility::logger( '[DUPLICATE PREVENTION] ✅ Updated order status from ' . $current_order_status . ' to ' . $auth_status . ' (no webhook yet) - Order ID: ' . $order_id );
 					}
 				}
@@ -3369,7 +3602,19 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		$order->add_order_note( $message );
 		// Only update status if not null (null means payment already captured, keep existing status)
 		if ( null !== $status ) {
-			$order->update_status( $status );
+			// CRITICAL: Refresh order from database and check current status to prevent downgrade
+			$order = wc_get_order( $order_id );
+			$current_status = $order->get_status();
+			
+			// Define protected statuses that should NEVER be downgraded
+			$protected_statuses = array( 'processing', 'completed' );
+			
+			// If order is already in a protected state, don't downgrade to on-hold
+			if ( in_array( $current_status, $protected_statuses, true ) && 'on-hold' === $status ) {
+				WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Order already in ' . $current_status . ' status - skipping update to ' . $status . ' to prevent downgrade. Order ID: ' . $order_id );
+			} else {
+				$order->update_status( $status );
+			}
 		}
 
 		// CRITICAL: Only proceed with success flow if order status is NOT failed
@@ -4476,8 +4721,36 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// Store payment data in order meta instead of modifying $_POST (WordPress coding standards compliant)
 		// process_payment() will check order meta as fallback if $_POST is not available
 		if ( $order ) {
-			// Store in the same meta keys that process_payment() checks as fallback
-			$order->update_meta_data( '_cko_flow_payment_id', $payment_id );
+			// CRITICAL: Check if this is a multi-tab scenario - don't overwrite primary payment ID
+			$existing_flow_payment_id = $order->get_meta( '_cko_flow_payment_id' );
+			$existing_payment_session_id = $order->get_meta( '_cko_payment_session_id' );
+			$current_payment_session_id = isset( $_GET['cko-payment-session-id'] ) ? sanitize_text_field( wp_unslash( $_GET['cko-payment-session-id'] ) ) : '';
+			
+			// Determine if this is a different payment attempt (multi-tab scenario)
+			$is_different_payment = ! empty( $existing_flow_payment_id ) && $existing_flow_payment_id !== $payment_id;
+			$is_different_session = ! empty( $existing_payment_session_id ) && ! empty( $current_payment_session_id ) && $existing_payment_session_id !== $current_payment_session_id;
+			
+			if ( $is_different_payment || $is_different_session ) {
+				// MULTI-TAB: This is a secondary payment - DO NOT overwrite primary
+				WC_Checkoutcom_Utility::logger( 
+					sprintf(
+						'[FLOW 3DS API] ⚠️ MULTI-TAB DETECTED - NOT overwriting primary payment. Primary: %s (Session: %s), This: %s (Session: %s)',
+						$existing_flow_payment_id,
+						$existing_payment_session_id,
+						$payment_id,
+						$current_payment_session_id
+					)
+				);
+			} else {
+				// Normal case: Store as primary payment ID
+				$order->update_meta_data( '_cko_flow_payment_id', $payment_id );
+				if ( empty( $order->get_meta( '_cko_payment_id' ) ) ) {
+					$order->update_meta_data( '_cko_payment_id', $payment_id );
+				}
+				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ✅ Stored primary payment_id in order meta: ' . $payment_id );
+			}
+			
+			// Always store payment type (this doesn't affect multi-tab logic)
 			$order->update_meta_data( '_cko_flow_payment_type', $payment_type );
 			$order->save();
 			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ✅ Stored payment_type in order meta: ' . $payment_type );
@@ -5669,29 +5942,43 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		$webhook_payment_id = isset( $data->data->id ) ? $data->data->id : 'NULL';
 		$webhook_session_id = isset( $data->data->metadata->cko_payment_session_id ) ? $data->data->metadata->cko_payment_session_id : 'NOT SET';
 		$webhook_order_id = isset( $data->data->metadata->order_id ) ? $data->data->metadata->order_id : 'NOT SET';
+		$webhook_reference = isset( $data->data->reference ) ? $data->data->reference : 'NOT SET';
 		
 		WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ========== STARTING ORDER LOOKUP ==========' );
 		WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Event Type: ' . $webhook_event_type );
 		WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Payment ID: ' . $webhook_payment_id );
 		WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Session ID in metadata: ' . $webhook_session_id );
 		WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Order ID in metadata: ' . $webhook_order_id );
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Reference (Order ID): ' . $webhook_reference );
 
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Starting order lookup process' );
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Webhook data structure: ' . wp_json_encode( $data ) );
 		}
 
-		// Method 1: Try order_id from metadata (order-pay page has this)
-		if ( ! empty( $data->data->metadata->order_id ) ) {
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Trying METHOD 1 (Order ID from metadata): ' . $data->data->metadata->order_id );
+		// Method 1: Try reference field first (contains Order ID - MOST DIRECT)
+		// We send order_id as reference when submitting payment, so this is the most reliable
+		if ( ! empty( $data->data->reference ) && is_numeric( $data->data->reference ) ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Trying METHOD 1 (Reference/Order ID): ' . $data->data->reference );
+			$order = wc_get_order( $data->data->reference );
+			if ( $order ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ✅ MATCHED BY METHOD 1 (Reference/Order ID) - Order ID: ' . $order->get_id() );
+			} else {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ❌ METHOD 1 FAILED - Order ID ' . $data->data->reference . ' not found' );
+			}
+		}
+		
+		// Method 1B: Try order_id from metadata (fallback if reference not available)
+		if ( ! $order && ! empty( $data->data->metadata->order_id ) ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Trying METHOD 1B (Order ID from metadata): ' . $data->data->metadata->order_id );
 			if ( $webhook_debug_enabled ) {
 				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Looking for order by metadata order_id: ' . $data->data->metadata->order_id );
 			}
 			$order = wc_get_order( $data->data->metadata->order_id );
 			if ( $order ) {
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ✅ MATCHED BY METHOD 1 (Order ID from metadata) - Order ID: ' . $order->get_id() );
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ✅ MATCHED BY METHOD 1B (Order ID from metadata) - Order ID: ' . $order->get_id() );
 			} else {
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ❌ METHOD 1 FAILED - Order ID ' . $data->data->metadata->order_id . ' not found' );
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ❌ METHOD 1B FAILED - Order ID ' . $data->data->metadata->order_id . ' not found' );
 			}
 			if ( $webhook_debug_enabled ) {
 				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order found by metadata order_id: ' . ($order ? 'YES (ID: ' . $order->get_id() . ')' : 'NO') );
@@ -5824,6 +6111,76 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order lookup result: ' . ($order ? 'FOUND (ID: ' . $order->get_id() . ')' : 'NOT FOUND') );
 		}
 
+		// Method 2.5: MULTI-TAB SUPPORT - Search for payment ID in _cko_payment_attempts array
+		// This handles the case where a secondary tab's payment succeeded but the order's primary
+		// _cko_payment_session_id doesn't match the webhook's session ID
+		if ( ! $order && ! empty( $data->data->id ) ) {
+			$webhook_payment_id = $data->data->id;
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Trying METHOD 2.5 (MULTI-TAB: Payment ID in _cko_payment_attempts)' );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Looking for payment ID: ' . $webhook_payment_id . ' in payment attempts array' );
+			
+			// Search for orders with this payment ID tracked in the payment_attempts array
+			// We need to search serialized data, so we use LIKE with the payment ID
+			global $wpdb;
+			$meta_key = '_cko_payment_attempts';
+			$search_pattern = '%' . $wpdb->esc_like( $webhook_payment_id ) . '%';
+			
+			$order_ids = $wpdb->get_col(
+				$wpdb->prepare(
+					"SELECT DISTINCT pm.post_id FROM {$wpdb->postmeta} pm 
+					INNER JOIN {$wpdb->posts} p ON pm.post_id = p.ID 
+					WHERE pm.meta_key = %s 
+					AND pm.meta_value LIKE %s 
+					AND p.post_type IN ('shop_order', 'shop_order_placehold')
+					AND p.post_status IN ('wc-pending', 'wc-failed', 'wc-on-hold', 'wc-processing', 'wc-completed')
+					LIMIT 5",
+					$meta_key,
+					$search_pattern
+				)
+			);
+			
+			if ( ! empty( $order_ids ) ) {
+				foreach ( $order_ids as $order_id ) {
+					$potential_order = wc_get_order( $order_id );
+					if ( ! $potential_order ) {
+						continue;
+					}
+					
+					// Verify the payment ID is actually in the attempts array
+					$payment_attempts = $potential_order->get_meta( '_cko_payment_attempts' );
+					if ( empty( $payment_attempts ) || ! is_array( $payment_attempts ) ) {
+						continue;
+					}
+					
+					$found_in_attempts = false;
+					foreach ( $payment_attempts as $attempt ) {
+						if ( isset( $attempt['payment_id'] ) && $attempt['payment_id'] === $webhook_payment_id ) {
+							$found_in_attempts = true;
+							break;
+						}
+					}
+					
+					if ( $found_in_attempts ) {
+						$order = $potential_order;
+						WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ✅ MATCHED BY METHOD 2.5 (MULTI-TAB) - Order ID: ' . $order->get_id() );
+						WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Payment ID found in _cko_payment_attempts array' );
+						
+						// Add order_id to metadata
+						if ( isset( $data->data->metadata ) && is_object( $data->data->metadata ) ) {
+							$data->data->metadata->order_id = $order->get_id();
+						} else {
+							$data->data->metadata = (object) array( 'order_id' => $order->get_id() );
+						}
+						break;
+					}
+				}
+			}
+			
+			if ( ! $order ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ❌ METHOD 2.5 FAILED - Payment ID not found in any _cko_payment_attempts' );
+			}
+		}
+		
 		// Method 3: Try payment ID alone (fallback if combined match failed)
 		// CRITICAL: Only match orders that need updating (pending, failed, on-hold, processing)
 		// This ensures webhook updates correct order and prevents matching completed orders
@@ -6903,9 +7260,26 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	 * @return void
 	 */
 	public function prevent_failed_order_reuse() {
+		WC_Checkoutcom_Utility::logger( '[PREVENT ORDER REUSE] ========== HOOK FIRED ==========' );
+		
 		// Only apply to Flow payment method.
+		// Check both POST (classic) and REST request body (blocks)
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce verified by WooCommerce checkout process.
 		$payment_method = isset( $_POST['payment_method'] ) ? sanitize_text_field( wp_unslash( $_POST['payment_method'] ) ) : '';
+		
+		// For Blocks checkout, check REST API request body
+		if ( empty( $payment_method ) && defined( 'REST_REQUEST' ) && REST_REQUEST ) {
+			$json_params = file_get_contents( 'php://input' );
+			if ( $json_params ) {
+				$request_data = json_decode( $json_params, true );
+				if ( isset( $request_data['payment_method'] ) ) {
+					$payment_method = sanitize_text_field( $request_data['payment_method'] );
+				}
+			}
+		}
+		
+		WC_Checkoutcom_Utility::logger( sprintf( '[PREVENT ORDER REUSE] Payment method: %s', $payment_method ?: '(none)' ) );
+		
 		if ( 'wc_checkout_com_flow' !== $payment_method ) {
 			return;
 		}
@@ -6964,10 +7338,37 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// This ensures each payment attempt gets its own order for clean tracking.
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Already verified above.
 		if ( ! $should_prevent_reuse ) {
+			// Try POST first (Classic checkout)
 			$current_payment_session_id = isset( $_POST['cko-flow-payment-session-id'] ) 
 				? sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-session-id'] ) ) 
 				: '';
+			
+			// If not in POST, check REST API request body (Blocks checkout)
+			if ( empty( $current_payment_session_id ) && defined( 'REST_REQUEST' ) && REST_REQUEST ) {
+				$json_params = file_get_contents( 'php://input' );
+				if ( $json_params ) {
+					$request_data = json_decode( $json_params, true );
+					// Check payment_data array for Blocks checkout
+					if ( isset( $request_data['payment_data'] ) && is_array( $request_data['payment_data'] ) ) {
+						foreach ( $request_data['payment_data'] as $data ) {
+							if ( isset( $data['key'] ) && 'cko-flow-payment-session-id' === $data['key'] ) {
+								$current_payment_session_id = sanitize_text_field( $data['value'] );
+								break;
+							}
+						}
+					}
+				}
+			}
+			
 			$order_payment_session_id = $existing_order->get_meta( '_cko_payment_session_id' );
+			
+			WC_Checkoutcom_Utility::logger(
+				sprintf(
+					'[PREVENT ORDER REUSE] Checking PS ID - Current: %s, Order: %s',
+					$current_payment_session_id ? substr( $current_payment_session_id, 0, 25 ) . '...' : '(none)',
+					$order_payment_session_id ? substr( $order_payment_session_id, 0, 25 ) . '...' : '(none)'
+				)
+			);
 			
 			// If both exist and don't match, this is a new payment attempt - create new order
 			if ( ! empty( $current_payment_session_id ) 
@@ -7020,6 +7421,418 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	}
 
 	/**
+	 * Check payment session ID when WooCommerce is about to resume an order.
+	 * 
+	 * This hook fires via woocommerce_resume_order action WHEN WooCommerce decides to resume
+	 * an existing order from the order_awaiting_payment session. At this point, we can check
+	 * if the current payment session ID matches the order's payment session ID.
+	 * 
+	 * If they don't match, we clear the session so WooCommerce will create a new order instead.
+	 * 
+	 * @since 5.0.4
+	 *
+	 * @param int $order_id The order ID being resumed.
+	 * @return void
+	 */
+	public function check_payment_session_on_resume( $order_id ) {
+		WC_Checkoutcom_Utility::logger( sprintf( '[RESUME ORDER] ========== HOOK FIRED for Order %d ==========', $order_id ) );
+		
+		$order = wc_get_order( $order_id );
+		if ( ! $order ) {
+			WC_Checkoutcom_Utility::logger( '[RESUME ORDER] Order not found' );
+			return;
+		}
+		
+		// Only check for Flow payment method
+		$payment_method = $order->get_payment_method();
+		if ( ! empty( $payment_method ) && 'wc_checkout_com_flow' !== $payment_method ) {
+			WC_Checkoutcom_Utility::logger( sprintf( '[RESUME ORDER] Not Flow payment method: %s', $payment_method ) );
+			return;
+		}
+		
+		// Get current payment session ID from multiple sources
+		$current_payment_session_id = '';
+		
+		// Try POST (classic checkout)
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Just reading value
+		if ( isset( $_POST['cko-flow-payment-session-id'] ) ) {
+			$current_payment_session_id = sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-session-id'] ) );
+		}
+		
+		// Try REST API body (blocks checkout)
+		if ( empty( $current_payment_session_id ) && defined( 'REST_REQUEST' ) && REST_REQUEST ) {
+			$json_body = file_get_contents( 'php://input' );
+			if ( $json_body ) {
+				$request_data = json_decode( $json_body, true );
+				if ( isset( $request_data['payment_data'] ) && is_array( $request_data['payment_data'] ) ) {
+					foreach ( $request_data['payment_data'] as $data ) {
+						if ( isset( $data['key'] ) && 'cko-flow-payment-session-id' === $data['key'] ) {
+							$current_payment_session_id = sanitize_text_field( $data['value'] );
+							break;
+						}
+					}
+				}
+			}
+		}
+		
+		$order_payment_session_id = $order->get_meta( '_cko_payment_session_id' );
+		
+		WC_Checkoutcom_Utility::logger(
+			sprintf(
+				'[RESUME ORDER] Order %d - Order PS: %s, Current PS: %s',
+				$order_id,
+				$order_payment_session_id ? substr( $order_payment_session_id, 0, 25 ) . '...' : '(none)',
+				$current_payment_session_id ? substr( $current_payment_session_id, 0, 25 ) . '...' : '(none)'
+			)
+		);
+		
+		// If order already has a payment session ID and current request has a DIFFERENT one
+		// MULTI-TAB HANDLING: This is expected behavior in multi-tab scenarios
+		// We track all payment attempts - first successful one wins
+		if ( ! empty( $order_payment_session_id ) && ! empty( $current_payment_session_id ) 
+			 && $order_payment_session_id !== $current_payment_session_id ) {
+			
+			WC_Checkoutcom_Utility::logger(
+				sprintf(
+					'[RESUME ORDER] ⚠️ MULTI-TAB DETECTED - Order %d already has PS %s but current request has PS %s. Tracking this as additional payment attempt.',
+					$order_id,
+					substr( $order_payment_session_id, 0, 25 ),
+					substr( $current_payment_session_id, 0, 25 )
+				)
+			);
+			
+			// Note: We now track all payment attempts in store_payment_session_id_in_order()
+			// and ajax_submit_payment_session(). The first successful payment will update
+			// the order status. Subsequent payments will be noted as duplicates from different tabs.
+		}
+		
+		// If order has a payment session ID but current request has NONE
+		if ( ! empty( $order_payment_session_id ) && empty( $current_payment_session_id ) ) {
+			WC_Checkoutcom_Utility::logger(
+				sprintf(
+					'[RESUME ORDER] Order %d has PS but current request has none - allowing resume (might be retry)',
+					$order_id
+				)
+			);
+		}
+	}
+
+	/**
+	 * Prevent order reuse for WooCommerce Blocks checkout.
+	 * 
+	 * WooCommerce Blocks uses the Store API which bypasses woocommerce_before_checkout_process.
+	 * This hook runs when the Store API processes an order.
+	 *
+	 * @since 5.0.4
+	 *
+	 * @param WC_Order $order The order being processed.
+	 * @return void
+	 */
+	public function prevent_order_reuse_blocks_checkout( $order ) {
+		// Only process Flow payments
+		if ( $order->get_payment_method() !== $this->id ) {
+			return;
+		}
+		
+		// Get current payment session ID from POST or request data
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce verified by WooCommerce
+		$current_payment_session_id = isset( $_POST['cko-flow-payment-session-id'] ) 
+			? sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-session-id'] ) ) 
+			: '';
+		
+		$order_payment_session_id = $order->get_meta( '_cko_payment_session_id' );
+		
+		WC_Checkoutcom_Utility::logger(
+			sprintf(
+				'[BLOCKS CHECKOUT] Order %d - Current PS: %s, Order PS: %s',
+				$order->get_id(),
+				$current_payment_session_id ? substr( $current_payment_session_id, 0, 20 ) . '...' : '(none)',
+				$order_payment_session_id ? substr( $order_payment_session_id, 0, 20 ) . '...' : '(none)'
+			)
+		);
+		
+		// If order already has a different payment session ID, this is a problem
+		// The order was reused when it shouldn't have been
+		if ( ! empty( $order_payment_session_id ) 
+			 && ! empty( $current_payment_session_id ) 
+			 && $order_payment_session_id !== $current_payment_session_id ) {
+			WC_Checkoutcom_Utility::logger(
+				sprintf(
+					'[BLOCKS CHECKOUT] ⚠️ Order %d was INCORRECTLY reused - has different payment session ID. Will be handled by duplicate prevention.',
+					$order->get_id()
+				)
+			);
+		}
+	}
+
+	/**
+	 * Clear order_awaiting_payment session if order has different payment session ID.
+	 * 
+	 * This hooks into checkout value retrieval (runs early) to clear the session
+	 * before WooCommerce decides to reuse an order.
+	 *
+	 * @since 5.0.4
+	 *
+	 * @param mixed  $value The checkout field value.
+	 * @param string $input The input name.
+	 * @return mixed
+	 */
+	public function maybe_clear_order_awaiting_payment( $value, $input ) {
+		static $checked = false;
+		
+		// Only run once per request
+		if ( $checked ) {
+			return $value;
+		}
+		$checked = true;
+		
+		// Only apply to Flow payment method
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Just checking context
+		$payment_method = isset( $_POST['payment_method'] ) ? sanitize_text_field( wp_unslash( $_POST['payment_method'] ) ) : '';
+		if ( 'wc_checkout_com_flow' !== $payment_method ) {
+			return $value;
+		}
+		
+		if ( ! WC()->session ) {
+			return $value;
+		}
+		
+		$session_order_id = absint( WC()->session->get( 'order_awaiting_payment' ) );
+		if ( ! $session_order_id ) {
+			return $value;
+		}
+		
+		$existing_order = wc_get_order( $session_order_id );
+		if ( ! $existing_order ) {
+			return $value;
+		}
+		
+		// Get current payment session ID from POST
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Just reading value
+		$current_payment_session_id = isset( $_POST['cko-flow-payment-session-id'] ) 
+			? sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-session-id'] ) ) 
+			: '';
+		
+		$order_payment_session_id = $existing_order->get_meta( '_cko_payment_session_id' );
+		
+		// If order has a DIFFERENT payment session ID, clear the session to force new order
+		if ( ! empty( $current_payment_session_id ) 
+			 && ! empty( $order_payment_session_id ) 
+			 && $current_payment_session_id !== $order_payment_session_id ) {
+			
+			WC_Checkoutcom_Utility::logger(
+				sprintf(
+					'[EARLY INTERCEPT] Clearing order_awaiting_payment - Order %d has different PS. Order: %s, Current: %s',
+					$session_order_id,
+					substr( $order_payment_session_id, 0, 20 ) . '...',
+					substr( $current_payment_session_id, 0, 20 ) . '...'
+				)
+			);
+			
+			WC()->session->set( 'order_awaiting_payment', null );
+			
+			// Add note to old order
+			$existing_order->add_order_note(
+				__( 'Order not reused: A new payment session was started. New order created.', 'checkout-com-unified-payments-api' )
+			);
+			$existing_order->save();
+		}
+		
+		return $value;
+	}
+
+	/**
+	 * Clear order_awaiting_payment session BEFORE Store API processes checkout.
+	 * 
+	 * This hooks into rest_pre_dispatch which fires BEFORE the Store API endpoint
+	 * processes the request. This is the earliest point we can intercept to clear
+	 * the session before WooCommerce decides to reuse an order.
+	 *
+	 * @since 5.0.4
+	 *
+	 * @param mixed           $result  Response to replace the requested version with. Can be anything.
+	 * @param \WP_REST_Server $server  Server instance.
+	 * @param \WP_REST_Request $request Request used to generate the response.
+	 * @return mixed Unchanged $result.
+	 */
+	public function clear_session_before_store_api_checkout( $result, $server, $request ) {
+		// Only intercept Store API checkout endpoint
+		$route = $request->get_route();
+		
+		// Debug: Log all Store API requests to see what's coming through
+		if ( strpos( $route, '/wc/store' ) !== false ) {
+			WC_Checkoutcom_Utility::logger( sprintf( '[REST PRE-DISPATCH] Route: %s, Method: %s', $route, $request->get_method() ) );
+		}
+		
+		if ( strpos( $route, '/wc/store/v1/checkout' ) === false && strpos( $route, '/wc/store/checkout' ) === false ) {
+			return $result;
+		}
+		
+		// Only process POST requests (actual checkout submission)
+		if ( $request->get_method() !== 'POST' ) {
+			return $result;
+		}
+		
+		// Check if using Flow payment method
+		$request_data = $request->get_json_params();
+		$payment_method = isset( $request_data['payment_method'] ) ? $request_data['payment_method'] : '';
+		
+		if ( 'wc_checkout_com_flow' !== $payment_method ) {
+			return $result;
+		}
+		
+		WC_Checkoutcom_Utility::logger( '[BLOCKS PRE-DISPATCH] Intercepting Store API checkout request for Flow payment' );
+		
+		// Get payment session ID from request
+		$current_payment_session_id = '';
+		
+		// Check in payment_data array (how Blocks sends custom payment data)
+		if ( isset( $request_data['payment_data'] ) && is_array( $request_data['payment_data'] ) ) {
+			foreach ( $request_data['payment_data'] as $data ) {
+				if ( isset( $data['key'] ) && $data['key'] === 'cko-flow-payment-session-id' ) {
+					$current_payment_session_id = sanitize_text_field( $data['value'] );
+					break;
+				}
+			}
+		}
+		
+		// Also check extensions (alternative location)
+		if ( empty( $current_payment_session_id ) && isset( $request_data['extensions']['checkout-com-flow']['payment_session_id'] ) ) {
+			$current_payment_session_id = sanitize_text_field( $request_data['extensions']['checkout-com-flow']['payment_session_id'] );
+		}
+		
+		WC_Checkoutcom_Utility::logger(
+			sprintf( '[BLOCKS PRE-DISPATCH] Current payment session ID from request: %s',
+				$current_payment_session_id ? substr( $current_payment_session_id, 0, 30 ) . '...' : '(none)'
+			)
+		);
+		
+		// Initialize WC session if needed (REST API may not have it initialized yet)
+		if ( ! WC()->session ) {
+			WC()->initialize_session();
+		}
+		
+		if ( ! WC()->session ) {
+			return $result;
+		}
+		
+		$session_order_id = absint( WC()->session->get( 'order_awaiting_payment' ) );
+		if ( ! $session_order_id ) {
+			WC_Checkoutcom_Utility::logger( '[BLOCKS PRE-DISPATCH] No order_awaiting_payment in session - will create new order' );
+			return $result;
+		}
+		
+		$existing_order = wc_get_order( $session_order_id );
+		if ( ! $existing_order ) {
+			WC_Checkoutcom_Utility::logger( '[BLOCKS PRE-DISPATCH] Session order not found - will create new order' );
+			return $result;
+		}
+		
+		$order_payment_session_id = $existing_order->get_meta( '_cko_payment_session_id' );
+		
+		WC_Checkoutcom_Utility::logger(
+			sprintf(
+				'[BLOCKS PRE-DISPATCH] Session Order %d - Order PS: %s, Current PS: %s',
+				$session_order_id,
+				$order_payment_session_id ? substr( $order_payment_session_id, 0, 30 ) . '...' : '(none)',
+				$current_payment_session_id ? substr( $current_payment_session_id, 0, 30 ) . '...' : '(none)'
+			)
+		);
+		
+		// MULTI-TAB HANDLING: Log if order is being reused with different payment session
+		// We don't try to prevent reuse here (doesn't work reliably in Blocks)
+		// Instead, we track all payment attempts and let the first successful one win
+		if ( ! empty( $order_payment_session_id ) ) {
+			if ( empty( $current_payment_session_id ) || $current_payment_session_id !== $order_payment_session_id ) {
+				WC_Checkoutcom_Utility::logger(
+					sprintf(
+						'[BLOCKS PRE-DISPATCH] ⚠️ MULTI-TAB DETECTED - Order %d already has payment session %s. Current request has different/no PS.',
+						$session_order_id,
+						substr( $order_payment_session_id, 0, 25 )
+					)
+				);
+				// Note: We don't clear the session - WooCommerce may reuse the order regardless
+				// The multi-tab handling in store_payment_session_id_in_order() and ajax_submit_payment_session()
+				// will track all payment attempts, and the first successful one will update the order status
+			} else {
+				WC_Checkoutcom_Utility::logger( '[BLOCKS PRE-DISPATCH] Payment session matches - same tab continuing payment' );
+			}
+		} else {
+			WC_Checkoutcom_Utility::logger( '[BLOCKS PRE-DISPATCH] Order has no payment session ID yet - first payment attempt' );
+		}
+		
+		return $result;
+	}
+
+	/**
+	 * Early session clearing on wp_loaded.
+	 * 
+	 * This runs very early on AJAX requests to check if a new payment session
+	 * is being used with an existing order. If so, clear the session.
+	 *
+	 * @since 5.0.4
+	 *
+	 * @return void
+	 */
+	public function early_clear_order_session_for_new_payment() {
+		// Only run on AJAX/REST requests related to checkout
+		if ( ! wp_doing_ajax() && ! ( defined( 'REST_REQUEST' ) && REST_REQUEST ) ) {
+			return;
+		}
+		
+		// Check if this is a Flow-related request
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Just checking context
+		$payment_method = isset( $_POST['payment_method'] ) ? sanitize_text_field( wp_unslash( $_POST['payment_method'] ) ) : '';
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Just checking context
+		$action = isset( $_POST['action'] ) ? sanitize_text_field( wp_unslash( $_POST['action'] ) ) : '';
+		
+		// Only process Flow payment requests
+		if ( 'wc_checkout_com_flow' !== $payment_method && strpos( $action, 'cko_flow' ) === false ) {
+			return;
+		}
+		
+		if ( ! WC()->session ) {
+			return;
+		}
+		
+		$session_order_id = absint( WC()->session->get( 'order_awaiting_payment' ) );
+		if ( ! $session_order_id ) {
+			return;
+		}
+		
+		$existing_order = wc_get_order( $session_order_id );
+		if ( ! $existing_order ) {
+			return;
+		}
+		
+		// Get current payment session ID from POST
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Just reading value
+		$current_payment_session_id = isset( $_POST['cko-flow-payment-session-id'] ) 
+			? sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-session-id'] ) ) 
+			: '';
+		
+		$order_payment_session_id = $existing_order->get_meta( '_cko_payment_session_id' );
+		
+		// If order has a DIFFERENT payment session ID, clear the session
+		if ( ! empty( $current_payment_session_id ) 
+			 && ! empty( $order_payment_session_id ) 
+			 && $current_payment_session_id !== $order_payment_session_id ) {
+			
+			// MULTI-TAB HANDLING: Log the detection but don't try to prevent reuse
+			// Session clearing doesn't work reliably, especially in Blocks checkout
+			// The tracking in store_payment_session_id_in_order() will handle this
+			WC_Checkoutcom_Utility::logger(
+				sprintf(
+					'[EARLY SESSION CHECK] ⚠️ MULTI-TAB DETECTED - Order %d has different PS. Order PS: %s, Current PS: %s. Tracking both attempts.',
+					$session_order_id,
+					substr( $order_payment_session_id, 0, 25 ),
+					substr( $current_payment_session_id, 0, 25 )
+				)
+			);
+		}
+	}
+
+	/**
 	 * Get an existing order ID that may be reused for the current checkout.
 	 *
 	 * Follows WooCommerce pattern: checks order_awaiting_payment session key
@@ -7040,7 +7853,30 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				WC_Checkoutcom_Utility::logger(
 					sprintf( '[ORDER REUSE CHECK] Found order_awaiting_payment in session: %d', $session_order_id )
 				);
-				$order_id = $session_order_id;
+				
+				// CRITICAL: If order already has a payment ID, it means a payment was attempted.
+				// Don't return this order - let validate_order_reuse handle it properly.
+				// NOTE: We do NOT clear session here to avoid "session expired" errors in WC Blocks.
+				$order = wc_get_order( $session_order_id );
+				if ( $order ) {
+					$existing_payment_id = $order->get_meta( '_cko_payment_id' );
+					if ( ! empty( $existing_payment_id ) ) {
+						WC_Checkoutcom_Utility::logger(
+							sprintf(
+								'[ORDER REUSE CHECK] Order %d already has Payment ID (%s) - skipping, will be handled by validate_order_reuse',
+								$session_order_id,
+								substr( $existing_payment_id, 0, 25 )
+							)
+						);
+						// Return the order ID - validate_order_reuse will reject it and create new order
+						// This avoids the "session expired" error caused by clearing session here
+						$order_id = $session_order_id;
+					} else {
+						$order_id = $session_order_id;
+					}
+				} else {
+					$order_id = $session_order_id;
+				}
 			}
 		}
 
@@ -7076,10 +7912,15 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	/**
 	 * Validate if an existing order can be reused for a new payment attempt.
 	 *
+	 * Order reuse rules:
+	 * 1. Order-pay page: ALWAYS reuse (user is paying for specific order)
+	 * 2. Failed orders: REUSE (allow retry on same order)
+	 * 3. Regular checkout with pending order: CREATE NEW ORDER (each Pay click = new order)
+	 *
 	 * An order CANNOT be reused if:
 	 * - It has _cko_security_check_failed flag (amount mismatch detected)
-	 * - Its status is completed, cancelled, or refunded
-	 * - The cart contents have changed (different cart hash)
+	 * - Its status is completed, cancelled, refunded, processing, or on-hold
+	 * - The cart contents have changed (different cart hash) - for failed order retries
 	 *
 	 * @since 5.0.3
 	 *
@@ -7098,10 +7939,31 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		}
 
 		$order_id = $order->get_id();
+		$status   = $order->get_status();
+
+		// Detect if this is an order-pay page request.
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Just checking context, not processing data
+		$is_order_pay_page = isset( $_POST['is_order_pay'] ) && 'yes' === sanitize_text_field( wp_unslash( $_POST['is_order_pay'] ) );
+		
+		// Also check URL pattern for order-pay pages
+		if ( ! $is_order_pay_page ) {
+			$referer = wp_get_referer();
+			if ( $referer && strpos( $referer, '/order-pay/' ) !== false ) {
+				$is_order_pay_page = true;
+			}
+		}
+
+		WC_Checkoutcom_Utility::logger(
+			sprintf(
+				'[ORDER REUSE CHECK] Evaluating Order %d - Status: %s, Is Order-Pay Page: %s',
+				$order_id,
+				$status,
+				$is_order_pay_page ? 'YES' : 'NO'
+			)
+		);
 
 		// Check 1: Security check failed flag.
 		// If order failed security check (amount mismatch), it should NOT be reused.
-		// A new order with correct amount should be created.
 		$security_check_failed = $order->get_meta( '_cko_security_check_failed' );
 		if ( ! empty( $security_check_failed ) ) {
 			WC_Checkoutcom_Utility::logger(
@@ -7117,102 +7979,158 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			);
 		}
 
-		// Check 2: Order status must be suitable for reuse.
-		// IMPORTANT: Only 'pending' status orders can be reused.
-		// 'failed' orders should NOT be reused - a new order should be created for retry.
-		// This prevents confusion from multiple payment attempts on the same order.
-		$status = $order->get_status();
-		$reusable_statuses = array( 'pending' );
-
-		/**
-		 * Filter the list of order statuses that allow order reuse.
-		 *
-		 * Default: only 'pending' orders can be reused.
-		 * 'failed' orders are excluded because they indicate a previous payment failure,
-		 * and a new order should be created for retry attempts.
-		 *
-		 * @since 5.0.3
-		 *
-		 * @param array    $reusable_statuses Array of status slugs (without 'wc-' prefix).
-		 * @param WC_Order $order             The order being checked.
-		 */
-		$reusable_statuses = apply_filters( 'cko_flow_order_reusable_statuses', $reusable_statuses, $order );
-
-		if ( ! in_array( $status, $reusable_statuses, true ) ) {
+		// Check 1.5: CRITICAL - Order already has a Payment Session ID (payment flow started).
+		// This is the key fix for multi-tab/rapid-click issues: 1 Order = 1 Payment Session.
+		// Payment Session ID is saved IMMEDIATELY when order is created (before 3DS),
+		// so this catches the case where Tab 1 is in 3DS and Tab 2 tries to pay.
+		// Exception: Order-pay pages can reuse (user explicitly paying for that specific order).
+		$existing_payment_session_id = $order->get_meta( '_cko_payment_session_id' );
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Just reading value for comparison
+		$current_payment_session_id = isset( $_POST['cko-flow-payment-session-id'] ) ? sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-session-id'] ) ) : '';
+		
+		if ( ! empty( $existing_payment_session_id ) && ! $is_order_pay_page ) {
+			// If current request has a DIFFERENT payment session ID, reject reuse
+			if ( ! empty( $current_payment_session_id ) && $existing_payment_session_id !== $current_payment_session_id ) {
+				WC_Checkoutcom_Utility::logger(
+					sprintf(
+						'[ORDER REUSE CHECK] Order %d already has DIFFERENT Payment Session ID - cannot reuse. Existing: %s, Current: %s',
+						$order_id,
+						substr( $existing_payment_session_id, 0, 20 ),
+						substr( $current_payment_session_id, 0, 20 )
+					)
+				);
+				return array(
+					'can_reuse' => false,
+					'reason'    => 'Order already has a different payment session (another tab/attempt in progress)',
+				);
+			}
+			// If current request has NO payment session ID but order has one, also reject
+			// (this means a new payment flow is starting)
+			if ( empty( $current_payment_session_id ) ) {
+				WC_Checkoutcom_Utility::logger(
+					sprintf(
+						'[ORDER REUSE CHECK] Order %d already has Payment Session ID (%s) but current request has none - cannot reuse',
+						$order_id,
+						substr( $existing_payment_session_id, 0, 20 )
+					)
+				);
+				return array(
+					'can_reuse' => false,
+					'reason'    => 'Order already has a payment session started',
+				);
+			}
+		}
+		
+		// Also check Payment ID (for cases where 3DS already completed)
+		$existing_payment_id = $order->get_meta( '_cko_payment_id' );
+		if ( ! empty( $existing_payment_id ) && ! $is_order_pay_page ) {
 			WC_Checkoutcom_Utility::logger(
 				sprintf(
-					'[ORDER REUSE CHECK] Order %d status "%s" cannot be reused (only pending orders can be reused)',
+					'[ORDER REUSE CHECK] Order %d already has Payment ID (%s) - cannot reuse (1 order = 1 payment rule)',
+					$order_id,
+					substr( $existing_payment_id, 0, 25 )
+				)
+			);
+			return array(
+				'can_reuse' => false,
+				'reason'    => 'Order already has a payment attempt (Payment ID exists)',
+			);
+		}
+
+		// Check 2: Order status validation.
+		// Orders that are already paid/processing/completed cannot be reused.
+		$non_reusable_statuses = array( 'processing', 'completed', 'on-hold', 'cancelled', 'refunded' );
+		if ( in_array( $status, $non_reusable_statuses, true ) ) {
+			WC_Checkoutcom_Utility::logger(
+				sprintf(
+					'[ORDER REUSE CHECK] Order %d status "%s" cannot be reused (already paid or cancelled)',
 					$order_id,
 					$status
 				)
 			);
 			return array(
 				'can_reuse' => false,
-				'reason'    => sprintf( 'Order status is "%s" - failed orders cannot be reused, creating new order', $status ),
+				'reason'    => sprintf( 'Order status is "%s" - cannot accept new payment', $status ),
 			);
 		}
 
-		// Check 3: Cart hash comparison (cart contents must match).
-		// This ensures the customer hasn't changed their cart since the order was created.
-		if ( WC()->cart ) {
-			$current_cart_hash  = WC()->cart->get_cart_hash();
-			$order_cart_hash    = $order->get_cart_hash();
-
-			if ( ! empty( $current_cart_hash ) && ! empty( $order_cart_hash ) && $current_cart_hash !== $order_cart_hash ) {
-				WC_Checkoutcom_Utility::logger(
-					sprintf(
-						'[ORDER REUSE CHECK] Order %d cart hash mismatch - Order: %s, Current: %s',
-						$order_id,
-						$order_cart_hash,
-						$current_cart_hash
-					)
-				);
-				return array(
-					'can_reuse' => false,
-					'reason'    => 'Cart contents changed since order was created',
-				);
-			}
+		// RULE: Order-pay page - ALWAYS reuse the specific order
+		if ( $is_order_pay_page ) {
+			WC_Checkoutcom_Utility::logger(
+				sprintf(
+					'[ORDER REUSE CHECK] Order %d - ORDER-PAY PAGE detected, will reuse order (status: %s)',
+					$order_id,
+					$status
+				)
+			);
+			return array(
+				'can_reuse' => true,
+				'reason'    => 'Order-pay page - reusing specific order',
+			);
 		}
 
-		// Check 4: Order total must match current cart total.
-		// Additional safeguard in case cart hash doesn't catch amount changes (e.g., coupons).
-		if ( WC()->cart ) {
-			$current_cart_total = WC()->cart->get_total( 'edit' );
-			$order_total        = $order->get_total();
+		// RULE: Failed orders - REUSE (allow retry on same order)
+		if ( 'failed' === $status ) {
+			// For failed orders, verify cart still matches before allowing reuse
+			if ( WC()->cart ) {
+				$current_cart_total = (float) WC()->cart->get_total( 'edit' );
+				$order_total        = (float) $order->get_total();
 
-			// Allow small floating point variance (1 cent).
-			if ( abs( (float) $current_cart_total - (float) $order_total ) > 0.01 ) {
-				WC_Checkoutcom_Utility::logger(
-					sprintf(
-						'[ORDER REUSE CHECK] Order %d total mismatch - Order: %s, Current Cart: %s',
-						$order_id,
-						$order_total,
-						$current_cart_total
-					)
-				);
-				return array(
-					'can_reuse' => false,
-					'reason'    => sprintf(
-						'Order total (%s) differs from current cart total (%s)',
-						wc_price( $order_total ),
-						wc_price( $current_cart_total )
-					),
-				);
+				// Allow small floating point variance (1 cent).
+				if ( abs( $current_cart_total - $order_total ) > 0.01 ) {
+					WC_Checkoutcom_Utility::logger(
+						sprintf(
+							'[ORDER REUSE CHECK] Failed Order %d - cart total changed (Order: %s, Cart: %s) - creating new order',
+							$order_id,
+							$order_total,
+							$current_cart_total
+						)
+					);
+					return array(
+						'can_reuse' => false,
+						'reason'    => 'Cart total changed since failed order was created',
+					);
+				}
 			}
+
+			WC_Checkoutcom_Utility::logger(
+				sprintf(
+					'[ORDER REUSE CHECK] Order %d - FAILED status, allowing retry on same order',
+					$order_id
+				)
+			);
+			return array(
+				'can_reuse' => true,
+				'reason'    => 'Failed order - allowing retry',
+			);
 		}
 
-		// All checks passed - order can be reused.
+		// RULE: Regular checkout with pending order - CREATE NEW ORDER
+		// Each Pay click should create a new order for clean 1:1 payment session ↔ order mapping
+		if ( 'pending' === $status ) {
+			WC_Checkoutcom_Utility::logger(
+				sprintf(
+					'[ORDER REUSE CHECK] Order %d - PENDING status on regular checkout - creating NEW order (1:1 PS↔Order rule)',
+					$order_id
+				)
+			);
+			return array(
+				'can_reuse' => false,
+				'reason'    => 'Regular checkout - creating new order for each payment attempt',
+			);
+		}
+
+		// Default: don't reuse
 		WC_Checkoutcom_Utility::logger(
 			sprintf(
-				'[ORDER REUSE CHECK] Order %d passed all reuse validation checks (status: %s)',
+				'[ORDER REUSE CHECK] Order %d - Unknown status "%s" - creating new order',
 				$order_id,
 				$status
 			)
 		);
-
 		return array(
-			'can_reuse' => true,
-			'reason'    => sprintf( 'Order status is "%s" and cart matches', $status ),
+			'can_reuse' => false,
+			'reason'    => sprintf( 'Order status "%s" not eligible for reuse', $status ),
 		);
 	}
 
@@ -7584,26 +8502,88 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] ✅ Payment submitted successfully - Payment ID: ' . ( $response_data['id'] ?? 'N/A' ) . ', Status: ' . ( $response_data['status'] ?? 'N/A' ) );
 
 		// Save payment ID and payment session ID to order if available
-		// CRITICAL: Save to BOTH _cko_payment_id AND _cko_flow_payment_id
-		// METHOD 2 webhook matching requires _cko_flow_payment_id to exist
-		// RETRY FIX: Also update _cko_payment_session_id for retry payments so webhooks can match
+		// MULTI-TAB SUPPORT: Track ALL payment attempts, let first successful one win
 		if ( $order_id > 0 && ! empty( $response_data['id'] ) ) {
 			$order = wc_get_order( $order_id );
 			if ( $order ) {
-				// Check if this is a retry payment (order already has a different session ID)
+				$payment_id = $response_data['id'];
 				$existing_session_id = $order->get_meta( '_cko_payment_session_id' );
-				$is_retry = ! empty( $existing_session_id ) && $existing_session_id !== $payment_session_id;
+				$existing_payment_id = $order->get_meta( '_cko_payment_id' );
+				$is_primary_session = empty( $existing_session_id ) || $existing_session_id === $payment_session_id;
 				
-				if ( $is_retry ) {
-					WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] RETRY PAYMENT - Updating session ID. Old: ' . $existing_session_id . ', New: ' . $payment_session_id );
+				// Get existing payment attempts array
+				$payment_attempts = $order->get_meta( '_cko_payment_attempts' );
+				if ( empty( $payment_attempts ) || ! is_array( $payment_attempts ) ) {
+					$payment_attempts = array();
 				}
 				
-				$order->update_meta_data( '_cko_payment_id', $response_data['id'] );
-				$order->update_meta_data( '_cko_flow_payment_id', $response_data['id'] );
-				// Always update payment session ID to ensure webhook matching works for retries
-				$order->update_meta_data( '_cko_payment_session_id', $payment_session_id );
+				// Find and update the attempt for this payment session, or add new one
+				$attempt_found = false;
+				foreach ( $payment_attempts as $index => $attempt ) {
+					if ( isset( $attempt['session_id'] ) && $attempt['session_id'] === $payment_session_id ) {
+						$payment_attempts[ $index ]['payment_id'] = $payment_id;
+						$payment_attempts[ $index ]['status'] = 'submitted';
+						$payment_attempts[ $index ]['submitted_at'] = current_time( 'mysql' );
+						$attempt_found = true;
+						break;
+					}
+				}
+				
+				// If not found, add new attempt entry
+				if ( ! $attempt_found ) {
+					$payment_attempts[] = array(
+						'session_id'   => $payment_session_id,
+						'payment_id'   => $payment_id,
+						'timestamp'    => current_time( 'mysql' ),
+						'submitted_at' => current_time( 'mysql' ),
+						'is_primary'   => $is_primary_session,
+						'status'       => 'submitted',
+					);
+				}
+				
+				// Save the updated attempts array
+				$order->update_meta_data( '_cko_payment_attempts', $payment_attempts );
+				
+				// Check if this is a multi-tab scenario
+				if ( ! empty( $existing_session_id ) && $existing_session_id !== $payment_session_id ) {
+					// MULTI-TAB: This is an additional payment attempt
+					WC_Checkoutcom_Utility::logger( 
+						sprintf(
+							'[SUBMIT PAYMENT SESSION] ⚠️ MULTI-TAB DETECTED - Order %d: Primary PS: %s, This PS: %s, This Payment ID: %s',
+							$order_id,
+							substr( $existing_session_id, 0, 25 ),
+							substr( $payment_session_id, 0, 25 ),
+							substr( $payment_id, 0, 25 )
+						)
+					);
+					
+					// Add note about the additional payment attempt
+					$order->add_order_note(
+						sprintf(
+							__( 'Additional payment submitted (multi-tab). Session: %s, Payment ID: %s. Waiting for 3DS completion.', 'checkout-com-unified-payments-api' ),
+							$payment_session_id,
+							$payment_id
+						)
+					);
+				} else {
+					// Normal case: This is the primary payment session
+					// Save as primary payment ID and session ID
+					$order->update_meta_data( '_cko_payment_id', $payment_id );
+					$order->update_meta_data( '_cko_flow_payment_id', $payment_id );
+					if ( empty( $existing_session_id ) ) {
+						$order->update_meta_data( '_cko_payment_session_id', $payment_session_id );
+					}
+					WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Primary payment ID saved to order: ' . $order_id );
+				}
+				
 				$order->save();
-				WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Payment ID saved to order: ' . $order_id . ( $is_retry ? ' (RETRY - session ID also updated)' : '' ) );
+				WC_Checkoutcom_Utility::logger( 
+					sprintf( 
+						'[SUBMIT PAYMENT SESSION] Payment attempts tracked for order %d. Total attempts: %d', 
+						$order_id, 
+						count( $payment_attempts ) 
+					) 
+				);
 			}
 		}
 
