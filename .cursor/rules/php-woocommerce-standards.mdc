@@ -1,0 +1,69 @@
+---
+description: PHP coding standards for WooCommerce Checkout.com plugin
+globs: **/*.php
+alwaysApply: false
+---
+
+# WooCommerce Checkout.com Plugin - PHP Standards
+
+## Project Context
+
+- **Plugin**: Checkout.com Payment Gateway for WooCommerce (Flow integration)
+- **Package**: `wc_checkout_com`
+- **Text domain**: `checkout-com-unified-payments-api`
+- **PHP**: 7.3+, tested with 8.2
+- **Standards**: WordPress Coding Standards (WPCS), VIP, PHPCompatibilityWP
+
+## Required Conventions
+
+### File Headers
+
+```php
+<?php
+/**
+ * Brief description.
+ *
+ * @package wc_checkout_com
+ */
+
+defined( 'ABSPATH' ) || exit;
+```
+
+### Naming
+
+- **Files**: `class-wc-checkoutcom-*.php` (lowercase, hyphens)
+- **Classes**: `WC_Gateway_Checkout_Com_*`, `WC_Checkout_Com_*` (snake_case)
+- **Functions**: `cko_*` prefix for global functions
+- **Prefix all globals** to avoid plugin conflicts
+
+### I18n
+
+Always use the text domain:
+
+```php
+// ✅ GOOD
+__( 'Checkout.com', 'checkout-com-unified-payments-api' );
+esc_html__( 'Error message', 'checkout-com-unified-payments-api' );
+
+// ❌ BAD
+__( 'Checkout.com' ); // Missing text domain
+```
+
+### Security
+
+- **Escape output**: `esc_html()`, `esc_attr()`, `wp_kses_post()` when needed
+- **Sanitize input**: `sanitize_text_field()`, `absint()` for user input
+- **Nonce verification**: Use `wp_verify_nonce()` for forms
+- **Prepared SQL**: Use `$wpdb->prepare()` for all queries
+
+### Forbidden
+
+- `var_dump`, `print_r`, `die`, `exit`, `eval`
+- `error_log` unless WP_DEBUG and with `// phpcs:ignore` for intentional debug logging
+
+### Run Linting
+
+```bash
+npm run lint:php     # Check
+npm run lint:php-fix # Auto-fix
+```
