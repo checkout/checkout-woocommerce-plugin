@@ -8443,6 +8443,27 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// Add Bearer prefix for NAS accounts
 		$secret_key = cko_is_nas_account() ? 'Bearer ' . $secret_key_raw : $secret_key_raw;
 
+		// CRITICAL: Calculate capture_on at SUBMIT time (not at session creation time)
+		// This ensures the capture delay is calculated from actual payment submission,
+		// not from when the customer landed on the checkout page.
+		// Previously, capture_on was calculated client-side at session creation, which caused
+		// issues when customers took longer than expected to complete checkout/3DS - the
+		// capture_on timestamp would be in the past, leading to immediate capture and webhook race conditions.
+		$auto_capture = '1' === WC_Admin_Settings::get_option( 'ckocom_card_autocap', '1' );
+		
+		WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Auto-capture setting: ' . ( $auto_capture ? 'ENABLED' : 'DISABLED' ) );
+		
+		if ( $auto_capture ) {
+			$capture_on = WC_Checkoutcom_Utility::get_delayed_capture_timestamp();
+			if ( $capture_on ) {
+				// Format as ISO 8601 string for Checkout.com API
+				$request_body['capture_on'] = $capture_on->format( 'c' );
+				WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] capture_on set to: ' . $request_body['capture_on'] . ' (calculated at submit time)' );
+			}
+		} else {
+			WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Auto-capture disabled - no capture_on set (authorize only)' );
+		}
+
 		// Build API URL
 		$api_base_url = 'sandbox' === $environment
 			? 'https://api.sandbox.checkout.com'

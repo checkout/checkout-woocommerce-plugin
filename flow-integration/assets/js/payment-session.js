@@ -503,27 +503,11 @@ var ckoFlow = {
 					},
 				},
 				capture: cko_flow_vars.auto_capture === true || cko_flow_vars.auto_capture === "true" || cko_flow_vars.auto_capture === "1" || cko_flow_vars.auto_capture === 1,
-				...(() => {
-					// Calculate capture_on timestamp when auto_capture is enabled
-					// This mirrors the classic card implementation in get_delayed_capture_timestamp()
-					const autoCapture = cko_flow_vars.auto_capture === true || cko_flow_vars.auto_capture === "true" || cko_flow_vars.auto_capture === "1" || cko_flow_vars.auto_capture === 1;
-					if (!autoCapture) {
-						return {}; // No capture_on for authorize-only
-					}
-					
-					const defaultSecondsDelay = 10; // Minimum 10 seconds to avoid webhook issues
-					let delayHours = parseFloat(cko_flow_vars.capture_delay_hours) || 0;
-					let totalSeconds = Math.round(delayHours * 3600);
-					
-					// If delay is 0, add minimum 10 seconds delay
-					if (totalSeconds === 0) {
-						totalSeconds = defaultSecondsDelay;
-					}
-					
-					// Calculate capture_on timestamp in ISO 8601 format
-					const captureOn = new Date(Date.now() + (totalSeconds * 1000));
-					return { capture_on: captureOn.toISOString() };
-				})(),
+				// NOTE: capture_on is now calculated at SUBMIT time (server-side in ajax_submit_payment_session)
+				// This ensures the delay is calculated from actual payment submission, not session creation.
+				// Previously capture_on was calculated here at session creation, which caused issues when
+				// customers took longer than expected to complete checkout/3DS - the capture_on timestamp
+				// would be in the past, leading to immediate capture and webhook race conditions.
 				items: orders,
 				integration: {
 					external_platform: {
