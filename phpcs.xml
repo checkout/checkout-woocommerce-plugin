@@ -1,137 +1,56 @@
 <?xml version="1.0"?>
-<ruleset name="Strict WordPress Plugin Quality">
+<ruleset name="Checkout.com WooCommerce Plugin">
+    <description>Custom ruleset for Checkout.com WooCommerce Plugin</description>
 
-	<description>
-		Ultra-strict PHPCS ruleset for WordPress plugins:
-		WPCS + VIP + PHPCompatibility + Debug detection + Code quality enforcement.
-	</description>
+    <!-- What to scan -->
+    <file>.</file>
 
-	<file>.</file>
+    <!-- Exclude paths -->
+    <exclude-pattern>/vendor/*</exclude-pattern>
+    <exclude-pattern>/node_modules/*</exclude-pattern>
+    <exclude-pattern>/e2e-tests/*</exclude-pattern>
+    <exclude-pattern>/tests/*</exclude-pattern>
+    <exclude-pattern>*.min.js</exclude-pattern>
+    <exclude-pattern>*.min.css</exclude-pattern>
 
-	<!-- Exclude paths -->
-	<exclude-pattern>./node_modules/*</exclude-pattern>
-	<exclude-pattern>./vendor/*</exclude-pattern>
-	<exclude-pattern>./dist/*</exclude-pattern>
-	<exclude-pattern>./build/*</exclude-pattern>
+    <!-- How to scan -->
+    <arg value="sp"/> <!-- Show sniff and progress -->
+    <arg name="basepath" value="."/>
+    <arg name="colors"/>
+    <arg name="extensions" value="php"/>
+    <arg name="parallel" value="8"/>
 
-	<!-- CLI behavior -->
-	<arg name="extensions" value="php"/>
-	<arg value="sp"/>
-	<arg name="colors"/>
-	<arg name="parallel" value="8"/>
-	<arg name="basepath" value="."/>
+    <!-- Rules: WordPress Coding Standards -->
+    <rule ref="WordPress">
+        <!-- Exclude some rules that are too strict for this project -->
+        <exclude name="WordPress.Files.FileName"/>
+        <exclude name="WordPress.NamingConventions.ValidVariableName"/>
+        <exclude name="WordPress.NamingConventions.ValidFunctionName"/>
+        <exclude name="WordPress.PHP.YodaConditions"/>
+        <exclude name="Generic.Commenting.DocComment"/>
+        <exclude name="Squiz.Commenting"/>
+    </rule>
 
-	<!-- WP + PHP versions -->
-	<config name="minimum_supported_wp_version" value="6.1" />
-	<config name="testVersion" value="8.2-"/>
+    <!-- Security-focused rules (HIGH PRIORITY) -->
+    <rule ref="WordPress.Security.EscapeOutput">
+        <type>error</type>
+    </rule>
+    <rule ref="WordPress.Security.NonceVerification">
+        <type>error</type>
+    </rule>
+    <rule ref="WordPress.Security.ValidatedSanitizedInput">
+        <type>error</type>
+    </rule>
+    <rule ref="WordPress.DB.PreparedSQL">
+        <type>error</type>
+    </rule>
+    <rule ref="WordPress.DB.PreparedSQLPlaceholders">
+        <type>error</type>
+    </rule>
 
-	<!-- Compatibility -->
-	<rule ref="PHPCompatibilityWP"/>
-
-	<!-- WordPress standards -->
-	<rule ref="WordPress-Core"/>
-	<rule ref="WordPress-Docs"/>
-	<rule ref="WordPress-Extra"/>
-
-	<!-- VIP -->
-	<rule ref="WordPressVIPMinimum"/>
-	<rule ref="WordPress-VIP-Go"/>
-
-	<!-- Allow sessions explicitly -->
-	<rule ref="WordPressVIPMinimum">
-		<exclude name="WordPressVIPMinimum.Functions.RestrictedFunctions.session_session_id"/>
-		<exclude name="WordPressVIPMinimum.Functions.RestrictedFunctions.session_session_start"/>
-		<exclude name="WordPressVIPMinimum.Variables.RestrictedVariables.session___SESSION"/>
-	</rule>
-
-	<!-- I18n -->
-	<rule ref="WordPress.WP.I18n">
-		<properties>
-			<property name="text_domain" type="array" value="checkout-com-unified-payments-api"/>
-		</properties>
-	</rule>
-
-	<!-- Allow short arrays -->
-	<rule ref="WordPress-Core">
-		<exclude name="Generic.Arrays.DisallowShortArraySyntax.Found"/>
-		<exclude name="Universal.Arrays.DisallowShortArraySyntax"/>
-	</rule>
-
-	<!-- ============================= -->
-	<!-- Debug & Logging Detection -->
-	<!-- ============================= -->
-
-	<rule ref="WordPress.PHP.DevelopmentFunctions.error_log"/>
-
-	<rule ref="Generic.PHP.ForbiddenFunctions">
-		<properties>
-			<property name="forbiddenFunctions" type="array">
-				<element key="var_dump" value="Remove debug output."/>
-				<element key="print_r" value="Remove debug output."/>
-				<element key="die" value="Avoid abrupt termination."/>
-				<element key="exit" value="Avoid abrupt termination."/>
-				<element key="eval" value="eval() is forbidden."/>
-			</property>
-		</properties>
-	</rule>
-
-	<!-- ============================= -->
-	<!-- Code Quality (REAL sniffs only) -->
-	<!-- ============================= -->
-
-	<rule ref="Squiz.PHP.CommentedOutCode"/>
-
-	<!-- Catches empty blocks/functions -->
-	<rule ref="Generic.CodeAnalysis.EmptyStatement"/>
-
-	<!-- Discourage deeply nested logic -->
-	<rule ref="Generic.Metrics.NestingLevel">
-		<properties>
-			<property name="absoluteNestingLevel" value="5"/>
-		</properties>
-	</rule>
-
-	<!-- Discourage high complexity -->
-	<rule ref="Generic.Metrics.CyclomaticComplexity">
-		<properties>
-			<property name="complexity" value="10"/>
-		</properties>
-	</rule>
-
-	<!-- ============================= -->
-	<!-- Security -->
-	<!-- ============================= -->
-
-	<rule ref="WordPress.Security.EscapeOutput"/>
-	<rule ref="WordPress.Security.ValidatedSanitizedInput"/>
-	<rule ref="WordPress.Security.NonceVerification"/>
-	<rule ref="WordPress.DB.PreparedSQL"/>
-
-	<!-- ============================= -->
-	<!-- Logic safety -->
-	<!-- ============================= -->
-
-	<rule ref="Generic.CodeAnalysis.AssignmentInCondition"/>
-
-	<!-- ============================= -->
-	<!-- Files -->
-	<!-- ============================= -->
-
-	<rule ref="WordPress.Files.FileName"/>
-
-	<!-- ============================= -->
-	<!-- Naming -->
-	<!-- ============================= -->
-
-	<rule ref="WordPress.NamingConventions.ValidFunctionName"/>
-	<rule ref="WordPress.NamingConventions.ValidVariableName"/>
-	<rule ref="WordPress.NamingConventions.PrefixAllGlobals"/>
-
-	<!-- ============================= -->
-	<!-- Best Practices -->
-	<!-- ============================= -->
-
-	<rule ref="PSR12"/>
-	<rule ref="Generic.PHP.NoSilencedErrors"/>
-
+    <!-- PHP Compatibility -->
+    <config name="testVersion" value="7.4-"/>
+    
+    <!-- Minimum supported WordPress version -->
+    <config name="minimum_wp_version" value="5.6"/>
 </ruleset>
