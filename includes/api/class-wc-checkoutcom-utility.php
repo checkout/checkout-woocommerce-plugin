@@ -228,7 +228,7 @@ class WC_Checkoutcom_Utility {
 			$log_level = 'warning';
 		} elseif ( preg_match( '/\[FLOW\s+ERROR\]|\[ERROR\]/i', $error_message ) ) {
 			$log_level = 'error';
-		} elseif ( preg_match( '/\[FLOW\s+SERVER\]|\[VALIDATE\s+CHECKOUT\]|\[PROCESS\s+PAYMENT\]|\[CREATE\s+ORDER\]|\[FLOW\s+VALID\s+FOR\s+USE\]|\[FLOW\s+AVAILABILITY\]|\[FLOW\s+SAVE\s+CARD\]/i', $error_message ) ) {
+		} elseif ( preg_match( '/\[FLOW\s+SERVER\]|\[VALIDATE\s+CHECKOUT\]|\[PROCESS\s+PAYMENT\]|\[CREATE\s+ORDER\]|\[FLOW\s+VALID\s+FOR\s+USE\]|\[FLOW\s+AVAILABILITY\]|\[FLOW\s+SAVE\s+CARD\]|\[FLOW\s+PAYMENT\s+SESSION\]|\[ORDER\s+NOTE\s+FILTER\]/i', $error_message ) ) {
 			// Server-side informational logs - use info level
 			$log_level = 'info';
 		}

@@ -23,12 +23,15 @@ class WC_Checkoutcom_Diagnostics {
 
 	/**
 	 * Add diagnostics submenu under WooCommerce.
+	 * Note: This is now integrated into Checkout.com settings navigation (Advanced tab).
+	 * The menu is kept for backward compatibility but the main access is via settings.
 	 *
 	 * @return void
 	 */
 	public static function add_menu() {
+		// Register standalone page for backward compatibility and to allow action handlers to work
 		add_submenu_page(
-			'woocommerce',
+			null, // Hidden from menu (no parent)
 			__( 'Checkout.com Diagnostics', 'checkout-com-unified-payments-api' ),
 			__( 'Checkout.com Diagnostics', 'checkout-com-unified-payments-api' ),
 			'manage_woocommerce',

@@ -140,14 +140,32 @@
 		},
 		
 		/**
+		 * Validate checkout data needed for payment session
+		 * @param {Object} checkoutData - Normalized checkout data
+		 * @returns {Object} Validation result
+		 */
+		validateCheckoutData: function(checkoutData) {
+			if (!checkoutData) {
+				return { isValid: false, reason: 'MISSING_DATA' };
+			}
+			
+			const email = checkoutData.email || '';
+			if (!email || !this.isValidEmail(String(email).trim())) {
+				return { isValid: false, reason: 'INVALID_EMAIL', email: email };
+			}
+			
+			return { isValid: true };
+		},
+		
+		/**
 		 * Check if postcode is required for a country
 		 * @param {string} country - Country code
 		 * @returns {boolean} True if postcode is required
 		 */
 		isPostcodeRequiredForCountry: function(country) {
 			if (!country) return true; // Default to required if unknown
-			// Countries that don't require postcode
-			const noPostcodeCountries = ['AE', 'AO', 'AG', 'AW', 'BS', 'BZ', 'BJ', 'BW', 'BF', 'BI', 'CM', 'CF', 'KM', 'CG', 'CD', 'CK', 'CI', 'DJ', 'DM', 'GQ', 'ER', 'FJ', 'TF', 'GM', 'GH', 'GD', 'GN', 'GY', 'HK', 'IE', 'JM', 'KE', 'KI', 'LS', 'LR', 'MW', 'ML', 'MR', 'MU', 'MS', 'NR', 'NU', 'KP', 'PA', 'QA', 'RW', 'KN', 'LC', 'ST', 'SC', 'SL', 'SB', 'SO', 'SR', 'SZ', 'TJ', 'TZ', 'TL', 'TG', 'TO', 'TT', 'TV', 'UG', 'VU', 'YE', 'ZW'];
+			// Countries that don't require postcode (aligned with WooCommerce get_country_locale)
+			const noPostcodeCountries = ['AE', 'AO', 'BD', 'BH', 'BO', 'BS', 'BW', 'BZ', 'CL', 'CO', 'CW', 'GH', 'GT', 'HK', 'JM', 'KN', 'MZ', 'NG', 'NP', 'SR', 'ST', 'UG', 'VN', 'WS', 'ZW'];
 			return !noPostcodeCountries.includes(country.toUpperCase());
 		},
 		
@@ -360,6 +378,87 @@
 			}
 			
 			return true;
+		},
+		
+		/**
+		 * Get list of missing or invalid fields for user-friendly error messages
+		 * Uses translated strings from cko_flow_vars.i18n if available
+		 * @returns {Object} Object with missingFields array and a formatted message
+		 */
+		getMissingFields: function() {
+			const missingFields = [];
+			
+			// Get translated labels from PHP (cko_flow_vars.i18n) or use English fallbacks
+			const i18n = (window.cko_flow_vars && window.cko_flow_vars.i18n) ? window.cko_flow_vars.i18n : {};
+			const labels = {
+				email: i18n.field_email || 'Email',
+				emailInvalid: i18n.field_email_invalid || 'Email (invalid format)',
+				firstName: i18n.field_first_name || 'First Name',
+				lastName: i18n.field_last_name || 'Last Name',
+				address: i18n.field_address || 'Street Address',
+				city: i18n.field_city || 'City',
+				country: i18n.field_country || 'Country',
+				state: i18n.field_state || 'State/Province',
+				postcode: i18n.field_postcode || 'Postcode/ZIP',
+				missingField: i18n.missing_field || 'Missing field:',
+				missingFields: i18n.missing_fields || 'Missing fields:',
+				allComplete: i18n.all_fields_complete || 'All fields are complete'
+			};
+			
+			// Check email
+			const email = this.getCheckoutFieldValue("billing_email");
+			if (!email) {
+				missingFields.push(labels.email);
+			} else if (!this.isValidEmail(email)) {
+				missingFields.push(labels.emailInvalid);
+			}
+			
+			// Check billing address fields
+			const firstName = this.getCheckoutFieldValue("billing_first_name");
+			const lastName = this.getCheckoutFieldValue("billing_last_name");
+			const address1 = this.getCheckoutFieldValue("billing_address_1");
+			const city = this.getCheckoutFieldValue("billing_city");
+			const country = this.getCheckoutFieldValue("billing_country");
+			const state = this.getCheckoutFieldValue("billing_state");
+			const postcode = this.getCheckoutFieldValue("billing_postcode");
+			
+			if (!firstName) missingFields.push(labels.firstName);
+			if (!lastName) missingFields.push(labels.lastName);
+			if (!address1) missingFields.push(labels.address);
+			if (!city) missingFields.push(labels.city);
+			if (!country) missingFields.push(labels.country);
+			
+			// Check state if the country has states
+			if (country) {
+				const stateFieldRow = document.getElementById('billing_state_field');
+				const stateIsVisible = stateFieldRow && !stateFieldRow.classList.contains('hidden') && stateFieldRow.style.display !== 'none';
+				const stateIsRequired = stateFieldRow && stateFieldRow.classList.contains('validate-required');
+				
+				if (stateIsVisible && stateIsRequired && !state) {
+					missingFields.push(labels.state);
+				}
+			}
+			
+			// Check postcode if required for the country
+			if (country && this.isPostcodeRequiredForCountry(country) && !postcode) {
+				missingFields.push(labels.postcode);
+			}
+			
+			// Format the message using translated strings
+			let message = '';
+			if (missingFields.length === 0) {
+				message = labels.allComplete;
+			} else if (missingFields.length === 1) {
+				message = labels.missingField + ' ' + missingFields[0];
+			} else {
+				message = labels.missingFields + ' ' + missingFields.join(', ');
+			}
+			
+			return {
+				missingFields: missingFields,
+				message: message,
+				isComplete: missingFields.length === 0
+			};
 		},
 		
 		/**
@@ -584,6 +683,7 @@
 	window.hasCompleteBillingAddress = function() { return window.FlowValidation.hasCompleteBillingAddress(); };
 	window.requiredFieldsFilledAndValid = function() { return window.FlowValidation.requiredFieldsFilledAndValid(); };
 	window.requiredFieldsFilled = function() { return window.FlowValidation.requiredFieldsFilled(); };
+	window.getMissingFields = function() { return window.FlowValidation.getMissingFields(); };
 	
 	// Log that module loaded (only in debug mode)
 	if (typeof window.ckoLogger !== 'undefined' && window.ckoLogger.debugEnabled) {

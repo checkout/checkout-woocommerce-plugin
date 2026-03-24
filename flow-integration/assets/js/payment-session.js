@@ -77,10 +77,41 @@ if (typeof window.isTermsCheckbox === 'undefined') {
 }
 
 /*
+ * REFACTORED: Session storage helper extracted to modules/flow-session-storage.js
+ *
+ * Fallback: If module didn't load, use direct sessionStorage access.
+ */
+if (typeof window.FlowSessionStorage === 'undefined') {
+	console.warn('[FLOW] Session storage module not loaded - using fallback storage');
+	window.FlowSessionStorage = {
+		getOrderId: function() { return sessionStorage.getItem('cko_flow_order_id'); },
+		setOrderId: function(orderId) { if (orderId) sessionStorage.setItem('cko_flow_order_id', orderId); },
+		clearOrderId: function() { sessionStorage.removeItem('cko_flow_order_id'); },
+		getOrderKey: function() { return sessionStorage.getItem('cko_flow_order_key'); },
+		setOrderKey: function(orderKey) { if (orderKey) sessionStorage.setItem('cko_flow_order_key', orderKey); },
+		clearOrderKey: function() { sessionStorage.removeItem('cko_flow_order_key'); },
+		getSaveCard: function() { return sessionStorage.getItem('cko_flow_save_card'); },
+		setSaveCard: function(value) { if (value != null) sessionStorage.setItem('cko_flow_save_card', value); },
+		clearSaveCard: function() { sessionStorage.removeItem('cko_flow_save_card'); },
+		clearOrderData: function() {
+			sessionStorage.removeItem('cko_flow_order_id');
+			sessionStorage.removeItem('cko_flow_order_key');
+		}
+	};
+}
+
+/*
  * The main object managing the Checkout.com flow payment integration.
  */
 var ckoFlow = {
 	flowComponent: null, // Holds the reference to the Checkout Web Component.
+	checkoutInstance: null, // Holds the CheckoutWebComponents instance for dynamic updates (checkout.update())
+	pendingAmountUpdate: null, // Stores pending amount update (in minor units/cents) for handleSubmit
+	initialSessionAmount: null, // Stores the original amount when payment session was created
+	initialSessionEmail: null, // Stores the original email when payment session was created (cannot be modified)
+	initialBillingAddress: null, // Stores the original billing address when payment session was created
+	initialShippingAddress: null, // Stores the original shipping address when payment session was created
+	selectedPaymentType: null, // Stores currently selected payment type (card, paypal, applepay, googlepay, etc.)
 	performanceMetrics: {
 		pageLoadTime: null,
 		flowInitStartTime: null,
@@ -109,46 +140,36 @@ var ckoFlow = {
 	 */
 	loadFlow: async () => {
 		// REFACTORED: Use initialization helper to validate prerequisites
-		if (typeof window.FlowInitialization !== 'undefined' && window.FlowInitialization.validatePrerequisites) {
-			const validation = window.FlowInitialization.validatePrerequisites();
-			if (!validation.isValid) {
-				if (validation.reason === 'FIELDS_NOT_FILLED') {
-					ckoLogger.debug('loadFlow: Required fields not filled - showing waiting message and aborting');
-					showFlowWaitingMessage();
-					// Reset initialization state so Flow can retry when fields are filled
-					FlowState.set('initialized', false);
-					FlowState.set('initializing', false);
-				}
-				return; // Exit - don't proceed with payment session creation
-			}
-		} else {
-			// Fallback to original validation if helper not available
-			// CRITICAL: Check for 3DS return FIRST - before any other checks
-			if (FlowState.get('is3DSReturn')) {
-				ckoLogger.threeDS('loadFlow: 3DS return in progress, aborting Flow initialization');
-				return; // Exit immediately
-			}
-			
-			// Check if cko_flow_vars is available
-			if (typeof cko_flow_vars === 'undefined') {
-				ckoLogger.error('cko_flow_vars is not defined. Flow cannot be initialized.');
-				return;
-			}
-			
-			// CRITICAL: Validate required fields BEFORE creating payment session
-			const fieldsValid = requiredFieldsFilledAndValid();
-			if (!fieldsValid) {
+		if (typeof window.FlowInitialization === 'undefined' || !window.FlowInitialization.validatePrerequisites) {
+			ckoLogger.error('loadFlow: FlowInitialization module not loaded - cannot initialize');
+			showError('Payment flow initialization failed. Please refresh and try again.');
+			return;
+		}
+		
+		const validation = window.FlowInitialization.validatePrerequisites();
+		if (!validation.isValid) {
+			if (validation.reason === 'FIELDS_NOT_FILLED') {
 				ckoLogger.debug('loadFlow: Required fields not filled - showing waiting message and aborting');
 				showFlowWaitingMessage();
+				// Reset initialized (should already be false)
+				FlowState.set('initialized', false);
+				// Delay reset of initializing flag to prevent immediate duplicate calls
+				// This gives time for the UI to settle before allowing retry
+				setTimeout(() => {
+					FlowState.set('initializing', false);
+					ckoLogger.debug('loadFlow: Initializing flag reset after delay');
+				}, 500);
+			} else {
+				// For other validation failures, reset immediately
 				FlowState.set('initialized', false);
 				FlowState.set('initializing', false);
-				return;
 			}
+			return; // Exit - don't proceed with payment session creation
 		}
 		
 		ckoLogger.debug('loadFlow: Validation passed - proceeding with payment session creation');
 		
-		ckoLogger.version('2025-10-13-FINAL-E2E');
+		ckoLogger.version('5.0.4');
 		
 		// Check if we're on a redirect page with payment parameters - if so, don't initialize Flow
 		const urlParams = new URLSearchParams(window.location.search);
@@ -225,38 +246,35 @@ var ckoFlow = {
 		}
 		
 		// REFACTORED: Use initialization helper to collect checkout data
-		let checkoutData;
-		if (typeof window.FlowInitialization !== 'undefined' && window.FlowInitialization.collectCheckoutData) {
-			checkoutData = window.FlowInitialization.collectCheckoutData();
-			
-			// Check for errors in data collection
-			if (checkoutData.error === 'INVALID_EMAIL') {
-				ckoLogger.error('❌ BLOCKED: Invalid email during data collection', { email: checkoutData.email });
-				hideLoadingOverlay();
-				showError('Please enter a valid email address to continue with payment.');
-				return; // Exit early - don't call API with invalid email
+		if (typeof window.FlowInitialization === 'undefined' || !window.FlowInitialization.collectCheckoutData) {
+			ckoLogger.error('loadFlow: FlowInitialization.collectCheckoutData not available');
+			hideLoadingOverlay();
+			showError('Payment flow initialization failed. Please refresh and try again.');
+			return;
+		}
+		
+		const checkoutData = window.FlowInitialization.collectCheckoutData();
+		if (!checkoutData) {
+			ckoLogger.error('loadFlow: Checkout data not available');
+			hideLoadingOverlay();
+			showError('Please complete required fields to continue with payment.');
+			return;
+		}
+		
+		if (typeof window.FlowValidation !== 'undefined' && window.FlowValidation.validateCheckoutData) {
+			const dataValidation = window.FlowValidation.validateCheckoutData(checkoutData);
+			if (!dataValidation.isValid) {
+				if (dataValidation.reason === 'INVALID_EMAIL') {
+					ckoLogger.error('❌ BLOCKED: Invalid email during data collection', { email: dataValidation.email });
+					hideLoadingOverlay();
+					showError('Please enter a valid email address to continue with payment.');
+				} else {
+					ckoLogger.error('❌ BLOCKED: Invalid checkout data', { reason: dataValidation.reason });
+					hideLoadingOverlay();
+					showError('Please complete required fields to continue with payment.');
+				}
+				return;
 			}
-		} else {
-			// Fallback to original data collection if helper not available
-			// This maintains backward compatibility
-			let cartInfo = jQuery("#cart-info").data("cart");
-			if (!cartInfo || jQuery.isEmptyObject(cartInfo)) {
-				cartInfo = jQuery("#order-pay-info").data("order-pay");
-			}
-			checkoutData = {
-				amount: cartInfo["order_amount"],
-				currency: cartInfo["purchase_currency"],
-				reference: "WOO" + (cko_flow_vars.ref_session || 'default'),
-				email: (cartInfo["billing_address"] || {})["email"] || (document.getElementById("billing_email") ? document.getElementById("billing_email").value : ''),
-				family_name: (cartInfo["billing_address"] || {})["family_name"] || (document.getElementById("billing_last_name") ? document.getElementById("billing_last_name").value : ''),
-				given_name: (cartInfo["billing_address"] || {})["given_name"] || (document.getElementById("billing_first_name") ? document.getElementById("billing_first_name").value : ''),
-				phone: (cartInfo["billing_address"] || {})["phone"] || (document.getElementById("billing_phone") ? document.getElementById("billing_phone").value : ''),
-				orders: cartInfo["order_lines"],
-				orderId: cartInfo["order_id"],
-				payment_type: cko_flow_vars.regular_payment_type,
-				metadata: { udf5: cko_flow_vars.udf5 },
-				isSubscription: false
-			};
 		}
 		
 		// Extract variables from checkoutData for use in rest of function
@@ -270,11 +288,13 @@ var ckoFlow = {
 		let address1 = checkoutData.address1;
 		let address2 = checkoutData.address2;
 		let city = checkoutData.city;
+		let state = checkoutData.state;
 		let zip = checkoutData.zip;
 		let country = checkoutData.country;
 		let shippingAddress1 = checkoutData.shippingAddress1;
 		let shippingAddress2 = checkoutData.shippingAddress2;
 		let shippingCity = checkoutData.shippingCity;
+		let shippingState = checkoutData.shippingState;
 		let shippingZip = checkoutData.shippingZip;
 		let shippingCountry = checkoutData.shippingCountry;
 		let orders = checkoutData.orders;
@@ -432,6 +452,15 @@ var ckoFlow = {
 				isRegular: payment_type === cko_flow_vars.regular_payment_type
 			});
 
+			// Debug: Log capture settings for troubleshooting
+			const captureValue = cko_flow_vars.auto_capture === true || cko_flow_vars.auto_capture === "true" || cko_flow_vars.auto_capture === "1" || cko_flow_vars.auto_capture === 1;
+			ckoLogger.debug('🔍 Capture Settings Check:', {
+				'cko_flow_vars.auto_capture': cko_flow_vars.auto_capture,
+				'typeof auto_capture': typeof cko_flow_vars.auto_capture,
+				'capture_delay_hours': cko_flow_vars.capture_delay_hours,
+				'calculated_capture': captureValue
+			});
+
 			// Debug: Log complete payment session request
 			const paymentSessionRequest = {
 				amount: amount,
@@ -473,7 +502,12 @@ var ckoFlow = {
 						store_payment_details: "enabled",
 					},
 				},
-				capture: true,
+				capture: cko_flow_vars.auto_capture === true || cko_flow_vars.auto_capture === "true" || cko_flow_vars.auto_capture === "1" || cko_flow_vars.auto_capture === 1,
+				// NOTE: capture_on is now calculated at SUBMIT time (server-side in ajax_submit_payment_session)
+				// This ensures the delay is calculated from actual payment submission, not session creation.
+				// Previously capture_on was calculated here at session creation, which caused issues when
+				// customers took longer than expected to complete checkout/3DS - the capture_on timestamp
+				// would be in the past, leading to immediate capture and webhook race conditions.
 				items: orders,
 				integration: {
 					external_platform: {
@@ -487,6 +521,11 @@ var ckoFlow = {
 					challenge_indicator: cko_flow_vars.challenge_indicator || "no_preference",
 					...(exemption && { exemption: exemption }),
 					allow_upgrade: cko_flow_vars.allow_upgrade === true || cko_flow_vars.allow_upgrade === "true" || cko_flow_vars.allow_upgrade === "yes",
+				},
+				// Disable customer retry - only one payment attempt per session
+				// If payment fails, user must reload checkout to get new payment session
+				customer_retry: {
+					max_attempts: 0,
 				},
 			};
 			
@@ -563,8 +602,8 @@ var ckoFlow = {
 				// This ensures guest orders can access order received page after 3DS
 				// CRITICAL FIX: Validate order_id before using - only use if it matches current checkout session
 				const formOrderId = jQuery('input[name="order_id"]').val();
-				const sessionOrderId = sessionStorage.getItem('cko_flow_order_id');
-				const sessionOrderKey = sessionStorage.getItem('cko_flow_order_key');
+				const sessionOrderId = FlowSessionStorage.getOrderId();
+				const sessionOrderKey = FlowSessionStorage.getOrderKey();
 				
 				// CRITICAL: Only use order_id from sessionStorage if it matches form order_id
 				// This prevents reusing old order IDs from previous checkouts
@@ -638,7 +677,7 @@ var ckoFlow = {
 			const checkboxChecked = currentSaveCardCheckbox ? currentSaveCardCheckbox.checked : false;
 			
 			// Also check sessionStorage and hidden field as fallbacks
-			const sessionStorageValue = sessionStorage.getItem('cko_flow_save_card');
+			const sessionStorageValue = FlowSessionStorage.getSaveCard();
 			const hiddenField = document.getElementById('cko-flow-save-card-persist');
 			const hiddenFieldValue = hiddenField ? hiddenField.value : '';
 			
@@ -679,8 +718,8 @@ var ckoFlow = {
 				// CRITICAL: This ensures guest orders can access order received page after 3DS
 				// CRITICAL FIX: Validate order_id before using - only use if it matches current checkout session
 				const formOrderId = jQuery('input[name="order_id"]').val();
-				const sessionOrderId = sessionStorage.getItem('cko_flow_order_id');
-				const sessionOrderKey = sessionStorage.getItem('cko_flow_order_key');
+				const sessionOrderId = FlowSessionStorage.getOrderId();
+				const sessionOrderKey = FlowSessionStorage.getOrderKey();
 				
 				// CRITICAL: Only use order_id from sessionStorage if it matches form order_id
 				// This prevents reusing old order IDs from previous checkouts
@@ -733,19 +772,20 @@ var ckoFlow = {
 			formData.append('action', 'cko_flow_create_payment_session');
 			formData.append('nonce', cko_flow_vars.payment_session_nonce);
 			// CRITICAL: Final validation before API call - prevent invalid email from being sent
-			// Validate email format inline (don't rely on function that might not be available)
-			const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 			const emailValue = paymentSessionRequest.customer?.email || '';
-			const emailTrimmed = emailValue.trim();
+			const emailTrimmed = String(emailValue).trim();
+			const emailValid = (typeof window.FlowValidation !== 'undefined' && window.FlowValidation.isValidEmail)
+				? window.FlowValidation.isValidEmail(emailTrimmed)
+				: false;
 			
 			// Check if email is missing or invalid
-			if (!emailValue || !emailTrimmed || !emailRegex.test(emailTrimmed)) {
+			if (!emailValue || !emailTrimmed || !emailValid) {
 				ckoLogger.error('❌ BLOCKED: Invalid or missing email before API call', { 
 					email: emailValue,
 					emailType: typeof emailValue,
 					emailLength: emailValue?.length,
 					emailTrimmed: emailTrimmed,
-					emailRegexTest: emailRegex.test(emailTrimmed)
+					emailValid: emailValid
 				});
 				hideLoadingOverlay();
 				
@@ -762,14 +802,21 @@ var ckoFlow = {
 				if (!fieldsValidCheck) {
 					ckoLogger.debug('Required fields not filled - showing waiting message instead of error');
 					showFlowWaitingMessage();
-					// Reset initialization state so Flow can retry when fields are filled
-					ckoFlowInitialized = false;
-					ckoFlowInitializing = false;
+					// Reset initialized flag (should already be false)
+					FlowState.set('initialized', false);
+					// Delay reset of initializing flag to prevent immediate duplicate calls
+					setTimeout(() => {
+						FlowState.set('initializing', false);
+						ckoLogger.debug('Email validation: Initializing flag reset after delay');
+					}, 500);
 					return; // Exit - don't call API
 				} else {
 					// Fields are filled but email is invalid - show error
 					ckoLogger.debug('Fields are filled but email is invalid - showing error message');
 					showError('Please enter a valid email address to continue with payment.');
+					// Reset flags for retry
+					FlowState.set('initialized', false);
+					FlowState.set('initializing', false);
 					return; // Exit - don't call API
 				}
 			}
@@ -1103,6 +1150,17 @@ var ckoFlow = {
 					document.body.classList.add("cko-flow--ready");
 					ckoLogger.debug('onReady - ✓ Flow marked as ready - Checkout is now fully interactive');
 					
+					// Step 4b: CRITICAL - Remove WooCommerce loading overlay/blockUI
+					// This ensures the checkout is fully interactive after Flow loads
+					// The overlay might be stuck if update_checkout was triggered during initialization
+					if (typeof jQuery !== 'undefined') {
+						jQuery('.woocommerce').removeClass('processing').unblock();
+						jQuery('.woocommerce-checkout').removeClass('processing').unblock();
+						jQuery('form.checkout').removeClass('processing').unblock();
+						jQuery('.blockOverlay').remove();
+						ckoLogger.debug('onReady - ✓ WooCommerce loading overlay removed');
+					}
+					
 					
 					// Step 5: Ensure no saved card is selected by default - user must explicitly select
 					// Remove any default selections to prevent issues with auto-detection
@@ -1163,7 +1221,7 @@ var ckoFlow = {
 				// CRITICAL: Check form field for order ID (set by createOrderBeforePayment())
 				// Don't use orderId from loadFlow() scope - it's only set for order-pay pages
 				const formOrderId = jQuery('input[name="order_id"]').val();
-				const sessionOrderId = sessionStorage.getItem('cko_flow_order_id');
+				const sessionOrderId = FlowSessionStorage.getOrderId();
 				const hasOrderId = formOrderId || sessionOrderId || orderId; // orderId is fallback for order-pay pages
 				
 				ckoLogger.debug('[PAYMENT COMPLETED] Order ID check:', {
@@ -1306,14 +1364,12 @@ var ckoFlow = {
 						// CRITICAL: Order key is required for guest orders to access order received page
 						ckoLogger.debug('[PAYMENT COMPLETED] ========== ORDER KEY RETRIEVAL DEBUG ==========');
 						ckoLogger.debug('[PAYMENT COMPLETED] Order ID to use:', orderIdToUse);
-						ckoLogger.debug('[PAYMENT COMPLETED] Checking sessionStorage for order key...');
-						const orderKey = sessionStorage.getItem('cko_flow_order_key') || '';
-						ckoLogger.debug('[PAYMENT COMPLETED] Order key from sessionStorage:', orderKey || 'NOT FOUND');
+						ckoLogger.debug('[PAYMENT COMPLETED] Checking stored order key...');
+						const orderKey = FlowSessionStorage.getOrderKey() || '';
+						ckoLogger.debug('[PAYMENT COMPLETED] Order key from storage:', orderKey || 'NOT FOUND');
 						ckoLogger.debug('[PAYMENT COMPLETED] Order key type:', typeof orderKey);
 						ckoLogger.debug('[PAYMENT COMPLETED] Order key length:', orderKey ? orderKey.length : 0);
-						ckoLogger.debug('[PAYMENT COMPLETED] All sessionStorage keys:', Object.keys(sessionStorage));
-						ckoLogger.debug('[PAYMENT COMPLETED] SessionStorage cko_flow_order_id:', sessionStorage.getItem('cko_flow_order_id'));
-						ckoLogger.debug('[PAYMENT COMPLETED] SessionStorage cko_flow_order_key:', sessionStorage.getItem('cko_flow_order_key'));
+						ckoLogger.debug('[PAYMENT COMPLETED] Stored order ID:', FlowSessionStorage.getOrderId());
 						
 						let redirectUrl = window.location.origin + '/?wc-api=wc_checkoutcom_flow_process&order_id=' + orderIdToUse + '&cko-payment-id=' + paymentResponse.id;
 						if (orderKey) {
@@ -1336,6 +1392,94 @@ var ckoFlow = {
 				 * Triggered when user submits the payment using Place Order Button of Woocommerce.
 				 */
 				const onSubmit = async (component) => {
+					// CRITICAL CHECK: Verify billing email hasn't changed since payment session was created
+					// If email changed, we MUST reload Flow to create new payment session
+					// Email is baked into payment session and cannot be modified via handleSubmit
+					const currentEmail = jQuery('#billing_email').val()?.trim().toLowerCase() || '';
+					const sessionEmail = (ckoFlow.initialSessionEmail || '').trim().toLowerCase();
+					
+					if (currentEmail && sessionEmail && currentEmail !== sessionEmail) {
+						ckoLogger.warn('[ONSUBMIT] ⚠️ Email changed since payment session created!', {
+							sessionEmail: sessionEmail,
+							currentEmail: currentEmail
+						});
+						
+						// Show user-friendly error message
+						const errorMessage = 'Your email address has changed. Please wait a moment while we update your payment details.';
+						
+						// Display error using WooCommerce's notice system
+						if (typeof wc_checkout_params !== 'undefined') {
+							jQuery('.woocommerce-error').remove();
+							jQuery('form.checkout').prepend('<div class="woocommerce-error">' + errorMessage + '</div>');
+							jQuery('html, body').animate({
+								scrollTop: jQuery('form.checkout').offset().top - 100
+							}, 500);
+						}
+						
+						// Trigger Flow reload
+						ckoLogger.debug('[ONSUBMIT] Triggering Flow reload due to email mismatch');
+						reloadFlowComponent();
+						
+						// Return false to prevent submission
+						return { continue: false };
+					}
+					
+					// Update cardholder name right before payment submission to ensure latest billing name is used
+					// This is especially important when position is "hidden" and billing name changed after Flow initialized
+					if (typeof window.ckoSetCardholderName === 'function') {
+						const beforeValue = window.componentOptions?.card?.data?.cardholderName || '(not set)';
+						window.ckoSetCardholderName();
+						const afterValue = window.componentOptions?.card?.data?.cardholderName || '(not set)';
+						
+						// CRITICAL: Try to update component's internal data if method exists
+						// The SDK might cache cardholder name at creation, so we need to update it directly
+						if (component && typeof component.update === 'function') {
+							try {
+								component.update({ card: { data: { cardholderName: afterValue } } });
+								if (typeof ckoLogger !== 'undefined') {
+									ckoLogger.debug('[CARDHOLDER NAME] Updated component via update() method:', {
+										before: beforeValue,
+										after: afterValue
+									});
+								}
+							} catch (e) {
+								if (typeof ckoLogger !== 'undefined') {
+									ckoLogger.warn('[CARDHOLDER NAME] component.update() failed:', e);
+								}
+							}
+						} else if (component && component._options) {
+							// Fallback: Try to update component's internal options directly
+							try {
+								if (!component._options.card) {
+									component._options.card = {};
+								}
+								if (!component._options.card.data) {
+									component._options.card.data = {};
+								}
+								component._options.card.data.cardholderName = afterValue;
+								if (typeof ckoLogger !== 'undefined') {
+									ckoLogger.debug('[CARDHOLDER NAME] Updated component._options directly:', {
+										before: beforeValue,
+										after: afterValue
+									});
+								}
+							} catch (e) {
+								if (typeof ckoLogger !== 'undefined') {
+									ckoLogger.warn('[CARDHOLDER NAME] Failed to update component._options:', e);
+								}
+							}
+						}
+						
+						if (typeof ckoLogger !== 'undefined') {
+							ckoLogger.debug('[CARDHOLDER NAME] Before payment submission:', {
+								before: beforeValue,
+								after: afterValue,
+								componentHasUpdate: component && typeof component.update === 'function',
+								componentHasOptions: component && component._options !== undefined
+							});
+						}
+					}
+					
 					showLoadingOverlay(2);
 					return { continue: true };
 				};
@@ -1394,6 +1538,41 @@ var ckoFlow = {
 			ckoLogger.debug('onChange - User interacted flag:', FlowState.get('userInteracted'));
 			ckoLogger.debug('onChange - Body has cko-flow--ready class:', document.body.classList.contains('cko-flow--ready'));
 			
+			// Store selected payment type for use in updateFlowAmount (PayPal needs special handling)
+			const previousPaymentType = ckoFlow.selectedPaymentType;
+			ckoFlow.selectedPaymentType = component.selectedType;
+			ckoLogger.debug('onChange - Stored selectedPaymentType:', ckoFlow.selectedPaymentType, 'previous:', previousPaymentType);
+			
+			// CRITICAL: If user selects an APM that doesn't support amount updates
+			// and there's a pending amount change, we need to reload the session.
+			// Only Card, Apple Pay, and Google Pay support dynamic amount adjustment.
+			// This handles cases like:
+			//   - card selected → coupon applied → switch to PayPal/Klarna/etc.
+			//   - no selection → coupon applied → select PayPal/Klarna/etc.
+			const currentType = component.selectedType?.toLowerCase() || '';
+			const typesWithAmountSupport = ['card', 'applepay', 'googlepay'];
+			
+			const isAPMWithoutAmountSupport = currentType && !typesWithAmountSupport.includes(currentType);
+			const hasPendingAmountChange = ckoFlow.pendingAmountUpdate !== null && 
+				ckoFlow.pendingAmountUpdate !== ckoFlow.initialSessionAmount;
+			
+			if (isAPMWithoutAmountSupport && hasPendingAmountChange) {
+				ckoLogger.debug('onChange - APM selected without amount support:', currentType);
+				ckoLogger.debug('onChange - Original amount:', ckoFlow.initialSessionAmount, 'pending amount:', ckoFlow.pendingAmountUpdate);
+				
+				// Clear pending amount - we're going to reload with correct amount
+				ckoFlow.pendingAmountUpdate = null;
+				
+				// Trigger Flow reload to create new session with correct amount
+				setTimeout(() => {
+					ckoLogger.debug('onChange - Reloading Flow for', currentType, 'with pending amount change');
+					reloadFlowComponent();
+				}, 100);
+				
+				// Return early - onChange will be called again after reload
+				return;
+			}
+			
 			// CRITICAL: Auto-deselect saved card when user interacts with Flow
 			// Check if a saved card is currently selected and Flow is de-emphasized
 			const flowContainer = document.getElementById("flow-container");
@@ -1444,14 +1623,16 @@ var ckoFlow = {
 					// Pre-validate for apple pay.
 					if ( component.selectedType === "applepay" ) {
 						const applePayButton = document.querySelector('button[aria-label="Apple Pay"]');
-						applePayButton.disabled = true;
+						if (applePayButton) {
+							applePayButton.disabled = true;
 
-						const form = jQuery("form.checkout");
+							const form = jQuery("form.checkout");
 
-						if ( ! orderId ) {
-							validateCheckout(form, function (response) {
-								applePayButton.disabled = false;
-							});
+							if ( ! orderId ) {
+								validateCheckout(form, function (response) {
+									if (applePayButton) applePayButton.disabled = false;
+								});
+							}
 						}
 					}
 
@@ -1496,32 +1677,338 @@ var ckoFlow = {
 				}
 				};
 
-					/*
-					 * Triggered on component click.
-					 */
-					const handleClick = (component) => {
+				/*
+				 * Triggered on component click (APM buttons: Apple Pay, Google Pay, PayPal, etc.)
+				 * 
+				 * CRITICAL: For APM payments, we create the WooCommerce order BEFORE the payment proceeds.
+				 * This ensures the order exists even if the user closes the browser after payment approval.
+				 * Without this, webhooks cannot find the order if the user abandons before form submission.
+				 */
+				const handleClick = (component) => {
+					ckoLogger.debug('[handleClick] Triggered for component type:', component.type);
 
-						if(component.type==="applepay") {
-							return {continue: true};
-						}
+					// APM types that need order creation before payment
+					const apmTypes = ['applepay', 'googlepay', 'paypal', 'klarna', 'sofort', 'ideal', 'giropay', 'bancontact', 'eps', 'p24', 'knet', 'fawry', 'qpay', 'multibanco', 'stcpay', 'alipay', 'wechatpay', 'octopus', 'twint', 'venmo', 'alma'];
+					const isAPMPayment = apmTypes.includes(component.type);
 
-						if ( orderId ) {
-							return {continue: true};
-						}
+					// If order already exists (order-pay page), proceed immediately
+					if (orderId) {
+						ckoLogger.debug('[handleClick] Order already exists (order-pay page) - proceeding immediately');
+						return { continue: true };
+					}
 
+					// Check if order was already created in this session
+					const existingOrderId = jQuery('input[name="order_id"]').val() || FlowSessionStorage.getOrderId();
+					if (existingOrderId) {
+						ckoLogger.debug('[handleClick] Order already created in session - Order ID:', existingOrderId);
+						return { continue: true };
+					}
+
+					// For APM payments, create order BEFORE payment proceeds
+					if (isAPMPayment) {
+						ckoLogger.debug('[handleClick] APM payment (' + component.type + ') - creating order before payment');
+						
 						return new Promise((resolve) => {
 							const form = jQuery("form.checkout");
-					
-							validateCheckout(form, function (response) {
-								resolve({ continue: true });
+							
+							// First validate the checkout form
+							validateCheckout(form, async function (response) {
+								try {
+									// Create order before APM payment proceeds
+									// Use window.createOrderBeforePayment since it's defined in DOMContentLoaded scope
+									ckoLogger.debug('[handleClick] Checkout validated - creating order for APM payment');
+									const createdOrderId = await window.createOrderBeforePayment();
+									
+									if (!createdOrderId) {
+										ckoLogger.error('[handleClick] Failed to create order for APM payment - blocking payment');
+										showError('Failed to create order. Please try again.');
+										resolve({ continue: false });
+										return;
+									}
+									
+									ckoLogger.debug('[handleClick] Order created successfully for APM - Order ID:', createdOrderId);
+									resolve({ continue: true });
+								} catch (error) {
+									ckoLogger.error('[handleClick] Error creating order for APM payment:', error);
+									showError('Failed to create order. Please try again.');
+									resolve({ continue: false });
+								}
 							});
 						});
-					};
+					}
 
-				/*
-				 * Triggered on any error in the component.
-				 */
-				const onError = (component, error) => {
+					// For non-APM payments (card), just validate checkout
+					// Order will be created when Place Order button is clicked
+					return new Promise((resolve) => {
+						const form = jQuery("form.checkout");
+				
+						validateCheckout(form, function (response) {
+							resolve({ continue: true });
+						});
+					});
+				};
+
+			/*
+			 * handleSubmit - Called when payment is submitted with modified session data
+			 * This enables dynamic amount adjustment without full Flow component reload.
+			 * 
+			 * When cart total changes (coupon, shipping), instead of reloading Flow:
+			 * 1. We store the new amount in ckoFlow.pendingAmountUpdate
+			 * 2. User clicks Place Order, Flow calls handleSubmit with session_data
+			 * 3. We send session_data + new amount to server
+			 * 4. Server calls Submit Payment Session API with modified amount
+			 * 5. Payment proceeds with correct amount (3DS if needed)
+			 * 
+			 * This preserves card details and avoids component reload.
+			 * Works for card, Apple Pay, and Google Pay payments.
+			 */
+			const handleSubmit = async (self, submitData) => {
+				ckoLogger.debug('[HANDLE SUBMIT] Processing payment submission', {
+					hasSubmitData: !!submitData,
+					hasPendingAmountUpdate: !!ckoFlow.pendingAmountUpdate,
+					pendingAmount: ckoFlow.pendingAmountUpdate,
+					initialAmount: ckoFlow.initialSessionAmount,
+					paymentSessionId: window.currentPaymentSessionId
+				});
+
+				// Get current cart amount from DOM (most up-to-date after coupon changes)
+				// Use getCurrentOrderTotalFromDOM() which reads from WooCommerce's displayed order total
+				// This is more reliable than cart-info data attribute which may be stale
+				let currentCartAmount = null;
+				if (typeof window.FlowUpdatedCheckoutGuard !== 'undefined' && 
+					typeof window.FlowUpdatedCheckoutGuard.getCurrentOrderTotalFromDOM === 'function') {
+					currentCartAmount = window.FlowUpdatedCheckoutGuard.getCurrentOrderTotalFromDOM();
+				}
+				
+				// Fallback to cart-info if DOM read fails (shouldn't happen normally)
+				if (currentCartAmount === null) {
+					const cartInfo = jQuery('#cart-info').data('cart');
+					currentCartAmount = cartInfo && typeof cartInfo.order_amount !== 'undefined'
+						? parseInt(cartInfo.order_amount, 10)
+						: null;
+					ckoLogger.debug('[HANDLE SUBMIT] Using fallback cart-info amount:', currentCartAmount);
+				}
+
+				// Check if amount has changed from initial session
+				const amountChanged = currentCartAmount !== null && 
+					ckoFlow.initialSessionAmount !== null && 
+					currentCartAmount !== ckoFlow.initialSessionAmount;
+
+				// Use pending amount update if set, otherwise use current cart amount if changed
+				const finalAmount = ckoFlow.pendingAmountUpdate || (amountChanged ? currentCartAmount : null);
+
+				// Helper function to get current address from checkout form or order-pay data
+				const getCurrentBillingAddress = () => {
+					// Check if we're on order-pay page
+					const isOrderPayPage = window.location.pathname.includes('/order-pay/');
+					
+					if (isOrderPayPage) {
+						// On order-pay pages, form fields don't exist - use order data
+						const orderPayInfo = jQuery("#order-pay-info")?.data("order-pay");
+						if (orderPayInfo && orderPayInfo.billing_address) {
+							const billing = orderPayInfo.billing_address;
+							return {
+								address_line1: billing.street_address || '',
+								address_line2: billing.street_address2 || '',
+								city: billing.city || '',
+								state: billing.state || '',
+								zip: billing.postal_code || '',
+								country: billing.country || '',
+								phone: billing.phone || ''
+							};
+						}
+					}
+					
+					// Regular checkout - read from form fields
+					return {
+						address_line1: getCheckoutFieldValue('billing_address_1') || '',
+						address_line2: getCheckoutFieldValue('billing_address_2') || '',
+						city: getCheckoutFieldValue('billing_city') || '',
+						state: getCheckoutFieldValue('billing_state') || '',
+						zip: getCheckoutFieldValue('billing_postcode') || '',
+						country: getCheckoutFieldValue('billing_country') || '',
+						phone: getCheckoutFieldValue('billing_phone') || ''
+					};
+				};
+				
+				const getCurrentShippingAddress = () => {
+					// Check if we're on order-pay page
+					const isOrderPayPage = window.location.pathname.includes('/order-pay/');
+					
+					if (isOrderPayPage) {
+						// On order-pay pages, use billing address for shipping (order already has addresses set)
+						return getCurrentBillingAddress();
+					}
+					
+					// Regular checkout - check if shipping to different address is enabled
+					const shipToDifferent = jQuery('#ship-to-different-address-checkbox').is(':checked');
+					if (!shipToDifferent) {
+						// Use billing address for shipping
+						return getCurrentBillingAddress();
+					}
+					return {
+						address_line1: getCheckoutFieldValue('shipping_address_1') || '',
+						address_line2: getCheckoutFieldValue('shipping_address_2') || '',
+						city: getCheckoutFieldValue('shipping_city') || '',
+						state: getCheckoutFieldValue('shipping_state') || '',
+						zip: getCheckoutFieldValue('shipping_postcode') || '',
+						country: getCheckoutFieldValue('shipping_country') || '',
+						phone: getCheckoutFieldValue('billing_phone') || ''  // Shipping uses billing phone
+					};
+				};
+				
+				// Helper to compare addresses
+				const addressesEqual = (addr1, addr2) => {
+					if (!addr1 || !addr2) return false;
+					return addr1.address_line1 === addr2.address_line1 &&
+						addr1.address_line2 === addr2.address_line2 &&
+						addr1.city === addr2.city &&
+						addr1.state === addr2.state &&
+						addr1.zip === addr2.zip &&
+						addr1.country === addr2.country &&
+						addr1.phone === addr2.phone;
+				};
+				
+				// Get current addresses and check for changes
+				const currentBilling = getCurrentBillingAddress();
+				const currentShipping = getCurrentShippingAddress();
+				const billingChanged = !addressesEqual(currentBilling, ckoFlow.initialBillingAddress);
+				const shippingChanged = !addressesEqual(currentShipping, ckoFlow.initialShippingAddress);
+
+				ckoLogger.debug('[HANDLE SUBMIT] Amount check', {
+					currentCartAmount: currentCartAmount,
+					initialSessionAmount: ckoFlow.initialSessionAmount,
+					amountChanged: amountChanged,
+					finalAmount: finalAmount
+				});
+				
+				ckoLogger.debug('[HANDLE SUBMIT] Address check', {
+					billingChanged: billingChanged,
+					shippingChanged: shippingChanged,
+					currentBilling: currentBilling,
+					initialBilling: ckoFlow.initialBillingAddress,
+					currentShipping: currentShipping,
+					initialShipping: ckoFlow.initialShippingAddress
+				});
+
+				// IMPORTANT: When handleSubmit is defined, we MUST handle all submissions
+				// The SDK does not fall back to default behavior when we return null
+				// So we always call the Submit Payment Session API, with or without amount modification
+
+				try {
+					// Log all amount-related values for debugging
+					ckoLogger.debug('[HANDLE SUBMIT] ========== AMOUNT DEBUG ==========');
+					ckoLogger.debug('[HANDLE SUBMIT] pendingAmountUpdate:', ckoFlow.pendingAmountUpdate);
+					ckoLogger.debug('[HANDLE SUBMIT] initialSessionAmount:', ckoFlow.initialSessionAmount);
+					ckoLogger.debug('[HANDLE SUBMIT] currentCartAmount:', currentCartAmount);
+					ckoLogger.debug('[HANDLE SUBMIT] amountChanged:', amountChanged);
+					ckoLogger.debug('[HANDLE SUBMIT] finalAmount (will be sent):', finalAmount);
+					ckoLogger.debug('[HANDLE SUBMIT] ========== END AMOUNT DEBUG ==========');
+					
+					ckoLogger.debug('[HANDLE SUBMIT] Submitting payment via server', {
+						amountModified: !!finalAmount,
+						newAmount: finalAmount,
+						billingModified: billingChanged,
+						shippingModified: shippingChanged,
+						sessionData: submitData?.session_data ? 'present' : 'missing'
+					});
+
+					// Send to server for Submit Payment Session API call
+					const formData = new FormData();
+					formData.append('action', 'cko_flow_submit_payment_session');
+					formData.append('nonce', cko_flow_vars.payment_session_nonce);
+					formData.append('payment_session_id', window.currentPaymentSessionId);
+					formData.append('session_data', submitData.session_data || '');
+					
+					// Only include amount if it needs to be modified
+					if (finalAmount) {
+						formData.append('amount', finalAmount);
+						ckoLogger.debug('[HANDLE SUBMIT] ✅ Amount being sent to server:', finalAmount);
+					} else {
+						ckoLogger.debug('[HANDLE SUBMIT] ⚠️ No amount modification - using original session amount');
+					}
+					
+					// Include billing address if changed
+					if (billingChanged) {
+						formData.append('billing', JSON.stringify(currentBilling));
+						ckoLogger.debug('[HANDLE SUBMIT] ✅ Billing address being sent to server:', currentBilling);
+					}
+					
+					// Include shipping address if changed
+					if (shippingChanged) {
+						formData.append('shipping', JSON.stringify(currentShipping));
+						ckoLogger.debug('[HANDLE SUBMIT] ✅ Shipping address being sent to server:', currentShipping);
+					}
+					
+					// Include order_id if available (for linking payment to order)
+					const formOrderId = jQuery('input[name="order_id"]').val();
+					const sessionOrderId = FlowSessionStorage.getOrderId();
+					const orderIdToUse = formOrderId || sessionOrderId || orderId;
+					if (orderIdToUse) {
+						formData.append('order_id', orderIdToUse);
+						// Include reference with WooCommerce order ID for better tracking in Checkout.com dashboard
+						formData.append('reference', orderIdToUse);
+						ckoLogger.debug('[HANDLE SUBMIT] ✅ Reference with order ID being sent:', orderIdToUse);
+					}
+
+					const response = await fetch(cko_flow_vars.ajax_url, {
+						method: 'POST',
+						body: formData
+					});
+
+					const result = await response.json();
+
+					ckoLogger.debug('[HANDLE SUBMIT] Server response', {
+						success: result.success,
+						hasData: !!result.data,
+						status: result.data?.status,
+						paymentId: result.data?.id
+					});
+
+					if (!result.success) {
+						ckoLogger.error('[HANDLE SUBMIT] Server returned error', result);
+						throw new Error(result.data?.message || 'Payment submission failed');
+					}
+
+					// Clear pending amount update after successful submission
+					ckoFlow.pendingAmountUpdate = null;
+
+					// Return the response for Flow to handle (3DS redirect, etc.)
+					return result.data;
+				} catch (error) {
+					ckoLogger.error('[HANDLE SUBMIT] Error submitting payment', error);
+					
+					// CRITICAL: Reset UI state on error to prevent "page stuck on loading"
+					// Hide loading overlays
+					hideLoadingOverlay();
+					hideLoadingOverlay(2);
+					
+					// Re-enable Place Order button
+					const placeOrderBtn = document.getElementById("place_order");
+					if (placeOrderBtn) {
+						placeOrderBtn.disabled = false;
+						placeOrderBtn.classList.remove("cko-flow--loading", "processing");
+					}
+					
+					// Also handle jQuery-based button state (WooCommerce may use this)
+					jQuery('#place_order').prop('disabled', false).removeClass('processing');
+					
+					// Reset order creation flag to allow retry
+					FlowState.set('orderCreationInProgress', false);
+					
+					// Clear pending amount update to ensure clean state on retry
+					ckoFlow.pendingAmountUpdate = null;
+					
+					// Show error message to user
+					showError(error.message || 'Payment submission failed. Please try again.');
+					throw error;
+				}
+			};
+
+			/*
+			 * Triggered on any error in the component.
+			 */
+			const onError = (component, error) => {
 					ckoLogger.error("onError", error, "Component", component.type);
 
 					// Hide loading overlay and skeleton.
@@ -1748,20 +2235,67 @@ var ckoFlow = {
 			onSubmit,
 			onChange,
 			handleClick,
+			handleSubmit, // Enables dynamic amount modification without full reload
 			onError
+		});
+
+		// Store checkout instance globally for dynamic amount updates (checkout.update())
+		// This enables updating payment amount without full component reload
+		ckoFlow.checkoutInstance = checkout;
+		ckoFlow.initialSessionAmount = amount; // Store initial amount for comparison
+		ckoFlow.initialSessionEmail = email; // Store initial email (cannot be modified via handleSubmit)
+		ckoFlow.pendingAmountUpdate = null; // Reset any pending updates
+		
+		ckoLogger.debug('[INIT] Stored initial session email for comparison:', {
+			email: email
+		});
+		
+		// Store initial billing/shipping addresses for comparison during handleSubmit
+		// This enables detecting address changes and updating via Submit Payment Session API
+		ckoFlow.initialBillingAddress = {
+			address_line1: address1,
+			address_line2: address2,
+			city: city,
+			state: state,
+			zip: zip,
+			country: country,
+			phone: phone
+		};
+		ckoFlow.initialShippingAddress = {
+			address_line1: shippingAddress1,
+			address_line2: shippingAddress2,
+			city: shippingCity,
+			state: shippingState,
+			zip: shippingZip,
+			country: shippingCountry,
+			phone: phone  // Shipping uses billing phone
+		};
+		
+		// Log initial addresses stored for comparison (helps debug address change detection)
+		ckoLogger.debug('[INIT] Initial addresses stored for handleSubmit comparison:', {
+			billing: ckoFlow.initialBillingAddress,
+			shipping: ckoFlow.initialShippingAddress
 		});
 
 		// Log SDK initialization (debug mode only)
 		ckoLogger.debug('SDK initialized:', {
 			hasCreate: typeof checkout.create === 'function',
+			hasUpdate: typeof checkout.update === 'function',
 			paymentSessionId: paymentSession.id,
-			environment: cko_flow_vars.env
+			environment: cko_flow_vars.env,
+			initialAmount: amount
 		});
 
 
 				// Ensure component name is defined
 				const componentName = window.componentName || 'flow';
 				ckoLogger.debug('Creating Flow component with name:', componentName);
+				
+				// Update cardholder name right before component creation to ensure latest billing name is used
+				// This ensures the cardholder name is up-to-date when the component is created
+				if (typeof window.ckoSetCardholderName === 'function') {
+					window.ckoSetCardholderName();
+				}
 				
 				let flowComponent;
 				try {
@@ -1821,8 +2355,8 @@ var ckoFlow = {
 			}
 		} catch (error) {
 			// Clear initialization guard flag on error
-			ckoFlowInitializing = false;
-			ckoFlowInitialized = false;
+			FlowState.set('initializing', false);
+			FlowState.set('initialized', false);
 			
 			// Hide loading overlay and skeleton.
 			hideLoadingOverlay();
@@ -1868,7 +2402,7 @@ var ckoFlow = {
 			ckoLogger.debug('Container not found before mount (attempt ' + attempt + ') - ensuring container exists', {
 				attempt: attempt,
 				maxAttempts: maxAttempts,
-				flowInitializing: typeof ckoFlowInitializing !== 'undefined' ? ckoFlowInitializing : false
+				flowInitializing: FlowState.get('initializing')
 			});
 
 			// OPTIMIZATION: Try direct container creation first (faster than calling addPaymentMethod)
@@ -1917,8 +2451,8 @@ var ckoFlow = {
 					)
 				);
 				// Clear initialization flags
-				ckoFlowInitializing = false;
-				ckoFlowInitialized = false;
+				FlowState.set('initializing', false);
+				FlowState.set('initialized', false);
 				return;
 			}
 		}
@@ -1941,8 +2475,12 @@ var ckoFlow = {
 			}
 
 			// Mark Flow as initialized and clear guard flag now that component is mounted
-			ckoFlowInitialized = true;
-			ckoFlowInitializing = false;
+			FlowState.set('initialized', true);
+			FlowState.set('initializing', false);
+			FlowState.set('lastInitTime', Date.now()); // Track init time to prevent immediate update_checkout
+			
+			// Reset field watcher flag - watchers are no longer needed once initialized
+			window.ckoFieldWatchersSetup = false;
 
 			// Enable UI after successful mount
 			ckoFlow.enableUIAfterMount();
@@ -1969,8 +2507,8 @@ var ckoFlow = {
 					)
 				);
 				// Clear initialization flags
-				ckoFlowInitializing = false;
-				ckoFlowInitialized = false;
+				FlowState.set('initializing', false);
+				FlowState.set('initialized', false);
 			}
 		}
 	},
@@ -2067,7 +2605,8 @@ let showError = function (error_message) {
 
 	if (Array.isArray(error_message)) {
 		jQuery.each(error_message, function (index, value) {
-			jQuery(ulWrapper).append(jQuery("<li>").html(value));
+			// Use .text() instead of .html() to prevent XSS from server responses
+			jQuery(ulWrapper).append(jQuery("<li>").text(value));
 		});
 	}
 
@@ -2283,9 +2822,17 @@ document.addEventListener("DOMContentLoaded", function () {
 			'[data-testid="checkout-web-component-root"]'
 		);
 
-		// If the element is not present, update ckoFlowInitialized.
+		// Only reset initialized flag if:
+		// 1. Element is missing from DOM AND
+		// 2. Component doesn't exist in memory AND  
+		// 3. NOT during updated_checkout (WooCommerce replaces DOM)
 		if (!element) {
-			ckoFlowInitialized = false;
+			const componentExistsInMemory = !!(ckoFlow && ckoFlow.flowComponent);
+			const duringUpdatedCheckout = window.ckoFlowUpdatedCheckoutInProgress || false;
+			
+			if (!componentExistsInMemory && !duringUpdatedCheckout) {
+				FlowState.set('initialized', false);
+			}
 		}
 	});
 
@@ -2368,7 +2915,7 @@ function canInitializeFlow() {
 	}
 	
 	// Check if already initialized
-	if (ckoFlowInitialized && ckoFlow.flowComponent) {
+	if (FlowState.get('initialized') && ckoFlow.flowComponent) {
 		ckoLogger.debug('canInitializeFlow: Already initialized');
 		return true; // Already initialized
 	}
@@ -2562,27 +3109,40 @@ function showFlowWaitingMessage() {
 	// Show container but with waiting message
 	flowContainer.style.display = "block";
 	
-	// Check if waiting message already exists
+	// Get specific missing fields for a more helpful message
+	let missingFieldsInfo = { missingFields: [], message: 'Required fields: Email, Billing Address' };
+	if (typeof window.getMissingFields === 'function') {
+		missingFieldsInfo = window.getMissingFields();
+	}
+	
+	// Check if waiting message already exists - if so, update it
 	let waitingMessage = flowContainer.querySelector('.cko-flow__waiting-message');
-	if (!waitingMessage) {
+	const isNewMessage = !waitingMessage;
+	
+	if (isNewMessage) {
 		waitingMessage = document.createElement('div');
 		waitingMessage.className = 'cko-flow__waiting-message';
-		const waitingTitle = (window.cko_flow_vars && window.cko_flow_vars.waiting_message_title)
-			? window.cko_flow_vars.waiting_message_title
-			: 'Please fill in all required fields to continue with payment.';
-		const waitingFields = (window.cko_flow_vars && window.cko_flow_vars.waiting_message_fields)
-			? window.cko_flow_vars.waiting_message_fields
-			: 'Required fields: Email, Billing Address';
-		waitingMessage.innerHTML = `
-			<div style="padding: 20px; text-align: center; background: #f5f5f5; border-radius: 4px; margin: 10px 0;">
-				<p style="margin: 0 0 10px 0; font-weight: 600; color: #333;">${waitingTitle}</p>
-				<p style="margin: 0; font-size: 14px; color: #666;">${waitingFields}</p>
-			</div>
-		`;
+	}
+	
+	const waitingTitle = (window.cko_flow_vars && window.cko_flow_vars.waiting_message_title)
+		? window.cko_flow_vars.waiting_message_title
+		: 'Please fill in the required fields to continue with payment.';
+	
+	// Use dynamic missing fields message instead of static text
+	const waitingFields = missingFieldsInfo.message;
+	
+	waitingMessage.innerHTML = `
+		<div style="padding: 20px; text-align: center; background: #f5f5f5; border-radius: 4px; margin: 10px 0;">
+			<p style="margin: 0 0 10px 0; font-weight: 600; color: #333;">${waitingTitle}</p>
+			<p style="margin: 0; font-size: 14px; color: #666;">${waitingFields}</p>
+		</div>
+	`;
+	
+	if (isNewMessage) {
 		flowContainer.appendChild(waitingMessage);
 	}
 	
-	ckoLogger.debug('Showing Flow waiting message');
+	ckoLogger.debug('Showing Flow waiting message', { missingFields: missingFieldsInfo.missingFields });
 }
 
 /**
@@ -2602,6 +3162,91 @@ function hideFlowWaitingMessage() {
 }
 
 /**
+ * Update Flow payment amount without full component reload.
+ * This is used when cart total changes (coupon, shipping).
+ * 
+ * For wallet payments (Apple Pay, Google Pay): calls checkout.update() to update payment sheet
+ * For card payments: stores amount for handleSubmit to use via Submit Payment Session API
+ * 
+ * @param {number} newAmountInCents - The new payment amount in minor units (cents)
+ * @returns {Promise<boolean>} - True if update succeeded, false otherwise
+ */
+async function updateFlowAmount(newAmountInCents) {
+	if (!ckoFlow.checkoutInstance) {
+		ckoLogger.warn('[UPDATE AMOUNT] Cannot update - checkout instance not available');
+		return false;
+	}
+
+	if (!newAmountInCents || newAmountInCents <= 0) {
+		ckoLogger.warn('[UPDATE AMOUNT] Invalid amount provided:', newAmountInCents);
+		return false;
+	}
+
+	ckoLogger.debug('[UPDATE AMOUNT] Updating payment amount', {
+		newAmount: newAmountInCents,
+		previousAmount: ckoFlow.initialSessionAmount,
+		pendingUpdate: ckoFlow.pendingAmountUpdate,
+		selectedPaymentType: ckoFlow.selectedPaymentType
+	});
+
+	// Check if amount actually changed
+	const amountChanged = ckoFlow.initialSessionAmount !== null && 
+		newAmountInCents !== ckoFlow.initialSessionAmount;
+
+	// CRITICAL: Only Card, Apple Pay, and Google Pay support dynamic amount adjustment
+	// Per Checkout.com docs: "You can only modify the payment sheet amount for Apple Pay and Google Pay payments."
+	// - Apple Pay / Google Pay: checkout.update() works
+	// - Card: handleSubmit with Submit Payment Session API works
+	// - ALL other APMs (PayPal, Klarna, etc.): Amount is locked at session creation, need full reload
+	const paymentType = ckoFlow.selectedPaymentType?.toLowerCase() || '';
+	const supportsAmountUpdate = ['card', 'applepay', 'googlepay'].includes(paymentType);
+
+	if (!supportsAmountUpdate && amountChanged && paymentType) {
+		ckoLogger.debug('[UPDATE AMOUNT] APM detected that does not support amount update:', paymentType);
+		ckoLogger.debug('[UPDATE AMOUNT] Original:', ckoFlow.initialSessionAmount, 'new:', newAmountInCents);
+		
+		// Don't store pending amount - we're going to reload
+		// This prevents handleSubmit from being called with wrong amount
+		ckoFlow.pendingAmountUpdate = null;
+		
+		// Trigger Flow reload to create new session with correct amount
+		// Use setTimeout to avoid blocking the current update cycle
+		setTimeout(() => {
+			ckoLogger.debug('[UPDATE AMOUNT] Reloading Flow for', paymentType, 'amount change');
+			reloadFlowComponent();
+		}, 100);
+		
+		return true;
+	}
+
+	// For Card/Apple Pay/Google Pay, store the pending amount for handleSubmit callback
+	ckoFlow.pendingAmountUpdate = newAmountInCents;
+
+	// Try to update wallet payment sheets (Apple Pay, Google Pay)
+	if (typeof ckoFlow.checkoutInstance.update === 'function') {
+		try {
+			await ckoFlow.checkoutInstance.update({
+				amount: newAmountInCents
+			});
+			ckoLogger.debug('[UPDATE AMOUNT] ✅ checkout.update() succeeded');
+			return true;
+		} catch (error) {
+			// checkout.update() may not work for all payment types (e.g., card)
+			// That's expected - handleSubmit will still use the updated amount
+			ckoLogger.debug('[UPDATE AMOUNT] checkout.update() failed (expected for card payments)', {
+				error: error?.message || 'unknown'
+			});
+			return true; // Still return true as handleSubmit will handle it
+		}
+	}
+
+	return true;
+}
+
+// Expose updateFlowAmount globally for other modules
+window.updateFlowAmount = updateFlowAmount;
+
+/**
  * Destroy Flow component
  */
 function destroyFlowComponent() {
@@ -2616,12 +3261,24 @@ function destroyFlowComponent() {
 		}
 		ckoFlow.flowComponent = null;
 	}
+
+	// Clear checkout instance and amount/address/email tracking
+	ckoFlow.checkoutInstance = null;
+	ckoFlow.pendingAmountUpdate = null;
+	ckoFlow.initialSessionAmount = null;
+	ckoFlow.initialSessionEmail = null;
+	ckoFlow.initialBillingAddress = null;
+	ckoFlow.initialShippingAddress = null;
+	ckoFlow.selectedPaymentType = null;
 	
 	// Clear component root
 	const flowComponentRoot = document.querySelector('[data-testid="checkout-web-component-root"]');
 	if (flowComponentRoot) {
 		flowComponentRoot.innerHTML = '';
 	}
+	
+	// Reset field watcher flag so they can be re-setup when Flow needs to reinitialize
+	window.ckoFieldWatchersSetup = false;
 	
 	ckoLogger.debug('Flow component destroyed');
 }
@@ -2630,6 +3287,15 @@ function destroyFlowComponent() {
  * Reload Flow component
  */
 function reloadFlowComponent() {
+	// Debounce reloads - prevent multiple reloads within 2 seconds
+	const now = Date.now();
+	const lastReload = window.ckoLastReloadTime || 0;
+	if (now - lastReload < 2000) {
+		ckoLogger.debug('[FLOW RELOAD] Debounced - reload already in progress');
+		return;
+	}
+	window.ckoLastReloadTime = now;
+	
 	if (!ckoFlow.flowComponent) {
 		try {
 			initializeFlowIfNeeded();
@@ -2649,11 +3315,20 @@ function reloadFlowComponent() {
 	});
 	ckoLogger.debug('Reloading Flow component due to field change');
 	
+	// Update cardholder name before reloading (if name fields changed)
+	if (typeof window.ckoSetCardholderName === 'function') {
+		window.ckoSetCardholderName();
+		ckoLogger.debug('Cardholder name updated before Flow reload');
+	}
+	
 	// Destroy existing component
 	destroyFlowComponent();
 	
 	// Reset initialization flag
-	ckoFlowInitialized = false;
+	FlowState.set('initialized', false);
+	
+	// Reset init time to allow immediate re-initialization (this is intentional reload)
+	window.ckoLastInitTime = 0;
 	
 	// Re-initialize Flow
 	try {
@@ -2721,6 +3396,8 @@ function checkRequiredFieldsStatus() {
 			destroyFlowComponent();
 			showFlowWaitingMessage();
 			FlowState.set('initialized', false);
+			// Reset field watcher flag so it can be re-setup when fields are filled again
+			window.ckoFieldWatchersSetup = false;
 		}
 	} else if (!wereFilled && areFilled) {
 		// Fields became filled - initialize Flow
@@ -2757,6 +3434,17 @@ function debouncedCheckFlowReload(fieldName, newValue) {
 			return;
 		}
 		
+		// CRITICAL FIX: Don't reload if Flow was just initialized (within 3 seconds)
+		// This prevents the double initialization when filling the last required field
+		const lastInitTime = FlowState.get('lastInitTime');
+		if (lastInitTime && (Date.now() - lastInitTime) < 3000) {
+			ckoLogger.debug(`🔄 Skipping reload for "${fieldName}" - Flow just initialized`, {
+				timeSinceInit: Date.now() - lastInitTime,
+				threshold: 3000
+			});
+			return;
+		}
+		
 		// Check if all required fields are still filled
 		if (!requiredFieldsFilledAndValid()) {
 			// Fields became invalid - destroy Flow
@@ -2785,10 +3473,22 @@ function debouncedCheckFlowReload(fieldName, newValue) {
  * 4. All required fields are filled (NEW)
  */
 function initializeFlowIfNeeded() {
+	
+	// EARLY EXIT: If Flow component already exists, don't reinitialize
+	// This prevents duplicate initialization from multiple triggers (observer, updated_checkout, etc.)
+	if (ckoFlow && ckoFlow.flowComponent) {
+		ckoLogger.debug('[FLOW AUTO-INIT] SKIPPED - Flow component already exists');
+		return;
+	}
+	
+	// NOTE: Debounce check moved AFTER guard checks
+	// This allows retries when container becomes available
+	const now = Date.now();
+	
 	// CRITICAL FIX: Clear old order data from sessionStorage when starting a new checkout
 	// This prevents reusing old order IDs from previous checkouts
 	// BUT: Only clear if we're NOT on a checkout page with an active order (to prevent clearing during payment processing)
-	const currentOrderId = sessionStorage.getItem('cko_flow_order_id');
+	const currentOrderId = FlowSessionStorage.getOrderId();
 	const isCheckoutPage = window.location.pathname.includes('/checkout/') || window.location.pathname.includes('/order-pay/');
 	const hasPaymentIdInUrl = new URLSearchParams(window.location.search).has('cko-payment-id');
 	const hasOrderIdInUrl = new URLSearchParams(window.location.search).has('order_id');
@@ -2798,9 +3498,8 @@ function initializeFlowIfNeeded() {
 	// 2. We're NOT on a checkout/order-pay page with payment processing in progress
 	// 3. We're NOT on a 3DS return (has payment ID or order_id in URL)
 	if (currentOrderId && !(isCheckoutPage && (hasPaymentIdInUrl || hasOrderIdInUrl))) {
-		ckoLogger.debug('[SESSION CLEANUP] Clearing old order data from sessionStorage - Order ID: ' + currentOrderId);
-		sessionStorage.removeItem('cko_flow_order_id');
-		sessionStorage.removeItem('cko_flow_order_key');
+		ckoLogger.debug('[SESSION CLEANUP] Clearing old order data from storage - Order ID: ' + currentOrderId);
+		FlowSessionStorage.clearOrderData();
 		ckoLogger.debug('[SESSION CLEANUP] ✅ Old order data cleared - new checkout will create fresh order');
 	} else if (currentOrderId) {
 		ckoLogger.debug('[SESSION CLEANUP] ⏭️ Skipping cleanup - Payment processing in progress (Order ID: ' + currentOrderId + ')');
@@ -2821,7 +3520,9 @@ function initializeFlowIfNeeded() {
 			ckoLogger.debug(`⏭️ ATTEMPT #${attemptNumber} BLOCKED - Reason: ${guardCheck.reason}`, {
 				timestamp: new Date().toLocaleTimeString()
 			});
-			if (guardCheck.reason === 'ALREADY_INITIALIZING') {
+			if (guardCheck.reason === 'COMPONENT_EXISTS') {
+				ckoLogger.debug('Flow component already exists, skipping duplicate initialization');
+			} else if (guardCheck.reason === 'ALREADY_INITIALIZING') {
 				ckoLogger.debug('Flow initialization already in progress, skipping duplicate call');
 			} else if (guardCheck.reason === '3DS_RETURN' || guardCheck.reason === '3DS_RETURN_URL') {
 				ckoLogger.threeDS('⚠️ initializeFlowIfNeeded: Blocked by 3DS return');
@@ -2830,6 +3531,27 @@ function initializeFlowIfNeeded() {
 				ckoLogger.debug('Flow payment method not selected, skipping initialization');
 			} else if (guardCheck.reason === 'CONTAINER_NOT_FOUND') {
 				ckoLogger.debug('Flow container not found, skipping initialization');
+				// Show waiting message since payment is selected but container isn't ready
+				document.body.classList.add("cko-flow--method-selected");
+				showFlowWaitingMessage();
+				// Only setup watchers if not already setup - prevents infinite loop
+				if (!window.ckoFieldWatchersSetup) {
+					setupFieldWatchersForInitialization();
+				}
+			} else if (guardCheck.reason === 'FIELDS_NOT_FILLED') {
+				// Throttle FIELDS_NOT_FILLED logs to prevent console spam
+				const lastFieldsNotFilledLog = window.ckoLastFieldsNotFilledLog || 0;
+				if (now - lastFieldsNotFilledLog > 5000) {
+					ckoLogger.debug('Required fields not filled, showing waiting message');
+					window.ckoLastFieldsNotFilledLog = now;
+				}
+				// Show waiting message and setup field watchers (only once)
+				document.body.classList.add("cko-flow--method-selected");
+				showFlowWaitingMessage();
+				// Only setup watchers if not already setup - prevents infinite loop
+				if (!window.ckoFieldWatchersSetup) {
+					setupFieldWatchersForInitialization();
+				}
 			} else if (guardCheck.reason === 'ALREADY_INITIALIZED') {
 				// Already initialized - just ensure UI is correct
 				const elements = window.FlowInitialization.getFlowElements();
@@ -2843,8 +3565,22 @@ function initializeFlowIfNeeded() {
 			}
 			return;
 		}
+		
+		// DEBOUNCE: Now that guard check passed, apply debounce to prevent duplicate init
+		const lastInit = window.ckoLastInitTime || 0;
+		if (now - lastInit < 2000) {
+			ckoLogger.debug('[FLOW AUTO-INIT] DEBOUNCED - recent init at', lastInit, 'current:', now);
+			return;
+		}
+		window.ckoLastInitTime = now;
 	} else {
 		// Fallback to original checks if helper not available
+		
+		// Check if component already exists (strongest guard)
+		if (ckoFlow && ckoFlow.flowComponent) {
+			ckoLogger.debug('Flow component already exists, skipping duplicate initialization');
+			return;
+		}
 		if (FlowState.get('initializing')) {
 			ckoLogger.debug('Flow initialization already in progress, skipping duplicate call');
 			return;
@@ -2861,8 +3597,37 @@ function initializeFlowIfNeeded() {
 		const flowContainer = document.getElementById("flow-container");
 		if (!flowContainer) {
 			ckoLogger.debug('Flow container not found, skipping initialization');
+			// Show waiting message since payment is selected but container isn't ready
+			document.body.classList.add("cko-flow--method-selected");
+			showFlowWaitingMessage();
+			// Only setup watchers if not already setup - prevents infinite loop
+			if (!window.ckoFieldWatchersSetup) {
+				setupFieldWatchersForInitialization();
+			}
 			return;
 		}
+		// Check if required fields are filled (prevents premature init)
+		if (typeof window.requiredFieldsFilledAndValid === 'function') {
+			const fieldsValid = window.requiredFieldsFilledAndValid();
+			if (!fieldsValid) {
+				ckoLogger.debug('Required fields not filled, showing waiting message');
+				document.body.classList.add("cko-flow--method-selected");
+				showFlowWaitingMessage();
+				// Only setup watchers if not already setup - prevents infinite loop
+				if (!window.ckoFieldWatchersSetup) {
+					setupFieldWatchersForInitialization();
+				}
+				return;
+			}
+		}
+		
+		// DEBOUNCE: Now that guard check passed, apply debounce to prevent duplicate init
+		const lastInit = window.ckoLastInitTime || 0;
+		if (now - lastInit < 2000) {
+			ckoLogger.debug('[FLOW AUTO-INIT] DEBOUNCED - recent init at', lastInit, 'current:', now);
+			return;
+		}
+		window.ckoLastInitTime = now;
 	}
 	
 	// Get Flow elements
@@ -2898,6 +3663,7 @@ function initializeFlowIfNeeded() {
 	});
 	
 	if (!canInit) {
+		ckoLogger.debug('[FLOW AUTO-INIT] canInitializeFlow() returned FALSE - showing waiting message');
 		ckoLogger.debug('❌ BLOCKED - Cannot initialize Flow - validation failed', {
 			requiredFieldsFilled: requiredFieldsFilled(),
 			requiredFieldsValid: requiredFieldsFilledAndValid(),
@@ -2910,6 +3676,8 @@ function initializeFlowIfNeeded() {
 		setupFieldWatchersForInitialization();
 		return;
 	}
+	
+	ckoLogger.debug('[FLOW AUTO-INIT] canInitializeFlow() returned TRUE - proceeding');
 	
 	// Hide waiting message if it was shown
 	hideFlowWaitingMessage();
@@ -2925,8 +3693,14 @@ function initializeFlowIfNeeded() {
 	// Mark fields as filled
 	FlowState.set('fieldsWereFilled', true);
 	
+	// Update cardholder name before initializing Flow (ensures latest name is used)
+	if (typeof window.ckoSetCardholderName === 'function') {
+		window.ckoSetCardholderName();
+	}
+	
 	// Only initialize if not already initialized
 	if (!FlowState.get('initialized') || !ckoFlow.flowComponent) {
+		ckoLogger.debug('[FLOW AUTO-INIT] About to call ckoFlow.init()...');
 		ckoLogger.debug('🚀 STARTING - Calling ckoFlow.init()...', {
 			alreadyInitialized: FlowState.get('initialized'),
 			componentExists: !!ckoFlow.flowComponent,
@@ -2935,18 +3709,17 @@ function initializeFlowIfNeeded() {
 		FlowState.set('initializing', true);
 		
 		try {
-			ckoLogger.debug('Calling ckoFlow.init()...');
+			ckoLogger.debug('[FLOW AUTO-INIT] Calling ckoFlow.init() NOW');
 			ckoFlow.init();
+			ckoLogger.debug('[FLOW AUTO-INIT] ckoFlow.init() returned');
 		} catch (error) {
-			console.error('[FLOW INIT] ❌ ERROR - Error during Flow initialization:', error);
-			ckoLogger.debug('Error during Flow initialization:', error);
+			ckoLogger.error('[FLOW AUTO-INIT] Error during Flow initialization:', error);
 			FlowState.set('initialized', false);
 			FlowState.set('initializing', false);
 			throw error;
 		}
 	} else {
-		ckoLogger.debug('⏭️ SKIPPED - Already initialized, skipping ckoFlow.init()');
-		ckoLogger.debug('Skipping ckoFlow.init() - already initialized');
+		ckoLogger.debug('[FLOW AUTO-INIT] SKIPPED - already initialized');
 	}
 }
 
@@ -2956,9 +3729,20 @@ function initializeFlowIfNeeded() {
  */
 function setupFieldWatchersForInitialization() {
 	// Only setup if Flow is not initialized
-	if (ckoFlowInitialized) {
+	if (FlowState.get('initialized')) {
+		window.ckoFieldWatchersSetup = false; // Reset flag when Flow is initialized
 		return;
 	}
+	
+	// Prevent duplicate watcher setup - this prevents infinite loops
+	if (window.ckoFieldWatchersSetup) {
+		ckoLogger.debug('Field watchers already setup, skipping duplicate setup');
+		return;
+	}
+	
+	// Set flag to prevent duplicate setup
+	window.ckoFieldWatchersSetup = true;
+	ckoLogger.debug('Setting up field watchers for initialization (first time)');
 	
 	// Get all required field selectors
 	const requiredLabels = document.querySelectorAll(".woocommerce-checkout label .required");
@@ -3019,17 +3803,23 @@ function setupFieldWatchersForInitialization() {
 		}
 	});
 	
-	// Setup watchers with debouncing
+	// Setup watchers with debouncing - increased debounce to prevent rapid firing
 	const debouncedCheck = debounce(() => {
 		ckoLogger.debug('Field watcher triggered - checking if Flow can initialize');
-		checkRequiredFieldsStatus();
 		
-		// Also directly check if we can initialize now
-		if (!ckoFlowInitialized && canInitializeFlow()) {
+		// Only call checkRequiredFieldsStatus and try to initialize if fields are actually valid
+		// This prevents the infinite loop where FIELDS_NOT_FILLED keeps triggering
+		if (canInitializeFlow()) {
 			ckoLogger.debug('Field watcher - all fields valid, initializing Flow');
+			checkRequiredFieldsStatus();
 			initializeFlowIfNeeded();
+		} else {
+			// Just check field status for state tracking, don't try to init
+			const areFilled = requiredFieldsFilledAndValid();
+			FlowState.set('fieldsWereFilled', areFilled);
+			ckoLogger.debug('Field watcher - fields not valid yet, waiting...', { areFilled });
 		}
-	}, 300); // Reduced debounce to 300ms for faster response
+	}, 500); // Increased debounce to 500ms to prevent rapid firing
 	
 	// Attach watchers to all required fields
 	fieldSelectors.forEach(selector => {
@@ -3054,13 +3844,13 @@ function setupFieldWatchersForInitialization() {
 	
 	ckoLogger.debug('Field watchers setup for initialization', { fieldCount: fieldSelectors.length });
 	
-	// Also check immediately if fields are already filled
+	// Also check immediately if fields are already filled (with a slightly longer delay)
 	setTimeout(() => {
-		if (!ckoFlowInitialized && canInitializeFlow()) {
+		if (!FlowState.get('initialized') && canInitializeFlow()) {
 			ckoLogger.debug('Immediate check after watcher setup - fields already filled, initializing Flow');
 			initializeFlowIfNeeded();
 		}
-	}, 100);
+	}, 200);
 }
 
 /**
@@ -3187,10 +3977,23 @@ document.addEventListener("DOMContentLoaded", function () {
 	window.ckoPageLoadTimestamps.push(loadTime);
 
 	normalizeFlowPaymentLabelText();
+	
 	jQuery(document.body).on('updated_checkout', function() {
 		logCheckoutFieldSnapshot('updated_checkout');
 		normalizeFlowPaymentLabelText();
 		checkRequiredFieldsStatus();
+		
+		// CRITICAL FIX: Try to initialize Flow on updated_checkout
+		// This handles environments where payment methods are rendered AFTER DOMContentLoaded
+		// (e.g., WooCommerce Blocks checkout, async payment method loading, 503 script errors)
+		// Only run this ONCE during initial page load - not on subsequent checkout updates
+		const flowPayment = document.getElementById("payment_method_wc_checkout_com_flow");
+		const componentExists = ckoFlow && ckoFlow.flowComponent;
+		
+		if (flowPayment && flowPayment.checked && !FlowState.get('initialized') && !FlowState.get('initializing') && !componentExists) {
+			ckoLogger.debug('[FLOW AUTO-INIT] updated_checkout - Payment method now available, attempting init');
+			initializeFlowIfNeeded();
+		}
 	});
 	
 	// Keep only last 10 timestamps
@@ -3212,7 +4015,7 @@ document.addEventListener("DOMContentLoaded", function () {
 	
 	// CRITICAL: Check for 3DS return FIRST - before any other checks
 	// This must be the very first thing we check
-	if (window.ckoFlow3DSReturn) {
+if (FlowState.get('is3DSReturn')) {
 		ckoLogger.threeDS('DOMContentLoaded: 3DS return in progress, skipping ALL Flow initialization');
 		return; // Exit immediately - don't do anything else
 	}
@@ -3223,6 +4026,7 @@ document.addEventListener("DOMContentLoaded", function () {
 	const sessionId = urlParams.get("cko-session-id");
 	const paymentSessionId = urlParams.get("cko-payment-session-id");
 	
+	
 	if (paymentId || sessionId || paymentSessionId) {
 		ckoLogger.threeDS('DOMContentLoaded: 3DS return detected in URL, skipping Flow initialization');
 		FlowState.set('is3DSReturn', true);
@@ -3232,25 +4036,67 @@ document.addEventListener("DOMContentLoaded", function () {
 	// Check if Flow payment method is selected on page load
 	const flowPayment = document.getElementById("payment_method_wc_checkout_com_flow");
 	
+	
+	ckoLogger.debug('[FLOW AUTO-INIT] DOMContentLoaded - flowPayment:', !!flowPayment, 'checked:', flowPayment?.checked);
+	
+	// CRITICAL FIX: If payment method doesn't exist yet, set up an observer to detect when it's added
+	// This handles environments where payment methods are rendered AFTER DOMContentLoaded
+	if (!flowPayment) {
+		ckoLogger.debug('[FLOW AUTO-INIT] Payment method not found at DOMContentLoaded - setting up observer');
+		const paymentObserver = new MutationObserver(function(mutations, observer) {
+			const flowPaymentNow = document.getElementById("payment_method_wc_checkout_com_flow");
+			if (flowPaymentNow) {
+				ckoLogger.debug('[FLOW AUTO-INIT] Payment method appeared in DOM via observer, checked:', flowPaymentNow.checked);
+				observer.disconnect(); // Stop observing
+				
+				const componentExists = ckoFlow && ckoFlow.flowComponent;
+				
+				if (flowPaymentNow.checked && !FlowState.get('initialized') && !FlowState.get('initializing') && !componentExists) {
+					ckoLogger.debug('[FLOW AUTO-INIT] Initializing Flow via observer');
+					initializeFlowIfNeeded();
+					
+					if (!FlowState.get('initialized')) {
+						setupFieldWatchersForInitialization();
+					}
+				}
+			}
+		});
+		
+		// Observe the body for added nodes
+		paymentObserver.observe(document.body, { childList: true, subtree: true });
+		
+		// Stop observer after 30 seconds to prevent indefinite watching
+		setTimeout(function() {
+			paymentObserver.disconnect();
+			ckoLogger.debug('[FLOW AUTO-INIT] Observer timeout - disconnected');
+		}, 30000);
+	}
+	
 	// If Flow is selected, check if we can initialize it
 	if (flowPayment && flowPayment.checked) {
-		ckoLogger.debug('DOMContentLoaded: Flow payment method is selected');
+		ckoLogger.debug('[FLOW AUTO-INIT] Payment selected, calling initializeFlowIfNeeded...');
 		// Try to initialize - validation will happen inside initializeFlowIfNeeded()
 		initializeFlowIfNeeded();
+		ckoLogger.debug('[FLOW AUTO-INIT] After initializeFlowIfNeeded, initialized:', FlowState.get('initialized'));
 		
 		// Also setup field watchers in case fields aren't filled yet
-		if (!ckoFlowInitialized) {
+		if (!FlowState.get('initialized')) {
 			setupFieldWatchersForInitialization();
 			
 			// Set up periodic check as fallback (every 2 seconds)
 			// This ensures Flow initializes even if field watchers don't trigger
+			let periodicCheckCount = 0;
 			const periodicCheck = setInterval(() => {
-				if (ckoFlowInitialized) {
+				periodicCheckCount++;
+				
+				if (FlowState.get('initialized')) {
 					clearInterval(periodicCheck);
 					return;
 				}
 				
-				if (canInitializeFlow()) {
+				const canInit = canInitializeFlow();
+				
+				if (canInit) {
 					ckoLogger.debug('Periodic check - Flow can initialize, initializing now');
 					initializeFlowIfNeeded();
 					clearInterval(periodicCheck);
@@ -3276,6 +4122,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			ckoLogger.debug('DOMContentLoaded: Order-pay page detected, but Flow payment method not selected');
 		}
 	}
+	
 });
 
 /**
@@ -3371,17 +4218,17 @@ document.addEventListener("DOMContentLoaded", function () {
 	});
 	
 	/**
-	 * Helper function to persist the save card checkbox value to sessionStorage
+	 * Helper function to persist the save card checkbox value to session storage
 	 * This ensures the value survives 3DS redirects
 	 */
 	function persistSaveCardCheckbox() {
 		const checkbox = document.getElementById('wc-wc_checkout_com_flow-new-payment-method');
 		
 		if (checkbox) {
-			// Store in sessionStorage to survive 3DS redirects
+			// Store in session storage to survive 3DS redirects
 			const value = checkbox.checked ? 'yes' : 'no';
-			sessionStorage.setItem('cko_flow_save_card', value);
-			ckoLogger.debug('SAVE CARD: Persisted checkbox value to sessionStorage:', value);
+			FlowSessionStorage.setSaveCard(value);
+			ckoLogger.debug('SAVE CARD: Persisted checkbox value to storage:', value);
 			ckoLogger.debug('SAVE CARD: Checkbox found:', checkbox);
 			ckoLogger.debug('SAVE CARD: Checkbox checked:', checkbox.checked);
 			ckoLogger.debug('SAVE CARD: Checkbox visible:', checkbox.offsetParent !== null);
@@ -3430,14 +4277,14 @@ document.addEventListener("DOMContentLoaded", function () {
 	}
 	
 	/**
-	 * Restore save card checkbox value from sessionStorage after 3DS redirect
+	 * Restore save card checkbox value from session storage after 3DS redirect
 	 * This runs on every page load
 	 */
 	function restoreSaveCardCheckbox() {
-		const savedValue = sessionStorage.getItem('cko_flow_save_card');
+		const savedValue = FlowSessionStorage.getSaveCard();
 		
 		if (savedValue) {
-			ckoLogger.debug('SAVE CARD: Restoring checkbox value from sessionStorage:', savedValue);
+			ckoLogger.debug('SAVE CARD: Restoring checkbox value from storage:', savedValue);
 			
 			// Set the hidden field value
 			const hiddenField = document.getElementById('cko-flow-save-card-persist');
@@ -3466,8 +4313,8 @@ document.addEventListener("DOMContentLoaded", function () {
 		
 		if (isOrderReceivedPage) {
 			// Clear the saved checkbox value after successful order
-			ckoLogger.debug('SAVE CARD: Order completed - clearing sessionStorage');
-			sessionStorage.removeItem('cko_flow_save_card');
+			ckoLogger.debug('SAVE CARD: Order completed - clearing storage');
+			FlowSessionStorage.clearSaveCard();
 		} else {
 			// Restore checkbox value (for 3DS return to checkout page)
 			restoreSaveCardCheckbox();
@@ -3479,13 +4326,13 @@ document.addEventListener("DOMContentLoaded", function () {
 		const checkbox = document.getElementById('wc-wc_checkout_com_flow-new-payment-method');
 		if (checkbox) {
 			const value = checkbox.checked ? 'yes' : 'no';
-			ckoLogger.debug('[SAVE CARD DEBUG] Checkbox changed - updating sessionStorage, hidden field, and WooCommerce session:', {
+			ckoLogger.debug('[SAVE CARD DEBUG] Checkbox changed - updating storage, hidden field, and WooCommerce session:', {
 				checked: checkbox.checked,
 				value: value
 			});
 			
-			// Update sessionStorage
-			sessionStorage.setItem('cko_flow_save_card', value);
+			// Update session storage
+			FlowSessionStorage.setSaveCard(value);
 			
 			// Update hidden field
 			const hiddenField = document.getElementById('cko-flow-save-card-persist');
@@ -3538,8 +4385,8 @@ document.addEventListener("DOMContentLoaded", function () {
 		const isOrderReceivedPage = window.location.pathname.includes('/order-received/') || 
 		                             window.location.pathname.includes('/checkout/thank-you/');
 		if (isOrderReceivedPage) {
-			ckoLogger.debug('SAVE CARD: Order completed - clearing sessionStorage');
-			sessionStorage.removeItem('cko_flow_save_card');
+			ckoLogger.debug('SAVE CARD: Order completed - clearing storage');
+			FlowSessionStorage.clearSaveCard();
 		} else {
 			restoreSaveCardCheckbox();
 		}
@@ -3618,11 +4465,16 @@ document.addEventListener("DOMContentLoaded", function () {
 		}
 		
 		try {
-			// Check if order already exists (for order-pay page) - check BEFORE form lookup
+			// Check if this is an order-pay page (existing order being paid for).
+			// ONLY skip order creation for order-pay pages - for regular checkout,
+			// ALWAYS call the server to validate if existing order can be reused.
+			const isOrderPayPage = window.location.pathname.includes('/order-pay/');
 			const orderIdField = jQuery('input[name="order_id"]');
-			if (orderIdField.length && orderIdField.val()) {
+			
+			if (isOrderPayPage && orderIdField.length && orderIdField.val()) {
+				// Order-pay page: order already exists, use it directly
 				const existingOrderId = orderIdField.val();
-				ckoLogger.debug('[CREATE ORDER] Order already exists (order-pay page) - Order ID: ' + existingOrderId);
+				ckoLogger.debug('[CREATE ORDER] Order-pay page detected - using existing Order ID: ' + existingOrderId);
 				// Clear lock flag and re-enable button before returning
 				FlowState.set('orderCreationInProgress', false);
 				if (placeOrderButton.length) {
@@ -3635,6 +4487,13 @@ document.addEventListener("DOMContentLoaded", function () {
 				}
 				return parseInt(existingOrderId);
 			}
+			
+			// For regular checkout: ALWAYS call server to decide if order should be reused or new one created.
+			// Server-side logic will check:
+			// 1. If existing order has _cko_security_check_failed flag → create new order
+			// 2. If existing order status is not suitable for reuse → create new order
+			// 3. If cart hash changed → create new order
+			// This fixes the bug where failed security check orders were incorrectly reused.
 		
 			// Try to find form - checkout form or order-pay form
 			let form = jQuery("form.checkout");
@@ -3747,19 +4606,40 @@ document.addEventListener("DOMContentLoaded", function () {
 			// Ensure nonce is included in form data
 			formDataObj['woocommerce-process-checkout-nonce'] = nonceValue;
 			
-			// Get payment session ID if available
+			// Get payment session ID - CRITICAL for order lookup after 3DS return.
+			// Try multiple sources: 1) hidden field, 2) window global, 3) force add field
+			let paymentSessionId = '';
 			const paymentSessionIdField = jQuery('input[name="cko-flow-payment-session-id"]');
-			const paymentSessionId = paymentSessionIdField.length > 0 ? paymentSessionIdField.val() : '';
+			
+			if (paymentSessionIdField.length > 0 && paymentSessionIdField.val()) {
+				paymentSessionId = paymentSessionIdField.val();
+				ckoLogger.debug('[CREATE ORDER] Payment session ID from hidden field: ' + paymentSessionId.substring(0, 20) + '...');
+			} else if (window.currentPaymentSessionId) {
+				// Fallback: use window global if hidden field not found
+				paymentSessionId = window.currentPaymentSessionId;
+				ckoLogger.debug('[CREATE ORDER] Payment session ID from window global: ' + paymentSessionId.substring(0, 20) + '...');
+				
+				// Also try to add the hidden field for subsequent use
+				if (window.ckoAddPaymentSessionIdField) {
+					window.ckoAddPaymentSessionIdField();
+					ckoLogger.debug('[CREATE ORDER] Added payment session ID hidden field (was missing)');
+				}
+			} else {
+				ckoLogger.error('[CREATE ORDER] ⚠️ Payment session ID NOT FOUND - order lookup after 3DS may fail');
+				ckoLogger.error('[CREATE ORDER] This can happen if: 1) Payment session not created yet, 2) Flow component not initialized');
+			}
 			
 			// Get save card preference
 			const saveCardField = jQuery('input[name="cko-flow-save-card-persist"]');
 			const saveCardValue = saveCardField.length > 0 ? saveCardField.val() : '';
 			
 			// Build data object ensuring nonce is included
+			// Note: isOrderPayPage is already defined at the start of the try block (line 4487)
 			const ajaxData = {
 				cko_flow_precreate_order: '1',
 				'cko-flow-payment-session-id': paymentSessionId,
-				'cko-flow-save-card-persist': saveCardValue
+				'cko-flow-save-card-persist': saveCardValue,
+				'is_order_pay': isOrderPayPage ? 'yes' : 'no'
 			};
 			
 			// Add all form data (including nonce)
@@ -3896,17 +4776,17 @@ document.addEventListener("DOMContentLoaded", function () {
 				}
 				
 				// Store in session for fallback
-				sessionStorage.setItem('cko_flow_order_id', orderId);
-				ckoLogger.debug('[CREATE ORDER] Stored order ID in sessionStorage:', orderId);
+				FlowSessionStorage.setOrderId(orderId);
+				ckoLogger.debug('[CREATE ORDER] Stored order ID in storage:', orderId);
 				if (orderKey) {
-					sessionStorage.setItem('cko_flow_order_key', orderKey);
-					ckoLogger.debug('[CREATE ORDER] ✅ Stored order key in sessionStorage:', orderKey);
+					FlowSessionStorage.setOrderKey(orderKey);
+					ckoLogger.debug('[CREATE ORDER] ✅ Stored order key in storage:', orderKey);
 					// Verify it was stored
-					const storedKey = sessionStorage.getItem('cko_flow_order_key');
-					ckoLogger.debug('[CREATE ORDER] Verification - Retrieved order key from sessionStorage:', storedKey);
+					const storedKey = FlowSessionStorage.getOrderKey();
+					ckoLogger.debug('[CREATE ORDER] Verification - Retrieved order key from storage:', storedKey);
 					ckoLogger.debug('[CREATE ORDER] Verification - Keys match?:', storedKey === orderKey);
 				} else {
-					ckoLogger.error('[CREATE ORDER] ❌ Order key is empty - NOT storing in sessionStorage');
+					ckoLogger.error('[CREATE ORDER] ❌ Order key is empty - NOT storing in storage');
 					ckoLogger.error('[CREATE ORDER] Full response.data:', JSON.stringify(normalizedResponse.data, null, 2));
 				}
 				
@@ -3963,7 +4843,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			ckoLogger.error('[CREATE ORDER] ❌ AJAX Error:', error);
 			
 			// Clear lock flag on error
-			ckoOrderCreationInProgress = false;
+			FlowState.set('orderCreationInProgress', false);
 			
 			// Re-enable place order button on error
 			if (placeOrderButton.length) {
@@ -3995,6 +4875,9 @@ document.addEventListener("DOMContentLoaded", function () {
 			}
 		}
 	}
+	
+	// Expose createOrderBeforePayment globally so it can be called from handleClick (inside ckoFlow.loadFlow)
+	window.createOrderBeforePayment = createOrderBeforePayment;
 	
 	document.addEventListener("click", function (event) {
 		const flowPayment = document.getElementById(
@@ -4108,6 +4991,12 @@ document.addEventListener("DOMContentLoaded", function () {
 								if (ckoFlow.flowComponent && typeof ckoFlow.flowComponent.isValid === 'function') {
 									const isValid = ckoFlow.flowComponent.isValid();
 									if (isValid) {
+										// Log cardholder name value right before submission
+										const cardholderNameValue = window.componentOptions?.card?.data?.cardholderName || '(not set)';
+										ckoLogger.debug('[CARDHOLDER NAME] Value in componentOptions at submission:', {
+											cardholderName: cardholderNameValue,
+											componentOptions: window.componentOptions?.card?.data
+										});
 										ckoLogger.debug('Flow component is valid, submitting...');
 										try {
 											ckoFlow.flowComponent.submit();
@@ -4121,6 +5010,12 @@ document.addEventListener("DOMContentLoaded", function () {
 									}
 								} else {
 									// Fallback: submit without validation check
+									// Log cardholder name value right before submission
+									const cardholderNameValue = window.componentOptions?.card?.data?.cardholderName || '(not set)';
+									ckoLogger.debug('[CARDHOLDER NAME] Value in componentOptions at submission (order-pay fallback):', {
+										cardholderName: cardholderNameValue,
+										componentOptions: window.componentOptions?.card?.data
+									});
 									ckoLogger.debug('Flow component validity check not available, submitting directly...');
 									try {
 										if (ckoFlow.flowComponent && typeof ckoFlow.flowComponent.submit === 'function') {
@@ -4219,6 +5114,12 @@ document.addEventListener("DOMContentLoaded", function () {
 							if (ckoFlow.flowComponent && typeof ckoFlow.flowComponent.isValid === 'function') {
 								const isValid = ckoFlow.flowComponent.isValid();
 								if (isValid) {
+									// Log cardholder name value right before submission
+									const cardholderNameValue = window.componentOptions?.card?.data?.cardholderName || '(not set)';
+									ckoLogger.debug('[CARDHOLDER NAME] Value in componentOptions at submission:', {
+										cardholderName: cardholderNameValue,
+										componentOptions: window.componentOptions?.card?.data
+									});
 									ckoLogger.debug('Flow component is valid, submitting...');
 									try {
 										ckoFlow.flowComponent.submit();
@@ -4232,6 +5133,12 @@ document.addEventListener("DOMContentLoaded", function () {
 								}
 							} else {
 								// Fallback: submit without validation check
+								// Log cardholder name value right before submission
+								const cardholderNameValue = window.componentOptions?.card?.data?.cardholderName || '(not set)';
+								ckoLogger.debug('[CARDHOLDER NAME] Value in componentOptions at submission (fallback):', {
+									cardholderName: cardholderNameValue,
+									componentOptions: window.componentOptions?.card?.data
+								});
 								ckoLogger.debug('Flow component validity check not available, submitting directly...');
 								try {
 									if (ckoFlow.flowComponent && typeof ckoFlow.flowComponent.submit === 'function') {

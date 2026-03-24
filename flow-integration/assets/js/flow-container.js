@@ -134,10 +134,24 @@ if (document.readyState === 'loading') {
 
 // EVENT-DRIVEN DESIGN: Listen for updated_checkout and ensure container exists
 // When container is ready, emit event for payment-session.js to handle Flow lifecycle
+// NOTE: Payment methods section is now preserved by PHP filter (exclude_payment_method_from_fragments)
+// so we don't need complex detach/reattach logic anymore
 jQuery(document).on("updated_checkout", function () {
 	if (typeof ckoLogger !== 'undefined') {
 		ckoLogger.debug('[FLOW CONTAINER] updated_checkout event fired');
 	}
+	
+	// Check if dynamic amount update is in progress (coupon being applied)
+	// The payment methods section is preserved by PHP, so we just skip container recreation
+	if (window.ckoFlowAmountUpdateInProgress) {
+		if (typeof ckoLogger !== 'undefined') {
+			ckoLogger.debug('[FLOW CONTAINER] 🛡️ Dynamic amount update in progress - payment section preserved by PHP');
+		}
+		return;
+	}
+	
+	// Set flag to prevent MutationObserver from resetting state during DOM churn
+	window.ckoFlowUpdatedCheckoutInProgress = true;
 	
 	// Wait for WooCommerce to finish DOM updates
 	setTimeout(function() {
@@ -146,11 +160,23 @@ jQuery(document).on("updated_checkout", function () {
 		updateSavedCardsState(false);
 		
 		// If Flow payment method is selected but container is missing, create it
+		// CRITICAL: Don't recreate if Flow was just initialized (prevents duplicate init)
 		if (paymentMethod && !flowContainer) {
-			if (typeof ckoLogger !== 'undefined') {
-				ckoLogger.debug('[FLOW CONTAINER] Container missing after updated_checkout - recreating');
+			// Check if Flow is currently initializing or was very recently initialized
+			// The Flow SDK creates its own container during initialization
+			// If we recreate the container during this time, we'll trigger a duplicate init
+			const flowCurrentlyInitializing = (typeof FlowState !== 'undefined' && FlowState.get('initializing')) || false;
+			
+			if (flowCurrentlyInitializing) {
+				if (typeof ckoLogger !== 'undefined') {
+					ckoLogger.debug('[FLOW CONTAINER] Container missing but Flow currently initializing - skipping recreation');
+				}
+			} else {
+				if (typeof ckoLogger !== 'undefined') {
+					ckoLogger.debug('[FLOW CONTAINER] Container missing after updated_checkout - recreating');
+				}
+				addPaymentMethod(); // This will emit cko:flow-container-ready event
 			}
-			addPaymentMethod(); // This will emit cko:flow-container-ready event
 		} else if (flowContainer) {
 			if (flowContainer.classList) {
 				flowContainer.classList.add('cko-flow__container');
@@ -165,6 +191,11 @@ jQuery(document).on("updated_checkout", function () {
 				ckoLogger.debug('[FLOW CONTAINER] Container exists - emitted cko:flow-container-ready event');
 			}
 		}
+		
+		// Clear flag after a delay to ensure MutationObserver doesn't interfere
+		setTimeout(function() {
+			window.ckoFlowUpdatedCheckoutInProgress = false;
+		}, 500);
 	}, 100); // Wait for WooCommerce to finish DOM updates
 });
 

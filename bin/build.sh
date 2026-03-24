@@ -69,6 +69,10 @@ rsync -av --inplace \
   --exclude='__MACOSX' \
   --exclude='backups' \
   --exclude='*-backup-*' \
+  --exclude='e2e-tests' \
+  --exclude='.env' \
+  --exclude='.env.*' \
+  --exclude='.cursor' \
   --exclude='check-domain-association-file.php' \
   --exclude='diagnose-*.php' \
   --exclude='generate-*.php' \

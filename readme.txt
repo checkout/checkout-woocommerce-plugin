@@ -1,8 +1,8 @@
-﻿=== Checkout.com Payment Gateway ===
+=== Checkout.com Payment Gateway ===
 Contributors: checkoutintegration
 Tags: checkout, payments, credit card, payment gateway, apple pay, google pay, payment request
 Requires at least: 5.0
-Stable tag: 5.0.1
+Stable tag: 5.0.4
 Requires PHP: 7.3
 Tested up to: 6.7.0
 License: GPLv2 or later
@@ -179,6 +179,25 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v5.0.4 5th March 2026
+- **[feat]** Prevent Flow reload on address changes - send updates via handleSubmit API
+- **[feat]** Add state/county and phone fields to dynamic address updates
+- **[fix]** Coupon/discount amounts now read from live DOM instead of stale data
+- **[fix]** Fixed order-pay page address validation errors
+- **[improvement]** Removed verbose debug logs to reduce log noise
+
+v5.0.3 17th February 2026
+- **[fix]** Use post-discount unit_price for Flow items to satisfy PayPal amount validation
+- **[fix]** Don't add shipping line when free shipping is selected (prevents charging for shipping when merchant has no shipping charge)
+
+v5.0.2 25th January 2026
+- **[feat]** Implement idempotent Flow initialization to prevent duplicate payment session requests
+- **[feat]** Add generation tracking and single-flight lock mechanism for initialization
+- **[feat]** Add destruction confirmation to handle transient DOM churn
+- **[perf]** Optimize state logging to only log actual value changes
+- **[fix]** Fix name field changes triggering Flow reload after initialization
+- **[improvement]** Production-ready improvements with comprehensive error handling
+
 v5.0.1 22nd January 2026
 - **[fix]** Multiple installation issue
 - **[fix]** Flow module refactor for stability and 3DS return handling

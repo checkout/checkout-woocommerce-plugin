@@ -88,71 +88,98 @@ let show_card_holder_name =
 // Saved Payment setting.
 window.saved_payment = cko_flow_customization_vars.flow_saved_payment;
 
-document.addEventListener("DOMContentLoaded", function () {
-	if (show_card_holder_name === "yes" && cardholderNamePosition !== "hidden") {
-		// Function to set cardholder name
-		function setCardholderName() {
-			let family_name = "";
-			let given_name = "";
-			
-			// Check if we're on order-pay page
-			const isOrderPayPage = window.location.pathname.includes('/order-pay/');
-			
-			if (isOrderPayPage) {
-				// For order-pay pages, get billing info from order data instead of form fields
-				// The order data is available in the cart-info or order-pay-info data attribute
-				let orderData = null;
-				
-				// Try to get order data from cart-info or order-pay-info
-				const cartInfoElement = document.getElementById("cart-info");
-				const orderPayInfoElement = document.getElementById("order-pay-info");
-				
-				if (orderPayInfoElement) {
-					orderData = orderPayInfoElement.getAttribute("data-order-pay");
-				} else if (cartInfoElement) {
-					orderData = cartInfoElement.getAttribute("data-cart");
-				}
-				
-				if (orderData) {
-					try {
-						const parsedData = JSON.parse(orderData);
-						
-						// Get billing info from order data
-						if (parsedData.billing_address) {
-							given_name = parsedData.billing_address.given_name || "";
-							family_name = parsedData.billing_address.family_name || "";
-						}
-				} catch (e) {
-					if (typeof ckoLogger !== 'undefined') {
-						ckoLogger.error('Error parsing order data for cardholder name:', e);
-					}
-				}
-				}
-				
-				// Fallback: try to get from form fields (even if disabled)
-				if (!given_name && !family_name) {
-					family_name = document.getElementById("billing_last_name")?.value || "";
-					given_name = document.getElementById("billing_first_name")?.value || "";
-				}
-			} else {
-				// For regular checkout pages, get from form fields
-				family_name = document.getElementById("billing_last_name")?.value || "";
-				given_name = document.getElementById("billing_first_name")?.value || "";
-			}
+// Function to set cardholder name - exposed globally so it can be called when Flow reloads
+function setCardholderName() {
+	// Only check if feature is enabled
+	// WooCommerce checkboxes can be "yes", "1", or true
+	const isEnabled = show_card_holder_name === "yes" || 
+	                  show_card_holder_name === "1" || 
+	                  show_card_holder_name === true ||
+	                  show_card_holder_name === 1;
+	
+	if (!isEnabled) {
+		return; // Cardholder name feature disabled
+	}
+	
+	// Only set cardholder name from billing when position is "hidden"
+	// When position is "top" or "bottom", Flow field is visible and user can type their own name
+	// The API will use whatever user types in the visible Flow field
+	if (cardholderNamePosition !== "hidden") {
+		return; // Position is visible - let user type in Flow field
+	}
 
-			const cardholderName = `${given_name} ${family_name}`.trim();
-			
-			if (cardholderName) {
-				if (!window.componentOptions.card.data) {
-					window.componentOptions.card.data = {};
+	let family_name = "";
+	let given_name = "";
+	
+	// Check if we're on order-pay page
+	const isOrderPayPage = window.location.pathname.includes('/order-pay/');
+	
+	if (isOrderPayPage) {
+		// For order-pay pages, get billing info from order data instead of form fields
+		// The order data is available in the cart-info or order-pay-info data attribute
+		let orderData = null;
+		
+		// Try to get order data from cart-info or order-pay-info
+		const cartInfoElement = document.getElementById("cart-info");
+		const orderPayInfoElement = document.getElementById("order-pay-info");
+		
+		if (orderPayInfoElement) {
+			orderData = orderPayInfoElement.getAttribute("data-order-pay");
+		} else if (cartInfoElement) {
+			orderData = cartInfoElement.getAttribute("data-cart");
+		}
+		
+		if (orderData) {
+			try {
+				const parsedData = JSON.parse(orderData);
+				
+				// Get billing info from order data
+				if (parsedData.billing_address) {
+					given_name = parsedData.billing_address.given_name || "";
+					family_name = parsedData.billing_address.family_name || "";
 				}
-				window.componentOptions.card.data.cardholderName = cardholderName;
+			} catch (e) {
+				if (typeof ckoLogger !== 'undefined') {
+					ckoLogger.error('[setCardholderName] Error parsing order data for cardholder name:', e);
+				}
 			}
 		}
 		
-		// Set cardholder name immediately
-		setCardholderName();
+		// Fallback: try to get from form fields (even if disabled)
+		if (!given_name && !family_name) {
+			family_name = document.getElementById("billing_last_name")?.value || "";
+			given_name = document.getElementById("billing_first_name")?.value || "";
+		}
+	} else {
+		// For regular checkout pages, get from form fields
+		family_name = document.getElementById("billing_last_name")?.value || "";
+		given_name = document.getElementById("billing_first_name")?.value || "";
 	}
+
+	const cardholderName = `${given_name} ${family_name}`.trim();
+	
+	if (cardholderName) {
+		if (!window.componentOptions.card.data) {
+			window.componentOptions.card.data = {};
+		}
+		const beforeValue = window.componentOptions.card.data.cardholderName || '(not set)';
+		window.componentOptions.card.data.cardholderName = cardholderName;
+		
+		if (typeof ckoLogger !== 'undefined') {
+			ckoLogger.debug('[CARDHOLDER NAME] Updated:', {
+				before: beforeValue,
+				after: cardholderName
+			});
+		}
+	}
+}
+
+// Expose globally so it can be called when Flow reloads
+window.ckoSetCardholderName = setCardholderName;
+
+document.addEventListener("DOMContentLoaded", function () {
+	// Set cardholder name immediately on page load
+	setCardholderName();
 });
 
 // Component name section.

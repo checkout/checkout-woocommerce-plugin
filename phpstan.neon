@@ -1,0 +1,32 @@
+parameters:
+    level: 5
+    paths:
+        - woocommerce-gateway-checkout-com.php
+        - includes/
+        - flow-integration/
+    excludePaths:
+        - vendor/
+        - node_modules/
+        - e2e-tests/
+        - tests/
+    
+    # WordPress/WooCommerce stubs
+    scanDirectories:
+        - vendor/
+    
+    # Ignore common WordPress/WooCommerce dynamic patterns
+    ignoreErrors:
+        # WordPress global functions
+        - '#Function [a-zA-Z_]+ not found\.#'
+        # WooCommerce classes
+        - '#Class WC_[a-zA-Z_]+ not found\.#'
+        - '#Class WP_[a-zA-Z_]+ not found\.#'
+        # Dynamic method calls common in WordPress
+        - '#Call to an undefined method [a-zA-Z_]+::[a-zA-Z_]+\(\)\.#'
+        # WordPress hooks with dynamic callbacks
+        - '#Parameter \#[0-9]+ .* expects callable.* given\.#'
+    
+    # Check for common issues
+    checkMissingIterableValueType: false
+    checkGenericClassInNonGenericObjectType: false
+    reportUnmatchedIgnoredErrors: false
