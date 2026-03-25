@@ -2,7 +2,7 @@
 Contributors: checkoutintegration
 Tags: checkout, payments, credit card, payment gateway, apple pay, google pay, payment request
 Requires at least: 5.0
-Stable tag: 5.0.4
+Stable tag: 5.1.0
 Requires PHP: 7.3
 Tested up to: 6.7.0
 License: GPLv2 or later
@@ -179,6 +179,27 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v5.1.0 25th March 2026
+- **[Core Payment Fixes]**:
+Multi-tab payment protection with "first capture wins" logic
+3DS decline no longer redirects to success page
+Retry payments work correctly without showing declined messages
+Coupons/discounts now properly applied to payment amounts
+Capture timing calculated at submit time (not session creation)
+- **[Webhook Improvements]**:
+Prevent payment authorized webhook from downgrading completed orders
+Added fuzzy matching (Method 4) for orders when browser closes early
+Fixed duplicate detection issues
+- **[Flow Component Stability]**:
+Idempotent initialization preventing duplicate API calls (~50% faster)
+Address changes no longer trigger Flow reload (preserves card entry)
+Email changes properly trigger reload when needed
+APM orders created before payment popup
+- **[Security & Quality]**:
+XSS protection, nonce verification, input sanitization
+Added PHPStan, PHPCS, ESLint automated code review workflows
+E2E test suite with Playwright
+
 v5.0.4 5th March 2026
 - **[feat]** Prevent Flow reload on address changes - send updates via handleSubmit API
 - **[feat]** Add state/county and phone fields to dynamic address updates
