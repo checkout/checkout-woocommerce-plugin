@@ -169,7 +169,7 @@ var ckoFlow = {
 		
 		ckoLogger.debug('loadFlow: Validation passed - proceeding with payment session creation');
 		
-		ckoLogger.version('5.0.4');
+		ckoLogger.version('5.1.0');
 		
 		// Check if we're on a redirect page with payment parameters - if so, don't initialize Flow
 		const urlParams = new URLSearchParams(window.location.search);
