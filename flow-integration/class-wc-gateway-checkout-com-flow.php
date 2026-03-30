@@ -444,10 +444,31 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 		// Detect downgrade attempt
 		if ( $old_rank > $new_rank && $old_rank >= 3 ) {
-			// This is a downgrade from on-hold or higher - block it
+			// Allow manual admin changes - only block automated/webhook changes
+			$is_admin_request = is_admin() && current_user_can( 'edit_shop_orders' );
+			$is_webhook_context = doing_action( 'woocommerce_api_wc_checkoutcom_flow_webhook' ) 
+				|| doing_action( 'woocommerce_api_wc_checkoutcom_webhook' )
+				|| doing_action( 'woocommerce_api_wc_checkoutcom_flow_process' );
+			$is_rest_api = defined( 'REST_REQUEST' ) && REST_REQUEST;
+			
+			// Allow if admin user is manually changing AND not triggered by webhook/API
+			if ( $is_admin_request && ! $is_webhook_context && ! $is_rest_api ) {
+				WC_Checkoutcom_Utility::logger( 
+					sprintf(
+						'[STATUS GUARD] ✅ ALLOWED manual admin status change: Order %d from "%s" to "%s" by user %d',
+						$order_id,
+						$old_status,
+						$new_status,
+						get_current_user_id()
+					)
+				);
+				return; // Allow the manual admin change
+			}
+			
+			// This is an automated/webhook downgrade - block it
 			WC_Checkoutcom_Utility::logger( 
 				sprintf(
-					'[STATUS GUARD] ❌ BLOCKED status downgrade: Order %d from "%s" to "%s" - reverting to "%s"',
+					'[STATUS GUARD] ❌ BLOCKED automated status downgrade: Order %d from "%s" to "%s" - reverting to "%s"',
 					$order_id,
 					$old_status,
 					$new_status,
@@ -6424,19 +6445,56 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			}
 			
 			if ( ! empty( $expected_payment_id ) && ! $payment_id_matches ) {
-				// Payment ID mismatch - reject webhook BEFORE processing
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ❌ CRITICAL ERROR - Payment ID mismatch in Flow webhook handler!' );
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Order ID: ' . $order->get_id() );
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Order _cko_flow_payment_id: ' . ( $order_payment_id ?: 'NOT SET' ) );
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Order _cko_payment_id: ' . ( $order_payment_id_alt ?: 'NOT SET' ) );
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Expected payment ID: ' . $expected_payment_id );
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Webhook payment ID: ' . $webhook_payment_id );
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ❌ REJECTING WEBHOOK - Payment ID does not match order!' );
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: This webhook is for a different payment - ignoring to prevent incorrect order updates' );
+				// Payment ID mismatch - check if this is a valid multi-tab retry before rejecting
+				$event_type = $data->type ?? '';
+				$payment_attempts = $order->get_meta( '_cko_payment_attempts' );
+				$is_tracked_payment = false;
 				
-				// Reject webhook - return HTTP 200 but don't process
-				$this->send_response( 200, 'Webhook payment ID does not match order payment ID' );
-				return;
+				// Check if this payment ID is tracked in the payment attempts array (multi-tab scenario)
+				if ( ! empty( $payment_attempts ) && is_array( $payment_attempts ) ) {
+					foreach ( $payment_attempts as $attempt ) {
+						if ( isset( $attempt['payment_id'] ) && $attempt['payment_id'] === $webhook_payment_id ) {
+							$is_tracked_payment = true;
+							break;
+						}
+					}
+				}
+				
+				// MULTI-TAB EXCEPTION: Allow payment_captured and payment_approved webhooks through
+				// if the payment ID is tracked in _cko_payment_attempts. The webhook handler has
+				// "first capture wins" logic that will correctly handle the multi-tab scenario.
+				$allow_multi_tab_events = array( 'payment_captured', 'payment_approved' );
+				$order_status = $order->get_status();
+				$allow_for_order_status = in_array( $order_status, array( 'failed', 'pending', 'on-hold' ), true );
+				
+				if ( $is_tracked_payment && in_array( $event_type, $allow_multi_tab_events, true ) && $allow_for_order_status ) {
+					// This is a valid multi-tab retry - let the webhook handler process it
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ⚠️ MULTI-TAB DETECTED - Payment ID mismatch but allowing through' );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Order ID: ' . $order->get_id() );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Order primary payment: ' . $expected_payment_id );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Webhook payment ID: ' . $webhook_payment_id );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Event type: ' . $event_type );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Order status: ' . $order_status );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ✅ Payment ID found in _cko_payment_attempts - passing to webhook handler for "first capture wins" processing' );
+					// Continue processing - don't return, let webhook handler decide
+				} else {
+					// Not a valid multi-tab scenario - reject the webhook
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ❌ CRITICAL ERROR - Payment ID mismatch in Flow webhook handler!' );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Order ID: ' . $order->get_id() );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Order _cko_flow_payment_id: ' . ( $order_payment_id ?: 'NOT SET' ) );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Order _cko_payment_id: ' . ( $order_payment_id_alt ?: 'NOT SET' ) );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Expected payment ID: ' . $expected_payment_id );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Webhook payment ID: ' . $webhook_payment_id );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Is tracked in payment_attempts: ' . ( $is_tracked_payment ? 'YES' : 'NO' ) );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Event type: ' . $event_type );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Order status: ' . $order_status );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ❌ REJECTING WEBHOOK - Payment ID does not match order!' );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: This webhook is for a different payment - ignoring to prevent incorrect order updates' );
+					
+					// Reject webhook - return HTTP 200 but don't process
+					$this->send_response( 200, 'Webhook payment ID does not match order payment ID' );
+					return;
+				}
 			}
 			
 			// If order doesn't have payment ID yet, set it from webhook (for first payment attempt)
