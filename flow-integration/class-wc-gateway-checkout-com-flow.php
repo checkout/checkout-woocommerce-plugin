@@ -6546,6 +6546,47 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				if ( $webhook_debug_enabled ) {
 					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Processing payment_approved event' );
 				}
+				
+				// Check if merchant wants to skip authorization status update when using "Authorize and Capture"
+				// This prevents webhook race conditions when capture delay is short
+				$auto_capture_enabled = '1' === WC_Admin_Settings::get_option( 'ckocom_card_autocap', '1' );
+				$skip_auth_status_update = '1' === WC_Admin_Settings::get_option( 'ckocom_skip_auth_status_update', '0' );
+				
+				if ( $auto_capture_enabled && $skip_auth_status_update ) {
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: "Authorize and Capture" + "Skip Authorization Status Update" enabled - skipping payment_approved status update. Will wait for payment_captured webhook to update order status directly.' );
+					
+					// Still add order note for audit trail
+					$webhook_data = $data->data;
+					$payment_id = $webhook_data->id ?? 'N/A';
+					$action_id = $webhook_data->action_id ?? 'N/A';
+					$order_id = isset($webhook_data->metadata->order_id) ? $webhook_data->metadata->order_id : null;
+					
+					// Fallback: use reference as order ID if metadata->order_id is not set
+					if ( empty( $order_id ) && isset( $webhook_data->reference ) && is_numeric( $webhook_data->reference ) ) {
+						$order_id = $webhook_data->reference;
+					}
+					
+					if ( $order_id ) {
+						$order = wc_get_order( $order_id );
+						if ( $order ) {
+							$order->add_order_note( 
+								sprintf( 
+									__( 'Payment approved webhook received (Payment ID: %s). "Skip Authorization Status Update" enabled - waiting for payment_captured webhook to complete order.', 'checkout-com-unified-payments-api' ), 
+									$payment_id 
+								) 
+							);
+							// Set authorized meta for tracking
+							$order->update_meta_data( 'cko_payment_authorized', true );
+							$order->update_meta_data( '_cko_payment_id', $payment_id );
+							$order->set_transaction_id( $action_id );
+							$order->save();
+						}
+					}
+					
+					$response = true; // Acknowledge webhook successfully
+					break;
+				}
+				
 				$response = WC_Checkout_Com_Webhook::authorize_payment( $data );
 				if ( $webhook_debug_enabled ) {
 					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: payment_approved response: ' . wp_json_encode( $response ) );
