@@ -416,6 +416,11 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	 * - completed → processing (NEVER allowed)
 	 * - processing → on-hold (NEVER allowed)
 	 * 
+	 * But ALLOWS legitimate terminal states from webhooks:
+	 * - processing → refunded (allowed from refund webhook)
+	 * - completed → refunded (allowed from refund webhook)
+	 * - on-hold → cancelled (allowed from void/cancel webhook)
+	 * 
 	 * This can happen when webhooks arrive out of order or when process_payment()
 	 * runs after webhooks have already updated the order to a final state.
 	 *
@@ -431,18 +436,38 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		}
 
 		// Define status hierarchy (higher number = more "complete")
+		// Note: refunded and cancelled are terminal states that can be reached from processing/completed
 		$status_hierarchy = array(
 			'pending'    => 1,
 			'failed'     => 2,
 			'on-hold'    => 3,
 			'processing' => 4,
 			'completed'  => 5,
+			'refunded'   => 6, // Terminal state - higher than completed
+			'cancelled'  => 0, // Special case - handled separately
 		);
+
+		// Terminal states that are always allowed as destinations (not downgrades)
+		// These represent legitimate end states from payment actions
+		$terminal_states = array( 'refunded', 'cancelled' );
+
+		// Always allow transitions TO terminal states (refund/cancel are legitimate actions)
+		if ( in_array( $new_status, $terminal_states, true ) ) {
+			WC_Checkoutcom_Utility::logger( 
+				sprintf(
+					'[STATUS GUARD] ✅ ALLOWED transition to terminal state: Order %d from "%s" to "%s"',
+					$order_id,
+					$old_status,
+					$new_status
+				)
+			);
+			return;
+		}
 
 		$old_rank = isset( $status_hierarchy[ $old_status ] ) ? $status_hierarchy[ $old_status ] : 0;
 		$new_rank = isset( $status_hierarchy[ $new_status ] ) ? $status_hierarchy[ $new_status ] : 0;
 
-		// Detect downgrade attempt
+		// Detect downgrade attempt (excluding terminal state transitions handled above)
 		if ( $old_rank > $new_rank && $old_rank >= 3 ) {
 			// Allow manual admin changes - only block automated/webhook changes
 			$is_admin_request = is_admin() && current_user_can( 'edit_shop_orders' );
@@ -5743,19 +5768,24 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		$order->update_meta_data( 'cko_payment_refunded', true );
 		$order->save();
 
-		/* translators: %s: Action ID. */
-		$message = sprintf( esc_html__( 'Checkout.com Payment refunded from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
+		// Get payment ID and format amount for the note.
+		$payment_id = $order->get_meta( '_cko_payment_id' );
+		$refund_amount = isset( $amount ) ? $amount : $order->get_total();
+		$formatted_amount = wc_price( $refund_amount, array( 'currency' => $order->get_currency() ) );
 
 		if ( isset( $_SESSION['cko-refund-is-less'] ) ) {
 			if ( $_SESSION['cko-refund-is-less'] ) {
-				/* translators: %s: Action ID. */
-				$order->add_order_note( sprintf( esc_html__( 'Checkout.com Payment Partially refunded from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] ) );
+				/* translators: %1$s: Payment ID, %2$s: Action ID, %3$s: Amount. */
+				$order->add_order_note( sprintf( esc_html__( 'Checkout.com Payment Partially refunded from Admin – Payment ID: %1$s, Action ID: %2$s, Amount: %3$s', 'checkout-com-unified-payments-api' ), $payment_id, $result['action_id'], $formatted_amount ) );
 
 				unset( $_SESSION['cko-refund-is-less'] );
 
 				return true;
 			}
 		}
+
+		/* translators: %1$s: Payment ID, %2$s: Action ID, %3$s: Amount. */
+		$message = sprintf( esc_html__( 'Checkout.com Payment refunded from Admin – Payment ID: %1$s, Action ID: %2$s, Amount: %3$s', 'checkout-com-unified-payments-api' ), $payment_id, $result['action_id'], $formatted_amount );
 
 		// add note for order.
 		$order->add_order_note( $message );
@@ -6394,12 +6424,26 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				$processed_webhooks = array();
 			}
 			
-			// Create unique webhook identifier (payment_id + event_type)
-			$webhook_id = $data->data->id . '_' . $data->type;
+			// Create unique webhook identifier
+			// For events with action_id (refund, void, capture), use action_id to allow multiple actions on same payment
+			// For other events (approved, declined), use payment_id + event_type
+			$action_id = isset( $data->data->action_id ) ? $data->data->action_id : null;
+			$event_type = $data->type;
+			
+			// Events that can have multiple actions per payment (each with unique action_id)
+			$action_based_events = array( 'payment_refunded', 'payment_voided', 'payment_captured', 'payment_capture_declined' );
+			
+			if ( ! empty( $action_id ) && in_array( $event_type, $action_based_events, true ) ) {
+				// Use action_id for events that can occur multiple times (e.g., multiple partial refunds)
+				$webhook_id = $action_id . '_' . $event_type;
+			} else {
+				// Use payment_id for single-occurrence events (approved, declined, etc.)
+				$webhook_id = $data->data->id . '_' . $event_type;
+			}
 			
 			if ( in_array( $webhook_id, $processed_webhooks, true ) ) {
 				// Webhook already processed - skip to prevent duplicate order updates
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK: ✅ Already processed - Payment ID: ' . $data->data->id . ', Type: ' . $data->type . ', Order: ' . $order->get_id() );
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK: ✅ Already processed - Payment ID: ' . $data->data->id . ', Action ID: ' . ( $action_id ?? 'N/A' ) . ', Type: ' . $event_type . ', Order: ' . $order->get_id() );
 				WC_Checkoutcom_Utility::logger( 'WEBHOOK: ✅ Skipping duplicate webhook processing to prevent multiple order updates' );
 				$this->send_response( 200, 'Webhook already processed' );
 				return;
@@ -6755,14 +6799,23 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				$processed_webhooks = array();
 			}
 			
-			$webhook_id = $data->data->id . '_' . $data->type;
+			// Create unique webhook identifier (must match the logic used for deduplication check above)
+			$action_id = isset( $data->data->action_id ) ? $data->data->action_id : null;
+			$event_type = $data->type;
+			$action_based_events = array( 'payment_refunded', 'payment_voided', 'payment_captured', 'payment_capture_declined' );
+			
+			if ( ! empty( $action_id ) && in_array( $event_type, $action_based_events, true ) ) {
+				$webhook_id = $action_id . '_' . $event_type;
+			} else {
+				$webhook_id = $data->data->id . '_' . $event_type;
+			}
 			
 			// Add to processed list if not already there
 			if ( ! in_array( $webhook_id, $processed_webhooks, true ) ) {
 				$processed_webhooks[] = $webhook_id;
 				$order->update_meta_data( '_cko_processed_webhook_ids', array_unique( $processed_webhooks ) );
 				$order->save();
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK: ✅ Marked as processed - Payment ID: ' . $data->data->id . ', Type: ' . $data->type . ', Order: ' . $order->get_id() );
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK: ✅ Marked as processed - Payment ID: ' . $data->data->id . ', Action ID: ' . ( $action_id ?? 'N/A' ) . ', Type: ' . $event_type . ', Order: ' . $order->get_id() );
 			}
 		}
 

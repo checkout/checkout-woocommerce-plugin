@@ -1111,22 +1111,24 @@ class WC_Checkout_Com_Webhook {
 		// Add note to order if refunded already.
 		if ( $order->get_total_refunded() == $order_amount ) { // PHPCS:ignore WordPress.PHP.StrictComparisons.LooseComparison
 			$order->add_order_note( $message );
+			$order->save();
 			return true;
 		}
 
 		// Set action id as woo transaction id.
 		$order->set_transaction_id( $action_id );
 		$order->update_meta_data( 'cko_payment_refunded', true );
+		$order->save();
 
 		$refund_amount = WC_Checkoutcom_Utility::decimal_to_value( $amount, $order->get_currency() );
 
 		/* translators: %1$s: Payment ID, %2$s: Action ID, %3$s: Amount. */
-		$order_message = sprintf( esc_html__( 'Checkout.com Payment Refunded - Payment ID: %1$s, Action ID: %2$s, Amount: %3$s', 'checkout-com-unified-payments-api' ), $payment_id, $action_id, $refund_amount_formatted );
+		$order_message = sprintf( esc_html__( 'Checkout.com Payment Refund webhook received - Payment ID: %1$s, Action ID: %2$s, Amount: %3$s', 'checkout-com-unified-payments-api' ), $payment_id, $action_id, $refund_amount_formatted );
 
 		// Check if webhook amount is less than order amount - partial refund.
 		if ( $amount < $order_amount_cents ) {
 			/* translators: %1$s: Payment ID, %2$s: Action ID, %3$s: Amount. */
-			$order_message = sprintf( esc_html__( 'Checkout.com Payment partially refunded - Payment ID: %1$s, Action ID: %2$s, Amount: %3$s', 'checkout-com-unified-payments-api' ), $payment_id, $action_id, $refund_amount_formatted );
+			$order_message = sprintf( esc_html__( 'Checkout.com Payment Partial Refund webhook received - Payment ID: %1$s, Action ID: %2$s, Amount: %3$s', 'checkout-com-unified-payments-api' ), $payment_id, $action_id, $refund_amount_formatted );
 
 			$refund = wc_create_refund(
 				[
@@ -1140,7 +1142,7 @@ class WC_Checkout_Com_Webhook {
 		} elseif ( $amount == $order_amount_cents ) { // PHPCS:ignore WordPress.PHP.StrictComparisons.LooseComparison
 			// Full refund.
 			/* translators: %1$s: Payment ID, %2$s: Action ID, %3$s: Amount. */
-			$order_message = sprintf( esc_html__( 'Checkout.com Payment fully refunded - Payment ID: %1$s, Action ID: %2$s, Amount: %3$s', 'checkout-com-unified-payments-api' ), $payment_id, $action_id, $refund_amount_formatted );
+			$order_message = sprintf( esc_html__( 'Checkout.com Payment Full Refund webhook received - Payment ID: %1$s, Action ID: %2$s, Amount: %3$s', 'checkout-com-unified-payments-api' ), $payment_id, $action_id, $refund_amount_formatted );
 
 			$refund = wc_create_refund(
 				[
@@ -1154,6 +1156,7 @@ class WC_Checkout_Com_Webhook {
 
 		// add notes for the order and update status.
 		$order->add_order_note( $order_message );
+		$order->save();
 
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Refund processed successfully' );

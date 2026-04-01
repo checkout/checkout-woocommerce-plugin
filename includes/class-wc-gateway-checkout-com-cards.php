@@ -1186,20 +1186,25 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		$order->update_meta_data( 'cko_payment_refunded', true );
 		$order->save();
 
-		/* translators: %s: Action ID. */
-		$message = sprintf( esc_html__( 'Checkout.com Payment refunded from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
+		// Get payment ID and format amount for the note.
+		$payment_id = $order->get_meta( '_cko_payment_id' );
+		$refund_amount = isset( $amount ) ? $amount : $order->get_total();
+		$formatted_amount = wc_price( $refund_amount, array( 'currency' => $order->get_currency() ) );
 
 		if ( isset( $_SESSION['cko-refund-is-less'] ) ) {
 			if ( $_SESSION['cko-refund-is-less'] ) {
 				WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Partial refund completed" );
-				/* translators: %s: Action ID. */
-				$order->add_order_note( sprintf( esc_html__( 'Checkout.com Payment Partially refunded from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] ) );
+				/* translators: %1$s: Payment ID, %2$s: Action ID, %3$s: Amount. */
+				$order->add_order_note( sprintf( esc_html__( 'Checkout.com Payment Partially refunded from Admin – Payment ID: %1$s, Action ID: %2$s, Amount: %3$s', 'checkout-com-unified-payments-api' ), $payment_id, $result['action_id'], $formatted_amount ) );
 
 				unset( $_SESSION['cko-refund-is-less'] );
 
 				return true;
 			}
 		}
+
+		/* translators: %1$s: Payment ID, %2$s: Action ID, %3$s: Amount. */
+		$message = sprintf( esc_html__( 'Checkout.com Payment refunded from Admin – Payment ID: %1$s, Action ID: %2$s, Amount: %3$s', 'checkout-com-unified-payments-api' ), $payment_id, $result['action_id'], $formatted_amount );
 
 		// add note for order.
 		WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Full refund completed" );
