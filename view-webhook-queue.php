@@ -36,26 +36,30 @@ if ($is_cli) {
     echo "Webhook Queue Table Viewer\n";
     echo "========================================\n\n";
     
-    // Check if table exists
-    $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_name'");
-    
+    // Check if table exists — use prepare() for the LIKE value; table name is a fixed internal constant.
+    $safe_table = esc_sql( $table_name );
+    $table_exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table_name ) );
+
     if (!$table_exists) {
-        echo "❌ Table '$table_name' does not exist.\n";
+        echo "Table '$safe_table' does not exist.\n";
         exit(1);
     }
-    
+
     // Get statistics
-    $total = $wpdb->get_var("SELECT COUNT(*) FROM $table_name");
-    $pending = $wpdb->get_var("SELECT COUNT(*) FROM $table_name WHERE processed_at IS NULL");
-    $processed = $wpdb->get_var("SELECT COUNT(*) FROM $table_name WHERE processed_at IS NOT NULL");
-    
+    // phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- $safe_table is an internal fixed constant, not user input.
+    $total     = $wpdb->get_var( "SELECT COUNT(*) FROM `{$safe_table}`" );
+    $pending   = $wpdb->get_var( "SELECT COUNT(*) FROM `{$safe_table}` WHERE processed_at IS NULL" );
+    $processed = $wpdb->get_var( "SELECT COUNT(*) FROM `{$safe_table}` WHERE processed_at IS NOT NULL" );
+    // phpcs:enable
+
     echo "Statistics:\n";
     echo "  Total: $total\n";
     echo "  Pending: $pending\n";
     echo "  Processed: $processed\n\n";
-    
+
     // Get records
-    $records = $wpdb->get_results("SELECT * FROM $table_name ORDER BY created_at DESC LIMIT 20");
+    // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- $safe_table is an internal fixed constant, not user input.
+    $records = $wpdb->get_results( "SELECT * FROM `{$safe_table}` ORDER BY created_at DESC LIMIT 20" );
     
     if (empty($records)) {
         echo "No webhooks found.\n";
@@ -111,18 +115,21 @@ if ($is_cli) {
             <h1>Webhook Queue Table - Direct Access</h1>
             
             <?php
-            // Check if table exists
-            $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_name'");
-            
+            // Check if table exists — $table_name is a fixed internal constant, not user input.
+            $safe_table   = esc_sql( $table_name );
+            $table_exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table_name ) );
+
             if (!$table_exists) {
-                echo "<p style='color: red;'>❌ Table '$table_name' does not exist.</p>";
+                echo '<p style="color: red;">Table does not exist.</p>';
                 exit;
             }
-            
+
             // Get statistics
-            $total = $wpdb->get_var("SELECT COUNT(*) FROM $table_name");
-            $pending = $wpdb->get_var("SELECT COUNT(*) FROM $table_name WHERE processed_at IS NULL");
-            $processed = $wpdb->get_var("SELECT COUNT(*) FROM $table_name WHERE processed_at IS NOT NULL");
+            // phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- $safe_table is an internal fixed constant, not user input.
+            $total     = $wpdb->get_var( "SELECT COUNT(*) FROM `{$safe_table}`" );
+            $pending   = $wpdb->get_var( "SELECT COUNT(*) FROM `{$safe_table}` WHERE processed_at IS NULL" );
+            $processed = $wpdb->get_var( "SELECT COUNT(*) FROM `{$safe_table}` WHERE processed_at IS NOT NULL" );
+            // phpcs:enable
             ?>
             
             <div class="stats">
@@ -142,10 +149,11 @@ if ($is_cli) {
             <?php
             // Get records
     $limit = isset($_GET['limit']) ? absint($_GET['limit']) : 50;
-            $records = $wpdb->get_results($wpdb->prepare(
-                "SELECT * FROM $table_name ORDER BY created_at DESC LIMIT %d",
+            // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- $safe_table is an internal fixed constant, not user input.
+            $records = $wpdb->get_results( $wpdb->prepare(
+                "SELECT * FROM `{$safe_table}` ORDER BY created_at DESC LIMIT %d",
                 $limit
-            ));
+            ) );
             
             if (empty($records)) {
                 echo "<p>No webhooks found.</p>";

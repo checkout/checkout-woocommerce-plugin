@@ -194,6 +194,57 @@ class WC_Checkoutcom_Utility {
 	}
 
 	/**
+	 * Keys whose values must never appear in logs.
+	 *
+	 * @var array
+	 */
+	private static $redacted_keys = [
+		'token',
+		'signature',
+		'private_key',
+		'secret_key',
+		'certificate',
+		'session_data',
+		'webhook_data',
+		'billing',
+		'shipping',
+		'card_number',
+		'cvv',
+		'authorization',
+	];
+
+	/**
+	 * Public wrapper around redact_sensitive() for use at call sites that
+	 * build their own log strings (e.g. wp_json_encode before passing to logger).
+	 *
+	 * @param array $data Data to redact.
+	 * @return array
+	 */
+	public static function redact_for_log( $data ) {
+		return self::redact_sensitive( $data );
+	}
+
+	/**
+	 * Recursively redact sensitive keys from an array before logging.
+	 *
+	 * @param array $data Data to redact.
+	 * @return array
+	 */
+	private static function redact_sensitive( $data ) {
+		if ( ! is_array( $data ) ) {
+			return $data;
+		}
+		foreach ( $data as $key => $value ) {
+			if ( in_array( strtolower( (string) $key ), self::$redacted_keys, true ) ) {
+				$data[ $key ] = '[REDACTED]';
+			} elseif ( is_array( $value ) ) {
+				$data[ $key ] = self::redact_sensitive( $value );
+			}
+		}
+		return $data;
+	}
+
+	/**
 	 * Log data to file using WC logger.
 	 *
 	 * @param string|array $error_message Error message to log.
@@ -202,6 +253,11 @@ class WC_Checkoutcom_Utility {
 	public static function logger( $error_message, $exception = null ) {
 		$logger  = wc_get_logger();
 		$context = [ 'source' => 'wc_checkoutcom_gateway_log' ];
+
+		// Redact sensitive keys from arrays/objects before converting to string
+		if ( is_array( $error_message ) ) {
+			$error_message = self::redact_sensitive( $error_message );
+		}
 
 		// Convert array to string if needed
 		if ( is_array( $error_message ) || is_object( $error_message ) ) {
@@ -238,9 +294,9 @@ class WC_Checkoutcom_Utility {
 			// Log message with appropriate level
 			$logger->log( $log_level, $error_message, $context );
 			if ( null !== $exception ) {
-				// If exception is an array, print it properly
+				// If exception is an array, redact and print it properly
 				if ( is_array( $exception ) ) {
-					$logger->log( $log_level, $error_message . ' Data: ' . wc_print_r( $exception, true ), $context );
+					$logger->log( $log_level, $error_message . ' Data: ' . wc_print_r( self::redact_sensitive( $exception ), true ), $context );
 				} else {
 					$logger->log( $log_level, wc_print_r( $exception, true ), $context );
 				}

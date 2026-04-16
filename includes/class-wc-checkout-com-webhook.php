@@ -35,12 +35,12 @@ class WC_Checkout_Com_Webhook {
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: authorize_payment START ===' );
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Event type: payment_approved' );
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Full webhook data structure: ' . print_r($data, true) );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Event ID: ' . ( isset( $data->id ) ? $data->id : 'N/A' ) . ', type: ' . ( isset( $data->type ) ? $data->type : 'N/A' ) );
 		}
-		
+
 		$webhook_data = $data->data;
 		if ( $webhook_debug_enabled ) {
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Webhook data extracted: ' . print_r($webhook_data, true) );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Webhook data extracted. Payment ID: ' . ( isset( $webhook_data->id ) ? $webhook_data->id : 'N/A' ) . ', reference: ' . ( isset( $webhook_data->reference ) ? $webhook_data->reference : 'N/A' ) );
 		}
 		
 		$order_id = isset($webhook_data->metadata->order_id) ? $webhook_data->metadata->order_id : null;
@@ -59,9 +59,9 @@ class WC_Checkout_Com_Webhook {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Payment ID: ' . ($webhook_data->id ?? 'NULL') );
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Reference: ' . ($webhook_data->reference ?? 'NULL') );
 			
-			// Log all available metadata
-			if (isset($webhook_data->metadata)) {
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: All metadata: ' . print_r($webhook_data->metadata, true) );
+			// Log available metadata keys only (not values — may contain PII)
+			if ( isset( $webhook_data->metadata ) ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Metadata keys present: ' . implode( ', ', array_keys( (array) $webhook_data->metadata ) ) );
 			}
 		}
 
@@ -354,7 +354,7 @@ class WC_Checkout_Com_Webhook {
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: card_verified START ===' );
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Event type: card_verified' );
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Full webhook data structure: ' . print_r($data, true) );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Event ID: ' . ( isset( $data->id ) ? $data->id : 'N/A' ) . ', type: ' . ( isset( $data->type ) ? $data->type : 'N/A' ) );
 		}
 		
 		$webhook_data = $data->data;
@@ -457,7 +457,7 @@ class WC_Checkout_Com_Webhook {
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: capture_payment START ===' );
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Event type: payment_captured' );
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Full webhook data structure: ' . print_r($data, true) );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Event ID: ' . ( isset( $data->id ) ? $data->id : 'N/A' ) . ', type: ' . ( isset( $data->type ) ? $data->type : 'N/A' ) );
 		}
 		
 		$webhook_data = $data->data;
@@ -771,7 +771,7 @@ class WC_Checkout_Com_Webhook {
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: capture_declined START ===' );
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Event type: payment_capture_declined' );
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Full webhook data structure: ' . print_r($data, true) );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Event ID: ' . ( isset( $data->id ) ? $data->id : 'N/A' ) . ', type: ' . ( isset( $data->type ) ? $data->type : 'N/A' ) );
 		}
 		
 		$webhook_data = $data->data;
@@ -864,7 +864,7 @@ class WC_Checkout_Com_Webhook {
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: void_payment START ===' );
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Event type: payment_voided' );
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Full webhook data structure: ' . print_r($data, true) );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Event ID: ' . ( isset( $data->id ) ? $data->id : 'N/A' ) . ', type: ' . ( isset( $data->type ) ? $data->type : 'N/A' ) );
 		}
 		
 		$webhook_data = $data->data;
@@ -1013,7 +1013,7 @@ class WC_Checkout_Com_Webhook {
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: refund_payment START ===' );
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Event type: payment_refunded' );
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Full webhook data structure: ' . print_r($data, true) );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Event ID: ' . ( isset( $data->id ) ? $data->id : 'N/A' ) . ', type: ' . ( isset( $data->type ) ? $data->type : 'N/A' ) );
 		}
 		
 		$webhook_data = $data->data;
@@ -1178,7 +1178,7 @@ class WC_Checkout_Com_Webhook {
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: cancel_payment START ===' );
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Event type: payment_canceled' );
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Full webhook data structure: ' . print_r($data, true) );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Event ID: ' . ( isset( $data->id ) ? $data->id : 'N/A' ) . ', type: ' . ( isset( $data->type ) ? $data->type : 'N/A' ) );
 		}
 		
 		$webhook_data  = $data->data;
@@ -1198,7 +1198,7 @@ class WC_Checkout_Com_Webhook {
 			// Check if payment is already voided or captured on checkout.com hub.
 			$details = $checkout->get_builder()->getPaymentsClient()->getPaymentDetails( $payment_id );
 			if ( $webhook_debug_enabled ) {
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Payment details retrieved: ' . print_r($details, true) );
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Payment details retrieved. ID: ' . ( isset( $details['id'] ) ? $details['id'] : 'N/A' ) . ', status: ' . ( isset( $details['status'] ) ? $details['status'] : 'N/A' ) );
 			}
 
 			$order_id = ! empty( $details['metadata']['order_id'] ) ? $details['metadata']['order_id'] : null;
@@ -1220,7 +1220,7 @@ class WC_Checkout_Com_Webhook {
 				// Always log errors
 				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: ERROR - No valid order_id found in payment details' );
 				if ( $webhook_debug_enabled ) {
-					WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Payment details metadata: ' . print_r(isset($details['metadata']) ? $details['metadata'] : 'N/A', true) );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Payment details metadata keys: ' . ( isset( $details['metadata'] ) ? implode( ', ', array_keys( (array) $details['metadata'] ) ) : 'N/A' ) );
 					WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: cancel_payment END (FAILED - Invalid Order ID) ===' );
 				}
 				return false;
@@ -1341,7 +1341,7 @@ class WC_Checkout_Com_Webhook {
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: decline_payment START ===' );
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Event type: payment_declined/payment_authentication_failed' );
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Full webhook data structure: ' . print_r($data, true) );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Event ID: ' . ( isset( $data->id ) ? $data->id : 'N/A' ) . ', type: ' . ( isset( $data->type ) ? $data->type : 'N/A' ) );
 		}
 		
 		$webhook_data     = $data->data;

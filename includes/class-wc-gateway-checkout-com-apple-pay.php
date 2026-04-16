@@ -1929,7 +1929,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		// Log that the handler was called (for debugging)
 		if ( function_exists( 'WC_Checkoutcom_Utility' ) && method_exists( 'WC_Checkoutcom_Utility', 'logger' ) ) {
 			WC_Checkoutcom_Utility::logger( 
-				'Apple Pay CSR AJAX Handler Called. POST data: ' . print_r( $_POST, true ),
+				'Apple Pay CSR AJAX Handler Called. POST keys: ' . implode( ', ', array_keys( $_POST ) ),
 				null
 			);
 		}
@@ -2176,7 +2176,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		// Log that the handler was called (for debugging)
 		if ( function_exists( 'WC_Checkoutcom_Utility' ) && method_exists( 'WC_Checkoutcom_Utility', 'logger' ) ) {
 			WC_Checkoutcom_Utility::logger( 
-				'Apple Pay Certificate Upload AJAX Handler Called. POST data: ' . print_r( $_POST, true ),
+				'Apple Pay Certificate Upload AJAX Handler Called. POST keys: ' . implode( ', ', array_keys( $_POST ) ),
 				null
 			);
 		}
@@ -2510,7 +2510,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			
 			// Log full error details
 			WC_Checkoutcom_Utility::logger( 
-				'Apple Pay Certificate Upload - Full Error Data: ' . print_r( $error_data, true ),
+				'Apple Pay Certificate Upload - Error type: ' . ( isset( $error_data['error_type'] ) ? $error_data['error_type'] : 'unknown' ) . ', HTTP status: ' . $response_code,
 				null
 			);
 			
@@ -2533,7 +2533,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 				// Check for additional error details
 				if ( isset( $error_data['details'] ) ) {
 					WC_Checkoutcom_Utility::logger( 
-						'Apple Pay Certificate Upload - Error Details: ' . print_r( $error_data['details'], true ),
+						'Apple Pay Certificate Upload - Error Details keys: ' . implode( ', ', array_keys( (array) $error_data['details'] ) ),
 						null
 					);
 				}
@@ -3205,7 +3205,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		curl_setopt( $ch, CURLOPT_SSLCERT, $certificate_path );
 		curl_setopt( $ch, CURLOPT_SSLKEY, $key_path );
 		curl_setopt( $ch, CURLOPT_RETURNTRANSFER, true );
-		curl_setopt( $ch, CURLOPT_VERBOSE, true );
+		curl_setopt( $ch, CURLOPT_VERBOSE, false );
 		curl_setopt( $ch, CURLOPT_SSL_VERIFYPEER, true );
 		curl_setopt( $ch, CURLOPT_HTTPHEADER, [
 			'Content-Type: application/json',

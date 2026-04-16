@@ -53,7 +53,10 @@ if ( php_sapi_name() !== 'cli' ) {
 
 // Check if WooCommerce is active
 if ( ! class_exists( 'WooCommerce' ) ) {
-	die( 'Error: WooCommerce is not active.' );
+	if ( php_sapi_name() === 'cli' ) {
+		die( 'Error: WooCommerce is not active.' );
+	}
+	wp_die( esc_html__( 'WooCommerce must be active to use this tool.', 'checkout-com-unified-payments-api' ) );
 }
 
 global $wpdb;

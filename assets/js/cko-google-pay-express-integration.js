@@ -158,9 +158,10 @@ jQuery( function ( $ ) {
 
         let data = {
             express_checkout: true,
-            add_to_cart: addToCartSuccess.result
+            add_to_cart: addToCartSuccess.result,
+            nonce: cko_google_pay_vars.create_payment_context_nonce
         }
-        
+
         return fetch( cko_google_pay_vars.create_payment_context_url, {
             method: 'POST',
             headers: {
@@ -203,9 +204,10 @@ jQuery( function ( $ ) {
     const cko_express_create_payment_context_for_cart = async function () {
         let data = {
             express_checkout: true,
-            use_existing_cart: true
+            use_existing_cart: true,
+            nonce: cko_google_pay_vars.create_payment_context_nonce
         }
-        
+
         return fetch( cko_google_pay_vars.create_payment_context_url, {
             method: 'POST',
             headers: {
@@ -258,7 +260,8 @@ jQuery( function ( $ ) {
         // Prepare add-to-cart for express checkout.
         let data = {
             express_checkout: true,
-            add_to_cart: addToCartSuccess.result
+            add_to_cart: addToCartSuccess.result,
+            nonce: cko_google_pay_vars.create_payment_context_nonce
         }
 
         cko_google_pay_vars.debug && console.log( data );
@@ -861,6 +864,7 @@ jQuery( function ( $ ) {
                 const response = await jQuery.ajax({
                     url: cko_google_pay_vars.get_cart_total_url,
                     type: 'GET',
+                    data: { nonce: cko_google_pay_vars.get_cart_total_nonce },
                     dataType: 'json'
                 });
 

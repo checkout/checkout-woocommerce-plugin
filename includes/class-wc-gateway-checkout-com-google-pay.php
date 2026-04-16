@@ -61,13 +61,13 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 	public function handle_wc_api() {
 		// Log that API endpoint was hit
 		WC_Checkoutcom_Utility::logger( 'Google Pay: handle_wc_api called' );
-		WC_Checkoutcom_Utility::logger( 'Google Pay: GET params: ' . print_r( $_GET, true ) );
 
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended, WordPress.Security.NonceVerification.Missing
 		if ( ! empty( $_GET['cko_google_pay_action'] ) ) {
-			WC_Checkoutcom_Utility::logger( 'Google Pay: Action requested: ' . $_GET['cko_google_pay_action'] );
-			
-			switch ( $_GET['cko_google_pay_action'] ) {
+			$action = sanitize_key( $_GET['cko_google_pay_action'] );
+			WC_Checkoutcom_Utility::logger( 'Google Pay: Action requested: ' . $action );
+
+			switch ( $action ) {
 
 				case 'express_add_to_cart':
 					$this->cko_express_add_to_cart();
@@ -144,7 +144,12 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 
 	public function cko_express_create_payment_context() {
 
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$nonce = isset( $_POST['nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['nonce'] ) ) : '';
+		if ( empty( $nonce ) || ! wp_verify_nonce( $nonce, 'checkoutcom_google_pay_express_create_payment_context' ) ) {
+			wp_send_json_error( array( 'messages' => __( 'Security check failed.', 'checkout-com-unified-payments-api' ) ) );
+			return;
+		}
+
 		if ( ! empty( $_POST['express_checkout'] ) ) {
 			// Check if add_to_cart was successful
 			if ( ! empty( $_POST['add_to_cart'] ) && 'success' !== $_POST['add_to_cart'] ) {
@@ -170,7 +175,14 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 	public function cko_express_get_cart_total() {
 		// Return cart total directly from WooCommerce
 		// This works for both classic and Blocks cart pages
-		
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- nonce verified below
+		$nonce = isset( $_GET['nonce'] ) ? sanitize_text_field( wp_unslash( $_GET['nonce'] ) ) : '';
+		if ( empty( $nonce ) || ! wp_verify_nonce( $nonce, 'checkoutcom_google_pay_express_get_cart_total' ) ) {
+			wp_send_json_error( array( 'messages' => __( 'Security check failed.', 'checkout-com-unified-payments-api' ) ) );
+			return;
+		}
+
 		// Ensure cart is loaded
 		if ( ! WC()->cart ) {
 			wp_send_json_error( array( 'messages' => 'Cart not initialized' ) );

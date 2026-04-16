@@ -3930,8 +3930,20 @@ document.addEventListener("change", function (event) {
 		if (flowPayment && flowPayment.checked) {
 			ckoLogger.debug('Checkout.com payment method SELECTED');
 			document.body.classList.add("cko-flow--method-selected");
-			// Remove cko-flow--ready until component is actually ready
-			document.body.classList.remove("cko-flow--ready");
+			
+			// BUG FIX: Only remove cko-flow--ready if Flow component doesn't exist yet.
+			// When switching back to Flow from another payment method, if the Flow component
+			// is already initialized and mounted, it's already ready - don't hide the button.
+			// Previously, this always removed cko-flow--ready, but initializeFlowIfNeeded()
+			// would skip re-initialization (component exists), so cko-flow--ready was never
+			// re-added, leaving the Place Order button permanently hidden.
+			if (typeof ckoFlow !== 'undefined' && ckoFlow && ckoFlow.flowComponent) {
+				ckoLogger.debug('Flow component already exists - keeping cko-flow--ready class');
+				document.body.classList.add("cko-flow--ready");
+			} else {
+				ckoLogger.debug('Flow component not yet initialized - removing cko-flow--ready until ready');
+				document.body.classList.remove("cko-flow--ready");
+			}
 		} else {
 			ckoLogger.debug('Checkout.com payment method NOT selected - other method selected');
 			// Remove Flow classes for other payment methods
@@ -4773,6 +4785,15 @@ document.addEventListener("DOMContentLoaded", function () {
 					form.append('<input type="hidden" name="order_id" value="' + orderId + '">');
 				} else {
 					orderIdField.val(orderId);
+				}
+				
+				// BUG FIX: Update payment session nonce if server returned a refreshed one.
+				// During checkout, WooCommerce may create a customer account and log them in,
+				// which changes the user context. The original nonce (generated for guest user ID 0)
+				// becomes invalid. The server returns a fresh nonce valid for the new user context.
+				if (normalizedResponse.data.refreshed_nonce && typeof cko_flow_vars !== 'undefined') {
+					ckoLogger.debug('[CREATE ORDER] Updating payment_session_nonce with refreshed nonce from server');
+					cko_flow_vars.payment_session_nonce = normalizedResponse.data.refreshed_nonce;
 				}
 				
 				// Store in session for fallback
