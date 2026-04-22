@@ -122,7 +122,15 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 
 		$core_settings    = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
 		$card_pay_enabled = ! empty( $core_settings['enabled'] ) && 'yes' === $core_settings['enabled'];
+		$checkout_mode    = $core_settings['ckocom_checkout_mode'] ?? 'classic';
 		$suffix           = defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG ? '' : '.min';
+
+		// Never load classic Frames scripts in Flow mode.
+		// Checking checkout_mode directly guards against multilingual plugins (e.g. Polylang)
+		// storing the 'enabled' flag per-language while checkout_mode is a single global setting.
+		if ( 'flow' === $checkout_mode ) {
+			return;
+		}
 
 		// Return if card payment is disabled.
 		if ( ! $card_pay_enabled ) {
