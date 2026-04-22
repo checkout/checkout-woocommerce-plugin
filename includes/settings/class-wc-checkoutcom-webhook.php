@@ -471,7 +471,7 @@ class WC_Checkoutcom_Webhook {
 				$error_message = __( 'Failed to create webhook. The API returned an invalid response.', 'checkout-com-unified-payments-api' );
 				$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
 				if ( $gateway_debug ) {
-					$error_message .= ' Response: ' . wc_print_r( $webhook_response, true );
+					$error_message .= ' Response keys: ' . implode( ', ', array_keys( (array) $webhook_response ) );
 				}
 				WC_Checkoutcom_Utility::logger( $error_message, null );
 			} else {
@@ -499,7 +499,7 @@ class WC_Checkoutcom_Webhook {
 				$error_message = __( 'Failed to create workflow. The API returned an invalid response.', 'checkout-com-unified-payments-api' );
 				$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
 				if ( $gateway_debug ) {
-					$error_message .= ' Response: ' . wc_print_r( $workflow_response, true );
+					$error_message .= ' Response keys: ' . implode( ', ', array_keys( (array) $workflow_response ) );
 				}
 				WC_Checkoutcom_Utility::logger( $error_message, null );
 			} else {
@@ -1010,7 +1010,7 @@ class WC_Checkoutcom_Webhook {
 
 		$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
 		if ( $gateway_debug ) {
-			WC_Checkoutcom_Utility::logger( 'Webhook API response: ' . wc_print_r( $data, true ) );
+			WC_Checkoutcom_Utility::logger( 'Webhook API response. Item count: ' . ( isset( $data['items'] ) ? count( $data['items'] ) : 0 ) . ', keys: ' . implode( ', ', array_keys( (array) $data ) ) );
 		}
 
 		if ( isset( $data['items'] ) && ! empty( $data['items'] ) ) {

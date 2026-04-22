@@ -90,14 +90,10 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// Filter order notes to use correct payment method title instead of gateway default
 		add_filter( 'woocommerce_new_order_note_data', [ $this, 'filter_order_note_payment_method_title' ], 10, 2 );
 
-		// Secure AJAX handler for creating payment sessions (prevents secret key exposure to frontend)
-		add_action( 'wp_ajax_cko_flow_create_payment_session', [ $this, 'ajax_create_payment_session' ] );
-		add_action( 'wp_ajax_nopriv_cko_flow_create_payment_session', [ $this, 'ajax_create_payment_session' ] );
-		
-		// AJAX handler for creating orders before payment processing (early order creation)
-		add_action( 'wp_ajax_cko_flow_create_order', [ $this, 'ajax_create_order' ] );
-		add_action( 'wp_ajax_nopriv_cko_flow_create_order', [ $this, 'ajax_create_order' ] );
-		
+		// Note: cko_flow_create_payment_session, cko_flow_create_order, and
+		// cko_flow_submit_payment_session are registered in cko_register_flow_ajax_handlers()
+		// (woocommerce-gateway-checkout-com.php) via init priority 0. Do not re-register here.
+
 		// AJAX handler for creating failed orders when payment is declined before form submission
 		add_action( 'wp_ajax_cko_flow_create_failed_order', [ $this, 'ajax_create_failed_order' ] );
 		add_action( 'wp_ajax_nopriv_cko_flow_create_failed_order', [ $this, 'ajax_create_failed_order' ] );
@@ -110,10 +106,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		add_action( 'wp_ajax_cko_flow_save_payment_session_id', [ $this, 'ajax_save_payment_session_id' ] );
 		add_action( 'wp_ajax_nopriv_cko_flow_save_payment_session_id', [ $this, 'ajax_save_payment_session_id' ] );
 
-		// AJAX handler for submitting payment session with modified amount (dynamic amount adjustment)
-		// This enables cart changes without full Flow component reload
-		add_action( 'wp_ajax_cko_flow_submit_payment_session', [ $this, 'ajax_submit_payment_session' ] );
-		add_action( 'wp_ajax_nopriv_cko_flow_submit_payment_session', [ $this, 'ajax_submit_payment_session' ] );
+		// Note: cko_flow_submit_payment_session registered in cko_register_flow_ajax_handlers().
 		
 		// CRITICAL: Hook to prevent WooCommerce from resuming failed orders.
 		// This runs early in the checkout process, BEFORE WooCommerce's create_order() is called.
@@ -416,6 +409,11 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	 * - completed → processing (NEVER allowed)
 	 * - processing → on-hold (NEVER allowed)
 	 * 
+	 * But ALLOWS legitimate terminal states from webhooks:
+	 * - processing → refunded (allowed from refund webhook)
+	 * - completed → refunded (allowed from refund webhook)
+	 * - on-hold → cancelled (allowed from void/cancel webhook)
+	 * 
 	 * This can happen when webhooks arrive out of order or when process_payment()
 	 * runs after webhooks have already updated the order to a final state.
 	 *
@@ -431,37 +429,103 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		}
 
 		// Define status hierarchy (higher number = more "complete")
+		// Note: refunded and cancelled are terminal states that can be reached from processing/completed
 		$status_hierarchy = array(
 			'pending'    => 1,
 			'failed'     => 2,
 			'on-hold'    => 3,
 			'processing' => 4,
 			'completed'  => 5,
+			'refunded'   => 6, // Terminal state - higher than completed
+			'cancelled'  => 0, // Special case - handled separately
 		);
 
-		$old_rank = isset( $status_hierarchy[ $old_status ] ) ? $status_hierarchy[ $old_status ] : 0;
-		$new_rank = isset( $status_hierarchy[ $new_status ] ) ? $status_hierarchy[ $new_status ] : 0;
+		// Terminal states that are always allowed as destinations (not downgrades)
+		// These represent legitimate end states from payment actions
+		$terminal_states = array( 'refunded', 'cancelled' );
 
-		// Detect downgrade attempt
-		if ( $old_rank > $new_rank && $old_rank >= 3 ) {
-			// This is a downgrade from on-hold or higher - block it
+		// Always allow transitions TO terminal states (refund/cancel are legitimate actions)
+		if ( in_array( $new_status, $terminal_states, true ) ) {
 			WC_Checkoutcom_Utility::logger( 
 				sprintf(
-					'[STATUS GUARD] ❌ BLOCKED status downgrade: Order %d from "%s" to "%s" - reverting to "%s"',
+					'[STATUS GUARD] ✅ ALLOWED transition to terminal state: Order %d from "%s" to "%s"',
 					$order_id,
 					$old_status,
+					$new_status
+				)
+			);
+			return;
+		}
+
+		// Re-read actual status from DB — the $old_status parameter comes from the in-memory
+		// order object and may be stale if a concurrent process (e.g. capture webhook) has
+		// already advanced the order to a higher state between when this process loaded the
+		// order and when it called update_status().
+		clean_post_cache( $order_id );
+		$fresh_order       = wc_get_order( $order_id );
+		$actual_old_status = ( $fresh_order ) ? $fresh_order->get_status() : $old_status;
+
+		$old_rank = isset( $status_hierarchy[ $actual_old_status ] ) ? $status_hierarchy[ $actual_old_status ] : 0;
+		$new_rank = isset( $status_hierarchy[ $new_status ] )        ? $status_hierarchy[ $new_status ]        : 0;
+
+		// Log any mismatch between the in-memory status and the real DB status.
+		// This is a diagnostic signal that a concurrent process updated the order
+		// between when this process loaded it and now — even if the transition is allowed.
+		if ( $actual_old_status !== $old_status ) {
+			WC_Checkoutcom_Utility::logger(
+				sprintf(
+					'[STATUS GUARD] ⚠️ STALE READ DETECTED: Order %d in-memory status was "%s" but DB shows "%s". Requested transition: "%s" → "%s".',
+					$order_id,
+					$old_status,
+					$actual_old_status,
+					$actual_old_status,
+					$new_status
+				)
+			);
+		}
+
+		// Detect downgrade attempt (excluding terminal state transitions handled above)
+		if ( $old_rank > $new_rank && $old_rank >= 3 ) {
+			// Allow manual admin changes - only block automated/webhook changes
+			$is_admin_request   = is_admin() && current_user_can( 'edit_shop_orders' );
+			$is_webhook_context = doing_action( 'woocommerce_api_wc_checkoutcom_flow_webhook' )
+				|| doing_action( 'woocommerce_api_wc_checkoutcom_webhook' )
+				|| doing_action( 'woocommerce_api_wc_checkoutcom_flow_process' );
+			$is_rest_api = defined( 'REST_REQUEST' ) && REST_REQUEST;
+
+			// Allow if admin user is manually changing AND not triggered by webhook/API
+			if ( $is_admin_request && ! $is_webhook_context && ! $is_rest_api ) {
+				WC_Checkoutcom_Utility::logger(
+					sprintf(
+						'[STATUS GUARD] ✅ ALLOWED manual admin status change: Order %d from "%s" to "%s" by user %d',
+						$order_id,
+						$actual_old_status,
+						$new_status,
+						get_current_user_id()
+					)
+				);
+				return; // Allow the manual admin change
+			}
+
+			// This is an automated/webhook downgrade - block it
+			WC_Checkoutcom_Utility::logger(
+				sprintf(
+					'[STATUS GUARD] ❌ BLOCKED automated status downgrade: Order %d from "%s" (DB) to "%s" - reverting to "%s" (in-memory old_status was "%s")',
+					$order_id,
+					$actual_old_status,
 					$new_status,
+					$actual_old_status,
 					$old_status
 				)
 			);
 
-			// Revert the status change by setting it back
-			// We need to remove this filter temporarily to avoid infinite loop
+			// Revert the status change by setting it back to the actual DB status.
+			// Remove this filter temporarily to avoid infinite loop.
 			remove_filter( 'woocommerce_order_status_changed', [ $this, 'prevent_status_downgrade' ], 5 );
-			
-			$order->set_status( $old_status, __( 'Status downgrade prevented by payment gateway.', 'checkout-com-unified-payments-api' ) );
+
+			$order->set_status( $actual_old_status, __( 'Status downgrade prevented by payment gateway.', 'checkout-com-unified-payments-api' ) );
 			$order->save();
-			
+
 			// Re-add the filter
 			add_filter( 'woocommerce_order_status_changed', [ $this, 'prevent_status_downgrade' ], 5, 4 );
 		}
@@ -2299,9 +2363,19 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					if ( $is_retry_payment_txn ) {
 						$order->update_status( $auth_status, __( 'Payment authorized (retry after previous failure).', 'checkout-com-unified-payments-api' ) );
 					} else {
-						// For pending orders, silently update status - the Checkout.com payment note is sufficient
-						$order->set_status( $auth_status );
-						$order->save();
+						// Fresh DB read before writing — a concurrent capture webhook may have already
+						// advanced the order to on-hold/processing/completed between when we first read
+						// the order and now. Writing on-hold over completed would be a regression.
+						clean_post_cache( $order_id );
+						$order        = wc_get_order( $order_id );
+						$fresh_status = $order->get_status();
+						if ( in_array( $fresh_status, array( 'on-hold', 'processing', 'completed' ), true ) ) {
+							WC_Checkoutcom_Utility::logger( '[DUPLICATE PREVENTION] Fresh DB read shows order already ' . $fresh_status . ' - skipping on-hold write to prevent overwrite. Order ID: ' . $order_id );
+						} else {
+							WC_Checkoutcom_Utility::logger( '[DUPLICATE PREVENTION] Fresh DB read confirms order still ' . $fresh_status . ' - proceeding with ' . $auth_status . ' write. Order ID: ' . $order_id );
+							$order->set_status( $auth_status );
+							$order->save();
+						}
 					}
 					WC_Checkoutcom_Utility::logger( '[DUPLICATE PREVENTION] ✅ Updated order status from ' . $current_order_status_txn . ' to ' . $auth_status . ' (no webhook yet, transaction ID check) - Order ID: ' . $order_id );
 				}
@@ -2449,9 +2523,19 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 						if ( $is_retry_payment ) {
 							$order->update_status( $auth_status, __( 'Payment authorized (retry after previous failure).', 'checkout-com-unified-payments-api' ) );
 						} else {
-							// For pending orders, silently update status - the Checkout.com payment note is sufficient
-							$order->set_status( $auth_status );
-							$order->save();
+							// Fresh DB read before writing — a concurrent capture webhook may have already
+							// advanced the order to on-hold/processing/completed between when we first read
+							// the order and now. Writing on-hold over completed would be a regression.
+							clean_post_cache( $order_id );
+							$order        = wc_get_order( $order_id );
+							$fresh_status = $order->get_status();
+							if ( in_array( $fresh_status, array( 'on-hold', 'processing', 'completed' ), true ) ) {
+								WC_Checkoutcom_Utility::logger( '[DUPLICATE PREVENTION] Fresh DB read shows order already ' . $fresh_status . ' - skipping on-hold write to prevent overwrite. Order ID: ' . $order_id );
+							} else {
+								WC_Checkoutcom_Utility::logger( '[DUPLICATE PREVENTION] Fresh DB read confirms order still ' . $fresh_status . ' - proceeding with ' . $auth_status . ' write. Order ID: ' . $order_id );
+								$order->set_status( $auth_status );
+								$order->save();
+							}
 						}
 						WC_Checkoutcom_Utility::logger( '[DUPLICATE PREVENTION] ✅ Updated order status from ' . $current_order_status . ' to ' . $auth_status . ' (no webhook yet) - Order ID: ' . $order_id );
 					}
@@ -5722,19 +5806,24 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		$order->update_meta_data( 'cko_payment_refunded', true );
 		$order->save();
 
-		/* translators: %s: Action ID. */
-		$message = sprintf( esc_html__( 'Checkout.com Payment refunded from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
+		// Get payment ID and format amount for the note.
+		$payment_id = $order->get_meta( '_cko_payment_id' );
+		$refund_amount = isset( $amount ) ? $amount : $order->get_total();
+		$formatted_amount = wc_price( $refund_amount, array( 'currency' => $order->get_currency() ) );
 
 		if ( isset( $_SESSION['cko-refund-is-less'] ) ) {
 			if ( $_SESSION['cko-refund-is-less'] ) {
-				/* translators: %s: Action ID. */
-				$order->add_order_note( sprintf( esc_html__( 'Checkout.com Payment Partially refunded from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] ) );
+				/* translators: %1$s: Payment ID, %2$s: Action ID, %3$s: Amount. */
+				$order->add_order_note( sprintf( esc_html__( 'Checkout.com Payment Partially refunded from Admin – Payment ID: %1$s, Action ID: %2$s, Amount: %3$s', 'checkout-com-unified-payments-api' ), $payment_id, $result['action_id'], $formatted_amount ) );
 
 				unset( $_SESSION['cko-refund-is-less'] );
 
 				return true;
 			}
 		}
+
+		/* translators: %1$s: Payment ID, %2$s: Action ID, %3$s: Amount. */
+		$message = sprintf( esc_html__( 'Checkout.com Payment refunded from Admin – Payment ID: %1$s, Action ID: %2$s, Amount: %3$s', 'checkout-com-unified-payments-api' ), $payment_id, $result['action_id'], $formatted_amount );
 
 		// add note for order.
 		$order->add_order_note( $message );
@@ -6373,12 +6462,26 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				$processed_webhooks = array();
 			}
 			
-			// Create unique webhook identifier (payment_id + event_type)
-			$webhook_id = $data->data->id . '_' . $data->type;
+			// Create unique webhook identifier
+			// For events with action_id (refund, void, capture), use action_id to allow multiple actions on same payment
+			// For other events (approved, declined), use payment_id + event_type
+			$action_id = isset( $data->data->action_id ) ? $data->data->action_id : null;
+			$event_type = $data->type;
+			
+			// Events that can have multiple actions per payment (each with unique action_id)
+			$action_based_events = array( 'payment_refunded', 'payment_voided', 'payment_captured', 'payment_capture_declined' );
+			
+			if ( ! empty( $action_id ) && in_array( $event_type, $action_based_events, true ) ) {
+				// Use action_id for events that can occur multiple times (e.g., multiple partial refunds)
+				$webhook_id = $action_id . '_' . $event_type;
+			} else {
+				// Use payment_id for single-occurrence events (approved, declined, etc.)
+				$webhook_id = $data->data->id . '_' . $event_type;
+			}
 			
 			if ( in_array( $webhook_id, $processed_webhooks, true ) ) {
 				// Webhook already processed - skip to prevent duplicate order updates
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK: ✅ Already processed - Payment ID: ' . $data->data->id . ', Type: ' . $data->type . ', Order: ' . $order->get_id() );
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK: ✅ Already processed - Payment ID: ' . $data->data->id . ', Action ID: ' . ( $action_id ?? 'N/A' ) . ', Type: ' . $event_type . ', Order: ' . $order->get_id() );
 				WC_Checkoutcom_Utility::logger( 'WEBHOOK: ✅ Skipping duplicate webhook processing to prevent multiple order updates' );
 				$this->send_response( 200, 'Webhook already processed' );
 				return;
@@ -6424,19 +6527,56 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			}
 			
 			if ( ! empty( $expected_payment_id ) && ! $payment_id_matches ) {
-				// Payment ID mismatch - reject webhook BEFORE processing
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ❌ CRITICAL ERROR - Payment ID mismatch in Flow webhook handler!' );
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Order ID: ' . $order->get_id() );
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Order _cko_flow_payment_id: ' . ( $order_payment_id ?: 'NOT SET' ) );
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Order _cko_payment_id: ' . ( $order_payment_id_alt ?: 'NOT SET' ) );
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Expected payment ID: ' . $expected_payment_id );
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Webhook payment ID: ' . $webhook_payment_id );
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ❌ REJECTING WEBHOOK - Payment ID does not match order!' );
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: This webhook is for a different payment - ignoring to prevent incorrect order updates' );
+				// Payment ID mismatch - check if this is a valid multi-tab retry before rejecting
+				$event_type = $data->type ?? '';
+				$payment_attempts = $order->get_meta( '_cko_payment_attempts' );
+				$is_tracked_payment = false;
 				
-				// Reject webhook - return HTTP 200 but don't process
-				$this->send_response( 200, 'Webhook payment ID does not match order payment ID' );
-				return;
+				// Check if this payment ID is tracked in the payment attempts array (multi-tab scenario)
+				if ( ! empty( $payment_attempts ) && is_array( $payment_attempts ) ) {
+					foreach ( $payment_attempts as $attempt ) {
+						if ( isset( $attempt['payment_id'] ) && $attempt['payment_id'] === $webhook_payment_id ) {
+							$is_tracked_payment = true;
+							break;
+						}
+					}
+				}
+				
+				// MULTI-TAB EXCEPTION: Allow payment_captured and payment_approved webhooks through
+				// if the payment ID is tracked in _cko_payment_attempts. The webhook handler has
+				// "first capture wins" logic that will correctly handle the multi-tab scenario.
+				$allow_multi_tab_events = array( 'payment_captured', 'payment_approved' );
+				$order_status = $order->get_status();
+				$allow_for_order_status = in_array( $order_status, array( 'failed', 'pending', 'on-hold' ), true );
+				
+				if ( $is_tracked_payment && in_array( $event_type, $allow_multi_tab_events, true ) && $allow_for_order_status ) {
+					// This is a valid multi-tab retry - let the webhook handler process it
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ⚠️ MULTI-TAB DETECTED - Payment ID mismatch but allowing through' );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Order ID: ' . $order->get_id() );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Order primary payment: ' . $expected_payment_id );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Webhook payment ID: ' . $webhook_payment_id );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Event type: ' . $event_type );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Order status: ' . $order_status );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ✅ Payment ID found in _cko_payment_attempts - passing to webhook handler for "first capture wins" processing' );
+					// Continue processing - don't return, let webhook handler decide
+				} else {
+					// Not a valid multi-tab scenario - reject the webhook
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ❌ CRITICAL ERROR - Payment ID mismatch in Flow webhook handler!' );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Order ID: ' . $order->get_id() );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Order _cko_flow_payment_id: ' . ( $order_payment_id ?: 'NOT SET' ) );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Order _cko_payment_id: ' . ( $order_payment_id_alt ?: 'NOT SET' ) );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Expected payment ID: ' . $expected_payment_id );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Webhook payment ID: ' . $webhook_payment_id );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Is tracked in payment_attempts: ' . ( $is_tracked_payment ? 'YES' : 'NO' ) );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Event type: ' . $event_type );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Order status: ' . $order_status );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ❌ REJECTING WEBHOOK - Payment ID does not match order!' );
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: This webhook is for a different payment - ignoring to prevent incorrect order updates' );
+					
+					// Reject webhook - return HTTP 200 but don't process
+					$this->send_response( 200, 'Webhook payment ID does not match order payment ID' );
+					return;
+				}
 			}
 			
 			// If order doesn't have payment ID yet, set it from webhook (for first payment attempt)
@@ -6488,6 +6628,47 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				if ( $webhook_debug_enabled ) {
 					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Processing payment_approved event' );
 				}
+				
+				// Check if merchant wants to skip authorization status update when using "Authorize and Capture"
+				// This prevents webhook race conditions when capture delay is short
+				$auto_capture_enabled = '1' === WC_Admin_Settings::get_option( 'ckocom_card_autocap', '1' );
+				$skip_auth_status_update = '1' === WC_Admin_Settings::get_option( 'ckocom_skip_auth_status_update', '0' );
+				
+				if ( $auto_capture_enabled && $skip_auth_status_update ) {
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: "Authorize and Capture" + "Skip Authorization Status Update" enabled - skipping payment_approved status update. Will wait for payment_captured webhook to update order status directly.' );
+					
+					// Still add order note for audit trail
+					$webhook_data = $data->data;
+					$payment_id = $webhook_data->id ?? 'N/A';
+					$action_id = $webhook_data->action_id ?? 'N/A';
+					$order_id = isset($webhook_data->metadata->order_id) ? $webhook_data->metadata->order_id : null;
+					
+					// Fallback: use reference as order ID if metadata->order_id is not set
+					if ( empty( $order_id ) && isset( $webhook_data->reference ) && is_numeric( $webhook_data->reference ) ) {
+						$order_id = $webhook_data->reference;
+					}
+					
+					if ( $order_id ) {
+						$order = wc_get_order( $order_id );
+						if ( $order ) {
+							$order->add_order_note( 
+								sprintf( 
+									__( 'Payment approved webhook received (Payment ID: %s). "Skip Authorization Status Update" enabled - waiting for payment_captured webhook to complete order.', 'checkout-com-unified-payments-api' ), 
+									$payment_id 
+								) 
+							);
+							// Set authorized meta for tracking
+							$order->update_meta_data( 'cko_payment_authorized', true );
+							$order->update_meta_data( '_cko_payment_id', $payment_id );
+							$order->set_transaction_id( $action_id );
+							$order->save();
+						}
+					}
+					
+					$response = true; // Acknowledge webhook successfully
+					break;
+				}
+				
 				$response = WC_Checkout_Com_Webhook::authorize_payment( $data );
 				if ( $webhook_debug_enabled ) {
 					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: payment_approved response: ' . wp_json_encode( $response ) );
@@ -6656,14 +6837,23 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				$processed_webhooks = array();
 			}
 			
-			$webhook_id = $data->data->id . '_' . $data->type;
+			// Create unique webhook identifier (must match the logic used for deduplication check above)
+			$action_id = isset( $data->data->action_id ) ? $data->data->action_id : null;
+			$event_type = $data->type;
+			$action_based_events = array( 'payment_refunded', 'payment_voided', 'payment_captured', 'payment_capture_declined' );
+			
+			if ( ! empty( $action_id ) && in_array( $event_type, $action_based_events, true ) ) {
+				$webhook_id = $action_id . '_' . $event_type;
+			} else {
+				$webhook_id = $data->data->id . '_' . $event_type;
+			}
 			
 			// Add to processed list if not already there
 			if ( ! in_array( $webhook_id, $processed_webhooks, true ) ) {
 				$processed_webhooks[] = $webhook_id;
 				$order->update_meta_data( '_cko_processed_webhook_ids', array_unique( $processed_webhooks ) );
 				$order->save();
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK: ✅ Marked as processed - Payment ID: ' . $data->data->id . ', Type: ' . $data->type . ', Order: ' . $order->get_id() );
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK: ✅ Marked as processed - Payment ID: ' . $data->data->id . ', Action ID: ' . ( $action_id ?? 'N/A' ) . ', Type: ' . $event_type . ', Order: ' . $order->get_id() );
 			}
 		}
 
@@ -7171,10 +7361,16 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 		wp_send_json_success(
 			array(
-				'order_id'       => $order_id,
-				'order_key'      => $order->get_order_key(),
-				'message'        => __( 'Order created successfully.', 'checkout-com-unified-payments-api' ),
-				'existing_order' => false,
+				'order_id'        => $order_id,
+				'order_key'       => $order->get_order_key(),
+				'message'         => __( 'Order created successfully.', 'checkout-com-unified-payments-api' ),
+				'existing_order'  => false,
+				// BUG FIX: Return a fresh nonce after order creation.
+				// During checkout, WooCommerce may create a customer account and log them in,
+				// which changes the user context. The original nonce (generated for guest user ID 0)
+				// becomes invalid for the now-logged-in user. This refreshed nonce ensures
+				// subsequent AJAX calls (like submit_payment_session) can verify successfully.
+				'refreshed_nonce' => wp_create_nonce( 'cko_flow_payment_session' ),
 			)
 		);
 	}
@@ -8471,7 +8667,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		$api_url      = $api_base_url . '/payment-sessions/' . $payment_session_id . '/submit';
 
 		WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Calling Checkout.com API - URL: ' . $api_url );
-		WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Request body: ' . wp_json_encode( $request_body ) );
+		WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Request body: ' . wp_json_encode( WC_Checkoutcom_Utility::redact_for_log( $request_body ) ) );
 
 		// Make API request
 		$response = wp_remote_post(
@@ -8774,8 +8970,9 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			// Update order status to failed
 			$order->update_status( 'failed', __( 'Payment declined before form submission', 'checkout-com-unified-payments-api' ) );
 			
-			// Add order note with decline reason
-			$order->add_order_note( sprintf( __( 'Payment declined (client-side) - Reason: %s, Message: %s', 'checkout-com-unified-payments-api' ), $error_reason, $error_message ) );
+			// Add a static order note — client-supplied reason/message are logged server-side only.
+			$order->add_order_note( __( 'Payment declined before form submission.', 'checkout-com-unified-payments-api' ) );
+			WC_Checkoutcom_Utility::logger( '[CREATE FAILED ORDER] Decline details — reason: ' . $error_reason . ', message: ' . $error_message );
 			
 			// Save order
 			$order->save();
@@ -8792,7 +8989,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			WC_Checkoutcom_Utility::logger( '[CREATE FAILED ORDER] ERROR: Exception: ' . $e->getMessage() );
 			WC_Checkoutcom_Utility::logger( '[CREATE FAILED ORDER] ERROR stack trace: ' . $e->getTraceAsString() );
 			wp_send_json_error( array(
-				'message' => __( 'Error creating failed order: ', 'checkout-com-unified-payments-api' ) . $e->getMessage(),
+				'message' => __( 'An error occurred. Please refresh and try again.', 'checkout-com-unified-payments-api' ),
 			) );
 		}
 	}

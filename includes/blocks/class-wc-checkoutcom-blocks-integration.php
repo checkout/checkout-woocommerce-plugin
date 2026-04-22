@@ -100,7 +100,9 @@ class WC_Checkoutcom_Blocks_Integration {
             }
         } catch ( Exception $e ) {
             // Log error but don't break the site
-            error_log( 'Checkout.com Blocks Integration Error: ' . $e->getMessage() );
+            if ( class_exists( 'WC_Checkoutcom_Utility' ) ) {
+                WC_Checkoutcom_Utility::logger( 'Checkout.com Blocks Integration Error: ' . $e->getMessage() );
+            }
         }
     }
 }

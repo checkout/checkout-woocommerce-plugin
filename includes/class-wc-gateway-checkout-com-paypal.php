@@ -237,8 +237,7 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 				// Process the payment immediately
 				$payment_response = $this->request_payment( $order, $payment_context_id, $processing_channel_id );
 
-				// Debug: Log the payment response
-				WC_Checkoutcom_Utility::logger( 'PayPal Express: Payment response received: ' . print_r( $payment_response, true ) );
+				WC_Checkoutcom_Utility::logger( 'PayPal Express: Payment response received. ID: ' . ( isset( $payment_response['id'] ) ? $payment_response['id'] : 'N/A' ) . ', status: ' . ( isset( $payment_response['status'] ) ? $payment_response['status'] : 'N/A' ) );
 
 				// Clear PayPal session
 				WC_Checkoutcom_Utility::cko_set_session( 'cko_paypal_order_id', '' );
@@ -561,7 +560,7 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 
 		// For Blocks cart pages, ensure cart contents are loaded
 		if ( WC()->cart->is_empty() ) {
-			WC_Checkoutcom_Utility::logger( 'PayPal Express: Cart is empty after session load. Cart contents: ' . print_r( WC()->cart->get_cart(), true ) );
+			WC_Checkoutcom_Utility::logger( 'PayPal Express: Cart is empty after session load. Item count: ' . WC()->cart->get_cart_contents_count() );
 			wp_send_json_error( array( 'messages' => 'Cart is empty. Please add items to your cart.' ) );
 			return;
 		}
@@ -587,7 +586,7 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 
 		// Validate that we have a valid total amount
 		if ( $total_amount <= 0 ) {
-			WC_Checkoutcom_Utility::logger( 'PayPal Express: Invalid cart total. Cart contents: ' . print_r( WC()->cart->get_cart(), true ) );
+			WC_Checkoutcom_Utility::logger( 'PayPal Express: Invalid cart total (' . floatval( $total_amount ) . '). Item count: ' . WC()->cart->get_cart_contents_count() );
 			wp_send_json_error( array( 'messages' => 'Cart total is invalid. Please refresh the page and try again.' ) );
 			return;
 		}
@@ -643,11 +642,10 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 		try {
 			$response = $checkout->get_builder()->getPaymentContextsClient()->createPaymentContexts( $paymentContextsRequest );
 
-			// Log the full response for debugging
-			WC_Checkoutcom_Utility::logger( 'PayPal Express: Payment context response. Full response: ' . print_r( $response, true ) );
+			WC_Checkoutcom_Utility::logger( 'PayPal Express: Payment context response. ID: ' . ( isset( $response['id'] ) ? $response['id'] : 'N/A' ) . ', response keys: ' . implode( ', ', array_keys( (array) $response ) ) );
 
 			if ( ! isset( $response['id'] ) ) {
-				WC_Checkoutcom_Utility::logger( 'PayPal Express: No payment context ID in response. Response: ' . print_r( $response, true ) );
+				WC_Checkoutcom_Utility::logger( 'PayPal Express: No payment context ID in response. Response keys: ' . implode( ', ', array_keys( (array) $response ) ) );
 				wp_send_json_error( [ 'messages' => 'Failed to create PayPal payment context. No ID returned.' ] );
 				return;
 			}
@@ -676,7 +674,7 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 				wp_send_json( [ 'order_id' => $order_id ], 200 );
 			} else {
 				// If no order_id found, log and return error
-				WC_Checkoutcom_Utility::logger( 'PayPal Express: No order_id found in response. Response structure: ' . print_r( $response, true ) );
+				WC_Checkoutcom_Utility::logger( 'PayPal Express: No order_id found in response. Response keys: ' . implode( ', ', array_keys( (array) $response ) ) );
 				wp_send_json_error( [ 'messages' => 'Failed to create PayPal order. No order ID returned from payment context.' ] );
 			}
 		} catch ( CheckoutApiException $ex ) {
@@ -690,12 +688,11 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 
 			// Log detailed error information
 			WC_Checkoutcom_Utility::logger( 'PayPal Express: CheckoutApiException caught. Error message: ' . $ex->getMessage() );
-			WC_Checkoutcom_Utility::logger( 'PayPal Express: Exception details: ' . print_r( $ex, true ) );
-			
+
 			// Get more detailed error information if available
 			if ( method_exists( $ex, 'getErrorDetails' ) ) {
 				$error_details = $ex->getErrorDetails();
-				WC_Checkoutcom_Utility::logger( 'PayPal Express: Error details: ' . print_r( $error_details, true ) );
+				WC_Checkoutcom_Utility::logger( 'PayPal Express: Error codes: ' . ( isset( $error_details['error_codes'] ) ? implode( ', ', (array) $error_details['error_codes'] ) : 'N/A' ) );
 				if ( is_array( $error_details ) && isset( $error_details['error_codes'] ) ) {
 					$error_message .= ' Error codes: ' . implode( ', ', $error_details['error_codes'] );
 				}

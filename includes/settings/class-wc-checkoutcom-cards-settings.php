@@ -455,6 +455,18 @@ class WC_Checkoutcom_Cards_Settings {
 				'desc'     => __( 'The delay in hours (0 means immediately, 1.2 means one hour and 30 min)', 'checkout-com-unified-payments-api' ),
 				'desc_tip' => true,
 			],
+			'ckocom_skip_auth_status_update'        => [
+				'id'       => 'ckocom_skip_auth_status_update',
+				'title'    => __( 'Skip Authorization Status Update', 'checkout-com-unified-payments-api' ),
+				'type'     => 'select',
+				'desc_tip' => true,
+				'options'  => [
+					0 => __( 'No', 'checkout-com-unified-payments-api' ),
+					1 => __( 'Yes', 'checkout-com-unified-payments-api' ),
+				],
+				'default'  => 0,
+				'desc'     => __( 'When "Authorize and Capture" is selected, skip setting order to on-hold on payment approval. Order will go directly to captured status. Enable this to prevent webhook race conditions when capture delay is short.', 'checkout-com-unified-payments-api' ),
+			],
 			'ckocom_card_threed'                    => [
 				'id'       => 'ckocom_card_threed',
 				'title'    => __( 'Use 3D Secure', 'checkout-com-unified-payments-api' ),

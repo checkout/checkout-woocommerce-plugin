@@ -117,10 +117,15 @@ class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway {
 		$order->update_meta_data( 'cko_payment_refunded', true );
 		$order->save();
 
+		// Get payment ID and format amount for the note.
+		$payment_id = $order->get_meta( '_cko_payment_id' );
+		$refund_amount = isset( $amount ) ? $amount : $order->get_total();
+		$formatted_amount = wc_price( $refund_amount, array( 'currency' => $order->get_currency() ) );
+
 		if ( isset( $_SESSION['cko-refund-is-less'] ) ) {
 			if ( $_SESSION['cko-refund-is-less'] ) {
-				/* translators: %s: Action ID. */
-				$order->add_order_note( sprintf( esc_html__( 'Checkout.com Payment Partially refunded from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] ) );
+				/* translators: %1$s: Payment ID, %2$s: Action ID, %3$s: Amount. */
+				$order->add_order_note( sprintf( esc_html__( 'Checkout.com Payment Partially refunded from Admin – Payment ID: %1$s, Action ID: %2$s, Amount: %3$s', 'checkout-com-unified-payments-api' ), $payment_id, $result['action_id'], $formatted_amount ) );
 
 				unset( $_SESSION['cko-refund-is-less'] );
 
@@ -128,8 +133,8 @@ class WC_Gateway_Checkout_Com_Alternative_Payments extends WC_Payment_Gateway {
 			}
 		}
 
-		/* translators: %s: Action ID. */
-		$order->add_order_note( sprintf( esc_html__( 'Checkout.com Payment refunded from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] ) );
+		/* translators: %1$s: Payment ID, %2$s: Action ID, %3$s: Amount. */
+		$order->add_order_note( sprintf( esc_html__( 'Checkout.com Payment refunded from Admin – Payment ID: %1$s, Action ID: %2$s, Amount: %3$s', 'checkout-com-unified-payments-api' ), $payment_id, $result['action_id'], $formatted_amount ) );
 
 		// when true is returned, status is changed to refunded automatically.
 		return true;

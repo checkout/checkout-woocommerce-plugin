@@ -5,7 +5,7 @@
  * Description: Extends WooCommerce by Adding the Checkout.com Gateway.
  * Author: Checkout.com
  * Author URI: https://www.checkout.com/
- * Version: 5.1.0
+ * Version: 5.1.2
  * Requires at least: 5.0
  * Tested up to: 6.7.0
  * WC requires at least: 3.0
@@ -150,7 +150,7 @@ add_action( 'woocommerce_new_order', 'cko_update_order_id_in_session', 5 );
 /**
  * Constants.
  */
-define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '5.1.0' );
+define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '5.1.2' );
 define( 'WC_CHECKOUTCOM_PLUGIN_URL', untrailingslashit( plugins_url( basename( plugin_dir_path( __FILE__ ) ), basename( __FILE__ ) ) ) );
 define( 'WC_CHECKOUTCOM_PLUGIN_PATH', untrailingslashit( plugin_dir_path( __FILE__ ) ) );
 
@@ -246,7 +246,7 @@ add_action( 'plugins_loaded', 'init_checkout_com_gateway_class', 0 );
 			include_once $blocks_file;
 		} else {
 			// Log error but don't break the site - Blocks integration is optional
-			error_log( 'Checkout.com Blocks integration file not found. Expected: ' . $blocks_file );
+			WC_Checkoutcom_Utility::logger( 'Checkout.com Blocks integration file not found.' );
 		}
 
 		// Load payment gateway class.
@@ -1374,19 +1374,13 @@ function cko_enqueue_frontend_assets() {
 		// Debug: Log 3DS settings for troubleshooting (only if WP_DEBUG is enabled)
 		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
 			$allow_upgrade_raw = WC_Admin_Settings::get_option( 'ckocom_card_3ds_allow_upgrade', 'yes' );
-			error_log( '[FLOW] 3DS Settings Debug: ' . print_r( array( // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
-				'three_d_enabled_raw' => WC_Admin_Settings::get_option( 'ckocom_card_threed', '0' ),
-				'three_d_enabled' => $three_d_enabled,
-				'attempt_no_three_d_raw' => WC_Admin_Settings::get_option( 'ckocom_card_notheed', '0' ),
-				'attempt_no_three_d' => $attempt_no_three_d,
-				'challenge_indicator' => $challenge_indicator,
-				'exemption' => $exemption,
-				'allow_upgrade_raw' => $allow_upgrade_raw,
-				'allow_upgrade_raw_type' => gettype( $allow_upgrade_raw ),
-				'allow_upgrade_comparison' => ( $allow_upgrade_raw === 'yes' ),
-				'allow_upgrade' => $allow_upgrade,
-				'settings_source' => 'card_settings',
-			), true ) );
+			WC_Checkoutcom_Utility::logger(
+				'[FLOW DEBUG] 3DS settings: three_d=' . ( $three_d_enabled ? '1' : '0' )
+				. ', no_three_d=' . ( $attempt_no_three_d ? '1' : '0' )
+				. ', challenge=' . $challenge_indicator
+				. ', exemption=' . $exemption
+				. ', allow_upgrade=' . ( $allow_upgrade ? '1' : '0' )
+			);
 		}
 		
 		// Validate 3DS values according to Checkout.com API requirements
@@ -1400,17 +1394,13 @@ function cko_enqueue_frontend_assets() {
 		
 		// Ensure challenge indicator is valid
 		if ( ! in_array( $challenge_indicator, $valid_challenge_indicators, true ) ) {
-			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-				error_log( '[FLOW] Invalid challenge_indicator: ' . esc_html( $challenge_indicator ) . ', using default: no_preference' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
-			}
+			WC_Checkoutcom_Utility::logger( '[FLOW WARNING] Invalid challenge_indicator: ' . $challenge_indicator . ', using default: no_preference' );
 			$challenge_indicator = 'no_preference';
 		}
-		
+
 		// Ensure exemption is valid - use empty string if not valid (no exemption)
 		if ( empty( $exemption ) || ! in_array( $exemption, $valid_exemptions, true ) ) {
-			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-				error_log( '[FLOW] Invalid or empty exemption: ' . esc_html( $exemption ) . ', using empty string (no exemption)' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
-			}
+			WC_Checkoutcom_Utility::logger( '[FLOW WARNING] Invalid or empty exemption: ' . $exemption . ', using empty string (no exemption)' );
 			$exemption = '';
 		}
 		
@@ -1931,21 +1921,18 @@ if ( ! function_exists( 'cko_ajax_flow_submit_payment_session' ) ) {
 
 /**
  * Register Flow AJAX handlers VERY early (before gateway class instantiation).
+ * Single registration point for all Flow AJAX handlers — do not register these anywhere else.
  */
 function cko_register_flow_ajax_handlers() {
+	add_action( 'wp_ajax_cko_flow_create_payment_session', 'cko_ajax_flow_create_payment_session' );
+	add_action( 'wp_ajax_nopriv_cko_flow_create_payment_session', 'cko_ajax_flow_create_payment_session' );
 	add_action( 'wp_ajax_cko_flow_create_order', 'cko_ajax_flow_create_order', 1 );
 	add_action( 'wp_ajax_nopriv_cko_flow_create_order', 'cko_ajax_flow_create_order', 1 );
 	add_action( 'wp_ajax_cko_flow_submit_payment_session', 'cko_ajax_flow_submit_payment_session', 1 );
 	add_action( 'wp_ajax_nopriv_cko_flow_submit_payment_session', 'cko_ajax_flow_submit_payment_session', 1 );
 }
-// Use 'init' hook with priority 0 to ensure registration happens as early as possible
+// Priority 0 on init ensures registration before gateway class instantiation.
 add_action( 'init', 'cko_register_flow_ajax_handlers', 0 );
-
-// Also register directly (in case init hook doesn't work for AJAX)
-add_action( 'wp_ajax_cko_flow_create_payment_session', 'cko_ajax_flow_create_payment_session' );
-add_action( 'wp_ajax_nopriv_cko_flow_create_payment_session', 'cko_ajax_flow_create_payment_session' );
-add_action( 'wp_ajax_cko_flow_create_order', 'cko_ajax_flow_create_order', 1 );
-add_action( 'wp_ajax_nopriv_cko_flow_create_order', 'cko_ajax_flow_create_order', 1 );
 
 /**
  * Validates the WooCommerce checkout form via AJAX.
@@ -1989,7 +1976,7 @@ function cko_validate_checkout() {
 		} catch ( Exception $e ) {
 			WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] ERROR in hooks: ' . $e->getMessage() );
 			WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] ERROR stack trace: ' . $e->getTraceAsString() );
-			wp_send_json_error( array( 'message' => __( 'Error during checkout validation: ', 'checkout-com-unified-payments-api' ) . $e->getMessage() ) );
+			wp_send_json_error( array( 'message' => __( 'An error occurred during checkout validation. Please refresh and try again.', 'checkout-com-unified-payments-api' ) ) );
 			return;
 		}
 
@@ -2014,7 +2001,7 @@ function cko_validate_checkout() {
 	} catch ( Exception $e ) {
 		WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] FATAL ERROR: ' . $e->getMessage() );
 		WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] FATAL ERROR stack trace: ' . $e->getTraceAsString() );
-		wp_send_json_error( array( 'message' => __( 'Fatal error during validation: ', 'checkout-com-unified-payments-api' ) . $e->getMessage() ) );
+		wp_send_json_error( array( 'message' => __( 'An unexpected error occurred. Please refresh and try again.', 'checkout-com-unified-payments-api' ) ) );
 	}
 }
 
@@ -2088,8 +2075,8 @@ function cko_get_payment_session() {
 		$body = wp_remote_retrieve_body( $response );
 		$data = json_decode( $body, true );
 		
-		WC_Checkoutcom_Utility::logger( 'API Response: ' . print_r( $data, true ) );
-		
+		WC_Checkoutcom_Utility::logger( 'API Response received. Keys: ' . implode( ', ', array_keys( $data ?? [] ) ) );
+
 		// Check if we have payment data
 		if ( isset( $data['payment'] ) && isset( $data['payment']['id'] ) ) {
 			$payment_data = array(
@@ -2098,8 +2085,8 @@ function cko_get_payment_session() {
 				'three_ds_status' => isset( $data['payment']['3ds']['status'] ) ? $data['payment']['3ds']['status'] : '',
 				'three_ds_auth_id' => isset( $data['payment']['3ds']['authentication_id'] ) ? $data['payment']['3ds']['authentication_id'] : '',
 			);
-			
-			WC_Checkoutcom_Utility::logger( 'Payment data extracted: ' . print_r( $payment_data, true ) );
+
+			WC_Checkoutcom_Utility::logger( 'Payment data extracted: payment_id=' . $payment_data['payment_id'] . ', type=' . $payment_data['payment_type'] . ', 3ds_status=' . $payment_data['three_ds_status'] );
 			
 			wp_send_json_success( $payment_data );
 		} else {

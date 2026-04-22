@@ -240,22 +240,7 @@ class WC_Checkoutcom_Logging_Settings {
                 }
             });
 
-            // Refresh performance stats
-            $('#refresh-performance').on('click', function() {
-                $.post(ajaxurl, {
-                    action: 'cko_get_performance_stats',
-                    nonce: '<?php echo wp_create_nonce('cko_performance_stats'); ?>'
-                }, function(response) {
-                    if (response.success) {
-                        $('#performance-stats').html('<pre>' + JSON.stringify(response.data, null, 2) + '</pre>');
-                    } else {
-                        $('#performance-stats').html('<p><?php _e('Error loading performance stats.', 'checkout-com-unified-payments-api'); ?></p>');
-                    }
-                });
-            });
-
-            // Load initial performance stats
-            $('#refresh-performance').trigger('click');
+            // Performance stats handler not yet implemented — button is disabled until supported.
         });
         </script>
 

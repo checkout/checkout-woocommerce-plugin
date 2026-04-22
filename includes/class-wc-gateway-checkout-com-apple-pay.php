@@ -1700,10 +1700,15 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		$order->update_meta_data( 'cko_payment_refunded', true );
 		$order->save();
 
+		// Get payment ID and format amount for the note.
+		$payment_id = $order->get_meta( '_cko_payment_id' );
+		$refund_amount = isset( $amount ) ? $amount : $order->get_total();
+		$formatted_amount = wc_price( $refund_amount, array( 'currency' => $order->get_currency() ) );
+
 		if ( isset( $_SESSION['cko-refund-is-less'] ) ) {
 			if ( $_SESSION['cko-refund-is-less'] ) {
-				/* translators: %s: Action ID. */
-				$order->add_order_note( sprintf( __( 'Checkout.com Payment Partially refunded from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] ) );
+				/* translators: %1$s: Payment ID, %2$s: Action ID, %3$s: Amount. */
+				$order->add_order_note( sprintf( __( 'Checkout.com Payment Partially refunded from Admin – Payment ID: %1$s, Action ID: %2$s, Amount: %3$s', 'checkout-com-unified-payments-api' ), $payment_id, $result['action_id'], $formatted_amount ) );
 
 				unset( $_SESSION['cko-refund-is-less'] );
 
@@ -1711,8 +1716,8 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			}
 		}
 
-		/* translators: %s: Action ID. */
-		$order->add_order_note( sprintf( __( 'Checkout.com Payment refunded from Admin - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] ) );
+		/* translators: %1$s: Payment ID, %2$s: Action ID, %3$s: Amount. */
+		$order->add_order_note( sprintf( __( 'Checkout.com Payment refunded from Admin – Payment ID: %1$s, Action ID: %2$s, Amount: %3$s', 'checkout-com-unified-payments-api' ), $payment_id, $result['action_id'], $formatted_amount ) );
 
 		// when true is returned, status is changed to refunded automatically.
 		return true;
@@ -1924,7 +1929,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		// Log that the handler was called (for debugging)
 		if ( function_exists( 'WC_Checkoutcom_Utility' ) && method_exists( 'WC_Checkoutcom_Utility', 'logger' ) ) {
 			WC_Checkoutcom_Utility::logger( 
-				'Apple Pay CSR AJAX Handler Called. POST data: ' . print_r( $_POST, true ),
+				'Apple Pay CSR AJAX Handler Called. POST keys: ' . implode( ', ', array_keys( $_POST ) ),
 				null
 			);
 		}
@@ -2171,7 +2176,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		// Log that the handler was called (for debugging)
 		if ( function_exists( 'WC_Checkoutcom_Utility' ) && method_exists( 'WC_Checkoutcom_Utility', 'logger' ) ) {
 			WC_Checkoutcom_Utility::logger( 
-				'Apple Pay Certificate Upload AJAX Handler Called. POST data: ' . print_r( $_POST, true ),
+				'Apple Pay Certificate Upload AJAX Handler Called. POST keys: ' . implode( ', ', array_keys( $_POST ) ),
 				null
 			);
 		}
@@ -2505,7 +2510,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			
 			// Log full error details
 			WC_Checkoutcom_Utility::logger( 
-				'Apple Pay Certificate Upload - Full Error Data: ' . print_r( $error_data, true ),
+				'Apple Pay Certificate Upload - Error type: ' . ( isset( $error_data['error_type'] ) ? $error_data['error_type'] : 'unknown' ) . ', HTTP status: ' . $response_code,
 				null
 			);
 			
@@ -2528,7 +2533,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 				// Check for additional error details
 				if ( isset( $error_data['details'] ) ) {
 					WC_Checkoutcom_Utility::logger( 
-						'Apple Pay Certificate Upload - Error Details: ' . print_r( $error_data['details'], true ),
+						'Apple Pay Certificate Upload - Error Details keys: ' . implode( ', ', array_keys( (array) $error_data['details'] ) ),
 						null
 					);
 				}
@@ -3200,7 +3205,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		curl_setopt( $ch, CURLOPT_SSLCERT, $certificate_path );
 		curl_setopt( $ch, CURLOPT_SSLKEY, $key_path );
 		curl_setopt( $ch, CURLOPT_RETURNTRANSFER, true );
-		curl_setopt( $ch, CURLOPT_VERBOSE, true );
+		curl_setopt( $ch, CURLOPT_VERBOSE, false );
 		curl_setopt( $ch, CURLOPT_SSL_VERIFYPEER, true );
 		curl_setopt( $ch, CURLOPT_HTTPHEADER, [
 			'Content-Type: application/json',

@@ -909,7 +909,7 @@ class WC_Checkoutcom_Workflows {
 			
 			// Verify ID exists
 			if ( ! isset( $workflows['id'] ) ) {
-				WC_Checkoutcom_Utility::logger( 'Workflow registration response missing ID: ' . wc_print_r( $workflows, true ) );
+				WC_Checkoutcom_Utility::logger( 'Workflow registration response missing ID. Response keys: ' . implode( ', ', array_keys( (array) $workflows ) ) );
 				return array( 'error' => 'Workflow registration failed: Response missing workflow ID.' );
 			}
 
