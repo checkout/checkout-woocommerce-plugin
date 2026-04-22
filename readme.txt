@@ -2,7 +2,7 @@
 Contributors: checkoutintegration
 Tags: checkout, payments, credit card, payment gateway, apple pay, google pay, payment request
 Requires at least: 5.0
-Stable tag: 5.1.0
+Stable tag: 5.1.2
 Requires PHP: 7.3
 Tested up to: 6.7.0
 License: GPLv2 or later
@@ -179,6 +179,20 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v5.1.2 22nd April 2026
+- **[Security]**:
+Removed sensitive data from logs (API responses, POST/GET payloads, webhook bodies)
+Added nonce verification to express checkout AJAX endpoints
+Generic error messages returned to client; SQL queries hardened
+Added log redaction helpers; removed duplicate AJAX handler registrations
+- **[Bug Fixes]**:  
+Fixed multi-tab payment retry being incorrectly rejected by webhook
+Fixed Status Guard blocking refund/cancel webhooks to terminal states
+- **[Improvements]**:
+Admin manual order status changes no longer blocked by Status Guard
+Payment ID and Amount added to refund order notes across all gateways
+New "Skip Authorization Status Update" setting to prevent webhook race conditions on short capture delays
+
 v5.1.0 25th March 2026
 - **[Core Payment Fixes]**:
 Multi-tab payment protection with "first capture wins" logic
