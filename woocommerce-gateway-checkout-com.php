@@ -80,6 +80,10 @@ function cko_is_flow_mode() {
 	$flow_settings    = get_option( 'woocommerce_wc_checkout_com_flow_settings', array() );
 	$checkout_mode    = isset( $checkout_setting['ckocom_checkout_mode'] ) ? $checkout_setting['ckocom_checkout_mode'] : 'classic';
 	$flow_enabled     = isset( $flow_settings['enabled'] ) && 'yes' === $flow_settings['enabled'];
+
+	WC_Checkoutcom_Utility::logger( '[CKO DEBUG] cko_is_flow_mode - checkout_mode: ' . $checkout_mode );
+	WC_Checkoutcom_Utility::logger( '[CKO DEBUG] cko_is_flow_mode - flow_enabled: ' . ( $flow_enabled ? 'yes' : 'no' ) );
+
 	return 'flow' === $checkout_mode || $flow_enabled;
 }
 
@@ -106,16 +110,38 @@ add_filter( 'woocommerce_available_payment_gateways', 'cko_force_flow_gateway_av
  * @return array Filtered available payment gateways.
  */
 function cko_backup_force_flow_gateway_available( $available_gateways ) {
+	WC_Checkoutcom_Utility::logger( '[CKO DEBUG] backup filter called - gateways in list: ' . implode( ', ', array_keys( $available_gateways ) ) );
+
 	if ( cko_is_flow_mode() && ! isset( $available_gateways['wc_checkout_com_flow'] ) ) {
 		$all_gateways = WC()->payment_gateways()->payment_gateways();
+		WC_Checkoutcom_Utility::logger( '[CKO DEBUG] backup filter - all registered gateways: ' . implode( ', ', array_keys( $all_gateways ) ) );
+
 		if ( isset( $all_gateways['wc_checkout_com_flow'] ) ) {
 			$available_gateways['wc_checkout_com_flow'] = $all_gateways['wc_checkout_com_flow'];
+			WC_Checkoutcom_Utility::logger( '[CKO DEBUG] backup filter - Flow gateway ADDED' );
+		} else {
+			WC_Checkoutcom_Utility::logger( '[CKO DEBUG] backup filter - Flow gateway NOT FOUND in registered gateways' );
 		}
+	} else {
+		WC_Checkoutcom_Utility::logger( '[CKO DEBUG] backup filter - Flow already in list or not flow mode, skipping' );
 	}
 
 	return $available_gateways;
 }
 add_filter( 'woocommerce_available_payment_gateways', 'cko_backup_force_flow_gateway_available', 999 );
+
+// Re-add Flow at very high priority to counteract multilingual plugins (e.g. Polylang)
+// that strip gateways between priority 999 and 99999.
+add_filter( 'woocommerce_available_payment_gateways', function( $gateways ) {
+	if ( cko_is_flow_mode() && ! isset( $gateways['wc_checkout_com_flow'] ) ) {
+		$all_gateways = WC()->payment_gateways()->payment_gateways();
+		if ( isset( $all_gateways['wc_checkout_com_flow'] ) ) {
+			$gateways['wc_checkout_com_flow'] = $all_gateways['wc_checkout_com_flow'];
+			WC_Checkoutcom_Utility::logger( '[CKO DEBUG] priority 99999 - Flow re-added after Polylang removed it' );
+		}
+	}
+	return $gateways;
+}, 99999 );
 
 
 /**

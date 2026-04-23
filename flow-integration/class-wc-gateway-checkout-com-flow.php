@@ -7004,6 +7004,11 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			$api_url = 'https://api.sandbox.checkout.com/payment-sessions';
 		}
 
+		$encoded_body = wp_json_encode( $payment_session_request );
+		WC_Checkoutcom_Utility::logger( '[PAYMENT SESSION] Sending request to: ' . $api_url );
+		WC_Checkoutcom_Utility::logger( '[PAYMENT SESSION] Request body: ' . $encoded_body );
+		WC_Checkoutcom_Utility::logger( '[PAYMENT SESSION] Secret key prefix: ' . substr( $secret_key, 0, 10 ) . '...' );
+
 		// Prepare the API request
 		$request_args = array(
 			'method'  => 'POST',
@@ -7012,7 +7017,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				'Authorization' => 'Bearer ' . $secret_key,
 				'Content-Type'  => 'application/json',
 			),
-			'body'    => wp_json_encode( $payment_session_request ),
+			'body'    => $encoded_body,
 		);
 
 		// Make the API request
