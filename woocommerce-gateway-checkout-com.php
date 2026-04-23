@@ -72,28 +72,29 @@ function cko_cleanup_old_webhooks_handler() {
  * @param array $available_gateways Available payment gateways.
  * @return array Filtered available payment gateways.
  */
+function cko_is_flow_mode() {
+	// Check checkout_mode from Cards settings and enabled flag from Flow settings.
+	// Reading both is resilient against multilingual plugins (e.g. Polylang) that may
+	// return language-specific values for one option but not the other.
+	$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+	$flow_settings    = get_option( 'woocommerce_wc_checkout_com_flow_settings', array() );
+	$checkout_mode    = isset( $checkout_setting['ckocom_checkout_mode'] ) ? $checkout_setting['ckocom_checkout_mode'] : 'classic';
+	$flow_enabled     = isset( $flow_settings['enabled'] ) && 'yes' === $flow_settings['enabled'];
+	return 'flow' === $checkout_mode || $flow_enabled;
+}
+
 function cko_force_flow_gateway_available( $available_gateways ) {
-	// Process on checkout page, order-pay page, and during checkout processing (when POST data exists)
 	// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce verified by WooCommerce checkout
-	$payment_method = isset( $_POST['payment_method'] ) ? sanitize_text_field( wp_unslash( $_POST['payment_method'] ) ) : '';
+	$payment_method      = isset( $_POST['payment_method'] ) ? sanitize_text_field( wp_unslash( $_POST['payment_method'] ) ) : '';
 	$is_checkout_context = is_checkout() || is_wc_endpoint_url( 'order-pay' ) || ( defined( 'DOING_AJAX' ) && DOING_AJAX ) || ( 'wc_checkout_com_flow' === $payment_method );
-	
-	if ( $is_checkout_context ) {
-		$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
-		$checkout_mode = isset( $checkout_setting['ckocom_checkout_mode'] ) ? $checkout_setting['ckocom_checkout_mode'] : 'classic';
-		
-		if ( 'flow' === $checkout_mode ) {
-			// Ensure Flow gateway is in the list if checkout mode is 'flow' and gateway is enabled
-			$all_gateways = WC()->payment_gateways()->payment_gateways();
-			if ( isset( $all_gateways['wc_checkout_com_flow'] ) ) {
-				$flow_gateway = $all_gateways['wc_checkout_com_flow'];
-				
-				if ( isset( $flow_gateway->enabled ) && 'yes' === $flow_gateway->enabled ) {
-					$available_gateways['wc_checkout_com_flow'] = $flow_gateway;
-				}
-			}
+
+	if ( $is_checkout_context && cko_is_flow_mode() ) {
+		$all_gateways = WC()->payment_gateways()->payment_gateways();
+		if ( isset( $all_gateways['wc_checkout_com_flow'] ) ) {
+			$available_gateways['wc_checkout_com_flow'] = $all_gateways['wc_checkout_com_flow'];
 		}
 	}
+
 	return $available_gateways;
 }
 add_filter( 'woocommerce_available_payment_gateways', 'cko_force_flow_gateway_available', 1 );
@@ -105,20 +106,13 @@ add_filter( 'woocommerce_available_payment_gateways', 'cko_force_flow_gateway_av
  * @return array Filtered available payment gateways.
  */
 function cko_backup_force_flow_gateway_available( $available_gateways ) {
-	// Only process if checkout mode is 'flow' and gateway is not already in list
-	$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
-	$checkout_mode = isset( $checkout_setting['ckocom_checkout_mode'] ) ? $checkout_setting['ckocom_checkout_mode'] : 'classic';
-	
-	if ( 'flow' === $checkout_mode && ! isset( $available_gateways['wc_checkout_com_flow'] ) ) {
+	if ( cko_is_flow_mode() && ! isset( $available_gateways['wc_checkout_com_flow'] ) ) {
 		$all_gateways = WC()->payment_gateways()->payment_gateways();
 		if ( isset( $all_gateways['wc_checkout_com_flow'] ) ) {
-			$flow_gateway = $all_gateways['wc_checkout_com_flow'];
-			if ( isset( $flow_gateway->enabled ) && 'yes' === $flow_gateway->enabled ) {
-				$available_gateways['wc_checkout_com_flow'] = $flow_gateway;
-			}
+			$available_gateways['wc_checkout_com_flow'] = $all_gateways['wc_checkout_com_flow'];
 		}
 	}
-	
+
 	return $available_gateways;
 }
 add_filter( 'woocommerce_available_payment_gateways', 'cko_backup_force_flow_gateway_available', 999 );
