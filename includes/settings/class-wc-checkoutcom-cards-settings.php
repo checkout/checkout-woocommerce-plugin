@@ -74,7 +74,9 @@ class WC_Checkoutcom_Cards_Settings {
 	 * @return mixed
 	 */
 	public static function quick_settings() {
-		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$core_settings = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings' );
 		$nas_docs      = 'https://www.checkout.com/docs/four/resources/api-authentication/api-keys';
 		$abc_docs      = 'https://www.checkout.com/docs/the-hub/update-your-hub-settings#Manage_the_API_keys';
 		$docs_link     = $nas_docs; // Default to NAS docs since account type is NAS

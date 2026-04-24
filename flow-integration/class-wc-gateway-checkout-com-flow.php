@@ -25,7 +25,9 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	 */
 	public function __construct() {
 
-		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		$core_settings = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 
 		$this->id                 = 'wc_checkout_com_flow';
 		$this->method_title       = __( 'Checkout.com', 'checkout-com-unified-payments-api' );
@@ -105,6 +107,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// AJAX handler for saving payment session ID to order immediately after payment session creation
 		add_action( 'wp_ajax_cko_flow_save_payment_session_id', [ $this, 'ajax_save_payment_session_id' ] );
 		add_action( 'wp_ajax_nopriv_cko_flow_save_payment_session_id', [ $this, 'ajax_save_payment_session_id' ] );
+		add_action( 'wc_ajax_cko_flow_save_payment_session_id', [ $this, 'ajax_save_payment_session_id' ] );
 
 		// Note: cko_flow_submit_payment_session registered in cko_register_flow_ajax_handlers().
 		
@@ -131,7 +134,9 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// This preserves the Flow component (and entered card details) when cart total changes.
 		// The payment amount is handled via handleSubmit callback instead of component reload.
 		// Only enabled if the admin toggle is ON (default is OFF for compatibility).
-		$flow_settings = get_option( 'woocommerce_wc_checkout_com_flow_settings', array() );
+		$flow_settings = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_flow_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_flow_settings', array() );
 		$preserve_card_enabled = isset( $flow_settings['flow_preserve_card_on_update'] ) && 'yes' === $flow_settings['flow_preserve_card_on_update'];
 		if ( $preserve_card_enabled ) {
 			add_filter( 'woocommerce_update_order_review_fragments', [ $this, 'exclude_payment_method_from_fragments' ], 10, 1 );
@@ -592,7 +597,9 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		}
 
 		// Check if checkout mode is set to 'flow'
-		$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		$checkout_setting = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$checkout_mode = isset( $checkout_setting['ckocom_checkout_mode'] ) ? $checkout_setting['ckocom_checkout_mode'] : 'classic';
 		
 		if ( 'flow' !== $checkout_mode ) {
@@ -620,7 +627,9 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		}
 
 		// Check if checkout mode is set to 'flow'
-		$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		$checkout_setting = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$checkout_mode = isset( $checkout_setting['ckocom_checkout_mode'] ) ? $checkout_setting['ckocom_checkout_mode'] : 'classic';
 		
 		if ( 'flow' !== $checkout_mode ) {
@@ -866,8 +875,12 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		
 		// Safely get flow saved card setting with fallback
 		// Check Card settings first (new location), then Flow settings (backward compatibility)
-		$card_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
-		$flow_settings = get_option( 'woocommerce_wc_checkout_com_flow_settings', array() );
+		$card_settings = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		$flow_settings = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_flow_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_flow_settings', array() );
 		$flow_saved_card = isset( $card_settings['flow_saved_payment'] ) ? $card_settings['flow_saved_payment'] : ( isset( $flow_settings['flow_saved_payment'] ) ? $flow_settings['flow_saved_payment'] : 'saved_cards_first' );
 		$flow_debug_logging = isset( $flow_settings['flow_debug_logging'] ) && 'yes' === $flow_settings['flow_debug_logging'];
 
@@ -5837,9 +5850,13 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	 */
 	public static function flow_enabled() {
 
-		$flow_settings = get_option( 'woocommerce_wc_checkout_com_flow_settings', array() );
+		$flow_settings = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_flow_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_flow_settings', array() );
 
-		$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		$checkout_setting = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$checkout_mode    = isset( $checkout_setting['ckocom_checkout_mode'] ) ? $checkout_setting['ckocom_checkout_mode'] : 'classic';
 	
 		$apm_settings      = get_option( 'woocommerce_wc_checkout_com_alternative_payments_settings', array() );
@@ -5865,6 +5882,10 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		update_option( 'woocommerce_wc_checkout_com_google_pay_settings', $gpay_settings );
 		update_option( 'woocommerce_wc_checkout_com_apple_pay_settings', $applepay_settings );
 		update_option( 'woocommerce_wc_checkout_com_paypal_settings', $paypal_settings );
+		if ( function_exists( 'cko_update_raw_option' ) ) {
+			cko_update_raw_option( 'woocommerce_wc_checkout_com_flow_settings', $flow_settings );
+			cko_update_raw_option( 'woocommerce_wc_checkout_com_cards_settings', $checkout_setting );
+		}
 		
 		// Log for debugging (only in debug mode to reduce log spam)
 		$is_debug = defined( 'WP_DEBUG' ) && WP_DEBUG;
@@ -5889,10 +5910,12 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	 */
 	public function webhook_handler() {
 		// webhook_url_format = http://example.com/?wc-api=wc_checkoutcom_webhook .
-		
+
 		// Check if detailed webhook logging is enabled (use existing gateway responses setting)
-		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
-		$webhook_debug_enabled = ( isset( $core_settings['cko_gateway_responses'] ) && $core_settings['cko_gateway_responses'] === 'yes' );
+		$core_settings = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		$webhook_debug_enabled = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
 		
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( '=== WEBHOOK DEBUG: Flow webhook handler started ===' );
@@ -5988,23 +6011,27 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: CKO signature from header: ' . ($header_signature ?? 'NOT FOUND') );
 		}
 
-		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$core_settings = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$raw_event     = file_get_contents( 'php://input' );
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Raw event for signature verification: ' . $raw_event );
 		}
 
-		// For webhook signature verification, use the same logic as the working version
-		$core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
-		$secret_key = $core_settings['ckocom_sk'];
+		$secret_key_raw = $core_settings['ckocom_sk'] ?? '';
+		$secret_key     = cko_is_nas_account() ? 'Bearer ' . $secret_key_raw : $secret_key_raw;
 		if ( $webhook_debug_enabled ) {
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Secret key (masked): ' . substr($secret_key, 0, 10) . '...' );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Secret key (masked): ' . substr($secret_key, 0, 14) . '...' );
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Is NAS account: ' . (cko_is_nas_account() ? 'YES' : 'NO') );
 		}
 
-		$signature = WC_Checkoutcom_Utility::verify_signature( $raw_event, $secret_key, $header_signature );
+		$computed_hmac = hash_hmac( 'sha256', $raw_event, $secret_key );
+		$signature     = ( $computed_hmac === $header_signature );
 		if ( $webhook_debug_enabled ) {
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Signature verification result: ' . ($signature ? 'VALID' : 'INVALID') );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Computed HMAC: ' . $computed_hmac );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Expected HMAC: ' . ( $header_signature ?? 'NULL' ) );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Signature verification result: ' . ( $signature ? 'VALID' : 'INVALID' ) );
 		}
 
 		// check if cko signature matches.
@@ -6936,8 +6963,10 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			return;
 		}
 
-		// Get core settings
-		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		// Get core settings bypassing Polylang filters to ensure current saved values are used.
+		$core_settings = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 
 		// Verify secret key is configured
 		$secret_key = isset( $core_settings['ckocom_sk'] ) ? $core_settings['ckocom_sk'] : '';
@@ -6998,16 +7027,46 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			}
 		}
 
+		// Strip 'stored_card' from enabled_payment_methods if save card is not enabled.
+		// Polylang may return a stale language-specific copy of flow settings that still has
+		// stored_card checked. stored_card requires a channel-scoped vault lookup and triggers
+		// processing_channel_id_required on accounts without a channel-scoped API key.
+		if ( function_exists( 'cko_get_raw_option' ) ) {
+			$raw_flow_settings  = cko_get_raw_option( 'woocommerce_wc_checkout_com_flow_settings' );
+			$raw_cards_settings = cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		} else {
+			$raw_flow_settings  = get_option( 'woocommerce_wc_checkout_com_flow_settings', array() );
+			$raw_cards_settings = $core_settings;
+		}
+		$save_card_enabled = '1' === ( isset( $raw_cards_settings['ckocom_card_saved'] ) ? $raw_cards_settings['ckocom_card_saved'] : '0' );
+
+		if ( ! $save_card_enabled && isset( $payment_session_request['enabled_payment_methods'] ) && is_array( $payment_session_request['enabled_payment_methods'] ) ) {
+			$payment_session_request['enabled_payment_methods'] = array_values(
+				array_filter(
+					$payment_session_request['enabled_payment_methods'],
+					function( $method ) {
+						return 'stored_card' !== $method;
+					}
+				)
+			);
+		}
+
+		// Enforce enabled_payment_methods from raw settings to prevent Polylang stale values.
+		$raw_enabled_methods = isset( $raw_flow_settings['flow_enabled_payment_methods'] ) ? $raw_flow_settings['flow_enabled_payment_methods'] : array();
+		if ( is_array( $raw_enabled_methods ) && ! empty( $raw_enabled_methods ) ) {
+			if ( ! $save_card_enabled ) {
+				$raw_enabled_methods = array_values( array_filter( $raw_enabled_methods, function( $m ) { return 'stored_card' !== $m; } ) );
+			}
+			$payment_session_request['enabled_payment_methods'] = $raw_enabled_methods;
+		} elseif ( isset( $payment_session_request['enabled_payment_methods'] ) ) {
+			unset( $payment_session_request['enabled_payment_methods'] );
+		}
+
 		// Determine API URL based on environment
 		$api_url = 'https://api.checkout.com/payment-sessions';
 		if ( isset( $core_settings['ckocom_environment'] ) && 'sandbox' === $core_settings['ckocom_environment'] ) {
 			$api_url = 'https://api.sandbox.checkout.com/payment-sessions';
 		}
-
-		$encoded_body = wp_json_encode( $payment_session_request );
-		WC_Checkoutcom_Utility::logger( '[PAYMENT SESSION] Sending request to: ' . $api_url );
-		WC_Checkoutcom_Utility::logger( '[PAYMENT SESSION] Request body: ' . $encoded_body );
-		WC_Checkoutcom_Utility::logger( '[PAYMENT SESSION] Secret key prefix: ' . substr( $secret_key, 0, 10 ) . '...' );
 
 		// Prepare the API request
 		$request_args = array(
@@ -7017,7 +7076,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				'Authorization' => 'Bearer ' . $secret_key,
 				'Content-Type'  => 'application/json',
 			),
-			'body'    => $encoded_body,
+			'body'    => wp_json_encode( $payment_session_request ),
 		);
 
 		// Make the API request
@@ -8627,9 +8686,11 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		}
 
 		// Get Checkout.com API credentials
-		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
-		$environment   = ! empty( $core_settings['ckocom_environment'] ) ? $core_settings['ckocom_environment'] : 'sandbox';
-		
+		$core_settings  = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		$environment    = ! empty( $core_settings['ckocom_environment'] ) ? $core_settings['ckocom_environment'] : 'sandbox';
+
 		// Get secret key - single key is used for both environments (determined by the key itself)
 		$secret_key_raw = ! empty( $core_settings['ckocom_sk'] ) ? $core_settings['ckocom_sk'] : '';
 		

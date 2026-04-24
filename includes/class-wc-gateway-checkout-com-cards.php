@@ -79,7 +79,9 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		add_action( 'woocommerce_api_wc_checkoutcom_callback', [ $this, 'callback_handler' ] );
 
 		// Webhook handler hook - only register if not in Flow mode
-		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$core_settings = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$checkout_mode = $core_settings['ckocom_checkout_mode'] ?? 'classic';
 		
 		if ( 'flow' !== $checkout_mode ) {
@@ -116,11 +118,29 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 	}
 
 	/**
+	 * Whether the classic Frames gateway is available.
+	 * Returns false in Flow mode so only the Flow gateway appears at checkout.
+	 *
+	 * @return bool
+	 */
+	public function is_available() {
+		$core_settings = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		if ( 'flow' === ( $core_settings['ckocom_checkout_mode'] ?? 'classic' ) ) {
+			return false;
+		}
+		return parent::is_available();
+	}
+
+	/**
 	 * Outputs scripts used for checkout payment.
 	 */
 	public function payment_scripts() {
 
-		$core_settings    = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$core_settings    = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$card_pay_enabled = ! empty( $core_settings['enabled'] ) && 'yes' === $core_settings['enabled'];
 		$checkout_mode    = $core_settings['ckocom_checkout_mode'] ?? 'classic';
 		$suffix           = defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG ? '' : '.min';
@@ -395,11 +415,15 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 			// Extract Secret Key (password field - may be empty if not changed, but we still need to check)
 			if ( isset( $_POST['woocommerce_wc_checkout_com_cards_settings']['ckocom_sk'] ) ) {
 				$secret_key_from_post = sanitize_text_field( $_POST['woocommerce_wc_checkout_com_cards_settings']['ckocom_sk'] );
+			} elseif ( isset( $_POST['ckocom_sk'] ) ) {
+				$secret_key_from_post = sanitize_text_field( $_POST['ckocom_sk'] );
 			}
-			
+
 			// Extract Public Key
 			if ( isset( $_POST['woocommerce_wc_checkout_com_cards_settings']['ckocom_pk'] ) ) {
 				$public_key_from_post = sanitize_text_field( $_POST['woocommerce_wc_checkout_com_cards_settings']['ckocom_pk'] );
+			} elseif ( isset( $_POST['ckocom_pk'] ) ) {
+				$public_key_from_post = sanitize_text_field( $_POST['ckocom_pk'] );
 			}
 			
 			// Extract Environment
@@ -447,13 +471,22 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 			
 			$settings['ckocom_account_type'] = 'NAS';
 			update_option( 'woocommerce_wc_checkout_com_cards_settings', $settings );
-			
+			// Force-write directly to wp_options so Polylang filter cannot block or redirect the save.
+			if ( function_exists( 'cko_update_raw_option' ) ) {
+				cko_update_raw_option( 'woocommerce_wc_checkout_com_cards_settings', $settings );
+			}
+
 			// If Flow mode, also save enabled payment methods to Flow settings
 			if ( isset( $settings['ckocom_checkout_mode'] ) && 'flow' === $settings['ckocom_checkout_mode'] ) {
 				if ( isset( $_POST['flow_enabled_payment_methods'] ) ) {
-					$flow_settings = get_option( 'woocommerce_wc_checkout_com_flow_settings', array() );
+					$flow_settings = function_exists( 'cko_get_raw_option' )
+						? cko_get_raw_option( 'woocommerce_wc_checkout_com_flow_settings' )
+						: get_option( 'woocommerce_wc_checkout_com_flow_settings', array() );
 					$flow_settings['flow_enabled_payment_methods'] = is_array( $_POST['flow_enabled_payment_methods'] ) ? array_map( 'sanitize_text_field', $_POST['flow_enabled_payment_methods'] ) : array();
 					update_option( 'woocommerce_wc_checkout_com_flow_settings', $flow_settings );
+					if ( function_exists( 'cko_update_raw_option' ) ) {
+						cko_update_raw_option( 'woocommerce_wc_checkout_com_flow_settings', $flow_settings );
+					}
 				}
 			}
 			
@@ -493,6 +526,9 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 			}
 			if ( $manual_updated ) {
 				update_option( 'woocommerce_wc_checkout_com_cards_settings', $settings );
+				if ( function_exists( 'cko_update_raw_option' ) ) {
+					cko_update_raw_option( 'woocommerce_wc_checkout_com_cards_settings', $settings );
+				}
 			}
 
 		} elseif ( 'orders_settings' === $screen ) {
@@ -1271,12 +1307,14 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		$header           = array_change_key_case( apache_request_headers(), CASE_LOWER );
 		$header_signature = $header['cko-signature'];
 
-		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$core_settings = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$raw_event     = file_get_contents( 'php://input' );
 
-		$core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];
-
-		$signature = WC_Checkoutcom_Utility::verify_signature( $raw_event, $core_settings['ckocom_sk'], $header_signature );
+		$secret_key_raw = $core_settings['ckocom_sk'] ?? '';
+		$secret_key     = cko_is_nas_account() ? 'Bearer ' . $secret_key_raw : $secret_key_raw;
+		$signature      = WC_Checkoutcom_Utility::verify_signature( $raw_event, $secret_key, $header_signature );
 
 		// check if cko signature matches.
 		if ( false === $signature ) {

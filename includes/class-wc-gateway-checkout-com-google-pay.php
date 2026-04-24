@@ -950,8 +950,10 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 		// Enqueue google pay script.
 		if ( $google_pay_enabled ) {
 
-			$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
-			$environment   = 'sandbox' === $core_settings['ckocom_environment'];
+			$core_settings = function_exists( 'cko_get_raw_option' )
+				? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+				: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+			$environment   = 'sandbox' === ( $core_settings['ckocom_environment'] ?? 'sandbox' );
 			$currency_code = get_woocommerce_currency();
 			$total_price   = WC()->cart->total;
 
@@ -979,6 +981,7 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 				'environment'   => $environment ? 'TEST' : 'PRODUCTION',
 				'public_key'    => $core_settings['ckocom_pk'],
 				'merchant_id'   => $this->get_option( 'ckocom_google_merchant_id' ),
+				'merchant_name' => get_bloginfo( 'name' ),
 				'currency_code' => $currency_code,
 				'total_price'   => $total_price,
 				'button_type'   => $this->get_option( 'ckocom_google_style', 'google-pay-black' ),

@@ -635,7 +635,9 @@ class WC_Checkoutcom_Utility {
 
 		$available_payment_methods = WC()->payment_gateways()->get_available_payment_gateways();
 
-		$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$checkout_setting = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$checkout_mode    = isset( $checkout_setting['ckocom_checkout_mode'] ) ? $checkout_setting['ckocom_checkout_mode'] : 'classic';
 
 		if ( $checkout_mode === 'classic' ) {
@@ -677,7 +679,9 @@ class WC_Checkoutcom_Utility {
 
 		$available_payment_methods = WC()->payment_gateways()->get_available_payment_gateways();
 
-		$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$checkout_setting = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$checkout_mode    = isset( $checkout_setting['ckocom_checkout_mode'] ) ? $checkout_setting['ckocom_checkout_mode'] : 'classic';
 
 		if ( $checkout_mode === 'classic' ) {
@@ -719,7 +723,9 @@ class WC_Checkoutcom_Utility {
 
 		$available_payment_methods = WC()->payment_gateways()->get_available_payment_gateways();
 
-		$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$checkout_setting = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$checkout_mode    = isset( $checkout_setting['ckocom_checkout_mode'] ) ? $checkout_setting['ckocom_checkout_mode'] : 'classic';
 
 		if ( $checkout_mode === 'classic' ) {

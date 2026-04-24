@@ -481,6 +481,15 @@
 				}
 			});
 
+			// Also scan validate-required rows — catches fields that are required server-side
+			// but whose label doesn't contain a .required span (e.g. billing_phone on some themes).
+			document.querySelectorAll('.woocommerce-checkout .form-row.validate-required').forEach((row) => {
+				const input = row.querySelector('input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]), select, textarea');
+				if (input && input.id && !fieldIds.includes(input.id)) {
+					fieldIds.push(input.id);
+				}
+			});
+
 			// Filter out fieldIds that start with "shipping".
 			let filteredFieldIds = fieldIds.filter((id) => !id.startsWith("shipping"));
 

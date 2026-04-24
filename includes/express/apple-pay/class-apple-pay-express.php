@@ -29,7 +29,9 @@ class CKO_Apple_Pay_Express {
 			&& ! empty( $apple_pay_settings['apple_pay_express'] );
 		$apple_pay_enabled    = ! empty( $apple_pay_settings['enabled'] ) && 'yes' === $apple_pay_settings['enabled'];
 
-		$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		$checkout_setting = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$checkout_mode    = isset( $checkout_setting['ckocom_checkout_mode'] ) ? $checkout_setting['ckocom_checkout_mode'] : 'classic';
 
 		// If Express is disabled, don't add any hooks (regardless of mode)
@@ -101,7 +103,9 @@ class CKO_Apple_Pay_Express {
 	 */
 	private function maybe_enable_apple_pay_in_flow_mode() {
 
-		$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		$checkout_setting = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$checkout_mode    = isset( $checkout_setting['ckocom_checkout_mode'] ) ? $checkout_setting['ckocom_checkout_mode'] : '';
 
 		// Run only for FLOW mode.
@@ -210,9 +214,11 @@ class CKO_Apple_Pay_Express {
 			return;
 		}
 
-		$core_settings      = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		$core_settings      = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$apple_pay_settings = get_option( 'woocommerce_wc_checkout_com_apple_pay_settings', array() );
-		$environment         = isset( $core_settings['ckocom_environment'] ) && 'sandbox' === $core_settings['ckocom_environment'];
+		$environment        = isset( $core_settings['ckocom_environment'] ) && 'sandbox' === $core_settings['ckocom_environment'];
 
 		// Load Apple Pay JS API script
 		wp_enqueue_script(

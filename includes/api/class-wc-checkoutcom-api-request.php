@@ -1016,7 +1016,9 @@ class WC_Checkoutcom_Api_Request {
 	 * @return array|mixed
 	 */
 	public static function refund_payment( $order_id, $order ) {
-		$core_settings      = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$core_settings      = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$is_fallback_active = ( 'yes' === ( $core_settings['enable_fallback_ac'] ?? 'no' ) );
 
 		$cko_payment_id = $order->get_meta( '_cko_payment_id' );
@@ -2065,7 +2067,9 @@ class WC_Checkoutcom_Api_Request {
 			return false;
 		}
 
-		$core_settings      = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$core_settings      = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$is_fallback_active = ( 'yes' === ( $core_settings['enable_fallback_ac'] ?? 'no' ) );
 
 		$core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];

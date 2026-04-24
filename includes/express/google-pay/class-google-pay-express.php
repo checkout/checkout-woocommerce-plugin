@@ -29,7 +29,9 @@ class CKO_Google_Pay_Express {
 			&& ! empty( $google_pay_settings['google_pay_express'] );
 		$google_pay_enabled    = ! empty( $google_pay_settings['enabled'] ) && 'yes' === $google_pay_settings['enabled'];
 
-		$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		$checkout_setting = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$checkout_mode    = isset( $checkout_setting['ckocom_checkout_mode'] ) ? $checkout_setting['ckocom_checkout_mode'] : 'classic';
 
 		// If Express is disabled, don't add any hooks (regardless of mode)
@@ -101,7 +103,9 @@ class CKO_Google_Pay_Express {
 	 */
 	private function maybe_enable_google_pay_in_flow_mode() {
 
-		$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		$checkout_setting = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$checkout_mode    = isset( $checkout_setting['ckocom_checkout_mode'] ) ? $checkout_setting['ckocom_checkout_mode'] : '';
 
 		// Run only for FLOW mode.
@@ -239,6 +243,7 @@ class CKO_Google_Pay_Express {
 			'environment'                         => $environment ? 'TEST' : 'PRODUCTION',
 			'public_key'                          => $core_settings['ckocom_pk'] ?? '',
 			'merchant_id'                         => $google_pay_settings['ckocom_google_merchant_id'] ?? '',
+			'merchant_name'                       => get_bloginfo( 'name' ),
 			'currency_code'                       => get_woocommerce_currency(),
 			'button_style'                        => $google_pay_settings['ckocom_google_style'] ?? 'google-pay-black',
 		];

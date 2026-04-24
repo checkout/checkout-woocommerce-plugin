@@ -5,7 +5,7 @@
  * Description: Extends WooCommerce by Adding the Checkout.com Gateway.
  * Author: Checkout.com
  * Author URI: https://www.checkout.com/
- * Version: 5.1.2
+ * Version: 5.1.3
  * Requires at least: 5.0
  * Tested up to: 6.7.0
  * WC requires at least: 3.0
@@ -55,6 +55,75 @@ if ( file_exists( $utility_path ) ) {
 add_filter( 'woocommerce_checkout_registration_enabled', '__return_true' );
 
 /**
+ * Read a WordPress option directly from the database, bypassing all filters.
+ *
+ * Multilingual plugins (e.g. Polylang for WooCommerce) hook into get_option() and may
+ * return a language-specific copy of an option that differs from the canonical saved value.
+ * For functional plugin settings (API keys, payment methods, checkout mode) this causes
+ * incorrect behaviour. This helper reads the raw row from wp_options so the value is
+ * always consistent regardless of the current language context.
+ *
+ * @param string $option_name Option name.
+ * @param mixed  $default     Default value if the option does not exist.
+ * @return mixed
+ */
+function cko_get_raw_option( $option_name, $default = array() ) {
+	global $wpdb;
+	$value = $wpdb->get_var(
+		$wpdb->prepare(
+			"SELECT option_value FROM {$wpdb->options} WHERE option_name = %s LIMIT 1",
+			$option_name
+		)
+	);
+	if ( null === $value ) {
+		return $default;
+	}
+	$value = maybe_unserialize( $value );
+	return is_array( $value ) ? $value : $default;
+}
+
+/**
+ * Write an option directly to wp_options, bypassing all WordPress filters.
+ *
+ * Polylang for WooCommerce hooks into pre_update_option and may either save to a
+ * language-specific row or cause WordPress to skip the write entirely (by returning
+ * the existing value so old === new). This helper writes the canonical row directly
+ * via $wpdb so that critical plugin settings (API keys, checkout mode) are always
+ * persisted to the same row that cko_get_raw_option() reads from.
+ *
+ * @param string $option_name Option name.
+ * @param mixed  $value       Value to save.
+ * @return bool True on success.
+ */
+function cko_update_raw_option( $option_name, $value ) {
+	global $wpdb;
+	$serialized = maybe_serialize( $value );
+	$updated    = $wpdb->update(
+		$wpdb->options,
+		array( 'option_value' => $serialized ),
+		array( 'option_name'  => $option_name ),
+		array( '%s' ),
+		array( '%s' )
+	);
+	if ( false === $updated || 0 === $updated ) {
+		// Row may not exist yet — insert it.
+		$wpdb->insert(
+			$wpdb->options,
+			array(
+				'option_name'  => $option_name,
+				'option_value' => $serialized,
+				'autoload'     => 'yes',
+			),
+			array( '%s', '%s', '%s' )
+		);
+	}
+	// Keep WordPress object cache in sync so same-request get_option() calls see the new value.
+	wp_cache_set( $option_name, $value, 'options' );
+	wp_cache_delete( 'alloptions', 'options' );
+	return true;
+}
+
+/**
  * Handler for cleanup of old webhooks.
  */
 function cko_cleanup_old_webhooks_handler() {
@@ -73,18 +142,14 @@ function cko_cleanup_old_webhooks_handler() {
  * @return array Filtered available payment gateways.
  */
 function cko_is_flow_mode() {
-	// Check checkout_mode from Cards settings and enabled flag from Flow settings.
-	// Reading both is resilient against multilingual plugins (e.g. Polylang) that may
-	// return language-specific values for one option but not the other.
-	$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
-	$flow_settings    = get_option( 'woocommerce_wc_checkout_com_flow_settings', array() );
+	// Use raw DB reads to bypass Polylang's get_option() filter which returns
+	// language-specific copies of these settings, causing incorrect mode detection.
+	$checkout_setting = cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' );
+	$flow_settings    = cko_get_raw_option( 'woocommerce_wc_checkout_com_flow_settings' );
 	$checkout_mode    = isset( $checkout_setting['ckocom_checkout_mode'] ) ? $checkout_setting['ckocom_checkout_mode'] : 'classic';
 	$flow_enabled     = isset( $flow_settings['enabled'] ) && 'yes' === $flow_settings['enabled'];
 
-	WC_Checkoutcom_Utility::logger( '[CKO DEBUG] cko_is_flow_mode - checkout_mode: ' . $checkout_mode );
-	WC_Checkoutcom_Utility::logger( '[CKO DEBUG] cko_is_flow_mode - flow_enabled: ' . ( $flow_enabled ? 'yes' : 'no' ) );
-
-	return 'flow' === $checkout_mode || $flow_enabled;
+	return 'flow' === $checkout_mode && $flow_enabled;
 }
 
 function cko_force_flow_gateway_available( $available_gateways ) {
@@ -110,22 +175,12 @@ add_filter( 'woocommerce_available_payment_gateways', 'cko_force_flow_gateway_av
  * @return array Filtered available payment gateways.
  */
 function cko_backup_force_flow_gateway_available( $available_gateways ) {
-	WC_Checkoutcom_Utility::logger( '[CKO DEBUG] backup filter called - gateways in list: ' . implode( ', ', array_keys( $available_gateways ) ) );
-
 	if ( cko_is_flow_mode() && ! isset( $available_gateways['wc_checkout_com_flow'] ) ) {
 		$all_gateways = WC()->payment_gateways()->payment_gateways();
-		WC_Checkoutcom_Utility::logger( '[CKO DEBUG] backup filter - all registered gateways: ' . implode( ', ', array_keys( $all_gateways ) ) );
-
 		if ( isset( $all_gateways['wc_checkout_com_flow'] ) ) {
 			$available_gateways['wc_checkout_com_flow'] = $all_gateways['wc_checkout_com_flow'];
-			WC_Checkoutcom_Utility::logger( '[CKO DEBUG] backup filter - Flow gateway ADDED' );
-		} else {
-			WC_Checkoutcom_Utility::logger( '[CKO DEBUG] backup filter - Flow gateway NOT FOUND in registered gateways' );
 		}
-	} else {
-		WC_Checkoutcom_Utility::logger( '[CKO DEBUG] backup filter - Flow already in list or not flow mode, skipping' );
 	}
-
 	return $available_gateways;
 }
 add_filter( 'woocommerce_available_payment_gateways', 'cko_backup_force_flow_gateway_available', 999 );
@@ -137,7 +192,6 @@ add_filter( 'woocommerce_available_payment_gateways', function( $gateways ) {
 		$all_gateways = WC()->payment_gateways()->payment_gateways();
 		if ( isset( $all_gateways['wc_checkout_com_flow'] ) ) {
 			$gateways['wc_checkout_com_flow'] = $all_gateways['wc_checkout_com_flow'];
-			WC_Checkoutcom_Utility::logger( '[CKO DEBUG] priority 99999 - Flow re-added after Polylang removed it' );
 		}
 	}
 	return $gateways;
@@ -170,7 +224,7 @@ add_action( 'woocommerce_new_order', 'cko_update_order_id_in_session', 5 );
 /**
  * Constants.
  */
-define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '5.1.2' );
+define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '5.1.3' );
 define( 'WC_CHECKOUTCOM_PLUGIN_URL', untrailingslashit( plugins_url( basename( plugin_dir_path( __FILE__ ) ), basename( __FILE__ ) ) ) );
 define( 'WC_CHECKOUTCOM_PLUGIN_PATH', untrailingslashit( plugin_dir_path( __FILE__ ) ) );
 
@@ -324,19 +378,10 @@ function cko_make_order_pay_billing_readonly() {
 	// Add JavaScript to disable billing fields
 	wp_add_inline_script( 'wc-checkout', '
 		jQuery(document).ready(function($) {
-			console.log("🔥🔥🔥 [CKO DEBUG] Order-pay page detected - making billing fields read-only 🔥🔥🔥");
-			
-			// Disable all billing fields
 			var billingFields = $("#billing_first_name, #billing_last_name, #billing_company, #billing_address_1, #billing_address_2, #billing_city, #billing_state, #billing_postcode, #billing_country, #billing_phone, #billing_email");
-			console.log("[CKO DEBUG] Found billing fields:", billingFields.length);
 			billingFields.prop("disabled", true);
-			
-			// Also disable any selects in billing fields
 			var billingSelects = $(".woocommerce-billing-fields select");
-			console.log("[CKO DEBUG] Found billing selects:", billingSelects.length);
 			billingSelects.prop("disabled", true);
-			
-			console.log("[CKO DEBUG] Billing fields disabled successfully on order-pay page");
 		});
 	' );
 	}
@@ -1044,7 +1089,7 @@ function cko_admin_enqueue_scripts( $hook ) {
 		}
 	}
 
-	$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+	$core_settings = cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' );
 	$checkout_mode = isset( $core_settings['ckocom_checkout_mode'] ) ? $core_settings['ckocom_checkout_mode'] : 'classic';
 	$flow_enabled  = false;
 
@@ -1111,9 +1156,9 @@ function cko_enqueue_frontend_assets() {
 	}
 
 	// Enqueue FLOW scripts.
-	$core_settings      = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+	$core_settings      = cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' );
 	$checkout_mode      = isset( $core_settings['ckocom_checkout_mode'] ) ? $core_settings['ckocom_checkout_mode'] : 'classic';
-	$flow_customization = get_option( 'woocommerce_wc_checkout_com_flow_settings', array() );
+	$flow_customization = cko_get_raw_option( 'woocommerce_wc_checkout_com_flow_settings' );
 	
 	// Merge Card settings into Flow customization vars (for Card Holder Name, Position, and Saved Payment Display Order)
 	// These settings were moved from Flow settings to Card settings
@@ -1290,7 +1335,7 @@ function cko_enqueue_frontend_assets() {
 		$payment_session_version = WC_CHECKOUTCOM_PLUGIN_VERSION . '-' . time();
 	}
 	
-	$card_settings            = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+	$card_settings            = cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' );
 	$terms_prevention_value   = WC_Admin_Settings::get_option( 'flow_terms_prevention_enabled', '' );
 	if ( '' === $terms_prevention_value && isset( $card_settings['flow_terms_prevention_enabled'] ) ) {
 		$terms_prevention_value = $card_settings['flow_terms_prevention_enabled'];
@@ -1371,8 +1416,8 @@ function cko_enqueue_frontend_assets() {
 		$auto_capture = '1' === WC_Admin_Settings::get_option( 'ckocom_card_autocap', '1' );
 		$capture_delay_hours = WC_Admin_Settings::get_option( 'ckocom_card_cap_delay', '0' );
 		
-	// Get Flow-specific settings
-	$flow_settings = get_option( 'woocommerce_wc_checkout_com_flow_settings' );
+	// Get Flow-specific settings — use raw DB read to bypass Polylang's language filter.
+	$flow_settings = cko_get_raw_option( 'woocommerce_wc_checkout_com_flow_settings' );
 	$debug_logging = isset( $flow_settings['flow_debug_logging'] ) && 'yes' === $flow_settings['flow_debug_logging'];
 	
 	// Get enabled payment methods from Flow settings
@@ -1455,6 +1500,7 @@ function cko_enqueue_frontend_assets() {
 			'PKey'         => $core_settings['ckocom_pk'],
 			'env'          => $sdk_env, // Use mapped environment value
 			'ajax_url'     => admin_url( 'admin-ajax.php' ),
+		'wc_ajax_url'  => WC_AJAX::get_endpoint( '%%endpoint%%' ),
 			// Security nonce for payment session creation
 			'payment_session_nonce' => wp_create_nonce( 'cko_flow_payment_session' ),
 			'woo_version'  => $woo_version,
@@ -1492,6 +1538,7 @@ function cko_enqueue_frontend_assets() {
 			'missing_field'         => esc_html__( 'Missing field:', 'checkout-com-unified-payments-api' ),
 			'missing_fields'        => esc_html__( 'Missing fields:', 'checkout-com-unified-payments-api' ),
 			'all_fields_complete'   => esc_html__( 'All fields are complete', 'checkout-com-unified-payments-api' ),
+			'terms_required'        => esc_html__( 'Please read and accept the terms and conditions to proceed with your order.', 'woocommerce' ),
 		),
 		// Preserve card details on checkout updates (coupon apply, address change)
 		'preserve_card_on_update' => ( isset( $flow_settings['flow_preserve_card_on_update'] ) && 'yes' === $flow_settings['flow_preserve_card_on_update'] ),
@@ -1766,7 +1813,7 @@ function cko_gateway_icon( $icons, $id ) {
  */
 function cko_is_nas_account() {
 
-	$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+	$core_settings = cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' );
 
 	return isset( $core_settings['ckocom_account_type'] ) && ( 'NAS' === $core_settings['ckocom_account_type'] );
 }
@@ -1950,6 +1997,12 @@ function cko_register_flow_ajax_handlers() {
 	add_action( 'wp_ajax_nopriv_cko_flow_create_order', 'cko_ajax_flow_create_order', 1 );
 	add_action( 'wp_ajax_cko_flow_submit_payment_session', 'cko_ajax_flow_submit_payment_session', 1 );
 	add_action( 'wp_ajax_nopriv_cko_flow_submit_payment_session', 'cko_ajax_flow_submit_payment_session', 1 );
+
+	// wc_ajax_ variants route through /?wc-ajax= instead of admin-ajax.php,
+	// bypassing WAF rules (Cloudflare etc.) that block admin-ajax.php POST requests.
+	add_action( 'wc_ajax_cko_flow_create_payment_session', 'cko_ajax_flow_create_payment_session' );
+	add_action( 'wc_ajax_cko_flow_create_order', 'cko_ajax_flow_create_order', 1 );
+	add_action( 'wc_ajax_cko_flow_submit_payment_session', 'cko_ajax_flow_submit_payment_session', 1 );
 }
 // Priority 0 on init ensures registration before gateway class instantiation.
 add_action( 'init', 'cko_register_flow_ajax_handlers', 0 );
@@ -2058,9 +2111,9 @@ function cko_get_payment_session() {
 	
 	try {
 		// Get Checkout.com API settings
-		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$core_settings = cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' );
 		$environment   = ! empty( $core_settings['ckocom_environment'] ) ? $core_settings['ckocom_environment'] : 'sandbox';
-		$secret_key    = $environment === 'sandbox' 
+		$secret_key    = $environment === 'sandbox'
 			? ( ! empty( $core_settings['ckocom_sk'] ) ? $core_settings['ckocom_sk'] : '' )
 			: ( ! empty( $core_settings['ckocom_sk_live'] ) ? $core_settings['ckocom_sk_live'] : '' );
 		
@@ -2166,7 +2219,7 @@ function cko_payment_status_permission_check( $request ) {
  */
 function cko_get_payment_status( $request ) {
 	$payment_id    = sanitize_text_field( $request->get_param( 'paymentId' ) );
-	$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+	$core_settings = cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' );
 	$env           = ! empty( $core_settings['ckocom_environment'] ) ? $core_settings['ckocom_environment'] : 'sandbox';
 	
 	// Use correct secret key based on environment

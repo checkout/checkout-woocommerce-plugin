@@ -1959,8 +1959,10 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		}
 
 		// Get settings
-		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
-		
+		$core_settings = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+
 		if ( empty( $core_settings['ckocom_sk'] ) ) {
 			wp_send_json_error( [ 'message' => __( 'Secret key is not configured. Please configure Checkout.com settings first.', 'checkout-com-unified-payments-api' ) ] );
 		}
@@ -2269,10 +2271,12 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		}
 
 		// Get settings
-		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
-		
+		$core_settings = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+
 		if ( empty( $core_settings['ckocom_sk'] ) ) {
-			wp_send_json_error( [ 
+			wp_send_json_error( [
 				'message' => __( 'Secret key is not configured. Please configure Checkout.com settings first.', 'checkout-com-unified-payments-api' ),
 			] );
 		}

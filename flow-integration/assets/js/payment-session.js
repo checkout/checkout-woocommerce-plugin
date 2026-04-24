@@ -101,6 +101,17 @@ if (typeof window.FlowSessionStorage === 'undefined') {
 }
 
 /*
+ * Build a wc-ajax URL for a given endpoint name, falling back to admin-ajax.php.
+ * Using /?wc-ajax= avoids Cloudflare WAF rules that block admin-ajax.php POST requests.
+ */
+function getCkoAjaxUrl(endpoint) {
+	if (typeof cko_flow_vars !== 'undefined' && cko_flow_vars.wc_ajax_url) {
+		return cko_flow_vars.wc_ajax_url.replace('%%endpoint%%', endpoint);
+	}
+	return (typeof cko_flow_vars !== 'undefined') ? cko_flow_vars.ajax_url : ajaxurl;
+}
+
+/*
  * The main object managing the Checkout.com flow payment integration.
  */
 var ckoFlow = {
@@ -499,7 +510,7 @@ var ckoFlow = {
 				metadata: metadata,
 				payment_method_configuration: {
 					card: {
-						store_payment_details: "enabled",
+						store_payment_details: (cko_flow_vars.save_card === "1" || cko_flow_vars.save_card === true || cko_flow_vars.save_card === "yes") ? "enabled" : "disabled",
 					},
 				},
 				capture: cko_flow_vars.auto_capture === true || cko_flow_vars.auto_capture === "true" || cko_flow_vars.auto_capture === "1" || cko_flow_vars.auto_capture === 1,
@@ -828,7 +839,7 @@ var ckoFlow = {
 
 			formData.append('payment_session_request', JSON.stringify(paymentSessionRequest));
 
-			let response = await fetch(cko_flow_vars.ajax_url, {
+			let response = await fetch(getCkoAjaxUrl('cko_flow_create_payment_session'), {
 				method: "POST",
 				body: formData,
 			});
@@ -972,15 +983,15 @@ var ckoFlow = {
 			// Save payment session ID asynchronously (fire and forget - don't wait for response)
 			// NOTE: This only works for order-pay pages where order already exists
 			// For regular checkout, payment session ID is saved via hidden field in process_payment()
-			if (paymentSession.id && orderIdToSave && cko_flow_vars && cko_flow_vars.ajax_url && cko_flow_vars.payment_session_nonce) {
+			if (paymentSession.id && orderIdToSave && cko_flow_vars && cko_flow_vars.payment_session_nonce) {
 				const saveFormData = new FormData();
 				saveFormData.append('action', 'cko_flow_save_payment_session_id');
 				saveFormData.append('nonce', cko_flow_vars.payment_session_nonce);
 				saveFormData.append('order_id', orderIdToSave);
 				saveFormData.append('payment_session_id', paymentSession.id);
-				
+
 				// Fire and forget - don't wait for response (non-blocking)
-				fetch(cko_flow_vars.ajax_url, {
+				fetch(getCkoAjaxUrl('cko_flow_save_payment_session_id'), {
 					method: 'POST',
 					body: saveFormData
 				}).then(response => {
@@ -1951,7 +1962,7 @@ var ckoFlow = {
 						ckoLogger.debug('[HANDLE SUBMIT] ✅ Reference with order ID being sent:', orderIdToUse);
 					}
 
-					const response = await fetch(cko_flow_vars.ajax_url, {
+					const response = await fetch(getCkoAjaxUrl('cko_flow_submit_payment_session'), {
 						method: 'POST',
 						body: formData
 					});
@@ -2594,7 +2605,16 @@ let showError = function (error_message) {
 		ckoLogger.error("showError() called with empty/null message");
 		return;
 	}
-	
+
+	// WooCommerce returns response.messages as an HTML string (e.g. <ul class="woocommerce-error"><li>...</li></ul>).
+	// Extract plain text from <li> elements so we don't render raw HTML tags as visible text.
+	if (typeof error_message === 'string' && error_message.trim().startsWith('<')) {
+		const div = document.createElement('div');
+		div.innerHTML = error_message;
+		const items = Array.from(div.querySelectorAll('li')).map(function(li) { return li.textContent.trim(); }).filter(Boolean);
+		error_message = items.length ? items : [div.textContent.trim()];
+	}
+
 	if ("string" === typeof error_message) {
 		error_message = [error_message];
 	}
@@ -4552,11 +4572,31 @@ document.addEventListener("DOMContentLoaded", function () {
 			}
 			
 			ckoLogger.debug('[CREATE ORDER] Creating order before payment processing...');
-			
+
+			// Validate terms acceptance before making the AJAX call.
+			// WooCommerce requires terms=1 in POST data; if not present, it returns a
+			// validation failure. We check client-side to give immediate feedback.
+			const termsCheckbox = jQuery('input[name="terms"]');
+			if (termsCheckbox.length && !termsCheckbox.is(':checked')) {
+				ckoLogger.error('[CREATE ORDER] Terms checkbox required but not accepted - blocking AJAX call');
+				const termsMsg = (typeof cko_flow_vars !== 'undefined' && cko_flow_vars.i18n && cko_flow_vars.i18n.terms_required)
+					? cko_flow_vars.i18n.terms_required
+					: 'Please read and accept the terms and conditions to proceed with your order.';
+				showError(termsMsg);
+				FlowState.set('orderCreationInProgress', false);
+				if (placeOrderButton.length) {
+					placeOrderButton.prop('disabled', false);
+					placeOrderButton.removeClass('processing');
+					const savedText = placeOrderButton.data('original-text');
+					if (savedText) placeOrderButton.text(savedText);
+				}
+				return null;
+			}
+
 			// Get form data
 			const formData = form.serialize();
 			const formDataObj = Object.fromEntries(new URLSearchParams(formData));
-			
+
 			// Get nonce from form or page
 			let nonceValue = '';
 			const nonceField = jQuery('input[name="woocommerce-process-checkout-nonce"]');

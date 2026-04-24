@@ -680,8 +680,10 @@ class WC_Checkoutcom_Webhook {
 		$gateway_debug = WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
 
 		// Check configuration before attempting webhook check
-		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
-		$secret_key = $core_settings['ckocom_sk'] ?? '';
+		$core_settings = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		$secret_key  = $core_settings['ckocom_sk'] ?? '';
 		$environment = $core_settings['ckocom_environment'] ?? 'sandbox';
 
 		// Validate configuration
@@ -945,7 +947,9 @@ class WC_Checkoutcom_Webhook {
 		}
 
 		// Use direct API call instead of SDK
-		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		$core_settings = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		if ( empty( $core_settings ) ) {
 			return array();
 		}

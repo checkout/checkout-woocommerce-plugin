@@ -97,8 +97,6 @@ jQuery( function ( $ ) {
 		var totalPrice = cko_google_pay_vars.total_price;
 		var buttonType = cko_google_pay_vars.button_type;
 
-		var allowedPaymentMethods = ['CARD', 'TOKENIZED_CARD'];
-		var allowedCardNetworks = ["AMEX", "DISCOVER", "JCB", "MASTERCARD", "VISA"];
 
 		var _setupClickListeners = function () {
 			jQuery( document ).off( 'click', '#' + googlePayUiController.getSelectors().googlePayButtonId );
@@ -108,6 +106,9 @@ jQuery( function ( $ ) {
 				_startPaymentDataRequest();
 			} );
 		}
+
+		var allowedPaymentMethods = ['CARD', 'TOKENIZED_CARD'];
+		var allowedCardNetworks = ["AMEX", "DISCOVER", "JCB", "MASTERCARD", "VISA"];
 
 		var _getGooglePaymentDataConfiguration = function () {
 			return {

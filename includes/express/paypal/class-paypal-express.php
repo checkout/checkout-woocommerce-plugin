@@ -29,7 +29,9 @@ class CKO_Paypal_Express {
 			&& ! empty( $paypal_settings['paypal_express'] );
 		$paypal_enabled    = ! empty( $paypal_settings['enabled'] ) && 'yes' === $paypal_settings['enabled'];
 
-		$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		$checkout_setting = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$checkout_mode    = isset( $checkout_setting['ckocom_checkout_mode'] ) ? $checkout_setting['ckocom_checkout_mode'] : 'classic';
 
 		// If Express is disabled, don't add any hooks (regardless of mode)
@@ -101,7 +103,9 @@ class CKO_Paypal_Express {
 	 */
 	private function maybe_enable_paypal_in_flow_mode() {
 
-		$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$checkout_setting = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$checkout_mode    = $checkout_setting['ckocom_checkout_mode'] ?? '';
 
 		// Run only for FLOW mode.
@@ -215,9 +219,11 @@ class CKO_Paypal_Express {
 			return;
 		}
 
-		$core_settings   = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$core_settings   = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$paypal_settings = get_option( 'woocommerce_wc_checkout_com_paypal_settings' );
-		$environment     = 'sandbox' === $core_settings['ckocom_environment'];
+		$environment     = 'sandbox' === ( $core_settings['ckocom_environment'] ?? 'sandbox' );
 
 		if ( $environment ) {
 			// sandbox.

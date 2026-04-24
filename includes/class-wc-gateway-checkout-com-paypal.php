@@ -909,8 +909,10 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 	public function payment_scripts() {
 		$paypal_enabled = ! empty( $this->get_option( 'enabled' ) ) && 'yes' === $this->get_option( 'enabled' );
 
-		$checkout_setting = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
-		$checkout_mode    = $checkout_setting['ckocom_checkout_mode'];
+		$checkout_setting = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		$checkout_mode    = $checkout_setting['ckocom_checkout_mode'] ?? 'classic';
 
 		if ( $checkout_mode === 'classic' ) {
 			if ( ! $paypal_enabled ) {
@@ -931,8 +933,10 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 			return;
 		}
 
-		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
-		$environment   = 'sandbox' === $core_settings['ckocom_environment'];
+		$core_settings = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		$environment   = 'sandbox' === ( $core_settings['ckocom_environment'] ?? 'sandbox' );
 
 		if ( $environment ) {
 			// sandbox.
