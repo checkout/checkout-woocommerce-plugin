@@ -520,3 +520,40 @@ body[data-saved-payment-order="new_payment_first"].cko-flow--ready .payment_meth
 	border-color: #186aff;
 	border-width: 1px;
 }
+
+/* Apple Pay first-tap fix: while ckoApplePayPreCreate is in flight (background
+   AJAX to validate + create the WooCommerce order), overlay a spinner on the
+   Flow payment component and block pointer events on the Apple Pay button.
+   This prevents the user from tapping Apple Pay before the order exists,
+   which is what causes "[PaymentMethod]: Unexpected failure
+   [payment_method_attempt_failed]" on iOS — Apple Pay's native sheet must
+   begin synchronously from the user gesture, so any AJAX inside handleClick
+   blows the timing window. */
+body.cko-applepay-preparing #flow-container,
+body.cko-applepay-preparing .payment_method_wc_checkout_com_flow {
+	position: relative;
+	pointer-events: none;
+	opacity: 0.55;
+	transition: opacity 0.15s ease-in-out;
+}
+
+body.cko-applepay-preparing #flow-container::after,
+body.cko-applepay-preparing .payment_method_wc_checkout_com_flow::after {
+	content: '';
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	width: 28px;
+	height: 28px;
+	margin: -14px 0 0 -14px;
+	border: 3px solid rgba(24, 106, 255, 0.25);
+	border-top-color: #186aff;
+	border-radius: 50%;
+	animation: cko-applepay-preparing-spin 0.8s linear infinite;
+	z-index: 100;
+	pointer-events: none;
+}
+
+@keyframes cko-applepay-preparing-spin {
+	to { transform: rotate(360deg); }
+}

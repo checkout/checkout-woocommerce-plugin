@@ -5016,6 +5016,15 @@ document.addEventListener("DOMContentLoaded", function () {
 		const applePayButton = document.querySelector('button[aria-label="Apple Pay"]');
 		if (applePayButton) applePayButton.disabled = true;
 
+		// Show a "preparing payment" overlay on the Flow component while the AJAX runs.
+		// The overlay sets pointer-events:none on the Flow component so the user
+		// physically cannot tap Apple Pay before the order exists. This is the visual
+		// half of the iOS Apple Pay first-tap fix: if the Apple Pay button is
+		// unclickable until pre-creation finishes, the user gesture that DOES initiate
+		// Apple Pay always finds an existing order, and handleClick returns
+		// synchronously — keeping iOS's gesture window intact for ApplePaySession.begin().
+		document.body.classList.add('cko-applepay-preparing');
+
 		// Pre-creation runs in the background. If validation fails (e.g. autofill hasn't
 		// populated required fields yet on page load), we must not surface the error to
 		// the user — they haven't even tapped Apple Pay yet. The flag is checked inside
@@ -5026,6 +5035,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		window.ckoApplePayPreCreatePromise = new Promise(function (resolve) {
 			const cleanup = function () {
 				if (applePayButton) applePayButton.disabled = false;
+				document.body.classList.remove('cko-applepay-preparing');
 				window.ckoSuppressErrorDisplay = false;
 				window.ckoApplePayPreCreatePromise = null;
 			};
