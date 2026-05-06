@@ -5094,57 +5094,6 @@ document.addEventListener("DOMContentLoaded", function () {
 		document.addEventListener('click', handleTermsChange, true);
 	}
 
-	// Form-interaction listener for Apple Pay pre-creation.
-	// Goal: don't pollute the orders table with abandoned orders for visitors who never
-	// fill the form, but do start pre-creation early enough that Apple Pay's first tap
-	// works on iOS (the AJAX takes ~600ms; iOS rejects ApplePaySession.begin() if we
-	// kick that off only when the user taps the button).
-	//
-	// We trigger on the first `change` event on a checkout form field. `change` fires
-	// when the user finishes editing a field (blur) and also when Safari/Chrome autofill
-	// populates fields. Multiple change events are safe — ckoApplePayPreCreate is
-	// idempotent: it skips if an order already exists, returns the in-flight Promise if
-	// one is running, and silently no-ops on validation failure (suppressed via
-	// ckoSuppressErrorDisplay).
-	//
-	// Gates (all must be true) — same as for any Apple Pay pre-creation, to avoid wasting
-	// AJAX on visitors who can't or won't use Apple Pay:
-	//   1. window.ApplePaySession exists (iOS Safari only).
-	//   2. canMakePayments() returns true (device has cards in Wallet, region OK).
-	//   3. Apple Pay is in the merchant's enabled payment methods.
-	if (typeof window.ckoApplePayFormListenerAttached === 'undefined') {
-		window.ckoApplePayFormListenerAttached = true;
-		const isApplePayPotentiallyAvailable = function () {
-			try {
-				return typeof window.ApplePaySession !== 'undefined' &&
-					typeof window.ApplePaySession.canMakePayments === 'function' &&
-					window.ApplePaySession.canMakePayments() &&
-					typeof cko_flow_vars !== 'undefined' &&
-					Array.isArray(cko_flow_vars.enabled_payment_methods) &&
-					cko_flow_vars.enabled_payment_methods.indexOf('applepay') !== -1;
-			} catch (e) {
-				return false;
-			}
-		};
-		const handleFormFieldChange = function (event) {
-			const target = event.target;
-			if (!target || !target.tagName) return;
-			const tag = target.tagName;
-			if (tag !== 'INPUT' && tag !== 'SELECT' && tag !== 'TEXTAREA') return;
-			// Only react to fields inside the checkout / order-pay form.
-			if (typeof target.closest !== 'function') return;
-			if (!target.closest('form.checkout, form#order_review')) return;
-			// Terms checkbox has its own listener above — don't double-fire.
-			if (target.name === 'terms' || target.id === 'terms') return;
-			// Only pre-create for visitors who could actually use Apple Pay.
-			if (!isApplePayPotentiallyAvailable()) return;
-			if (typeof window.ckoApplePayPreCreate !== 'function') return;
-			ckoLogger.debug('[Form Listener] Field changed — attempting Apple Pay pre-creation');
-			window.ckoApplePayPreCreate();
-		};
-		document.addEventListener('change', handleFormFieldChange, true);
-	}
-	
 	document.addEventListener("click", function (event) {
 		const flowPayment = document.getElementById(
 			"payment_method_wc_checkout_com_flow"
