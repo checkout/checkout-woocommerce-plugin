@@ -1191,6 +1191,7 @@ var ckoFlow = {
 					
 					// Note: Save card checkbox visibility is controlled by the onChange event
 					// It will only show when payment type is "card" and hide for other payment methods
+
 				} catch (error) {
 					ckoLogger.error('onReady ERROR:', error);
 					ckoLogger.error('Error stack:', error.stack);
@@ -1631,20 +1632,25 @@ var ckoFlow = {
 					
 					ckoLogger.debug('===== onChange END =====');
 						
-					// Pre-validate for apple pay.
-					if ( component.selectedType === "applepay" ) {
-						const applePayButton = document.querySelector('button[aria-label="Apple Pay"]');
-						if (applePayButton) {
-							applePayButton.disabled = true;
-
-							const form = jQuery("form.checkout");
-
-							if ( ! orderId ) {
-								validateCheckout(form, function (response) {
-									if (applePayButton) applePayButton.disabled = false;
-								});
-							}
-						}
+					// Pre-validate and pre-create order for Apple Pay.
+					// Apple Pay's native sheet requires ApplePaySession.begin() to fire
+					// synchronously from the user gesture. Any async work inside handleClick
+					// (validateCheckout + createOrderBeforePayment) breaches that timing
+					// window and causes payment_method_attempt_failed on the first tap.
+					// By doing both steps here in onChange — before the user taps Apple Pay —
+					// the order already exists when handleClick runs, so it returns
+					// { continue: true } synchronously with no AJAX delay.
+					//
+					// Two preconditions can block pre-creation:
+					//   1. Terms checkbox not yet ticked — createOrderBeforePayment aborts
+					//      with a user-facing error if terms is required but not accepted.
+					//      We pre-empt that check here and skip silently; a one-time terms
+					//      checkbox listener (below) re-triggers pre-creation when the user
+					//      ticks it while Apple Pay is selected.
+					//   2. Apple Pay button DOM lookup fails — irrelevant to the actual fix;
+					//      the button disable is only UX feedback.
+					if ( component.selectedType === "applepay" && ! orderId ) {
+						window.ckoApplePayPreCreate();
 					}
 
 					// Control Save to Account checkbox visibility based on payment type
@@ -1706,6 +1712,25 @@ var ckoFlow = {
 					if (orderId) {
 						ckoLogger.debug('[handleClick] Order already exists (order-pay page) - proceeding immediately');
 						return { continue: true };
+					}
+
+					// For Apple Pay specifically: if a pre-creation kicked off by onChange or the
+					// terms-checkbox listener is still in flight, await it instead of starting our
+					// own AJAX cycle. Without this, fast users (tap Apple Pay within ~500ms of
+					// ticking terms) trigger a parallel validateCheckout + createOrderBeforePayment
+					// here, the duplicate stalls 500ms on the in-progress lock, and the iOS gesture
+					// window is gone before Apple Pay can begin.
+					if (component.type === 'applepay' && window.ckoApplePayPreCreatePromise) {
+						ckoLogger.debug('[handleClick] Apple Pay pre-creation in flight — awaiting it before proceeding');
+						return window.ckoApplePayPreCreatePromise.then(function () {
+							const preCreatedOrderId = jQuery('input[name="order_id"]').val() || FlowSessionStorage.getOrderId();
+							if (preCreatedOrderId) {
+								ckoLogger.debug('[handleClick] Pre-creation completed — Order ID:', preCreatedOrderId);
+								return { continue: true };
+							}
+							ckoLogger.warn('[handleClick] Pre-creation finished but no order ID found — falling back to slow path');
+							return { continue: false };
+						});
 					}
 
 					// Check if order was already created in this session
@@ -2599,8 +2624,17 @@ var ckoFlow = {
  * Displays error messages at the top of the WooCommerce form.
  */
 let showError = function (error_message) {
+	// Background pre-creation flows (e.g. Apple Pay onReady pre-create) set this flag
+	// so validation errors raised by validateCheckout / createOrderBeforePayment don't
+	// surface to the user. The user hasn't tried to pay yet — showing them
+	// "Email is required" while they're still looking at the page would be wrong.
+	if (window.ckoSuppressErrorDisplay) {
+		ckoLogger.debug('[showError] suppressed (background pre-create):', error_message);
+		return;
+	}
+
 	ckoLogger.error("showError() called with message:", error_message);
-	
+
 	if (!error_message) {
 		ckoLogger.error("showError() called with empty/null message");
 		return;
@@ -4939,6 +4973,167 @@ document.addEventListener("DOMContentLoaded", function () {
 	
 	// Expose createOrderBeforePayment globally so it can be called from handleClick (inside ckoFlow.loadFlow)
 	window.createOrderBeforePayment = createOrderBeforePayment;
+
+	// Apple Pay pre-creation helper.
+	// Why this exists: iOS Apple Pay requires ApplePaySession.begin() to fire synchronously
+	// from a user gesture. The Flow SDK's handleClick runs validateCheckout +
+	// createOrderBeforePayment async on first tap, blowing the gesture window and producing
+	// "[PaymentMethod]: Unexpected failure [payment_method_attempt_failed]". By pre-creating
+	// the order BEFORE the user taps Apple Pay (triggered from onChange and from a terms-
+	// checkbox listener), handleClick finds the order via FlowSessionStorage and returns
+	// { continue: true } synchronously.
+	window.ckoApplePayPreCreate = function () {
+		// Order already exists for this checkout session — nothing to do.
+		if ((typeof FlowSessionStorage !== 'undefined' && FlowSessionStorage.getOrderId()) ||
+			jQuery('input[name="order_id"]').val()) {
+			ckoLogger.debug('[ApplePayPreCreate] Order already exists — skipping');
+			return Promise.resolve();
+		}
+
+		// If a pre-creation is already running, return its Promise so callers (especially
+		// handleClick) can await the same one instead of starting another AJAX cycle.
+		// Without this dedupe, click + change firing on a single checkbox tick spawn two
+		// pre-creations — the second hits createOrderBeforePayment's in-progress lock,
+		// stalls 500ms, and returns null, eating the time we wanted to give the first one.
+		if (window.ckoApplePayPreCreatePromise) {
+			ckoLogger.debug('[ApplePayPreCreate] Pre-creation already in flight — reusing existing promise');
+			return window.ckoApplePayPreCreatePromise;
+		}
+
+		// Terms checkbox required but not yet ticked. Skip silently and rely on the
+		// terms-checkbox listener (set up below) to retry once the user ticks it.
+		// Calling createOrderBeforePayment here would surface a user-facing
+		// "Please accept the terms" error which is confusing — the user has only just
+		// selected Apple Pay; they have not yet attempted to pay.
+		const termsCheckbox = jQuery('input[name="terms"]');
+		if (termsCheckbox.length && !termsCheckbox.is(':checked')) {
+			ckoLogger.debug('[ApplePayPreCreate] Terms not yet ticked — waiting for terms listener to retry');
+			return Promise.resolve();
+		}
+
+		ckoLogger.debug('[ApplePayPreCreate] Starting pre-validation and pre-order creation');
+
+		const applePayButton = document.querySelector('button[aria-label="Apple Pay"]');
+		if (applePayButton) applePayButton.disabled = true;
+
+		// Pre-creation runs in the background. If validation fails (e.g. autofill hasn't
+		// populated required fields yet on page load), we must not surface the error to
+		// the user — they haven't even tapped Apple Pay yet. The flag is checked inside
+		// showError; we restore it once pre-creation finishes either way.
+		window.ckoSuppressErrorDisplay = true;
+
+		const form = jQuery("form.checkout");
+		window.ckoApplePayPreCreatePromise = new Promise(function (resolve) {
+			const cleanup = function () {
+				if (applePayButton) applePayButton.disabled = false;
+				window.ckoSuppressErrorDisplay = false;
+				window.ckoApplePayPreCreatePromise = null;
+			};
+			validateCheckout(form, async function () {
+				try {
+					const preCreatedOrderId = await window.createOrderBeforePayment();
+					ckoLogger.debug('[ApplePayPreCreate] Pre-order created — Order ID:', preCreatedOrderId);
+					resolve(preCreatedOrderId);
+				} catch (e) {
+					ckoLogger.error('[ApplePayPreCreate] Pre-order creation failed:', e);
+					resolve(null);
+				}
+				cleanup();
+			}, function () {
+				ckoLogger.debug('[ApplePayPreCreate] Validation failed — deferring (user must complete the form)');
+				cleanup();
+				resolve(null);
+			});
+		});
+		return window.ckoApplePayPreCreatePromise;
+	};
+
+	// One-time terms checkbox listener: when the user ticks terms while Apple Pay is the
+	// currently selected payment method, retry pre-creation. This is the second half of
+	// the Apple Pay first-tap fix — without it, users who select Apple Pay before ticking
+	// terms would still hit the slow path on their first payment tap.
+	//
+	// IMPORTANT: We MUST use a native capture-phase listener here. The existing
+	// flow-terms-prevention.js module attaches a delegated change handler that calls
+	// e.stopImmediatePropagation() to block update_checkout from firing on terms toggle.
+	// stopImmediatePropagation kills every later-attached bubble-phase handler — so a
+	// jQuery delegated listener attached on document never fires. Capture phase runs
+	// before any bubble-phase handler can intercept it.
+	if (typeof window.ckoApplePayTermsListenerAttached === 'undefined') {
+		window.ckoApplePayTermsListenerAttached = true;
+		const handleTermsChange = function (event) {
+			const target = event.target;
+			if (!target || (target.name !== 'terms' && target.id !== 'terms')) {
+				return;
+			}
+			if (!target.checked) {
+				return;
+			}
+			const applePayActive = (typeof ckoFlow !== 'undefined' && ckoFlow.selectedPaymentType === 'applepay');
+			if (!applePayActive) {
+				return;
+			}
+			ckoLogger.debug('[Terms Listener] Terms ticked while Apple Pay selected — pre-creating order');
+			window.ckoApplePayPreCreate();
+		};
+		// Capture phase for change. Some browsers fire `change` after `click` on
+		// checkboxes; we listen to both to start pre-creation as soon as possible.
+		document.addEventListener('change', handleTermsChange, true);
+		// For click on a checkbox the .checked property is already updated when the
+		// click handler fires, so we can read it directly.
+		document.addEventListener('click', handleTermsChange, true);
+	}
+
+	// Form-interaction listener for Apple Pay pre-creation.
+	// Goal: don't pollute the orders table with abandoned orders for visitors who never
+	// fill the form, but do start pre-creation early enough that Apple Pay's first tap
+	// works on iOS (the AJAX takes ~600ms; iOS rejects ApplePaySession.begin() if we
+	// kick that off only when the user taps the button).
+	//
+	// We trigger on the first `change` event on a checkout form field. `change` fires
+	// when the user finishes editing a field (blur) and also when Safari/Chrome autofill
+	// populates fields. Multiple change events are safe — ckoApplePayPreCreate is
+	// idempotent: it skips if an order already exists, returns the in-flight Promise if
+	// one is running, and silently no-ops on validation failure (suppressed via
+	// ckoSuppressErrorDisplay).
+	//
+	// Gates (all must be true) — same as for any Apple Pay pre-creation, to avoid wasting
+	// AJAX on visitors who can't or won't use Apple Pay:
+	//   1. window.ApplePaySession exists (iOS Safari only).
+	//   2. canMakePayments() returns true (device has cards in Wallet, region OK).
+	//   3. Apple Pay is in the merchant's enabled payment methods.
+	if (typeof window.ckoApplePayFormListenerAttached === 'undefined') {
+		window.ckoApplePayFormListenerAttached = true;
+		const isApplePayPotentiallyAvailable = function () {
+			try {
+				return typeof window.ApplePaySession !== 'undefined' &&
+					typeof window.ApplePaySession.canMakePayments === 'function' &&
+					window.ApplePaySession.canMakePayments() &&
+					typeof cko_flow_vars !== 'undefined' &&
+					Array.isArray(cko_flow_vars.enabled_payment_methods) &&
+					cko_flow_vars.enabled_payment_methods.indexOf('applepay') !== -1;
+			} catch (e) {
+				return false;
+			}
+		};
+		const handleFormFieldChange = function (event) {
+			const target = event.target;
+			if (!target || !target.tagName) return;
+			const tag = target.tagName;
+			if (tag !== 'INPUT' && tag !== 'SELECT' && tag !== 'TEXTAREA') return;
+			// Only react to fields inside the checkout / order-pay form.
+			if (typeof target.closest !== 'function') return;
+			if (!target.closest('form.checkout, form#order_review')) return;
+			// Terms checkbox has its own listener above — don't double-fire.
+			if (target.name === 'terms' || target.id === 'terms') return;
+			// Only pre-create for visitors who could actually use Apple Pay.
+			if (!isApplePayPotentiallyAvailable()) return;
+			if (typeof window.ckoApplePayPreCreate !== 'function') return;
+			ckoLogger.debug('[Form Listener] Field changed — attempting Apple Pay pre-creation');
+			window.ckoApplePayPreCreate();
+		};
+		document.addEventListener('change', handleFormFieldChange, true);
+	}
 	
 	document.addEventListener("click", function (event) {
 		const flowPayment = document.getElementById(

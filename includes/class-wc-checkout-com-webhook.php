@@ -292,29 +292,40 @@ class WC_Checkout_Com_Webhook {
 			return true;
 		}
 
-		// Set action id as woo transaction id.
-		$order->set_transaction_id( $action_id );
-		$order->update_meta_data( '_cko_payment_id', $payment_id );
-		$order->update_meta_data( 'cko_payment_authorized', true );
-
-		// Ensure payment method title is correct before status update (for Flow gateway)
+		// Resolve the correct payment method title using the current $order object (safe:
+		// reads meta only, does not depend on status). We resolve BEFORE the reload below
+		// so we don't lose the stale object's meta context.
+		$correct_title = null;
 		if ( $order->get_payment_method() === 'wc_checkout_com_flow' ) {
 			$payment_type = $order->get_meta( '_cko_flow_payment_type' );
-			
 			if ( ! empty( $payment_type ) ) {
 				$available_gateways = WC()->payment_gateways()->get_available_payment_gateways();
 				$gateway = isset( $available_gateways[ $order->get_payment_method() ] ) ? $available_gateways[ $order->get_payment_method() ] : null;
-				
 				if ( $gateway && is_callable( array( $gateway, 'get_payment_method_title_by_type' ) ) ) {
 					$correct_title = $gateway->get_payment_method_title_by_type( $order, null );
-					$order->set_payment_method_title( $correct_title );
-					$order->save();
-					
-					clean_post_cache( $order_id );
-					$order = wc_get_order( $order_id );
 				}
 			}
 		}
+
+		// CRITICAL: Reload order before any save to prevent the stale "pending" status on this
+		// handler's $order object (loaded at handler start) from overwriting a "completed" status
+		// that a concurrent capture webhook may have already committed to the DB.
+		// Previously, $order->save() was called while $order still carried the original "pending"
+		// status, silently clobbering the capture's update and causing the final guard below to
+		// read "pending" and then proceed to set "on-hold".
+		clean_post_cache( $order_id );
+		$order = wc_get_order( $order_id );
+
+		// Apply auth metadata and optional title correction, then persist once.
+		$order->set_transaction_id( $action_id );
+		$order->update_meta_data( '_cko_payment_id', $payment_id );
+		$order->update_meta_data( 'cko_payment_authorized', true );
+		if ( null !== $correct_title ) {
+			$order->set_payment_method_title( $correct_title );
+		}
+		$order->save();
+		clean_post_cache( $order_id );
+		$order = wc_get_order( $order_id );
 
 		// CRITICAL: Final guard before update_status - order may have been updated by capture webhook
 		// during Flow payment title processing (save/reload above). Never downgrade completed/processing.
