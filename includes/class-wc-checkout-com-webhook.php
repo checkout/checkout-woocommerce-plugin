@@ -91,6 +91,14 @@ class WC_Checkout_Com_Webhook {
 			return false;
 		}
 		
+		// Safety: never apply order-status changes to a WC_Subscription. A subscription card-change
+		// verification ($0 auth) must not flip the subscription's status — that is managed by WCS,
+		// not by payment webhooks. Acknowledge (return true so Checkout.com doesn't retry) and stop.
+		if ( function_exists( 'wcs_is_subscription' ) && wcs_is_subscription( $order ) ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: resolved order ' . $order->get_id() . ' is a subscription — skipping status update (managed by WCS).' );
+			return true;
+		}
+
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order loaded successfully - Order ID: ' . $order->get_id() . ', Status: ' . $order->get_status() );
 		}
@@ -410,6 +418,14 @@ class WC_Checkout_Com_Webhook {
 			return false;
 		}
 		
+		// Safety: never apply order-status changes to a WC_Subscription. A subscription card-change
+		// verification ($0 auth) must not flip the subscription's status — that is managed by WCS,
+		// not by payment webhooks. Acknowledge (return true so Checkout.com doesn't retry) and stop.
+		if ( function_exists( 'wcs_is_subscription' ) && wcs_is_subscription( $order ) ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: resolved order ' . $order->get_id() . ' is a subscription — skipping status update (managed by WCS).' );
+			return true;
+		}
+
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order loaded successfully - Order ID: ' . $order->get_id() . ', Status: ' . $order->get_status() );
 		}
@@ -514,6 +530,12 @@ class WC_Checkout_Com_Webhook {
 		}
 		
 		$order_id = $order->get_id();
+
+		// Safety: never apply order-status changes to a WC_Subscription (see authorize_payment).
+		if ( function_exists( 'wcs_is_subscription' ) && wcs_is_subscription( $order ) ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: resolved order ' . $order_id . ' is a subscription — skipping status update (managed by WCS).' );
+			return true;
+		}
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order loaded successfully - Order ID: ' . $order_id . ', Status: ' . $order->get_status() );
 		}
@@ -830,6 +852,14 @@ class WC_Checkout_Com_Webhook {
 			return false;
 		}
 		
+		// Safety: never apply order-status changes to a WC_Subscription. A subscription card-change
+		// verification ($0 auth) must not flip the subscription's status — that is managed by WCS,
+		// not by payment webhooks. Acknowledge (return true so Checkout.com doesn't retry) and stop.
+		if ( function_exists( 'wcs_is_subscription' ) && wcs_is_subscription( $order ) ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: resolved order ' . $order->get_id() . ' is a subscription — skipping status update (managed by WCS).' );
+			return true;
+		}
+
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order loaded successfully - Order ID: ' . $order->get_id() . ', Status: ' . $order->get_status() );
 		}
@@ -919,6 +949,12 @@ class WC_Checkout_Com_Webhook {
 		}
 		
 		$order_id = $order->get_id();
+
+		// Safety: never apply order-status changes to a WC_Subscription (see authorize_payment).
+		if ( function_exists( 'wcs_is_subscription' ) && wcs_is_subscription( $order ) ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: resolved order ' . $order_id . ' is a subscription — skipping status update (managed by WCS).' );
+			return true;
+		}
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order loaded successfully - Order ID: ' . $order_id . ', Status: ' . $order->get_status() );
 		}
@@ -1069,6 +1105,12 @@ class WC_Checkout_Com_Webhook {
 		}
 		
 		$order_id = $order->get_id();
+
+		// Safety: never apply order-status changes to a WC_Subscription (see authorize_payment).
+		if ( function_exists( 'wcs_is_subscription' ) && wcs_is_subscription( $order ) ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: resolved order ' . $order_id . ' is a subscription — skipping status update (managed by WCS).' );
+			return true;
+		}
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order loaded successfully - Order ID: ' . $order_id . ', Status: ' . $order->get_status() );
 		}
@@ -1398,6 +1440,14 @@ class WC_Checkout_Com_Webhook {
 			return false;
 		}
 		
+		// Safety: never apply order-status changes to a WC_Subscription. A subscription card-change
+		// verification ($0 auth) must not flip the subscription's status — that is managed by WCS,
+		// not by payment webhooks. Acknowledge (return true so Checkout.com doesn't retry) and stop.
+		if ( function_exists( 'wcs_is_subscription' ) && wcs_is_subscription( $order ) ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: resolved order ' . $order->get_id() . ' is a subscription — skipping status update (managed by WCS).' );
+			return true;
+		}
+
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order loaded successfully - Order ID: ' . $order->get_id() . ', Status: ' . $order->get_status() );
 		}

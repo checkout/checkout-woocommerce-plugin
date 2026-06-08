@@ -5,7 +5,7 @@
  * Description: Extends WooCommerce by Adding the Checkout.com Gateway.
  * Author: Checkout.com
  * Author URI: https://www.checkout.com/
- * Version: 5.1.3.1
+ * Version: 5.1.3.3
  * Requires at least: 5.0
  * Tested up to: 6.7.0
  * WC requires at least: 3.0
@@ -224,7 +224,7 @@ add_action( 'woocommerce_new_order', 'cko_update_order_id_in_session', 5 );
 /**
  * Constants.
  */
-define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '5.1.3.1' );
+define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '5.1.3.3' );
 define( 'WC_CHECKOUTCOM_PLUGIN_URL', untrailingslashit( plugins_url( basename( plugin_dir_path( __FILE__ ) ), basename( __FILE__ ) ) ) );
 define( 'WC_CHECKOUTCOM_PLUGIN_PATH', untrailingslashit( plugin_dir_path( __FILE__ ) ) );
 
@@ -1544,6 +1544,39 @@ function cko_enqueue_frontend_assets() {
 		'preserve_card_on_update' => ( isset( $flow_settings['flow_preserve_card_on_update'] ) && 'yes' === $flow_settings['flow_preserve_card_on_update'] ),
 		);
 
+		// Add Payment Method support (My Account → Payment methods → Add payment method).
+		// This page has no cart, no checkout form, and no order, so Flow's normal validation would
+		// refuse to load. We flag the page and inject the logged-in customer's saved billing data so
+		// JS can build a synthetic checkout context and render Flow as a card-only "save card" flow.
+		// The session is forced to a $0 card verification (amount=0, capture=false) server-side in
+		// BOTH ajax_create_payment_session() and ajax_submit_payment_session(); on success the
+		// wc_checkoutcom_flow_add_payment_method return endpoint tokenises the card as a
+		// WC_Payment_Token_CC. is_add_payment_method arrives in JS as the string "1" (wp_localize_script
+		// stringifies booleans), so JS compares loosely.
+		$flow_vars['is_add_payment_method'] = false;
+		if ( function_exists( 'is_add_payment_method_page' ) && is_add_payment_method_page() && is_user_logged_in() ) {
+			$flow_vars['is_add_payment_method']          = true;
+			$flow_vars['save_card_nonce']                = wp_create_nonce( 'cko_flow_save_card' );
+			$flow_vars['my_account_payment_methods_url'] = wc_get_account_endpoint_url( 'payment-methods' );
+
+			$current_user = wp_get_current_user();
+			$customer     = WC()->customer;
+
+			$flow_vars['customer_data_for_setup'] = array(
+				'email'      => $customer && $customer->get_billing_email() ? $customer->get_billing_email() : $current_user->user_email,
+				'first_name' => $customer ? $customer->get_billing_first_name() : '',
+				'last_name'  => $customer ? $customer->get_billing_last_name() : '',
+				'address_1'  => $customer ? $customer->get_billing_address_1() : '',
+				'address_2'  => $customer ? $customer->get_billing_address_2() : '',
+				'city'       => $customer ? $customer->get_billing_city() : '',
+				'state'      => $customer ? $customer->get_billing_state() : '',
+				'postcode'   => $customer ? $customer->get_billing_postcode() : '',
+				'country'    => $customer ? $customer->get_billing_country() : '',
+			);
+
+			$flow_vars['add_payment_method_currency'] = get_woocommerce_currency();
+		}
+
 		wp_set_script_translations( 'checkout-com-flow-payment-session-script', 'checkout-com-unified-payments-api' );
 
 		wp_localize_script( 'checkout-com-flow-payment-session-script', 'cko_flow_vars', $flow_vars );
@@ -1849,7 +1882,11 @@ add_action( 'woocommerce_subscription_status_cancelled', 'cko_subscription_cance
 function cko_subscription_cancelled( $subscription ) {
 	include_once 'includes/subscription/class-wc-checkoutcom-subscription.php';
 
-	WC_Checkoutcom_Subscription::cko_subscription_cancelled( $subscription );
+	// The static method on WC_Checkoutcom_Subscription is named subscription_cancelled()
+	// (no cko_ prefix). Calling cko_subscription_cancelled() here would fatal with
+	// "Call to undefined method" every time the woocommerce_subscription_status_cancelled
+	// hook fires.
+	WC_Checkoutcom_Subscription::subscription_cancelled( $subscription );
 }
 
 // @TODO : Remove all below functions and logic once product is fixed.

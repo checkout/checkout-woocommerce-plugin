@@ -283,6 +283,21 @@
 		 * @returns {boolean} True if all required fields are filled and valid
 		 */
 		requiredFieldsFilledAndValid: function() {
+			// Add-Payment-Method branch — /my-account/add-payment-method/. No checkout form/cart here;
+			// the customer's billing data comes from PHP via cko_flow_vars.customer_data_for_setup.
+			// (wp_localize_script stringifies booleans, so compare against true/"1"/1.)
+			if (typeof cko_flow_vars !== 'undefined' && ( cko_flow_vars.is_add_payment_method === true || cko_flow_vars.is_add_payment_method === '1' || cko_flow_vars.is_add_payment_method === 1 )) {
+				const setup = (cko_flow_vars.customer_data_for_setup) || {};
+				const email = (setup.email || '').toString().trim();
+				if (!email || !this.isValidEmail(email)) {
+					if (typeof window.ckoLogger !== 'undefined') {
+						window.ckoLogger.debug('requiredFieldsFilledAndValid: [add-payment-method] customer email missing or invalid');
+					}
+					return false;
+				}
+				return true;
+			}
+
 			// Check if we're on order-pay page and have order data
 			const isOrderPayPage = window.location.pathname.includes('/order-pay/');
 			let orderPayInfo = null;

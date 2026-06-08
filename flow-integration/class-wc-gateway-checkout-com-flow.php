@@ -45,6 +45,22 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			'subscription_suspension',
 			'subscription_reactivation',
 			'subscription_date_changes',
+			// Brought to parity with the Classic Cards gateway (cards.php:40-54). Without
+			// these, customers/admins with Flow-created subscriptions had no UI path to
+			// change the card on an active subscription, change the amount, or hold
+			// multiple subscriptions. The change-payment-method path persists the new
+			// source via WC_Checkoutcom_Subscription::save_source_id(), whose guards now
+			// also recognise a WC_Subscription object (see process_payment / handle_3ds_return).
+			'subscription_amount_changes',
+			'subscription_payment_method_change',
+			'subscription_payment_method_change_customer',
+			'subscription_payment_method_change_admin',
+			'multiple_subscriptions',
+			// Enables the gateway on My Account → Payment methods → Add payment method, and the
+			// "Add payment method" button. The actual save is driven by JS + the
+			// wc_checkoutcom_flow_add_payment_method return endpoint (a $0 card verification that
+			// tokenises the card), not by the default add_payment_method() submit handler.
+			'add_payment_method',
 		);
 
 		$this->init_form_fields();
@@ -66,7 +82,11 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// WC API endpoint for processing 3DS returns (similar to PayPal)
 		// This allows direct redirect to order-received page without showing checkout page
 		add_action( 'woocommerce_api_wc_checkoutcom_flow_process', [ $this, 'handle_3ds_return' ] );
-		
+
+		// WC API endpoint for the My Account → Add payment method return. Flow redirects here
+		// (incl. after 3DS) once the $0 card verification completes; we tokenise the card.
+		add_action( 'woocommerce_api_wc_checkoutcom_flow_add_payment_method', [ $this, 'handle_add_payment_method_return' ] );
+
 		// Detect 3DS return on checkout page load and process server-side (no AJAX)
 		// This handles cases where user returns to checkout page with 3DS parameters
 		// Priority 1 ensures it runs very early, before other template_redirect hooks
@@ -1930,15 +1950,22 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		<?php endif; ?>
 		<?php
 
+		// On the Add Payment Method page (My Account → Payment methods → Add payment method) the
+		// sole purpose is to add a NEW card, so don't show the customer's existing saved cards or
+		// the "save card for future purchases" checkbox (the card is saved regardless here).
+		$is_add_pm_page = function_exists( 'is_add_payment_method_page' ) && is_add_payment_method_page();
+
 		// check if saved card enable from module setting.
-		if ( $save_card ) {
+		if ( $save_card && ! $is_add_pm_page ) {
 			// Show saved cards from BOTH Flow and Classic Cards gateways
 			// No migration needed - backend already handles both token types
 			$this->saved_payment_methods();
 		}
 
-		// Render Save Card input.
-		$this->element_form_save_card( $save_card );
+		// Render Save Card input (hidden on the Add Payment Method page).
+		if ( ! $is_add_pm_page ) {
+			$this->element_form_save_card( $save_card );
+		}
 	}
 
 	/**
@@ -2030,6 +2057,236 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			</li>
 		</ul>
 		<?php
+	}
+
+	/**
+	 * Handle a WooCommerce Subscriptions "Change payment method" request.
+	 *
+	 * WCS calls process_payment() with the WC_Subscription as the order when a customer or admin
+	 * updates the card on an active subscription. The normal process_payment() flow is invalid for
+	 * a subscription object (order statuses, stock, cart, amount validation), so process_payment()
+	 * routes here instead. We:
+	 *   1. Fetch the verification payment's details to get the new card's source.id + scheme.
+	 *   2. Persist them on the subscription so future MIT renewals charge the new card.
+	 *   3. Best-effort void the verification authorisation (the session is created amount=0/
+	 *      capture:false, so there is usually nothing to void — purely defensive).
+	 *   4. Return success so WCS switches the subscription's stored payment method.
+	 *
+	 * @param WC_Subscription $subscription    The subscription whose card is being changed.
+	 * @param string          $flow_payment_id Checkout.com payment id from the new-card verification.
+	 * @return array WC process_payment response.
+	 */
+	public function handle_subscription_payment_method_change( $subscription, $flow_payment_id ) {
+		$subscription_id = $subscription->get_id();
+		WC_Checkoutcom_Utility::logger( '[CHANGE PAYMENT METHOD] Handling subscription card change — Subscription ID: ' . $subscription_id . ', payment_id: ' . ( $flow_payment_id ?: 'MISSING' ) );
+
+		if ( empty( $flow_payment_id ) ) {
+			WC_Checkoutcom_Utility::logger( '[CHANGE PAYMENT METHOD] ERROR: No Flow payment id — cannot retrieve the new card source.' );
+			WC_Checkoutcom_Utility::wc_add_notice_self( __( 'Could not update the payment method. Please try again.', 'checkout-com-unified-payments-api' ), 'error' );
+			return array( 'result' => 'failure' );
+		}
+
+		// Fetch payment details via direct call — the REST endpoint needs a browser-scoped nonce
+		// we don't have server-side (same pattern as flow_save_cards / the subscription source save).
+		$request = new \WP_REST_Request( 'GET', '/ckoplugin/v1/payment-status' );
+		$request->set_query_params( [ 'paymentId' => $flow_payment_id ] );
+		$response = cko_get_payment_status( $request );
+		$status   = $response instanceof \WP_REST_Response ? $response->get_status() : 500;
+		$data     = $response instanceof \WP_REST_Response ? $response->get_data() : null;
+
+		if ( $status >= 400 || ! is_array( $data ) || isset( $data['error'] ) || empty( $data['source']['id'] ) ) {
+			$err = is_array( $data ) && isset( $data['error'] ) ? $data['error'] : 'Unknown error (HTTP ' . $status . ')';
+			WC_Checkoutcom_Utility::logger( '[CHANGE PAYMENT METHOD] ERROR: Could not fetch payment details: ' . $err );
+			WC_Checkoutcom_Utility::wc_add_notice_self( __( 'Could not verify the new card. Please try again.', 'checkout-com-unified-payments-api' ), 'error' );
+			return array( 'result' => 'failure' );
+		}
+
+		$source_id = $data['source']['id'];
+
+		// Persist the new source on the subscription so future MIT renewals charge the new card.
+		WC_Checkoutcom_Subscription::save_source_id( $subscription_id, $subscription, $source_id );
+		if ( ! empty( $data['source']['scheme'] ) ) {
+			$this->save_preferred_card_scheme( $subscription_id, $subscription, $data['source']['scheme'] );
+		}
+		// NOTE: deliberately do NOT store the verification's _cko_payment_id on the subscription —
+		// doing so gives the payment webhooks another way to resolve the subscription as an "order"
+		// (by payment id) and flip its status. The source_id is all renewals need.
+		$subscription->save();
+		WC_Checkoutcom_Utility::logger( '[CHANGE PAYMENT METHOD] ✅ Saved new source_id ' . $source_id . ' on subscription ' . $subscription_id );
+
+		// Best-effort void of the verification authorisation (amount=0 sessions usually have
+		// nothing to void; this is defensive in case an auth was raised).
+		$this->cko_flow_void_payment( $flow_payment_id );
+
+		$subscription->add_order_note( __( 'Checkout.com: subscription payment method updated.', 'checkout-com-unified-payments-api' ) );
+
+		return array(
+			'result'   => 'success',
+			'redirect' => $subscription->get_view_order_url(),
+		);
+	}
+
+	/**
+	 * WC API return handler for My Account → Payment methods → Add payment method.
+	 *
+	 * Flow redirects here (with cko-payment-id appended) once the $0 card verification completes —
+	 * for both the no-3DS and post-3DS paths. We fetch the verified card's source, save it as a
+	 * WC_Payment_Token_CC against the logged-in user, best-effort void the (zero-amount) auth, and
+	 * redirect back to the Payment methods page. No order is involved, so there is no status/stock.
+	 *
+	 * @return void
+	 */
+	public function handle_add_payment_method_return() {
+		$payment_methods_url = wc_get_account_endpoint_url( 'payment-methods' );
+
+		// Must be logged in.
+		if ( ! is_user_logged_in() ) {
+			wp_safe_redirect( wc_get_page_permalink( 'myaccount' ) );
+			exit;
+		}
+
+		// Verify nonce (issued in cko_flow_vars.save_card_nonce).
+		$nonce = isset( $_GET['cko-apm-nonce'] ) ? sanitize_text_field( wp_unslash( $_GET['cko-apm-nonce'] ) ) : '';
+		if ( empty( $nonce ) || ! wp_verify_nonce( $nonce, 'cko_flow_save_card' ) ) {
+			WC_Checkoutcom_Utility::logger( '[ADD PAYMENT METHOD] ERROR: invalid/missing nonce on return.' );
+			wc_add_notice( __( 'Security check failed. Please try again.', 'checkout-com-unified-payments-api' ), 'error' );
+			wp_safe_redirect( $payment_methods_url );
+			exit;
+		}
+
+		// Explicit failure return from Flow.
+		if ( ! empty( $_GET['cko-apm-failed'] ) ) {
+			WC_Checkoutcom_Utility::logger( '[ADD PAYMENT METHOD] Flow returned failure — card not added.' );
+			wc_add_notice( __( 'The card could not be verified. Please try again.', 'checkout-com-unified-payments-api' ), 'error' );
+			wp_safe_redirect( wc_get_endpoint_url( 'add-payment-method', '', wc_get_page_permalink( 'myaccount' ) ) );
+			exit;
+		}
+
+		$payment_id = isset( $_GET['cko-payment-id'] ) ? sanitize_text_field( wp_unslash( $_GET['cko-payment-id'] ) ) : '';
+		if ( empty( $payment_id ) ) {
+			WC_Checkoutcom_Utility::logger( '[ADD PAYMENT METHOD] ERROR: missing cko-payment-id on return.' );
+			wc_add_notice( __( 'Could not add the card. Please try again.', 'checkout-com-unified-payments-api' ), 'error' );
+			wp_safe_redirect( $payment_methods_url );
+			exit;
+		}
+
+		$user_id = get_current_user_id();
+		WC_Checkoutcom_Utility::logger( '[ADD PAYMENT METHOD] Return — user_id=' . $user_id . ', payment_id=' . $payment_id );
+
+		// Fetch payment details (direct call — REST endpoint needs a browser nonce we don't have).
+		$request = new \WP_REST_Request( 'GET', '/ckoplugin/v1/payment-status' );
+		$request->set_query_params( [ 'paymentId' => $payment_id ] );
+		$response = cko_get_payment_status( $request );
+		$status   = $response instanceof \WP_REST_Response ? $response->get_status() : 500;
+		$data     = $response instanceof \WP_REST_Response ? $response->get_data() : null;
+
+		if ( $status >= 400 || ! is_array( $data ) || isset( $data['error'] ) || empty( $data['source']['id'] ) ) {
+			$err = is_array( $data ) && isset( $data['error'] ) ? $data['error'] : 'Unknown error (HTTP ' . $status . ')';
+			WC_Checkoutcom_Utility::logger( '[ADD PAYMENT METHOD] ERROR: could not fetch card details: ' . $err );
+			wc_add_notice( __( 'Could not retrieve the card details. Please try again.', 'checkout-com-unified-payments-api' ), 'error' );
+			wp_safe_redirect( $payment_methods_url );
+			exit;
+		}
+
+		$source = $data['source'];
+
+		// Duplicate check by fingerprint for this user + gateway.
+		if ( ! empty( $source['fingerprint'] ) ) {
+			$existing_tokens = WC_Payment_Tokens::get_tokens( array(
+				'user_id'    => $user_id,
+				'gateway_id' => $this->id,
+				'limit'      => 100,
+			) );
+			foreach ( $existing_tokens as $existing_token ) {
+				if ( $existing_token->get_meta( 'fingerprint', true ) === $source['fingerprint'] ) {
+					WC_Checkoutcom_Utility::logger( '[ADD PAYMENT METHOD] Card already saved (fingerprint match) — voiding placeholder.' );
+					$this->cko_flow_void_payment( $payment_id );
+					wc_add_notice( __( 'This card is already saved to your account.', 'checkout-com-unified-payments-api' ), 'notice' );
+					wp_safe_redirect( $payment_methods_url );
+					exit;
+				}
+			}
+		}
+
+		// Save the token.
+		try {
+			$token = new WC_Payment_Token_CC();
+			$token->set_token( (string) $source['id'] );
+			$token->set_gateway_id( $this->id );
+			$token->set_card_type( isset( $source['scheme'] ) ? strtolower( (string) $source['scheme'] ) : '' );
+			$token->set_last4( isset( $source['last4'] ) ? (string) $source['last4'] : '' );
+			$token->set_expiry_month( isset( $source['expiry_month'] ) ? sprintf( '%02d', (int) $source['expiry_month'] ) : '' );
+			$token->set_expiry_year( isset( $source['expiry_year'] ) ? (string) $source['expiry_year'] : '' );
+			$token->set_user_id( $user_id );
+			if ( ! empty( $source['fingerprint'] ) ) {
+				$token->add_meta_data( 'fingerprint', $source['fingerprint'], true );
+			}
+
+			if ( ! $token->save() ) {
+				WC_Checkoutcom_Utility::logger( '[ADD PAYMENT METHOD] ERROR: token save returned falsy.' );
+				wc_add_notice( __( 'Could not save the card. Please try again.', 'checkout-com-unified-payments-api' ), 'error' );
+				wp_safe_redirect( $payment_methods_url );
+				exit;
+			}
+
+			WC_Checkoutcom_Utility::logger( '[ADD PAYMENT METHOD] ✅ Saved token id=' . $token->get_id() . ' for user ' . $user_id );
+		} catch ( Exception $e ) {
+			WC_Checkoutcom_Utility::logger( '[ADD PAYMENT METHOD] ERROR: exception saving token: ' . $e->getMessage() );
+			wc_add_notice( __( 'Could not save the card. Please try again.', 'checkout-com-unified-payments-api' ), 'error' );
+			wp_safe_redirect( $payment_methods_url );
+			exit;
+		}
+
+		// Best-effort void of the $0 verification auth (usually nothing to void).
+		$this->cko_flow_void_payment( $payment_id );
+
+		wc_add_notice( __( 'Payment method successfully added.', 'checkout-com-unified-payments-api' ), 'success' );
+		wp_safe_redirect( $payment_methods_url );
+		exit;
+	}
+
+	/**
+	 * Best-effort void of a Checkout.com authorisation. Used by the subscription change-payment
+	 * flow to release any hold left by a card-verification session. Errors are logged, not thrown.
+	 *
+	 * @param string $payment_id Checkout.com payment id (e.g. pay_xxx).
+	 * @return bool True on HTTP 2xx.
+	 */
+	protected function cko_flow_void_payment( $payment_id ) {
+		if ( empty( $payment_id ) ) {
+			return false;
+		}
+
+		$core_settings = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+
+		$secret_key = isset( $core_settings['ckocom_sk'] ) ? $core_settings['ckocom_sk'] : '';
+		if ( empty( $secret_key ) ) {
+			WC_Checkoutcom_Utility::logger( '[CHANGE PAYMENT METHOD] Void skipped — secret key not configured.' );
+			return false;
+		}
+
+		$env  = isset( $core_settings['ckocom_environment'] ) ? $core_settings['ckocom_environment'] : 'sandbox';
+		$base = ( 'sandbox' === $env ) ? 'https://api.sandbox.checkout.com' : 'https://api.checkout.com';
+
+		$response = wp_remote_post( $base . '/payments/' . rawurlencode( $payment_id ) . '/voids', array(
+			'timeout' => 15,
+			'headers' => array(
+				'Authorization' => 'Bearer ' . $secret_key,
+				'Content-Type'  => 'application/json',
+			),
+			'body'    => wp_json_encode( array( 'reference' => 'subscription-card-change-verification-void' ) ),
+		) );
+
+		if ( is_wp_error( $response ) ) {
+			WC_Checkoutcom_Utility::logger( '[CHANGE PAYMENT METHOD] Void request failed: ' . $response->get_error_message() );
+			return false;
+		}
+
+		$code = wp_remote_retrieve_response_code( $response );
+		WC_Checkoutcom_Utility::logger( '[CHANGE PAYMENT METHOD] Void of ' . $payment_id . ' returned HTTP ' . $code );
+		return $code >= 200 && $code < 300;
 	}
 
 	/**
@@ -2216,6 +2473,18 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			}
 		}
 		
+		// ── Subscription "Change payment method" (customer/admin) ──────────────────────────────
+		// WCS hands process_payment() the WC_Subscription itself as $order when a customer or admin
+		// changes the card on an existing subscription. The remainder of this method assumes a
+		// normal order (it sets ORDER statuses like 'processing', reduces stock, empties the cart,
+		// validates amount) — all invalid for a subscription, which is why it previously fataled
+		// with "Unable to change subscription status to processing" and stranded the sub on-hold.
+		// Route it to a dedicated, side-effect-free handler instead. The card-verification session
+		// was built amount=0/capture:false in ajax_create_payment_session, so no charge occurs.
+		if ( function_exists( 'wcs_is_subscription' ) && wcs_is_subscription( $order ) ) {
+			return $this->handle_subscription_payment_method_change( $order, $flow_payment_id );
+		}
+
 		if ( ! empty( $existing_transaction_id ) ) {
 			WC_Checkoutcom_Utility::logger( 'DUPLICATE PREVENTION: Order ' . $order_id . ' already has transaction ID: ' . $existing_transaction_id . ' - skipping processing' );
 			WC_Checkoutcom_Utility::logger( '[FLOW SAVE CARD] [DUPLICATE PREVENTION] Payment ID check - POST: ' . ( isset( $_POST['cko-flow-payment-id'] ) ? sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-id'] ) ) : 'NOT SET' ) . ', Order meta _cko_flow_payment_id: ' . $order->get_meta( '_cko_flow_payment_id' ) . ', Order meta _cko_payment_id: ' . $order->get_meta( '_cko_payment_id' ) . ', Final flow_payment_id: ' . $flow_payment_id );
@@ -3602,16 +3871,29 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			}
 
 			// Get source ID for the payment id for subscription product.
-			if ( function_exists( 'wcs_order_contains_subscription' ) && wcs_order_contains_subscription( $order->get_id() ) ) {
-				$request  = new \WP_REST_Request( 'GET', '/ckoplugin/v1/payment-status' );
+			// Also true in change-payment-method mode, where $order IS the WC_Subscription
+			// itself — wcs_order_contains_subscription() returns false for a subscription
+			// object, so we must additionally check wcs_is_subscription() or the new source
+			// never gets persisted and the next renewal charges the old card.
+			if ( ( function_exists( 'wcs_order_contains_subscription' ) && wcs_order_contains_subscription( $order->get_id() ) )
+				|| ( function_exists( 'wcs_is_subscription' ) && wcs_is_subscription( $order ) ) ) {
+				// Call cko_get_payment_status() directly instead of rest_do_request() —
+				// same reason as in flow_save_cards(): the REST endpoint requires a
+				// browser-scoped nonce we don't have server-side, and going through
+				// rest_do_request would return an error payload that downstream code
+				// would mistake for valid payment data.
+				$request = new \WP_REST_Request( 'GET', '/ckoplugin/v1/payment-status' );
 				$request->set_query_params( [ 'paymentId' => $flow_pay_id ] );
-				$result = rest_do_request( $request );
-				
-				if ( is_wp_error( $result ) ) {
-					$error_message = $result->get_error_message();
-					WC_Checkoutcom_Utility::logger( "There was an error in saving cards: $error_message" ); // phpcs:ignore
+
+				$response = cko_get_payment_status( $request );
+				$status   = $response instanceof \WP_REST_Response ? $response->get_status() : 500;
+				$data     = $response instanceof \WP_REST_Response ? $response->get_data() : null;
+
+				if ( $status >= 400 || ! is_array( $data ) || isset( $data['error'] ) ) {
+					$error_message = is_array( $data ) && isset( $data['error'] ) ? $data['error'] : 'Unknown error fetching payment status (HTTP ' . $status . ')';
+					WC_Checkoutcom_Utility::logger( "There was an error fetching payment status for subscription source: $error_message" );
 				} else {
-					$flow_result = $result->get_data();
+					$flow_result = $data;
 				}
 		}
 	}
@@ -3701,16 +3983,27 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		if ( null !== $status ) {
 			// CRITICAL: Refresh order from database and check current status to prevent downgrade
 			$order = wc_get_order( $order_id );
-			$current_status = $order->get_status();
-			
-			// Define protected statuses that should NEVER be downgraded
-			$protected_statuses = array( 'processing', 'completed' );
-			
-			// If order is already in a protected state, don't downgrade to on-hold
-			if ( in_array( $current_status, $protected_statuses, true ) && 'on-hold' === $status ) {
-				WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Order already in ' . $current_status . ' status - skipping update to ' . $status . ' to prevent downgrade. Order ID: ' . $order_id );
+
+			// Change-payment-method mode: $order_id is a WC_Subscription, not an order. WCS
+			// subscription statuses are active/on-hold/cancelled/etc. — 'processing'/'completed'
+			// are ORDER statuses, and calling update_status() with one throws "Unable to change
+			// subscription status to processing" and leaves the subscription on-hold. The card
+			// change only needs the new _cko_source_id (saved above); WCS manages the
+			// subscription's own status, so we skip the order-status transition entirely here.
+			if ( function_exists( 'wcs_is_subscription' ) && wcs_is_subscription( $order ) ) {
+				WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Subscription object (change-payment-method mode) — skipping order-status transition to "' . $status . '". Subscription ID: ' . $order_id );
 			} else {
-				$order->update_status( $status );
+				$current_status = $order->get_status();
+
+				// Define protected statuses that should NEVER be downgraded
+				$protected_statuses = array( 'processing', 'completed' );
+
+				// If order is already in a protected state, don't downgrade to on-hold
+				if ( in_array( $current_status, $protected_statuses, true ) && 'on-hold' === $status ) {
+					WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Order already in ' . $current_status . ' status - skipping update to ' . $status . ' to prevent downgrade. Order ID: ' . $order_id );
+				} else {
+					$order->update_status( $status );
+				}
 			}
 		}
 
@@ -3723,8 +4016,11 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			return; // Return early - don't clear cart or redirect
 		}
 
-		// Reduce stock levels.
-		wc_reduce_stock_levels( $order_id );
+		// Reduce stock levels — skip in change-payment-method mode ($order is a subscription,
+		// no purchase is occurring, so reducing stock would be incorrect).
+		if ( ! ( function_exists( 'wcs_is_subscription' ) && wcs_is_subscription( $order ) ) ) {
+			wc_reduce_stock_levels( $order_id );
+		}
 
 		// Get return URL before emptying cart
 		$return_url = $this->get_return_url( $order );
@@ -3932,7 +4228,21 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ERROR: Order key mismatch' );
 				wp_die( esc_html__( 'Invalid order key', 'checkout-com-unified-payments-api' ), esc_html__( 'Payment Error', 'checkout-com-unified-payments-api' ), array( 'response' => 400 ) );
 			}
-			
+
+			// Subscription "Change payment method" 3DS return: $order is the WC_Subscription itself.
+			// The amount/currency validation and status transitions further down assume a normal
+			// order — for a $0 verification they would fail the amount-match check and try to set the
+			// subscription to 'failed'. Delegate straight to process_payment(), which routes
+			// subscriptions to handle_subscription_payment_method_change(). process_payment() reads
+			// the payment id from the cko-payment-id GET param already present on this return URL.
+			if ( function_exists( 'wcs_is_subscription' ) && wcs_is_subscription( $order ) ) {
+				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Subscription change-payment-method 3DS return — delegating to process_payment. Subscription ID: ' . $order_id );
+				$result   = $this->process_payment( $order_id );
+				$redirect = ( is_array( $result ) && ! empty( $result['redirect'] ) ) ? $result['redirect'] : $order->get_view_order_url();
+				wp_safe_redirect( $redirect );
+				exit;
+			}
+
 			// PERFORMANCE: Fast path - order found, skip to payment processing
 			// Payment details will be fetched later if needed (after duplicate check)
 		} else {
@@ -4943,8 +5253,46 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			} else {
 				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] [CARD SAVING] ❌ Conditions NOT met - Payment type: ' . $flow_payment_type_for_save . ' (expected: card), Save enabled: ' . ( $save_card_enabled ? 'YES' : 'NO' ) . ', Checkbox: ' . ( $save_card_checkbox ? 'YES' : 'NO' ) );
 			}
+
+			// Subscription source-id save for 3DS returns.
+			// process_payment()'s duplicate-prevention branches early-return BEFORE reaching
+			// the subscription source-id save at line ~3699 — meaning on every 3DS return for
+			// a subscription order, _cko_source_id never gets persisted on the subscription,
+			// and the first renewal fails because there's no source to charge against.
+			// Saving it here in handle_3ds_return() — after process_payment, regardless of
+			// which branch process_payment took — closes that gap. save_source_id() is
+			// idempotent (just writes meta) so it's safe even when the normal path already
+			// saved it.
+			if ( ( function_exists( 'wcs_order_contains_subscription' ) && wcs_order_contains_subscription( $order_id ) )
+				|| ( function_exists( 'wcs_is_subscription' ) && wcs_is_subscription( $order ) ) ) {
+				$existing_source_id = $order->get_meta( '_cko_source_id' );
+				if ( ! empty( $existing_source_id ) ) {
+					WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] [SUBSCRIPTION SOURCE] Source ID already saved (' . $existing_source_id . ') - skipping' );
+				} else {
+					WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] [SUBSCRIPTION SOURCE] Fetching payment details to persist source_id for subscription' );
+					$source_request = new \WP_REST_Request( 'GET', '/ckoplugin/v1/payment-status' );
+					$source_request->set_query_params( [ 'paymentId' => $payment_id ] );
+					$source_response = cko_get_payment_status( $source_request );
+					$source_status   = $source_response instanceof \WP_REST_Response ? $source_response->get_status() : 500;
+					$source_data     = $source_response instanceof \WP_REST_Response ? $source_response->get_data() : null;
+
+					if ( $source_status < 400 && is_array( $source_data ) && ! isset( $source_data['error'] ) && ! empty( $source_data['source']['id'] ) ) {
+						WC_Checkoutcom_Subscription::save_source_id( $order_id, $order, $source_data['source']['id'] );
+						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] [SUBSCRIPTION SOURCE] ✅ Saved source_id ' . $source_data['source']['id'] . ' on order ' . $order_id );
+
+						// Also save the preferred card scheme (mirrors the normal-path save at line ~3702).
+						if ( 'card' === $flow_payment_type_for_save && ! empty( $source_data['source']['scheme'] ) ) {
+							$this->save_preferred_card_scheme( $order_id, $order, $source_data['source']['scheme'] );
+							WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] [SUBSCRIPTION SOURCE] ✅ Saved preferred card scheme: ' . $source_data['source']['scheme'] );
+						}
+					} else {
+						$err = is_array( $source_data ) && isset( $source_data['error'] ) ? $source_data['error'] : 'Unknown error (HTTP ' . $source_status . ')';
+						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] [SUBSCRIPTION SOURCE] ⚠️ Failed to fetch payment details - source_id NOT saved: ' . $err );
+					}
+				}
+			}
 		}
-			
+
 		// Redirect after card saving logic completes
 			if ( isset( $result['result'] ) && 'success' === $result['result'] && isset( $result['redirect'] ) ) {
 				$redirect_url = $result['redirect'];
@@ -5599,21 +5947,31 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		}
 
 		WC_Checkoutcom_Utility::logger( 'Fetching payment details from Checkout.com API...' );
-		$request  = new \WP_REST_Request( 'GET', '/ckoplugin/v1/payment-status' );
+
+		// Call cko_get_payment_status() directly instead of going through rest_do_request().
+		// The REST endpoint's permission_callback requires a `nonce` param (cko_flow_payment_session)
+		// which we can't easily produce server-side here, and going through rest_do_request would
+		// hit the permission failure → WP_REST_Response with status 403 → $result->get_data()
+		// returns the error payload, which save_token would then try to read as payment data,
+		// producing an invalid token row (empty token / null fields) and potentially a fatal
+		// inside WC_Payment_Token_CC->save() depending on WooCommerce version.
+		$request = new \WP_REST_Request( 'GET', '/ckoplugin/v1/payment-status' );
 		$request->set_query_params( [ 'paymentId' => $pay_id ] );
 
-		$result = rest_do_request( $request );
+		$response = cko_get_payment_status( $request );
+		$status   = $response instanceof \WP_REST_Response ? $response->get_status() : 500;
+		$data     = $response instanceof \WP_REST_Response ? $response->get_data() : null;
 
-		if ( is_wp_error( $result ) ) {
-			$error_message = $result->get_error_message();
-			WC_Checkoutcom_Utility::logger( "ERROR in saving cards: $error_message" ); // phpcs:ignore
+		if ( $status >= 400 || ! is_array( $data ) || isset( $data['error'] ) ) {
+			$error_message = is_array( $data ) && isset( $data['error'] ) ? $data['error'] : 'Unknown error fetching payment status (HTTP ' . $status . ')';
+			WC_Checkoutcom_Utility::logger( "ERROR in saving cards: $error_message" );
 			WC_Checkoutcom_Utility::logger( '=== FLOW_SAVE_CARDS METHOD END (ERROR) ===' );
-		} else {
-			$data = $result->get_data();
-			WC_Checkoutcom_Utility::logger( 'Payment data retrieved successfully' );
-			WC_Checkoutcom_Utility::logger( 'Payment data: ' . wp_json_encode( $data ) );
+			return;
 		}
-		
+
+		WC_Checkoutcom_Utility::logger( 'Payment data retrieved successfully' );
+		WC_Checkoutcom_Utility::logger( 'Payment data: ' . wp_json_encode( $data ) );
+
 		WC_Checkoutcom_Utility::logger( 'Calling save_token method...' );
 		$this->save_token( $order->get_user_id(), $data );
 		WC_Checkoutcom_Utility::logger( '=== FLOW_SAVE_CARDS METHOD END ===' );
@@ -7060,6 +7418,106 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			$payment_session_request['enabled_payment_methods'] = $raw_enabled_methods;
 		} elseif ( isset( $payment_session_request['enabled_payment_methods'] ) ) {
 			unset( $payment_session_request['enabled_payment_methods'] );
+		}
+
+		// Customer-Initiated Transaction (CIT) flag for subscriptions.
+		// When the cart (or the order being paid on an order-pay page) contains a subscription,
+		// this first payment is a customer-initiated recurring setup, so it must be sent with
+		// payment_type = Recurring (sets up the stored-credential / recurring agreement).
+		// We deliberately do NOT send merchant_initiated here — the customer is present and
+		// Checkout.com treats its absence as a customer-initiated payment; sending it on the
+		// initial Flow session is unnecessary/incorrect. Renewals (MIT) are handled server-side
+		// in WC_Checkoutcom_Api_Request with merchant_initiated=true + previous_payment_id.
+		// We enforce this here, server-side, so the client cannot tamper with it.
+		$is_subscription_cit = false;
+		if ( class_exists( 'WC_Subscriptions_Cart' ) && WC()->cart && ! WC()->cart->is_empty()
+			&& WC_Subscriptions_Cart::cart_contains_subscription() ) {
+			$is_subscription_cit = true;
+		} else {
+			// Order-pay fallback: paying for an existing subscription parent order (cart may be empty).
+			$cko_cit_order_id = isset( $_POST['order_id'] ) ? absint( wp_unslash( $_POST['order_id'] ) ) : 0;
+			if ( $cko_cit_order_id && function_exists( 'wcs_order_contains_subscription' ) ) {
+				$cko_cit_order = wc_get_order( $cko_cit_order_id );
+				if ( $cko_cit_order && wcs_order_contains_subscription( $cko_cit_order, 'parent' ) ) {
+					$is_subscription_cit = true;
+				}
+			}
+		}
+
+		if ( $is_subscription_cit ) {
+			$payment_session_request['payment_type'] = class_exists( 'Checkout\\Payments\\PaymentType' ) ? \Checkout\Payments\PaymentType::$recurring : 'Recurring';
+			// Ensure no merchant_initiated flag leaks in from the client for a CIT.
+			unset( $payment_session_request['merchant_initiated'] );
+			WC_Checkoutcom_Utility::logger( '[PAYMENT SESSION] CIT subscription detected — payment_type=Recurring (merchant_initiated not sent)' );
+		}
+
+		// Subscription "Change payment method" flow (customer/admin updating the card on an
+		// existing subscription). The client flags this via is_subscription_payment_change when the
+		// order-pay URL carries ?change_payment_method=<id>. We build a ZERO-AMOUNT, capture:false
+		// account-verification session so swapping a card never charges the customer, and mark it
+		// Recurring. The verification still returns a usable source.id, which process_payment ->
+		// handle_subscription_payment_method_change() then stores on the subscription for future
+		// MIT renewals. We re-verify server-side that the referenced id is really a subscription
+		// before trusting the client flag.
+		$is_sub_pay_change = ! empty( $_POST['is_subscription_payment_change'] ) && '1' === sanitize_text_field( wp_unslash( $_POST['is_subscription_payment_change'] ) );
+		if ( $is_sub_pay_change && is_user_logged_in() ) {
+			$change_sub_id = isset( $_POST['change_payment_method'] ) ? absint( wp_unslash( $_POST['change_payment_method'] ) ) : 0;
+			$change_sub    = $change_sub_id ? wc_get_order( $change_sub_id ) : false;
+			if ( $change_sub && function_exists( 'wcs_is_subscription' ) && wcs_is_subscription( $change_sub ) ) {
+				$payment_session_request['amount']       = 0;     // account verification — no charge for changing a card
+				$payment_session_request['capture']      = false;
+				$payment_session_request['payment_type'] = class_exists( 'Checkout\\Payments\\PaymentType' ) ? \Checkout\Payments\PaymentType::$recurring : 'Recurring';
+				unset( $payment_session_request['items'] );
+				unset( $payment_session_request['merchant_initiated'] );
+
+				// Detach this verification from the subscription so the payment webhooks
+				// (authorize_payment / void_payment) cannot resolve the subscription as an "order"
+				// and flip its status to on-hold. The webhook resolves the order from
+				// metadata.order_id, falling back to a NUMERIC reference — so we clear order_id and
+				// set a non-numeric reference. Our handle_subscription_payment_method_change() uses
+				// the payment_id from the return URL (not the reference), so detaching is safe.
+				if ( isset( $payment_session_request['metadata'] ) && is_array( $payment_session_request['metadata'] ) ) {
+					unset( $payment_session_request['metadata']['order_id'] );
+				}
+				$payment_session_request['reference'] = 'cko-card-change-' . $change_sub_id;
+
+				WC_Checkoutcom_Utility::logger( '[PAYMENT SESSION] Subscription change-payment-method mode — amount=0, capture=false, payment_type=Recurring, detached from subscription webhooks. Subscription ID: ' . $change_sub_id );
+			} else {
+				WC_Checkoutcom_Utility::logger( '[PAYMENT SESSION] is_subscription_payment_change flag set but id ' . $change_sub_id . ' is not a subscription — ignoring.' );
+			}
+		}
+
+		// Add Payment Method (My Account → Payment methods → Add payment method). No cart/order here,
+		// so force a $0 card verification: amount=0, capture=false, cards only, no items (sending the
+		// inherited cart items with a $0 amount is what triggers Checkout.com's items_invalid error),
+		// and a non-numeric reference so payment webhooks never resolve an order from it. On success
+		// the wc_checkoutcom_flow_add_payment_method endpoint tokenises the card as a WC_Payment_Token_CC.
+		$is_add_payment_method = ! empty( $_POST['is_add_payment_method'] ) && '1' === sanitize_text_field( wp_unslash( $_POST['is_add_payment_method'] ) );
+		if ( $is_add_payment_method && is_user_logged_in() ) {
+			$payment_session_request['amount']                  = 0;
+			$payment_session_request['capture']                 = false;
+			$payment_session_request['enabled_payment_methods'] = array( 'card' );
+			$payment_session_request['reference']               = 'cko-add-payment-method-' . get_current_user_id();
+			unset( $payment_session_request['items'] );
+			unset( $payment_session_request['merchant_initiated'] );
+			if ( isset( $payment_session_request['metadata'] ) && is_array( $payment_session_request['metadata'] ) ) {
+				unset( $payment_session_request['metadata']['order_id'] );
+			}
+			if ( empty( $payment_session_request['currency'] ) ) {
+				$payment_session_request['currency'] = get_woocommerce_currency();
+			}
+			// Drop billing/shipping address when the country is missing or not a valid 2-letter ISO
+			// code. A $0 card verification doesn't need an address, and an empty/invalid country
+			// triggers Checkout.com's billing_address_country_invalid / shipping_address_country_invalid.
+			$bill_country = isset( $payment_session_request['billing']['address']['country'] ) ? (string) $payment_session_request['billing']['address']['country'] : '';
+			if ( ! preg_match( '/^[A-Za-z]{2}$/', $bill_country ) ) {
+				unset( $payment_session_request['billing'] );
+			}
+			$ship_country = isset( $payment_session_request['shipping']['address']['country'] ) ? (string) $payment_session_request['shipping']['address']['country'] : '';
+			if ( ! preg_match( '/^[A-Za-z]{2}$/', $ship_country ) ) {
+				unset( $payment_session_request['shipping'] );
+			}
+			WC_Checkoutcom_Utility::logger( '[PAYMENT SESSION] Add-payment-method mode — amount=0, capture=false, cards-only, items dropped, reference detached, address ' . ( isset( $payment_session_request['billing'] ) ? 'kept' : 'dropped' ) . '. User ID: ' . get_current_user_id() );
 		}
 
 		// Determine API URL based on environment
@@ -8564,38 +9022,65 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			'session_data' => $session_data,
 		);
 
+		// Subscription "Change payment method": the order being submitted is a WC_Subscription.
+		// This SUBMIT step is where amount/reference/capture are finalised from the order — so the
+		// zero-amount/detach forced at session-creation must be re-applied here too, otherwise the
+		// order total (full recurring amount) is re-derived and CAPTURED, charging the customer for
+		// a card change and re-attaching the payment to the subscription (which the webhooks then
+		// flip to on-hold and fatal on capture). Force a zero-amount, capture:false, detached
+		// verification instead.
+		$is_sub_pay_change = false;
+		if ( $order_id > 0 && function_exists( 'wcs_is_subscription' ) ) {
+			$maybe_change_sub = wc_get_order( $order_id );
+			if ( $maybe_change_sub && wcs_is_subscription( $maybe_change_sub ) ) {
+				$is_sub_pay_change = true;
+			}
+		}
+
+		// Add Payment Method (My Account → add-payment-method): also a $0 card verification, flagged
+		// by the client since there is no order to resolve from. Same enforcement as change-payment.
+		$is_add_pm = ! empty( $_POST['is_add_payment_method'] ) && '1' === sanitize_text_field( wp_unslash( $_POST['is_add_payment_method'] ) ) && is_user_logged_in();
+
 		// CRITICAL: Always get the correct amount from WooCommerce order or cart
 		// This ensures coupons/discounts are properly applied even if client-side tracking fails
 		$final_amount = $amount; // Start with client-provided amount
-		
-		// If order_id is provided, get amount from order (most reliable - includes coupons, taxes, etc.)
-		if ( $order_id > 0 ) {
-			$order = wc_get_order( $order_id );
-			if ( $order ) {
-				$order_currency = $order->get_currency();
-				$order_total_decimal = (float) $order->get_total();
-				$order_amount_minor = (int) WC_Checkoutcom_Utility::value_to_decimal( $order_total_decimal, $order_currency );
-				
-				WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Order amount check - Order ID: ' . $order_id . ', Order total: ' . $order_total_decimal . ' ' . $order_currency . ', Minor units: ' . $order_amount_minor . ', Client amount: ' . $amount );
-				
-				// Use order amount (always has correct discounted total)
-				$final_amount = $order_amount_minor;
-			}
-		} elseif ( WC()->cart && ! WC()->cart->is_empty() ) {
-			// Fallback to cart if no order (shouldn't happen in normal flow)
-			$cart_total = WC()->cart->get_total( 'edit' );
-			$cart_currency = get_woocommerce_currency();
-			$cart_amount_minor = (int) WC_Checkoutcom_Utility::value_to_decimal( (float) $cart_total, $cart_currency );
-			
-			WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Cart amount check - Cart total: ' . $cart_total . ' ' . $cart_currency . ', Minor units: ' . $cart_amount_minor . ', Client amount: ' . $amount );
-			
-			$final_amount = $cart_amount_minor;
-		}
 
-		// Add amount to request (always include to ensure correct discounted amount)
-		if ( $final_amount > 0 ) {
-			$request_body['amount'] = $final_amount;
-			WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Including amount in request: ' . $final_amount );
+		if ( $is_sub_pay_change || $is_add_pm ) {
+			// Zero-amount card verification — never charge for a card change / add-card.
+			$final_amount           = 0;
+			$request_body['amount']  = 0;
+			$reference               = $is_add_pm ? ( 'cko-add-payment-method-' . get_current_user_id() ) : ( 'cko-card-change-' . $order_id ); // non-numeric → webhooks can't resolve an order
+			WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] ' . ( $is_add_pm ? 'Add-payment-method' : 'Subscription change-payment-method' ) . ' mode — forcing amount=0, capture off, reference detached.' );
+		} else {
+			// If order_id is provided, get amount from order (most reliable - includes coupons, taxes, etc.)
+			if ( $order_id > 0 ) {
+				$order = wc_get_order( $order_id );
+				if ( $order ) {
+					$order_currency = $order->get_currency();
+					$order_total_decimal = (float) $order->get_total();
+					$order_amount_minor = (int) WC_Checkoutcom_Utility::value_to_decimal( $order_total_decimal, $order_currency );
+
+					WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Order amount check - Order ID: ' . $order_id . ', Order total: ' . $order_total_decimal . ' ' . $order_currency . ', Minor units: ' . $order_amount_minor . ', Client amount: ' . $amount );
+
+					// Use order amount (always has correct discounted total)
+					$final_amount = $order_amount_minor;
+				}
+			} elseif ( WC()->cart && ! WC()->cart->is_empty() ) {
+				// Fallback to cart if no order (shouldn't happen in normal flow)
+				$cart_total = WC()->cart->get_total( 'edit' );
+				$cart_currency = get_woocommerce_currency();
+				$cart_amount_minor = (int) WC_Checkoutcom_Utility::value_to_decimal( (float) $cart_total, $cart_currency );
+
+				WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Cart amount check - Cart total: ' . $cart_total . ' ' . $cart_currency . ', Minor units: ' . $cart_amount_minor . ', Client amount: ' . $amount );
+
+				$final_amount = $cart_amount_minor;
+			}
+
+			// Add amount to request (always include to ensure correct discounted amount)
+			if ( $final_amount > 0 ) {
+				$request_body['amount'] = $final_amount;
+				WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Including amount in request: ' . $final_amount );
+			}
 		}
 		
 		// Add reference if provided (WooCommerce order ID for tracking in Checkout.com dashboard)
@@ -8610,10 +9095,14 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Including reference: ' . $reference );
 		}
 		
-		// Add billing address if provided (dynamic address adjustment)
+		// Add billing address if provided (dynamic address adjustment).
+		// Only include it when the country is a valid 2-letter ISO code — sending an empty/invalid
+		// country triggers Checkout.com's billing_address_country_invalid (common on the add-payment-
+		// method page where the customer may have no saved country).
 		if ( ! empty( $billing_json ) ) {
 			$billing_data = json_decode( $billing_json, true );
-			if ( json_last_error() === JSON_ERROR_NONE && is_array( $billing_data ) ) {
+			$billing_country_valid = is_array( $billing_data ) && isset( $billing_data['country'] ) && preg_match( '/^[A-Za-z]{2}$/', (string) $billing_data['country'] );
+			if ( json_last_error() === JSON_ERROR_NONE && is_array( $billing_data ) && $billing_country_valid ) {
 				$request_body['billing'] = array(
 					'address' => array(
 						'address_line1' => isset( $billing_data['address_line1'] ) ? sanitize_text_field( $billing_data['address_line1'] ) : '',
@@ -8634,10 +9123,12 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			}
 		}
 		
-		// Add shipping address if provided (dynamic address adjustment)
+		// Add shipping address if provided (dynamic address adjustment).
+		// Only include it when the country is a valid 2-letter ISO code (see billing note above).
 		if ( ! empty( $shipping_json ) ) {
 			$shipping_data = json_decode( $shipping_json, true );
-			if ( json_last_error() === JSON_ERROR_NONE && is_array( $shipping_data ) ) {
+			$shipping_country_valid = is_array( $shipping_data ) && isset( $shipping_data['country'] ) && preg_match( '/^[A-Za-z]{2}$/', (string) $shipping_data['country'] );
+			if ( json_last_error() === JSON_ERROR_NONE && is_array( $shipping_data ) && $shipping_country_valid ) {
 				$request_body['shipping'] = array(
 					'address' => array(
 						'address_line1' => isset( $shipping_data['address_line1'] ) ? sanitize_text_field( $shipping_data['address_line1'] ) : '',
@@ -8712,7 +9203,12 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// issues when customers took longer than expected to complete checkout/3DS - the
 		// capture_on timestamp would be in the past, leading to immediate capture and webhook race conditions.
 		$auto_capture = '1' === WC_Admin_Settings::get_option( 'ckocom_card_autocap', '1' );
-		
+
+		// Never capture a card-change / add-card verification — it must stay a $0 auth only.
+		if ( $is_sub_pay_change || $is_add_pm ) {
+			$auto_capture = false;
+		}
+
 		WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Auto-capture setting: ' . ( $auto_capture ? 'ENABLED' : 'DISABLED' ) );
 		
 		if ( $auto_capture ) {
@@ -9059,7 +9555,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			) );
 		}
 	}
-	
+
 	/**
 	 * AJAX handler for storing save card preference in WooCommerce session
 	 * This ensures the value survives 3DS redirects

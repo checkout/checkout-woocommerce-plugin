@@ -264,30 +264,56 @@ var ckoFlow = {
 			return;
 		}
 		
-		const checkoutData = window.FlowInitialization.collectCheckoutData();
-		if (!checkoutData) {
-			ckoLogger.error('loadFlow: Checkout data not available');
-			hideLoadingOverlay();
-			showError('Please complete required fields to continue with payment.');
-			return;
-		}
-		
-		if (typeof window.FlowValidation !== 'undefined' && window.FlowValidation.validateCheckoutData) {
-			const dataValidation = window.FlowValidation.validateCheckoutData(checkoutData);
-			if (!dataValidation.isValid) {
-				if (dataValidation.reason === 'INVALID_EMAIL') {
-					ckoLogger.error('❌ BLOCKED: Invalid email during data collection', { email: dataValidation.email });
-					hideLoadingOverlay();
-					showError('Please enter a valid email address to continue with payment.');
-				} else {
-					ckoLogger.error('❌ BLOCKED: Invalid checkout data', { reason: dataValidation.reason });
-					hideLoadingOverlay();
-					showError('Please complete required fields to continue with payment.');
-				}
+		// Add-Payment-Method mode: no cart/checkout form on /my-account/add-payment-method/, so build
+		// a synthetic checkoutData from the customer profile PHP injected into customer_data_for_setup.
+		// amount/capture are forced to a $0 verification server-side in ajax_create_payment_session()
+		// AND ajax_submit_payment_session() — the values here are placeholders.
+		const isAddPaymentMethodMode = (typeof cko_flow_vars !== 'undefined' && ( cko_flow_vars.is_add_payment_method === true || cko_flow_vars.is_add_payment_method === '1' || cko_flow_vars.is_add_payment_method === 1 ));
+		let checkoutData;
+		if (isAddPaymentMethodMode) {
+			const setup = (cko_flow_vars.customer_data_for_setup) || {};
+			checkoutData = {
+				amount: 0,
+				currency: cko_flow_vars.add_payment_method_currency || 'USD',
+				reference: 'cko-add-payment-method',
+				email: setup.email || '',
+				family_name: setup.last_name || '',
+				given_name: setup.first_name || '',
+				phone: '',
+				address1: setup.address_1 || '', address2: setup.address_2 || '',
+				city: setup.city || '', state: setup.state || '', zip: setup.postcode || '', country: setup.country || '',
+				shippingAddress1: setup.address_1 || '', shippingAddress2: setup.address_2 || '',
+				shippingCity: setup.city || '', shippingState: setup.state || '', shippingZip: setup.postcode || '', shippingCountry: setup.country || '',
+				orders: [], description: 'Add payment method', orderId: null,
+				payment_type: cko_flow_vars.regular_payment_type || 'Regular',
+			};
+			ckoLogger.debug('loadFlow: [add-payment-method] using synthetic checkoutData from customer_data_for_setup');
+		} else {
+			checkoutData = window.FlowInitialization.collectCheckoutData();
+			if (!checkoutData) {
+				ckoLogger.error('loadFlow: Checkout data not available');
+				hideLoadingOverlay();
+				showError('Please complete required fields to continue with payment.');
 				return;
 			}
+
+			if (typeof window.FlowValidation !== 'undefined' && window.FlowValidation.validateCheckoutData) {
+				const dataValidation = window.FlowValidation.validateCheckoutData(checkoutData);
+				if (!dataValidation.isValid) {
+					if (dataValidation.reason === 'INVALID_EMAIL') {
+						ckoLogger.error('❌ BLOCKED: Invalid email during data collection', { email: dataValidation.email });
+						hideLoadingOverlay();
+						showError('Please enter a valid email address to continue with payment.');
+					} else {
+						ckoLogger.error('❌ BLOCKED: Invalid checkout data', { reason: dataValidation.reason });
+						hideLoadingOverlay();
+						showError('Please complete required fields to continue with payment.');
+					}
+					return;
+				}
+			}
 		}
-		
+
 		// Extract variables from checkoutData for use in rest of function
 		let amount = checkoutData.amount;
 		let currency = checkoutData.currency;
@@ -510,7 +536,9 @@ var ckoFlow = {
 				metadata: metadata,
 				payment_method_configuration: {
 					card: {
-						store_payment_details: (cko_flow_vars.save_card === "1" || cko_flow_vars.save_card === true || cko_flow_vars.save_card === "yes") ? "enabled" : "disabled",
+						// On Add Payment Method the card must be stored to be reusable, so force enabled
+						// there; otherwise follow the merchant's Save Card setting.
+						store_payment_details: ( isAddPaymentMethodMode || cko_flow_vars.save_card === "1" || cko_flow_vars.save_card === true || cko_flow_vars.save_card === "yes") ? "enabled" : "disabled",
 					},
 				},
 				capture: cko_flow_vars.auto_capture === true || cko_flow_vars.auto_capture === "true" || cko_flow_vars.auto_capture === "1" || cko_flow_vars.auto_capture === 1,
@@ -837,7 +865,33 @@ var ckoFlow = {
 			
 			ckoLogger.debug('✅ Email validated before API call', { email: paymentSessionRequest.customer.email });
 
+			// Add-Payment-Method: route Flow's success/failure (incl. after 3DS) to the dedicated
+			// token-save endpoint, so the verified card is tokenised regardless of the 3DS path.
+			const ckoIsAddPaymentMethod = (typeof cko_flow_vars !== 'undefined' && ( cko_flow_vars.is_add_payment_method === true || cko_flow_vars.is_add_payment_method === '1' || cko_flow_vars.is_add_payment_method === 1 ));
+			if (ckoIsAddPaymentMethod) {
+				const apmNonce = cko_flow_vars.save_card_nonce || '';
+				const apmUrl = window.location.origin + "/?wc-api=wc_checkoutcom_flow_add_payment_method&cko-apm-nonce=" + encodeURIComponent(apmNonce);
+				paymentSessionRequest.success_url = apmUrl;
+				paymentSessionRequest.failure_url = apmUrl + "&cko-apm-failed=1";
+				ckoLogger.debug('[PAYMENT SESSION] Add-payment-method mode — routing success/failure to token-save endpoint');
+			}
+
 			formData.append('payment_session_request', JSON.stringify(paymentSessionRequest));
+
+			if (ckoIsAddPaymentMethod) {
+				formData.append('is_add_payment_method', '1');
+			}
+
+			// Subscription "Change payment method" flow. WCS routes the customer/admin card-change
+			// through an order-pay page carrying ?change_payment_method=<id> in the URL. Flag it so
+			// the server can build a zero-amount, capture:false card-verification session (no charge
+			// for swapping a card) and recognise this as a recurring-method update.
+			const ckoChangePaymentMethod = new URLSearchParams(window.location.search).get('change_payment_method');
+			if (ckoChangePaymentMethod) {
+				formData.append('is_subscription_payment_change', '1');
+				formData.append('change_payment_method', ckoChangePaymentMethod);
+				ckoLogger.debug('[PAYMENT SESSION] Subscription change-payment-method mode detected — flagging request', { subscription: ckoChangePaymentMethod });
+			}
 
 			let response = await fetch(getCkoAjaxUrl('cko_flow_create_payment_session'), {
 				method: "POST",
@@ -1987,6 +2041,12 @@ var ckoFlow = {
 						ckoLogger.debug('[HANDLE SUBMIT] ✅ Reference with order ID being sent:', orderIdToUse);
 					}
 
+					// Add-payment-method: flag the submit so the server keeps it a $0, capture:false
+					// card verification (this page posts no order_id/reference).
+					if (typeof cko_flow_vars !== 'undefined' && ( cko_flow_vars.is_add_payment_method === true || cko_flow_vars.is_add_payment_method === '1' || cko_flow_vars.is_add_payment_method === 1 )) {
+						formData.append('is_add_payment_method', '1');
+					}
+
 					const response = await fetch(getCkoAjaxUrl('cko_flow_submit_payment_session'), {
 						method: 'POST',
 						body: formData
@@ -2973,7 +3033,16 @@ function canInitializeFlow() {
 		ckoLogger.debug('canInitializeFlow: Already initialized');
 		return true; // Already initialized
 	}
-	
+
+	// Add-Payment-Method page (/my-account/add-payment-method/): no cart, no checkout form, so
+	// the cart/address/required-field checks below would all fail. Flow is selected and the
+	// container exists (verified above); the session is forced to a $0 verification server-side,
+	// so we can initialize straight away. (Boolean arrives as "1" from wp_localize_script.)
+	if (typeof cko_flow_vars !== 'undefined' && ( cko_flow_vars.is_add_payment_method === true || cko_flow_vars.is_add_payment_method === '1' || cko_flow_vars.is_add_payment_method === 1 )) {
+		ckoLogger.debug('canInitializeFlow: [add-payment-method] bypassing cart/address/required-field checks');
+		return true;
+	}
+
 	// Check cart has items
 	// Note: cart_total might not be available in cko_flow_vars
 	// If we're on checkout page, WooCommerce ensures cart has items (redirects empty carts)
@@ -5159,7 +5228,33 @@ document.addEventListener("DOMContentLoaded", function () {
 					}
 					return; // Exit early - don't create order via AJAX, don't use Flow component
 				}
-				
+
+				// Add Payment Method page: WC's "Add payment method" button is id="place_order", so this
+				// handler fires here too — but there's no checkout/order-pay form to submit. Drive the Flow
+				// $0 card verification directly; Flow then redirects to wc_checkoutcom_flow_add_payment_method,
+				// which tokenises the card. (default was prevented above, so the WC form won't submit.)
+				if (typeof cko_flow_vars !== 'undefined' && ( cko_flow_vars.is_add_payment_method === true || cko_flow_vars.is_add_payment_method === '1' || cko_flow_vars.is_add_payment_method === 1 )) {
+					if (ckoFlow.flowComponent && typeof ckoFlow.flowComponent.submit === 'function') {
+						const apmValid = (typeof ckoFlow.flowComponent.isValid === 'function') ? ckoFlow.flowComponent.isValid() : true;
+						if (!apmValid) {
+							ckoLogger.error('[ADD PAYMENT METHOD] Flow component invalid - cannot submit');
+							showError('Please complete the card details.');
+							return;
+						}
+						ckoLogger.debug('[ADD PAYMENT METHOD] Submitting Flow component for $0 card verification');
+						try {
+							ckoFlow.flowComponent.submit();
+						} catch (e) {
+							ckoLogger.error('[ADD PAYMENT METHOD] Flow submit failed:', e);
+							showError('Could not add the card. Please try again.');
+						}
+					} else {
+						ckoLogger.error('[ADD PAYMENT METHOD] Flow component not ready');
+						showError('Payment component not ready. Please refresh the page and try again.');
+					}
+					return;
+				}
+
 				// CRITICAL: Validate checkout form FIRST before creating order
 				// This ensures orders are only created when form is valid
 				const form = jQuery("form.checkout");
