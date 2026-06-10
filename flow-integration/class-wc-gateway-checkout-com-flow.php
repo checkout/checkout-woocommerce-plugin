@@ -1950,20 +1950,27 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		<?php endif; ?>
 		<?php
 
-		// On the Add Payment Method page (My Account → Payment methods → Add payment method) the
-		// sole purpose is to add a NEW card, so don't show the customer's existing saved cards or
-		// the "save card for future purchases" checkbox (the card is saved regardless here).
-		$is_add_pm_page = function_exists( 'is_add_payment_method_page' ) && is_add_payment_method_page();
+		// Hide the saved-cards list and the "save card for future purchases" checkbox on pages whose
+		// sole purpose is to register a NEW card:
+		//   - Add Payment Method page (My Account → Payment methods → Add payment method)
+		//   - Subscription "Change payment method" (order-pay page carrying ?change_payment_method)
+		// On both, the card is handled as a fresh $0 verification. Showing saved cards there let the
+		// customer pick a token whose (stale) source then got applied to the subscription instead of
+		// their selection; and the save-card checkbox did nothing. Hiding both removes the ambiguity.
+		$is_add_pm_page    = function_exists( 'is_add_payment_method_page' ) && is_add_payment_method_page();
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only page detection
+		$is_change_pm_page = ! empty( $_GET['change_payment_method'] );
+		$hide_new_card_ui  = $is_add_pm_page || $is_change_pm_page;
 
 		// check if saved card enable from module setting.
-		if ( $save_card && ! $is_add_pm_page ) {
+		if ( $save_card && ! $hide_new_card_ui ) {
 			// Show saved cards from BOTH Flow and Classic Cards gateways
 			// No migration needed - backend already handles both token types
 			$this->saved_payment_methods();
 		}
 
-		// Render Save Card input (hidden on the Add Payment Method page).
-		if ( ! $is_add_pm_page ) {
+		// Render Save Card input (hidden on add-payment-method and change-payment-method pages).
+		if ( ! $hide_new_card_ui ) {
 			$this->element_form_save_card( $save_card );
 		}
 	}
@@ -1978,6 +1985,19 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	 */
 	public function saved_payment_methods() {
 		if ( ! is_user_logged_in() ) {
+			return;
+		}
+
+		// Never render the saved-cards list on pages whose sole purpose is registering a NEW card:
+		//   - Add Payment Method page
+		//   - Subscription "Change payment method" (order-pay page carrying ?change_payment_method)
+		// Showing tokens there let the customer pick a saved card whose stale source then got applied
+		// to the subscription instead of their selection. Guard here (not just in the caller) so the
+		// list is suppressed no matter who invokes saved_payment_methods().
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only page detection
+		$is_change_pm_page = ! empty( $_GET['change_payment_method'] );
+		$is_add_pm_page    = function_exists( 'is_add_payment_method_page' ) && is_add_payment_method_page();
+		if ( $is_change_pm_page || $is_add_pm_page ) {
 			return;
 		}
 

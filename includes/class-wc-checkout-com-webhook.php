@@ -393,8 +393,17 @@ class WC_Checkout_Com_Webhook {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Payment ID: ' . ($webhook_data->id ?? 'NULL') );
 		}
 
-		// Return false if no order id.
+		// Return if no order id. Card-change / add-payment-method verifications are intentionally
+		// detached from any order (a $0 card verification with a non-numeric reference like
+		// "cko-card-change-123" / "cko-add-payment-method-4"), so card_verified arriving with no
+		// numeric order is EXPECTED — the token/source is saved by our own return handler, not here.
+		// Acknowledge it quietly (return true, no retry) instead of logging a misleading error.
 		if ( empty( $order_id ) || ! is_numeric( $order_id ) ) {
+			$ref = isset( $webhook_data->reference ) ? (string) $webhook_data->reference : '';
+			if ( 0 === strpos( $ref, 'cko-card-change-' ) || 0 === strpos( $ref, 'cko-add-payment-method-' ) ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: card_verified for a standalone card verification (reference: ' . $ref . ') — no order to update, acknowledging.' );
+				return true;
+			}
 			// Always log errors
 			WC_Checkoutcom_Utility::logger( "WEBHOOK PROCESS: ERROR - Invalid/Empty order_id: " . ($order_id ?? 'NULL') );
 			if ( $webhook_debug_enabled ) {

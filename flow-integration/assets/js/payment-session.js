@@ -4111,6 +4111,32 @@ document.addEventListener("DOMContentLoaded", function () {
 	const loadTime = Date.now();
 	window.ckoPageLoadTimestamps.push(loadTime);
 
+	// Subscription "Change payment method" + Add Payment Method: client-side fallback to hide the
+	// saved-cards list and the save-card checkbox. The server already suppresses these (see
+	// saved_payment_methods()), but this guarantees they're gone even if a cached/older server
+	// render slipped through — and prevents picking a saved card whose stale source would otherwise
+	// be applied to the subscription. Keyed on the real browser URL, which always carries the param.
+	(function ckoHideSavedCardsOnNewCardPages() {
+		const isChangePm = !!new URLSearchParams(window.location.search).get('change_payment_method');
+		const isAddPm = (typeof cko_flow_vars !== 'undefined' && ( cko_flow_vars.is_add_payment_method === true || cko_flow_vars.is_add_payment_method === '1' || cko_flow_vars.is_add_payment_method === 1 ));
+		if (!isChangePm && !isAddPm) return;
+		const hide = function () {
+			jQuery('.cko-flow__saved-cards-accordion-container, .woocommerce-SavedPaymentMethods.wc-saved-payment-methods, .woocommerce-SavedPaymentMethods-saveNew, .cko-save-card-checkbox').hide();
+			// Deselect any saved-card radio so it can't be submitted as the (stale) source.
+			jQuery('input[name="wc-wc_checkout_com_flow-payment-token"]').prop('checked', false);
+			// Hide the WCS "Use this payment method for all of my current subscriptions" checkbox.
+			// Our redirect-based change-payment flow can't honour it reliably, so we hide it and
+			// uncheck it; customers update each subscription individually (which works).
+			jQuery('#update_all_subscriptions_payment_method, input[name="update_all_subscriptions_payment_method"]')
+				.prop('checked', false)
+				.closest('p, .form-row, li').hide();
+		};
+		hide();
+		// Re-apply after any async re-render of the payment area.
+		jQuery(document.body).on('updated_checkout', hide);
+		ckoLogger.debug('[CKO] Hiding saved cards + save-card checkbox (new-card page: change-payment/add-payment-method)');
+	})();
+
 	normalizeFlowPaymentLabelText();
 	
 	jQuery(document.body).on('updated_checkout', function() {
