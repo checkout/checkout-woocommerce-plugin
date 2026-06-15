@@ -9,6 +9,38 @@ so that renewals and saved-card payments work on the CKO plugin.
 
 ---
 
+## In plain language — what happens & what the merchant does
+
+When a merchant moves to Checkout.com, their saved cards are re-vaulted at Checkout.com, which returns a
+new ID for each card (the **`source_id`**, e.g. `src_xxxx`). That ID is what Checkout.com charges from then
+on. The technical sections below give the exact steps; here's the short version.
+
+**What the merchant needs to do:**
+
+1. **Get the new card IDs from Checkout.com.** The old provider sends the raw card data **to Checkout.com**
+   (not to the merchant); Checkout.com vaults the cards and gives the merchant back the list of
+   **`source_id`s**. *(The old provider does not hand over Checkout.com `source_id`s — Checkout.com does.)*
+
+2. **Put each card ID on its subscription.** For every subscription, save the **`source_id`**, set the
+   payment method to **Checkout.com**, and keep the subscription **active**. Renewals then charge the new
+   card automatically.
+
+3. **Get the "first-payment reference" from the old provider, too.** Card networks want each renewal to
+   reference the original first payment (the **scheme transaction ID** / `previous_payment_id`). For
+   migrated subscriptions that first payment happened at the *old* provider, so the merchant must request
+   those **scheme transaction IDs** from the incumbent and store them. **If they're missing, some renewals
+   can be declined by the bank** even though the card ID is correct.
+
+4. **Re-add the saved cards** into WooCommerce's saved-card tables so customers see them under
+   *My Account → Payment methods*.
+
+**Important note on step 3 (for our team):** today the plugin looks for that first-payment reference on an
+"original order" that migrated subscriptions don't have. The clean fix is a small plugin update so the
+reference can live **directly on the subscription** — so merchants don't have to create fake "dummy"
+orders just to hold it. **Recommended: do that enhancement; do not create dummy parent orders.**
+
+---
+
 ## 0. Prerequisites
 
 - You must have, **per saved card / per subscription**, the Checkout.com **`source_id`** (`src_xxxxxxxx…`).
