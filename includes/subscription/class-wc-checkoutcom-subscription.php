@@ -41,6 +41,10 @@ class WC_Checkoutcom_Subscription {
 			$args['source_id']        = $subscriptions_obj->get_meta( '_cko_source_id' );
 			$args['parent_order_id']  = $subscriptions_obj->get_parent_id();
 			$args['preferred_scheme'] = $subscriptions_obj->get_meta( '_cko_preferred_scheme' );
+			// previous_payment_id (scheme transaction id) stored directly on the subscription — set when
+			// migrating parent-less subscriptions, or on a card change. create_payment() falls back to
+			// the parent order's _cko_payment_id when this is empty (native CKO subscriptions).
+			$args['previous_payment_id'] = $subscriptions_obj->get_meta( '_cko_payment_id' );
 		}
 
 		$payment_result = (array) WC_Checkoutcom_Api_Request::create_payment( $renewal_order, $args, 'renewal' );

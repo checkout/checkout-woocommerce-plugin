@@ -1,309 +1,146 @@
-# Migration Guide — Subscriptions & Saved Cards (Checkout.com WooCommerce)
+# Migration Guide — Subscriptions & Saved Cards (Checkout.com)
 
-How to migrate WooCommerce **subscriptions** and **saved cards** from another PSP to Checkout.com (CKO),
-so that renewals and saved-card payments work on the CKO plugin.
-
-> **Revised for current plugins (v5.1.3.x).** The key change vs. older guides: the plugin now supports
-> **HPOS (High-Performance Order Storage)**, which changes *where* subscription meta is stored. Saved-card
-> tables are unchanged. Read the **HPOS** note in the Subscriptions section.
+Moving your WooCommerce **subscriptions** and **saved cards** to Checkout.com. Written to be quick to read;
+the exact field names for whoever runs the import are at the end.
 
 ---
 
-## In plain language — what happens & what the merchant does
+## The idea in one minute
 
-When a merchant moves to Checkout.com, their saved cards are re-vaulted at Checkout.com, which returns a
-new ID for each card (the **`source_id`**, e.g. `src_xxxx`). That ID is what Checkout.com charges from then
-on. The technical sections below give the exact steps; here's the short version.
+Your old provider hands your card data to Checkout.com. Checkout.com stores the cards and gives you back a
+new ID for each one — the **`source_id`** (looks like `src_xxxx`). That ID is what Checkout.com charges from
+now on. You then put each `source_id` onto the right subscription and into your saved-cards list.
 
-**What the merchant needs to do:**
-
-1. **Get the new card IDs from Checkout.com.** The old provider sends the raw card data **to Checkout.com**
-   (not to the merchant); Checkout.com vaults the cards and gives the merchant back the list of
-   **`source_id`s**. *(The old provider does not hand over Checkout.com `source_id`s — Checkout.com does.)*
-
-2. **Put each card ID on its subscription.** For every subscription, save the **`source_id`**, set the
-   payment method to **Checkout.com**, and keep the subscription **active**. Renewals then charge the new
-   card automatically.
-
-3. **Get the "first-payment reference" from the old provider, too.** Card networks want each renewal to
-   reference the original first payment (the **scheme transaction ID** / `previous_payment_id`). For
-   migrated subscriptions that first payment happened at the *old* provider, so the merchant must request
-   those **scheme transaction IDs** from the incumbent and store them. **If they're missing, some renewals
-   can be declined by the bank** even though the card ID is correct.
-
-4. **Re-add the saved cards** into WooCommerce's saved-card tables so customers see them under
-   *My Account → Payment methods*.
-
-**Important note on step 3 (for our team):** today the plugin looks for that first-payment reference on an
-"original order" that migrated subscriptions don't have. The clean fix is a small plugin update so the
-reference can live **directly on the subscription** — so merchants don't have to create fake "dummy"
-orders just to hold it. **Recommended: do that enhancement; do not create dummy parent orders.**
+One extra thing for subscriptions: card networks want every renewal to point back to the **first payment**.
+That reference is called the **scheme transaction ID**. You must get these from your old provider too, or some
+renewals can be declined.
 
 ---
 
-## 0. Prerequisites
+## What you need before you start
 
-- You must have, **per saved card / per subscription**, the Checkout.com **`source_id`** (`src_xxxxxxxx…`).
-  This is the reusable card credential CKO charges against.
-  - **`source_id`s come from Checkout.com — not from the previous PSP.** The incumbent securely exports
-    the **raw card details** (and scheme transaction IDs) **to CKO**; CKO imports them into its vault and
-    **exports the `source_id`s**, which the **CKO migration team** then delivers to you to import. The
-    previous PSP does **not** hand you CKO `source_id`s (and typically you never see the raw PANs — they
-    go PSP → CKO directly).
-- Decide which CKO gateway the store runs:
-  - **Flow mode** → gateway id `wc_checkout_com_flow`
-  - **Classic mode** → gateway id `wc_checkout_com_cards`
-  - (Under Flow, the plugin reads and charges tokens from **both** ids, so either works — but prefer the
-    active mode's id.)
-- **Back up the database** before any bulk insert.
-- Find out whether **HPOS** is enabled: **WooCommerce → Settings → Advanced → Features →
-  "High-performance order storage"**. This determines the subscription storage location (Section 1).
-
-> **Recommendation:** prefer the **WP-CLI / PHP API** methods below over raw SQL. The WooCommerce API
-> writes to the correct location automatically (HPOS columns/tables vs. legacy post meta) and validates
-> data. Use raw SQL only if you understand your storage mode.
+1. **`source_id`s** — Checkout.com gives you these (after vaulting your cards). *Your old provider does not.*
+2. **Scheme transaction IDs** — ask your **old provider** for these (one per card). Needed so renewals aren't declined.
+3. Know your mode: **Flow** (gateway `wc_checkout_com_flow`) or **Classic** (`wc_checkout_com_cards`).
+4. **Back up your database**, and test on staging first.
 
 ---
 
-## 1. Subscription migration
+## Step 1 — Migrate subscriptions
 
-### What the plugin needs
-For each migrated subscription to **auto-renew** through CKO, the **subscription** (not the parent order)
-must have:
+For each subscription, set these values **on the subscription**:
 
-| Field | Value | Notes |
-|---|---|---|
-| `_cko_source_id` (meta) | the `source_id` (`src_…`) | **CKO-specific** — what renewals charge |
-| `payment_method` | `wc_checkout_com_flow` or `wc_checkout_com_cards` | so WCS routes renewals to CKO |
-| `payment_method_title` | e.g. `Checkout.com` | display only |
-| `requires_manual_renewal` | `false` | so WCS auto-charges instead of asking the customer |
-| status | `active` | a chargeable subscription |
-
-> ⚠️ Older guides only mention `_cko_source_id`. That alone is **not enough** — without
-> `payment_method` pointing at a CKO gateway (and manual renewal off), WooCommerce Subscriptions won't
-> hand the renewal to the CKO plugin.
-
-### Previous payment id / scheme transaction IDs — required for MIT renewals
-Subscription renewals are **Merchant-Initiated Transactions (MIT)** with stored credentials (recurring /
-UCOF). Card schemes require these to reference the **initiating transaction** via a **scheme transaction
-ID** — surfaced in the Checkout.com API through `previous_payment_id`. It is **strongly recommended**:
-although not strictly "mandatory", **renewals may be declined** by the issuer if it is missing.
-
-How this is satisfied:
-
-- **Native CKO subscriptions** (the first payment happened on CKO): the plugin auto-populates
-  `previous_payment_id` from the subscription's **parent order `_cko_payment_id`** (the initial
-  `pay_xxx`). CKO derives the scheme transaction ID from that prior payment. **No action needed.**
-
-- **Migrated subscriptions** (the first payment happened at the previous PSP): there is **no CKO
-  `pay_xxx`** to reference, so the merchant must **obtain the "scheme transaction ID" (a.k.a. previous /
-  original network transaction identifier) from the incumbent processor for each migrated card** and
-  **store it in WooCommerce** so the plugin includes it on every MIT renewal request.
-  - **Where to store it:** the plugin reads `previous_payment_id` from the subscription's **parent
-    order** meta **`_cko_payment_id`** (see `WC_Checkoutcom_Api_Request::create_payment()`). So set
-    `_cko_payment_id` = the scheme/previous-payment id on the **parent order** of each migrated
-    subscription.
-  - If a migrated subscription has **no parent order**, the plugin can't read it today — see the caveat
-    below.
-
-> **Action for migrations:** request the **scheme transaction IDs** from the incumbent alongside the raw
-> card details, and store each one as **`_cko_payment_id` on the migrated subscription's parent order**.
-> Without it, migrated subscriptions risk **soft declines on the first renewal** even though the
-> `source_id` is valid.
-
-> ⚠️ **Plugin limitation / recommended enhancement:** the plugin currently reads `previous_payment_id`
-> from the **parent order**, not the subscription. Migrated subscriptions often have **no parent order**
-> (or an empty one). The robust fix is a plugin change to read `previous_payment_id` from a
-> **subscription-level meta** (e.g. `_cko_payment_id` on the subscription) with a fallback to the parent
-> order — then migration only needs to write it on the subscription. Until that lands, store it on a
-> parent order the subscription points to.
-
-**Token-migration flow (high level):** incumbent exports raw card details **+ scheme transaction IDs** →
-delivered securely to CKO → CKO imports into the vault → CKO exports `source_id`s → merchant imports the
-`source_id`s (this guide). Run **in parallel** (legacy tokens on the legacy gateway, new/migrated cards on
-CKO) to avoid downtime and double-migration. If using **network tokens**, decide before vs. after import
-(provisioning cost vs. async first-use provisioning).
-
-### Where `_cko_source_id` is stored (HPOS vs legacy)
-- **HPOS enabled:** subscription meta is in **`wp_wc_orders_meta`** — columns `order_id`, `meta_key`,
-  `meta_value`. `payment_method` / `payment_method_title` are **columns** in **`wp_wc_orders`**.
-- **HPOS disabled (legacy):** subscription meta is in **`wp_postmeta`** — `post_id`, `meta_key`,
-  `meta_value`. `payment_method` is post meta `_payment_method` / `_payment_method_title`.
-
-This storage difference is exactly why the API method below is recommended.
-
-### Method A — WP-CLI / PHP (recommended, HPOS-safe) ✅
-Build a CSV/array of `subscription_id => source_id` and run:
-
-```php
-// wp eval-file migrate-subscriptions.php
-// $rows = [ subscription_id => 'src_xxx', ... ];
-$rows = [
-    1234 => 'src_ekhbm6rkh65ehb6e74gzn5qtaq',
-    // ...
-];
-
-$gateway_id    = 'wc_checkout_com_flow'; // or 'wc_checkout_com_cards' for Classic mode
-$gateway_title = 'Checkout.com';
-
-foreach ( $rows as $subscription_id => $source_id ) {
-    $subscription = function_exists( 'wcs_get_subscription' ) ? wcs_get_subscription( $subscription_id ) : false;
-    if ( ! $subscription ) {
-        WP_CLI::warning( "Subscription {$subscription_id} not found" );
-        continue;
-    }
-
-    $subscription->update_meta_data( '_cko_source_id', $source_id );
-    $subscription->set_payment_method( $gateway_id );
-    $subscription->set_payment_method_title( $gateway_title );
-    $subscription->set_requires_manual_renewal( false );
-    $subscription->save();
-
-    WP_CLI::log( "Migrated subscription {$subscription_id} -> {$source_id}" );
-}
-```
-Run: `wp eval-file migrate-subscriptions.php`
-This works **identically** whether or not HPOS is enabled.
-
-### Method B — direct SQL (only if you know your storage mode)
-
-**Legacy (HPOS off):**
-```sql
--- source id
-INSERT INTO wp_postmeta (post_id, meta_key, meta_value)
-VALUES (1234, '_cko_source_id', 'src_ekhbm6rkh65ehb6e74gzn5qtaq');
--- route renewals to CKO + auto-renew
-INSERT INTO wp_postmeta (post_id, meta_key, meta_value) VALUES (1234, '_payment_method', 'wc_checkout_com_flow');
-INSERT INTO wp_postmeta (post_id, meta_key, meta_value) VALUES (1234, '_payment_method_title', 'Checkout.com');
-INSERT INTO wp_postmeta (post_id, meta_key, meta_value) VALUES (1234, '_requires_manual_renewal', 'false');
-```
-
-**HPOS enabled:**
-```sql
--- source id (meta table)
-INSERT INTO wp_wc_orders_meta (order_id, meta_key, meta_value)
-VALUES (1234, '_cko_source_id', 'src_ekhbm6rkh65ehb6e74gzn5qtaq');
-INSERT INTO wp_wc_orders_meta (order_id, meta_key, meta_value) VALUES (1234, '_requires_manual_renewal', 'false');
--- payment method lives in COLUMNS on wp_wc_orders, not meta
-UPDATE wp_wc_orders
-   SET payment_method = 'wc_checkout_com_flow', payment_method_title = 'Checkout.com'
- WHERE id = 1234;
-```
-> Replace the `wp_` prefix with your actual table prefix. After bulk SQL on HPOS, clear caches
-> (`wp cache flush`) so WooCommerce re-reads the orders.
-
----
-
-## 2. Saved cards migration
-
-Saved cards live in **two standard WooCommerce tables** — **not affected by HPOS**, so these steps are
-unchanged across storage modes.
-
-### `wp_woocommerce_payment_tokens`
-| Column | Value for CKO |
+| Set this | To this |
 |---|---|
-| `token_id` | primary key (auto) |
-| `gateway_id` | `wc_checkout_com_flow` (Flow store) or `wc_checkout_com_cards` (Classic). Both are accepted under Flow. |
-| `token` | the **`source_id`** (`src_…`) |
-| `user_id` | the WordPress user the card belongs to |
-| `type` | `CC` (token type) |
-| `is_default` | `1` for the default card, else `0` |
+| Source ID | the card's `source_id` (`src_xxxx`) |
+| Payment method | `wc_checkout_com_flow` (or `wc_checkout_com_cards` for Classic) |
+| First-payment reference | the **scheme transaction ID** from your old provider |
+| Auto-renew | on (manual renewal **off**) |
+| Status | active |
 
-> Note: `type` in this table is the **token type** (`CC`). The **card scheme** (Visa/Mastercard) goes in
-> the `card_type` tokenmeta below.
+That's it — renewals will then charge the new card automatically.
 
-### `wp_woocommerce_payment_tokenmeta`
-For each `token_id`, add these `meta_key` / `meta_value` rows:
+> ✅ **New subscriptions created on Checkout.com need none of this** — it's automatic.
+> ⚠️ The **scheme transaction ID** matters: without it, the **first renewal may be declined** even though the card is fine.
 
-| `meta_key` | Example | Notes |
+---
+
+## Step 2 — Migrate saved cards
+
+So customers see their cards under **My Account → Payment methods**, add each card with:
+
+| Set this | To this |
+|---|---|
+| Token | the card's `source_id` (`src_xxxx`) |
+| Gateway | `wc_checkout_com_flow` (or `wc_checkout_com_cards`) |
+| Customer | the customer's user account |
+| Card scheme | e.g. `visa`, `mastercard` |
+| Card details | last 4 digits, expiry month, expiry year |
+
+---
+
+## Step 3 — Check it worked
+
+- Open a migrated subscription → **process a renewal** → it charges the new card. ✅
+- Log in as a customer → **My Account → Payment methods** → the cards appear. ✅
+- Place a test order with a saved card → it charges. ✅
+
+If a renewal is **declined**, the most common cause is a **missing scheme transaction ID** (Step 1) — go back and add it.
+
+---
+
+## Quick FAQ
+
+**Does my old provider give me the `source_id`s?** No — **Checkout.com** does, after it vaults your cards.
+
+**What if a subscription has no original order?** That's fine — put everything on the subscription itself. You do **not** need to create a fake order.
+
+**Do I need the scheme transaction ID for brand-new Checkout.com subscriptions?** No — only for migrated ones.
+
+**Will my old saved cards stop working?** Run both providers **in parallel** during the switch: old cards on the old gateway, new/migrated cards on Checkout.com. No downtime.
+
+---
+---
+
+## Technical reference (for whoever runs the import)
+
+> Plugin v5.1.3.x. Use the WooCommerce API (WP-CLI/PHP) where possible — it writes to the right place
+> automatically whether or not **HPOS** (High-Performance Order Storage) is enabled. Use raw SQL only if you
+> know your storage mode.
+
+### Field map
+| Concept | WooCommerce field | Notes |
 |---|---|---|
-| `last4` | `4242` | |
-| `expiry_month` | `10` | two digits |
-| `expiry_year` | `2029` | four digits |
-| `card_type` | `visa` | lowercase scheme |
-| `fingerprint` | *(optional)* | CKO source fingerprint; used to de-duplicate cards — include if available |
+| Subscription source | meta `_cko_source_id` **on the subscription** | what renewals charge |
+| Subscription payment method | `payment_method` / `payment_method_title` | `wc_checkout_com_flow` / `Checkout.com` |
+| Subscription auto-renew | meta `_requires_manual_renewal` = `false` | |
+| Subscription first-payment ref | meta `_cko_payment_id` **on the subscription** | scheme transaction ID; sent as `previous_payment_id` on renewals (**v5.1.3.5+**) |
+| Saved card | `wp_woocommerce_payment_tokens`: `token`=`source_id`, `gateway_id`, `user_id`, `type`=`CC`, `is_default` | standard WC tables (HPOS-independent) |
+| Saved card details | `wp_woocommerce_payment_tokenmeta`: `last4`, `expiry_month` (2-digit), `expiry_year`, `card_type` | optional `fingerprint` for de-dup |
 
-### Method A — PHP / WP-CLI (recommended) ✅
+### Where subscription meta lives
+- **HPOS on:** `wp_wc_orders_meta` (`order_id`, `meta_key`, `meta_value`); `payment_method` is a column in `wp_wc_orders`.
+- **HPOS off:** `wp_postmeta` (`post_id`, `meta_key`, `meta_value`); payment method is meta `_payment_method` / `_payment_method_title`.
+
+### Recommended import method (WP-CLI / PHP, HPOS-safe)
 ```php
-// wp eval-file migrate-cards.php
-// rows: [ user_id, source_id, scheme, last4, exp_month, exp_year, is_default ]
-$rows = [
-    [ 1, 'src_ekhbm6rkh65ehb6e74gzn5qtaq', 'visa',       '4242', '10', '2025', true  ],
-    [ 1, 'src_pg3rmzoeqm4e7lqqgtcv4vpmwi', 'mastercard', '6378', '10', '2029', false ],
-];
-$gateway_id = 'wc_checkout_com_flow'; // or 'wc_checkout_com_cards'
-
-foreach ( $rows as $r ) {
-    list( $user_id, $source_id, $scheme, $last4, $mm, $yyyy, $is_default ) = $r;
-
-    $token = new WC_Payment_Token_CC();
-    $token->set_token( $source_id );
-    $token->set_gateway_id( $gateway_id );
-    $token->set_user_id( $user_id );
-    $token->set_card_type( strtolower( $scheme ) );
-    $token->set_last4( $last4 );
-    $token->set_expiry_month( $mm );
-    $token->set_expiry_year( $yyyy );
-    if ( $is_default ) {
-        $token->set_default( true );
-    }
-    $token->save();
-    WP_CLI::log( "Saved card {$last4} for user {$user_id}" );
+// Subscriptions — wp eval-file migrate-subscriptions.php
+// rows: subscription_id => [ source_id, scheme_transaction_id ]
+$rows = [ 1234 => [ 'src_xxx', 'scheme_txn_id_xxx' ] ];
+foreach ( $rows as $id => $r ) {
+    $sub = wcs_get_subscription( $id );
+    if ( ! $sub ) { continue; }
+    $sub->update_meta_data( '_cko_source_id', $r[0] );
+    $sub->update_meta_data( '_cko_payment_id', $r[1] ); // scheme transaction id (previous_payment_id)
+    $sub->set_payment_method( 'wc_checkout_com_flow' );
+    $sub->set_payment_method_title( 'Checkout.com' );
+    $sub->set_requires_manual_renewal( false );
+    $sub->save();
 }
 ```
-Run: `wp eval-file migrate-cards.php`
-This writes both tables correctly and is the safest option.
-
-### Method B — direct SQL
-```sql
--- 1) the token
-INSERT INTO wp_woocommerce_payment_tokens (gateway_id, token, user_id, type, is_default)
-VALUES ('wc_checkout_com_flow', 'src_ekhbm6rkh65ehb6e74gzn5qtaq', 1, 'CC', 1);
--- note the new token_id, then:
-INSERT INTO wp_woocommerce_payment_tokenmeta (payment_token_id, meta_key, meta_value) VALUES
-  (<token_id>, 'last4', '4242'),
-  (<token_id>, 'expiry_month', '10'),
-  (<token_id>, 'expiry_year', '2025'),
-  (<token_id>, 'card_type', 'visa');
+```php
+// Saved cards — wp eval-file migrate-cards.php
+// rows: [ user_id, source_id, scheme, last4, exp_month, exp_year, is_default ]
+$rows = [ [ 1, 'src_xxx', 'visa', '4242', '10', '2029', true ] ];
+foreach ( $rows as $r ) {
+    list( $user_id, $source, $scheme, $last4, $mm, $yyyy, $default ) = $r;
+    $t = new WC_Payment_Token_CC();
+    $t->set_token( $source );
+    $t->set_gateway_id( 'wc_checkout_com_flow' );
+    $t->set_user_id( $user_id );
+    $t->set_card_type( strtolower( $scheme ) );
+    $t->set_last4( $last4 );
+    $t->set_expiry_month( $mm );
+    $t->set_expiry_year( $yyyy );
+    if ( $default ) { $t->set_default( true ); }
+    $t->save();
+}
 ```
+> After any bulk SQL, run `wp cache flush`. The saved-card `gateway_id` can be `wc_checkout_com_flow` or
+> `wc_checkout_com_cards` — under Flow the plugin reads/charges tokens from both. Subscription renewals
+> don't depend on the token at all; they use the subscription's `_cko_source_id` + `_cko_payment_id`.
 
----
-
-## 3. Verification
-
-- **Subscriptions:** open a migrated subscription in admin → it shows the CKO gateway and (under
-  "Edit payment method") the **`_cko_source_id`**. Run a **manual renewal** (Subscriptions list → row
-  action "Process renewal") → it should charge the source successfully.
-- **Saved cards:** log in as the customer → **My Account → Payment methods** → the migrated cards appear
-  with correct last4/expiry. Place a test order using a saved card → it charges.
-- **Logs:** WooCommerce → Status → Logs → `wc_checkoutcom_gateway_log` confirms the source being used.
-
----
-
-## 4. Notes & caveats
-
-- **`source_id` must be valid and reusable on your CKO account** (same processing channel/environment).
-  A source tied to a different account/environment will fail at renewal.
-- **Scheme transaction IDs for migrated subscriptions** — obtain them from the incumbent and **store each
-  as `_cko_payment_id` on the subscription's parent order** so the plugin sends it as `previous_payment_id`
-  on MIT renewals (see that section). Without it, first renewals may be declined. Native CKO subscriptions
-  populate this automatically from the original CKO payment.
-- **One subscription = one `_cko_source_id`** on the **subscription** object (not the parent order).
-- **Sandbox vs production:** migrate production `src_` ids only into a production-configured store.
-- **Caches:** after bulk SQL, run `wp cache flush` (and any object-cache/CDN purge) so WooCommerce
-  re-reads orders/tokens.
-- **Test on staging first** with a small batch, verify a renewal + a saved-card checkout, then run the
-  full migration.
-
----
-
-### What changed vs. the previous guide
-| Topic | Previous guide | Now |
-|---|---|---|
-| Subscription `_cko_source_id` key | ✅ correct | ✅ unchanged |
-| Subscription meta **location** | only `wp_postmeta` | `wp_postmeta` (legacy) **or** `wp_wc_orders_meta` (HPOS) — prefer WC API |
-| Subscription `payment_method` / manual renewal | not mentioned | **required** for renewals to route to CKO |
-| `previous_payment_id` / scheme transaction ID | not mentioned | **store the scheme transaction ID as `_cko_payment_id` on the parent order** of migrated subs so MITs include it (renewals may decline without it) |
-| Token tables/keys | ✅ correct | ✅ unchanged (HPOS-independent) |
-| `gateway_id` | `wc_checkout_com_cards` | `wc_checkout_com_flow` for Flow stores (both accepted under Flow) |
-| `fingerprint` tokenmeta | not mentioned | optional; aids de-duplication |
+### Notes
+- `source_id` must be valid on your CKO account/environment (production `src_` → production store).
+- The scheme transaction ID is **required-in-practice** for migrated subscriptions (renewals may decline without it). Confirm with your CKO migration contact whether to send it as `previous_payment_id` or whether it was associated with the `source_id` at vault import.
+- Token-migration flow: incumbent exports card data + scheme transaction IDs → CKO vaults → CKO returns `source_id`s → you import. Run in **parallel** to avoid downtime.

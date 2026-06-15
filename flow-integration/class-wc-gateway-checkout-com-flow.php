@@ -2128,11 +2128,14 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		if ( ! empty( $data['source']['scheme'] ) ) {
 			$this->save_preferred_card_scheme( $subscription_id, $subscription, $data['source']['scheme'] );
 		}
-		// NOTE: deliberately do NOT store the verification's _cko_payment_id on the subscription —
-		// doing so gives the payment webhooks another way to resolve the subscription as an "order"
-		// (by payment id) and flip its status. The source_id is all renewals need.
+		// Store this verification's payment id on the subscription as the new previous_payment_id for
+		// future MIT renewals, so the credential chain follows the NEW card rather than the original
+		// order's payment. renewal_payment() reads `_cko_payment_id` from the subscription (v5.1.3.5+).
+		// Safe to store now: the webhook handlers skip any WC_Subscription (they return early on
+		// wcs_is_subscription), so matching the subscription by payment id can no longer flip its status.
+		$subscription->update_meta_data( '_cko_payment_id', $flow_payment_id );
 		$subscription->save();
-		WC_Checkoutcom_Utility::logger( '[CHANGE PAYMENT METHOD] ✅ Saved new source_id ' . $source_id . ' on subscription ' . $subscription_id );
+		WC_Checkoutcom_Utility::logger( '[CHANGE PAYMENT METHOD] ✅ Saved new source_id ' . $source_id . ' and payment_id ' . $flow_payment_id . ' on subscription ' . $subscription_id );
 
 		// Best-effort void of the verification authorisation (amount=0 sessions usually have
 		// nothing to void; this is defensive in case an auth was raised).
