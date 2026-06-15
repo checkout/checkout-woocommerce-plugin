@@ -47,6 +47,35 @@ must have:
 > `payment_method` pointing at a CKO gateway (and manual renewal off), WooCommerce Subscriptions won't
 > hand the renewal to the CKO plugin.
 
+### Previous payment id / scheme transaction IDs — required for MIT renewals
+Subscription renewals are **Merchant-Initiated Transactions (MIT)** with stored credentials (recurring /
+UCOF). Card schemes require these to reference the **initiating transaction** via a **scheme transaction
+ID** — surfaced in the Checkout.com API through `previous_payment_id`. It is **strongly recommended**:
+although not strictly "mandatory", **renewals may be declined** by the issuer if it is missing.
+
+How this is satisfied:
+
+- **Native CKO subscriptions** (the first payment happened on CKO): the plugin auto-populates
+  `previous_payment_id` from the subscription's **parent order `_cko_payment_id`** (the initial
+  `pay_xxx`). CKO derives the scheme transaction ID from that prior payment. **No action needed.**
+
+- **Migrated subscriptions** (the first payment happened at the previous PSP): there is **no CKO
+  `pay_xxx`** to reference. You must obtain the **"scheme transaction IDs"** from the incumbent processor
+  and provide them to Checkout.com **during the vault/token import**, so the imported `source_id` carries
+  the credential-on-file history. Once imported with the scheme transaction ID, MIT renewals on that
+  source succeed; the plugin sends the `source_id` and CKO applies the associated scheme transaction ID.
+
+> **Action for migrations:** explicitly request **scheme transaction IDs** (a.k.a. network/original
+> transaction identifiers) from the incumbent alongside the raw card details, and pass them to CKO with
+> the card import. If they are omitted, migrated subscriptions risk **soft declines on the first
+> renewal** even though the `source_id` is valid.
+
+**Token-migration flow (high level):** incumbent exports raw card details **+ scheme transaction IDs** →
+delivered securely to CKO → CKO imports into the vault → CKO exports `source_id`s → merchant imports the
+`source_id`s (this guide). Run **in parallel** (legacy tokens on the legacy gateway, new/migrated cards on
+CKO) to avoid downtime and double-migration. If using **network tokens**, decide before vs. after import
+(provisioning cost vs. async first-use provisioning).
+
 ### Where `_cko_source_id` is stored (HPOS vs legacy)
 - **HPOS enabled:** subscription meta is in **`wp_wc_orders_meta`** — columns `order_id`, `meta_key`,
   `meta_value`. `payment_method` / `payment_method_title` are **columns** in **`wp_wc_orders`**.
@@ -207,6 +236,10 @@ INSERT INTO wp_woocommerce_payment_tokenmeta (payment_token_id, meta_key, meta_v
 
 - **`source_id` must be valid and reusable on your CKO account** (same processing channel/environment).
   A source tied to a different account/environment will fail at renewal.
+- **Scheme transaction IDs are required for migrated subscriptions** — obtain them from the incumbent and
+  include them in the CKO vault import, or first renewals may be declined (see the "Previous payment id /
+  scheme transaction IDs" section). Native CKO subscriptions handle this automatically via the parent
+  order's `_cko_payment_id`.
 - **One subscription = one `_cko_source_id`** on the **subscription** object (not the parent order).
 - **Sandbox vs production:** migrate production `src_` ids only into a production-configured store.
 - **Caches:** after bulk SQL, run `wp cache flush` (and any object-cache/CDN purge) so WooCommerce
@@ -222,6 +255,7 @@ INSERT INTO wp_woocommerce_payment_tokenmeta (payment_token_id, meta_key, meta_v
 | Subscription `_cko_source_id` key | ✅ correct | ✅ unchanged |
 | Subscription meta **location** | only `wp_postmeta` | `wp_postmeta` (legacy) **or** `wp_wc_orders_meta` (HPOS) — prefer WC API |
 | Subscription `payment_method` / manual renewal | not mentioned | **required** for renewals to route to CKO |
+| `previous_payment_id` / scheme transaction ID | not mentioned | **request scheme transaction IDs** from incumbent for migrated subs (recommended; renewals may decline without it) |
 | Token tables/keys | ✅ correct | ✅ unchanged (HPOS-independent) |
 | `gateway_id` | `wc_checkout_com_cards` | `wc_checkout_com_flow` for Flow stores (both accepted under Flow) |
 | `fingerprint` tokenmeta | not mentioned | optional; aids de-duplication |
