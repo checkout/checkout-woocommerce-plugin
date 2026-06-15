@@ -12,8 +12,12 @@ so that renewals and saved-card payments work on the CKO plugin.
 ## 0. Prerequisites
 
 - You must have, **per saved card / per subscription**, the Checkout.com **`source_id`** (`src_xxxxxxxx…`).
-  This is the reusable card credential CKO charges against. Your previous PSP / CKO migration team
-  provides these (e.g. via a token-migration export).
+  This is the reusable card credential CKO charges against.
+  - **`source_id`s come from Checkout.com — not from the previous PSP.** The incumbent securely exports
+    the **raw card details** (and scheme transaction IDs) **to CKO**; CKO imports them into its vault and
+    **exports the `source_id`s**, which the **CKO migration team** then delivers to you to import. The
+    previous PSP does **not** hand you CKO `source_id`s (and typically you never see the raw PANs — they
+    go PSP → CKO directly).
 - Decide which CKO gateway the store runs:
   - **Flow mode** → gateway id `wc_checkout_com_flow`
   - **Classic mode** → gateway id `wc_checkout_com_cards`
