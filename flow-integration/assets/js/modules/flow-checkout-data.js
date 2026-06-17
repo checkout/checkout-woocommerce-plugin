@@ -52,9 +52,18 @@
 				billingAddress["state"] || '';
 			let zip = (document.getElementById("billing_postcode") ? document.getElementById("billing_postcode").value : '') || 
 				billingAddress["postal_code"] || '';
-			let country = (document.getElementById("billing_country") ? document.getElementById("billing_country").value : '') || 
+			let country = (document.getElementById("billing_country") ? document.getElementById("billing_country").value : '') ||
 				billingAddress["country"] || '';
-			
+
+			// "Don't require billing address" mode: no country field is collected, so fall back to the
+			// store base country supplied by PHP (cko_flow_vars.default_billing_country). Checkout.com
+			// needs a billing country to determine which payment methods to serve.
+			if (!country && typeof cko_flow_vars !== 'undefined'
+				&& ( cko_flow_vars.address_not_required === true || cko_flow_vars.address_not_required === '1' || cko_flow_vars.address_not_required === 1 )
+				&& cko_flow_vars.default_billing_country) {
+				country = cko_flow_vars.default_billing_country;
+			}
+
 			// Debug: Log data sources to verify fresh data
 			if (typeof window.ckoLogger !== 'undefined' && window.ckoLogger.debugEnabled) {
 				window.ckoLogger.debug('[FlowCheckoutData] Reading from DOM (fresh) vs cartInfo (cached):', {

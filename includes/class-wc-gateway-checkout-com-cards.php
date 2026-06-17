@@ -469,6 +469,11 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 				$settings['title'] = $title_from_post;
 			}
 			
+			// CRITICAL FIX: Manually save the "Don't require billing address (Flow)" toggle.
+			// save_fields() doesn't reliably persist it here; the checkbox is in POST only when checked.
+			$settings['flow_no_billing_address'] = ( isset( $_POST['woocommerce_wc_checkout_com_cards_settings']['flow_no_billing_address'] )
+				|| isset( $_POST['flow_no_billing_address'] ) ) ? 'yes' : 'no';
+
 			$settings['ckocom_account_type'] = 'NAS';
 			update_option( 'woocommerce_wc_checkout_com_cards_settings', $settings );
 			// Force-write directly to wp_options so Polylang filter cannot block or redirect the save.

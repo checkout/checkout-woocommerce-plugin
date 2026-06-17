@@ -298,6 +298,18 @@
 				return true;
 			}
 
+			// "Don't require billing address" mode (gateway setting flow_no_billing_address). The checkout
+			// only collects name & email (no address fields), so validate the email only — a default
+			// billing country is supplied server-side for the payment session.
+			if (typeof cko_flow_vars !== 'undefined' && ( cko_flow_vars.address_not_required === true || cko_flow_vars.address_not_required === '1' || cko_flow_vars.address_not_required === 1 )) {
+				const apmEmail = this.getCheckoutFieldValue('billing_email');
+				const ok = !!(apmEmail && this.isValidEmail(apmEmail));
+				if (typeof window.ckoLogger !== 'undefined') {
+					window.ckoLogger.debug('requiredFieldsFilledAndValid: [no-billing-address] email-only check = ' + ok);
+				}
+				return ok;
+			}
+
 			// Check if we're on order-pay page and have order data
 			const isOrderPayPage = window.location.pathname.includes('/order-pay/');
 			let orderPayInfo = null;

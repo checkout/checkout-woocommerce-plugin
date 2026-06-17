@@ -5,7 +5,7 @@
  * Description: Extends WooCommerce by Adding the Checkout.com Gateway.
  * Author: Checkout.com
  * Author URI: https://www.checkout.com/
- * Version: 5.1.3.5
+ * Version: 5.1.3.6
  * Requires at least: 5.0
  * Tested up to: 6.7.0
  * WC requires at least: 3.0
@@ -224,7 +224,7 @@ add_action( 'woocommerce_new_order', 'cko_update_order_id_in_session', 5 );
 /**
  * Constants.
  */
-define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '5.1.3.5' );
+define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '5.1.3.6' );
 define( 'WC_CHECKOUTCOM_PLUGIN_URL', untrailingslashit( plugins_url( basename( plugin_dir_path( __FILE__ ) ), basename( __FILE__ ) ) ) );
 define( 'WC_CHECKOUTCOM_PLUGIN_PATH', untrailingslashit( plugin_dir_path( __FILE__ ) ) );
 
@@ -1543,6 +1543,28 @@ function cko_enqueue_frontend_assets() {
 		// Preserve card details on checkout updates (coupon apply, address change)
 		'preserve_card_on_update' => ( isset( $flow_settings['flow_preserve_card_on_update'] ) && 'yes' === $flow_settings['flow_preserve_card_on_update'] ),
 		);
+
+		// "Don't require billing address" mode (for checkouts that collect only name & email, e.g. quick
+		// restaurant/micro payments). When on, Flow loads without billing address validation and a default
+		// billing country (store base country) is sent so card payments can still be served. Controlled by
+		// the gateway setting `flow_no_billing_address`, overridable via the `cko_flow_require_billing_address`
+		// filter. The default country is overridable via `cko_flow_default_billing_country`.
+		// The toggle lives in Quick Setup, which stores it in the cards-settings ARRAY — so that is the
+		// source of truth and must be read FIRST. Only fall back to the standalone option (a legacy
+		// location from when this setting briefly lived under Debug settings) if the array key is absent.
+		// Reading the standalone option first could short-circuit on a stale value and ignore Quick Setup.
+		if ( isset( $card_settings['flow_no_billing_address'] ) ) {
+			$flow_no_billing_value = $card_settings['flow_no_billing_address'];
+		} else {
+			$flow_no_billing_value = WC_Admin_Settings::get_option( 'flow_no_billing_address', '' );
+		}
+		$flow_no_billing_setting = 'yes' === $flow_no_billing_value;
+		$flow_require_billing     = apply_filters( 'cko_flow_require_billing_address', ! $flow_no_billing_setting );
+		$flow_vars['address_not_required'] = ! $flow_require_billing;
+		if ( ! $flow_require_billing ) {
+			$flow_base_country = ( function_exists( 'WC' ) && WC()->countries ) ? WC()->countries->get_base_country() : '';
+			$flow_vars['default_billing_country'] = apply_filters( 'cko_flow_default_billing_country', $flow_base_country );
+		}
 
 		// Add Payment Method support (My Account → Payment methods → Add payment method).
 		// This page has no cart, no checkout form, and no order, so Flow's normal validation would

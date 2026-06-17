@@ -3034,6 +3034,15 @@ function canInitializeFlow() {
 		return true; // Already initialized
 	}
 
+	// "Don't require billing address" mode (gateway setting): the checkout collects only name & email,
+	// so skip the cart/address/logged-in checks below and gate purely on a valid email. A default
+	// billing country is supplied server-side for the payment session.
+	if (typeof cko_flow_vars !== 'undefined' && ( cko_flow_vars.address_not_required === true || cko_flow_vars.address_not_required === '1' || cko_flow_vars.address_not_required === 1 )) {
+		const noAddrOk = (typeof requiredFieldsFilledAndValid === 'function') ? requiredFieldsFilledAndValid() : true;
+		ckoLogger.debug('canInitializeFlow: [no-billing-address mode] email-only validation = ' + noAddrOk);
+		return noAddrOk;
+	}
+
 	// Add-Payment-Method page (/my-account/add-payment-method/): no cart, no checkout form, so
 	// the cart/address/required-field checks below would all fail. Flow is selected and the
 	// container exists (verified above); the session is forced to a $0 verification server-side,

@@ -286,6 +286,18 @@ class WC_Checkoutcom_Cards_Settings {
 			),
 		);
 
+		// Flow: allow checkouts that collect only name & email (e.g. quick / micro payments) to load the
+		// card form without a billing address. Store base country is sent so card payments can be served.
+		$settings['flow_no_billing_address'] = array(
+			'id'          => 'flow_no_billing_address',
+			'title'       => __( 'Don\'t require billing address (Flow)', 'checkout-com-unified-payments-api' ),
+			'type'        => 'checkbox',
+			'desc'        => __( 'Enable for checkouts that collect only name & email. Flow loads without requiring a billing address, and the store\'s base country is sent so card payments can be served. 3DS still applies as configured. (You still remove the address fields in your checkout config.)', 'checkout-com-unified-payments-api' ),
+			'desc_tip'    => true,
+			'default'     => 'no',
+			'value'       => isset( $core_settings['flow_no_billing_address'] ) ? $core_settings['flow_no_billing_address'] : 'no',
+		);
+
 		return apply_filters( 'wc_checkout_com_quick_settings', $settings );
 	}
 
