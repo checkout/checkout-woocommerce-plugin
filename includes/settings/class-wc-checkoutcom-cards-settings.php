@@ -273,7 +273,7 @@ class WC_Checkoutcom_Cards_Settings {
 
 		$settings['flow_components_title'] = array(
 			'id'          => 'flow_components_title',
-			'title'       => __( 'Flow Payment Methods', 'checkout-com-unified-payments-api' ),
+			'title'       => __( 'Payment Method Display Options', 'checkout-com-unified-payments-api' ),
 			'type'        => 'title',
 			'description' => __( 'Choose which payment methods to display in the Flow checkout and in what order. Tick "Flow" to show all methods enabled on your Checkout.com account (Checkout.com controls the order). Or tick individual methods and set their display order.', 'checkout-com-unified-payments-api' ),
 		);

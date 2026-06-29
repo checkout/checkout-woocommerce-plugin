@@ -24,7 +24,7 @@ The existing layout must remain as is. The backend payment setting acts as a sec
 
 
 | Quick Setup | 
-  Under "Quick Setup" in the 'Checkout Mode' Instead of a drop down to select "Flow" replace with tick boxes (with description) so customer can tick their prefered Checkout Mode
+ After "Enabled Payment Methods, add "Payment Method Display Options"
     [] Flow (Description => By selecting 'Flow' all payment methods enabled on your Checkout account will be available for your customers)
     [] Card (Description => By selecting 'Card' only Card payment methods would be displayed, Google Pay and Appple Pay will not be available)
     [] Google Pay  (Description => By selecting 'Google Pay' only Google Payment payment methods would be displayed)
@@ -35,58 +35,7 @@ The existing layout must remain as is. The backend payment setting acts as a sec
   Example If the client selects 'Card', provide a selection next to Card (Display 'First', 'Second', 'Third'), if client selects 'First' then the front end UI should have create card component at the top,
   If client selects Google Pay provide a selection next to Google Pay (Display 'First', 'Second', 'Third'), if client selects 'First' then the front end UI should have create googlepay component at the top,
   If Apple Pay provide a selection next to Apple Pay (Display 'First', 'Second', 'Third'), if client selects 'First' then the front end UI should have create applepay component at the top,
-  Condition, the design is such that if client selects a payment method as 'First' they cannot have the option for selecting 'First' for other payment methods, the available options remaining would be 'Second', 'Third' or throw an display a warning to select 'Second' etc
-
-
----
-
-### >>> CLAUDE'S RECOMMENDATION (for your review — not yet implemented) <<<
-
-**Feasibility:** The goal (let merchants choose which payment components display, and in what order) is achievable.
-But there is ONE design conflict I must raise before implementing, plus a frontend refactor cost.
-
-**Conflict — "Checkout Mode" currently means Flow vs Classic, which are two different integration engines:**
-- `ckocom_checkout_mode` today = `flow` (modern CheckoutWebComponents) OR `classic` (legacy integration:
-  Alternative Payment Methods via `ckocom_apms_selector`, plus the separate express gateways).
-- The value `classic` is read across the codebase: `assets/js/admin-checkout-mode-toggle.js` (shows/hides the
-  Flow methods field vs the Classic APM field), `includes/express/*` (apple/google/paypal express classes),
-  `includes/api/class-wc-checkoutcom-utility.php`, and `woocommerce-gateway-checkout-com.php`.
-- **Card / Google Pay / Apple Pay are all Flow components** — sub-selections *within* Flow, not peers of Classic.
-  Replacing the Checkout Mode dropdown with `[Flow][Card][Google Pay][Apple Pay]` tickboxes would DROP the Classic
-  option from the UI and break the meaning of a setting the whole plugin depends on. That is a large, risky
-  regression unrelated to the actual goal.
-
-**Recommended design — keep the two concepts on separate axes:**
-1. **Leave "Checkout Mode" (Flow / Classic) intact.** Do not replace it.
-2. Add a NEW control under Quick Setup, shown only when Flow is selected: the payment-method tickboxes
-   `[Flow] [Card] [Google Pay] [Apple Pay]` + per-method Display Order (First / Second / Third with
-   mutual-exclusion). This is the new feature, and it lives on the Quick Setup page — which already renders via
-   `WC_Admin_Settings::output_fields()` and therefore supports native `checkbox`/`radio`/`select` fields
-   (the Flow Settings page does NOT — it uses `WC_Settings_API`, which has no radio renderer; that is why the
-   earlier radio attempt rendered as a broken empty control).
-3. Behaviour: ticking **Flow** = the existing all-in-one component (Checkout owns ordering; order selectors hidden
-   and ignored). Ticking **Card / Google Pay / Apple Pay** (Flow unticked) = render those as standalone components
-   in the chosen order. Persist as an ordered list in `woocommerce_wc_checkout_com_flow_settings`.
-
-**Frontend refactor cost (required, no longer deferrable under this design):**
-`flow-integration/assets/js/payment-session.js` (~3300 lines) is built around a SINGLE `ckoFlow.flowComponent`:
-one mount point (`#flow-container`), one `selectedType`, and one shared 3DS / save-card / amount-update lifecycle.
-Rendering multiple components simultaneously requires: separate containers (`#card-container`,
-`#googlepay-container`, `#applepay-container`), one component instance each, `isAvailable()`-gating + `mount()` in
-the configured order, and generalising the lifecycle (3DS redirect, save-card, amount/address updates,
-selectedType) to operate per component. This is a substantial, higher-risk change that should be planned and
-tested as its own phase.
-
-**Open questions for you:**
-- OK to keep Checkout Mode (Flow/Classic) and add the tickboxes as a separate Flow-only control (recommended),
-  rather than replacing the Checkout Mode dropdown?
-- Is the existing Quick Setup `flow_enabled_payment_methods` multiselect meant to be REPLACED by these tickboxes,
-  or kept (it currently filters methods inside a Flow session)?
-- Display Order UI: per-method First/Second/Third dropdowns with mutual-exclusion (matches your wording), correct?
-
-### >>> END CLAUDE'S RECOMMENDATION <<<
-
----
+  Condition, the design is such that if client selects a payment method as 'First' they cannot have the option for selecting 'First' for other payment methods, the available options remaining would be 'Second', 'Third' or throw an display a warning to select 'Second'
 
 
 ## 3. Implementation Guidelines
@@ -226,7 +175,7 @@ Example code
             );
           }
         });
-      }
+      
 
 
 ## 4. Code Generation 

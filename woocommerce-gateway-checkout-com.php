@@ -1112,6 +1112,44 @@ function cko_enqueue_frontend_assets() {
 		$flow_customization['flow_component_name'] = 'flow';
 	}
 
+	/*
+	 * Build the normalized standalone-component display config for the frontend.
+	 *
+	 * flow_display_mode:
+	 *   'flow'       -> render the single all-in-one Flow component (Checkout.com owns the order).
+	 *   'components' -> render the listed standalone components, in the given order.
+	 * flow_display_components: ordered list of component names ('card' | 'googlepay' | 'applepay').
+	 *
+	 * "Flow" ticked (or nothing valid selected) falls back to the all-in-one component to preserve
+	 * existing behavior for installs that have not configured the new options.
+	 */
+	$flow_all_in_one = ! isset( $flow_customization['flow_component_flow'] ) || 'yes' === $flow_customization['flow_component_flow'];
+
+	$flow_standalone = array();
+	foreach ( array( 'card', 'googlepay', 'applepay' ) as $cko_component ) {
+		if ( isset( $flow_customization[ 'flow_component_' . $cko_component ] ) && 'yes' === $flow_customization[ 'flow_component_' . $cko_component ] ) {
+			$flow_standalone[] = array(
+				'name'  => $cko_component,
+				'order' => isset( $flow_customization[ 'flow_component_order_' . $cko_component ] ) ? (int) $flow_customization[ 'flow_component_order_' . $cko_component ] : 99,
+			);
+		}
+	}
+	usort(
+		$flow_standalone,
+		function ( $a, $b ) {
+			return $a['order'] - $b['order'];
+		}
+	);
+	$flow_standalone_names = wp_list_pluck( $flow_standalone, 'name' );
+
+	if ( $flow_all_in_one || empty( $flow_standalone_names ) ) {
+		$flow_customization['flow_display_mode']       = 'flow';
+		$flow_customization['flow_display_components']  = array();
+	} else {
+		$flow_customization['flow_display_mode']       = 'components';
+		$flow_customization['flow_display_components']  = array_values( $flow_standalone_names );
+	}
+
 	if ( 'flow' === $checkout_mode ) {
 		// Add resource hints for faster DNS resolution and connection to Checkout.com
 		add_action( 'wp_head', 'cko_add_flow_resource_hints', 1 );

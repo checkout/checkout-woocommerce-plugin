@@ -104,7 +104,8 @@ if (typeof window.FlowSessionStorage === 'undefined') {
  * The main object managing the Checkout.com flow payment integration.
  */
 var ckoFlow = {
-	flowComponent: null, // Holds the reference to the Checkout Web Component.
+	flowComponent: null, // Holds the reference to the primary Checkout Web Component (submit target).
+	standaloneComponents: [], // Holds standalone components ({name, component, container}) when using Payment Method Display Options.
 	checkoutInstance: null, // Holds the CheckoutWebComponents instance for dynamic updates (checkout.update())
 	pendingAmountUpdate: null, // Stores pending amount update (in minor units/cents) for handleSubmit
 	initialSessionAmount: null, // Stores the original amount when payment session was created
@@ -2287,6 +2288,19 @@ var ckoFlow = {
 		});
 
 
+				// "Payment Method Display Options": when configured, render the selected standalone
+				// components in order. This fully replaces the single all-in-one Flow component below.
+				const ckoDisplayMode = window.flowDisplayMode || 'flow';
+				const ckoOrderedComponents = Array.isArray(window.flowDisplayComponents) ? window.flowDisplayComponents : [];
+				if (ckoDisplayMode === 'components' && ckoOrderedComponents.length > 0) {
+					ckoLogger.debug('Creating standalone Flow components in order:', ckoOrderedComponents);
+					if (typeof window.ckoSetCardholderName === 'function') {
+						window.ckoSetCardholderName();
+					}
+					ckoFlow.createStandaloneComponents(checkout, ckoOrderedComponents);
+					return;
+				}
+
 				// Ensure component name is defined
 				const componentName = window.componentName || 'flow';
 				ckoLogger.debug('Creating Flow component with name:', componentName);
@@ -2511,6 +2525,156 @@ var ckoFlow = {
 				FlowState.set('initialized', false);
 			}
 		}
+	},
+
+	/**
+	 * Render multiple standalone Flow components (card / googlepay / applepay) in the
+	 * configured display order, each in its own container inside #flow-container.
+	 *
+	 * All components share the instance-level callbacks (onSubmit, onPaymentCompleted,
+	 * onChange, handleSubmit, onError) passed to CheckoutWebComponents(), so 3DS, order
+	 * completion and amount/address updates continue to work without per-component wiring.
+	 *
+	 * The card component (when present) keeps showPayButton:false and is wired to the
+	 * WooCommerce "Place order" button via ckoFlow.flowComponent (the existing submit path).
+	 * Wallet components (googlepay/applepay) render their own buttons and self-submit.
+	 *
+	 * @param {Object} checkout        CheckoutWebComponents instance.
+	 * @param {Array}  componentNames  Ordered component names, e.g. ['card','googlepay'].
+	 * @param {number} attempt         Internal retry counter.
+	 * @param {number} maxAttempts     Max container-resolution attempts.
+	 */
+	createStandaloneComponents: function(checkout, componentNames, attempt = 1, maxAttempts = 5) {
+		// Resolve the parent container (#flow-container), creating it if WooCommerce hasn't yet.
+		let flowContainer = document.getElementById("flow-container");
+		if (!flowContainer) {
+			const paymentMethod = document.querySelector('.payment_method_wc_checkout_com_flow');
+			if (paymentMethod) {
+				const paymentBox = paymentMethod.querySelector("div.payment_box");
+				if (paymentBox && !paymentBox.id) {
+					paymentBox.id = "flow-container";
+					paymentBox.style.padding = "0";
+					flowContainer = paymentBox;
+				} else if (paymentBox && paymentBox.id === 'flow-container') {
+					flowContainer = paymentBox;
+				}
+			}
+			if (!flowContainer && typeof addPaymentMethod === 'function') {
+				addPaymentMethod();
+				flowContainer = document.getElementById("flow-container");
+			}
+		}
+
+		if (!flowContainer) {
+			if (attempt < maxAttempts) {
+				const delay = Math.min(200 * Math.pow(2, attempt - 1), 1000);
+				ckoLogger.debug('Standalone container not found, retrying in ' + delay + 'ms (attempt ' + attempt + '/' + maxAttempts + ')');
+				setTimeout(() => {
+					ckoFlow.createStandaloneComponents(checkout, componentNames, attempt + 1, maxAttempts);
+				}, delay);
+				return;
+			}
+			ckoLogger.error('Failed to mount standalone components: container not found after ' + maxAttempts + ' attempts');
+			hideLoadingOverlay();
+			showError(
+				wp.i18n.__(
+					"Unable to initialize payment form. Please refresh the page and try again.",
+					"checkout-com-unified-payments-api"
+				)
+			);
+			FlowState.set('initializing', false);
+			FlowState.set('initialized', false);
+			return;
+		}
+
+		if (flowContainer.classList) {
+			flowContainer.classList.add('cko-flow__container');
+		}
+
+		ckoFlow.standaloneComponents = [];
+
+		// Create each component, gate on availability, and mount into an ordered child container.
+		const creationPromises = componentNames.map((name) => {
+			let component;
+			try {
+				// Card uses the WooCommerce place-order button (no built-in pay button);
+				// wallets render their own button so they can self-submit via a user gesture.
+				component = checkout.create(name, {
+					showPayButton: name !== 'card'
+				});
+			} catch (error) {
+				ckoLogger.error('Error creating standalone component "' + name + '":', error);
+				return Promise.resolve(null);
+			}
+
+			return component.isAvailable().then((available) => {
+				if (!available) {
+					ckoLogger.debug('Standalone component not available, skipping:', name);
+					return null;
+				}
+
+				// Create (or reuse) the ordered child container.
+				let child = document.getElementById('cko-standalone-' + name);
+				if (!child) {
+					child = document.createElement('div');
+					child.id = 'cko-standalone-' + name;
+					child.className = 'cko-standalone-component cko-standalone-component--' + name;
+					flowContainer.appendChild(child);
+				}
+
+				try {
+					component.mount(child);
+				} catch (error) {
+					ckoLogger.error('Error mounting standalone component "' + name + '":', error);
+					return null;
+				}
+
+				const entry = { name: name, component: component, container: child };
+				ckoFlow.standaloneComponents.push(entry);
+
+				// The card component is the primary submit target for the place-order button.
+				if (name === 'card') {
+					ckoFlow.flowComponent = component;
+				}
+
+				return entry;
+			}).catch((error) => {
+				ckoLogger.error('isAvailable() failed for standalone component "' + name + '":', error);
+				return null;
+			});
+		});
+
+		Promise.all(creationPromises).then((results) => {
+			const mounted = results.filter(Boolean);
+
+			if (mounted.length === 0) {
+				hideLoadingOverlay();
+				ckoLogger.error('No standalone payment components are available.');
+				showError(
+					wp.i18n.__(
+						"The selected payment method is not available at this time.",
+						"checkout-com-unified-payments-api"
+					)
+				);
+				FlowState.set('initializing', false);
+				FlowState.set('initialized', false);
+				return;
+			}
+
+			// If no card component was mounted, use the first available component as the primary.
+			if (!ckoFlow.flowComponent) {
+				ckoFlow.flowComponent = mounted[0].component;
+			}
+
+			FlowState.set('initialized', true);
+			FlowState.set('initializing', false);
+			FlowState.set('lastInitTime', Date.now());
+			window.ckoFieldWatchersSetup = false;
+
+			ckoFlow.enableUIAfterMount();
+
+			ckoLogger.debug('Standalone components mounted in order:', mounted.map((m) => m.name));
+		});
 	},
 
 	/**
@@ -3261,6 +3425,23 @@ function destroyFlowComponent() {
 		}
 		ckoFlow.flowComponent = null;
 	}
+
+	// Tear down any standalone components (Payment Method Display Options) and their containers.
+	if (Array.isArray(ckoFlow.standaloneComponents) && ckoFlow.standaloneComponents.length) {
+		ckoFlow.standaloneComponents.forEach((entry) => {
+			try {
+				if (entry && entry.component && typeof entry.component.unmount === 'function') {
+					entry.component.unmount();
+				}
+			} catch (error) {
+				ckoLogger.error('Error unmounting standalone component "' + (entry && entry.name) + '":', error);
+			}
+			if (entry && entry.container && entry.container.parentNode) {
+				entry.container.parentNode.removeChild(entry.container);
+			}
+		});
+	}
+	ckoFlow.standaloneComponents = [];
 
 	// Clear checkout instance and amount/address/email tracking
 	ckoFlow.checkoutInstance = null;
