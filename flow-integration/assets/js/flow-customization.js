@@ -183,7 +183,10 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 // Component name section.
-window.componentName = cko_flow_customization_vars.flow_component_name || 'flow';
+// Constrain to the known standalone components; any unexpected/legacy value falls back to 'flow'.
+const allowedComponents = ['flow', 'card', 'googlepay', 'applepay'];
+const requestedComponent = cko_flow_customization_vars.flow_component_name || 'flow';
+window.componentName = allowedComponents.includes(requestedComponent) ? requestedComponent : 'flow';
 
 // Locale and Translation section.
 // Use Flow locale setting if provided, otherwise fallback to WordPress locale

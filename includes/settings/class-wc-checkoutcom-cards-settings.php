@@ -1975,9 +1975,15 @@ class WC_Checkoutcom_Cards_Settings {
 				'flow_component_name'                        => array(
 					'id'          => 'flow_component_name',
 					'title'       => __( 'Flow Payment method', 'checkout-com-unified-payments-api' ),
-					'type'        => 'text',
+					'type'        => 'radio',
+					'options'     => array(
+						'flow'      => __( 'Flow — All payment methods enabled on your Checkout.com account are displayed.', 'checkout-com-unified-payments-api' ),
+						'card'      => __( 'Card — Only Card payment methods are displayed (Google Pay and Apple Pay not shown).', 'checkout-com-unified-payments-api' ),
+						'googlepay' => __( 'Google Pay — Only Google Pay is displayed.', 'checkout-com-unified-payments-api' ),
+						'applepay'  => __( 'Apple Pay — Only Apple Pay is displayed.', 'checkout-com-unified-payments-api' ),
+					),
 					/* translators: 1: HTML anchor opening tag, 2: HTML anchor closing tag. */
-					'description' => sprintf( __( 'You can %1$s read more about flow component name here %2$s in the Checkout.com Hub. "flow" option will render all the available payment methods.', 'checkout-com-unified-payments-api' ), '<a class="checkoutcom-key-docs" target="_blank" href="' . esc_url( $flow_com_link ) . '">', '</a>' ),
+					'description' => sprintf( __( 'You can %1$s read more about flow component name here %2$s in the Checkout.com Hub. "Flow" will render all the available payment methods.', 'checkout-com-unified-payments-api' ), '<a class="checkoutcom-key-docs" target="_blank" href="' . esc_url( $flow_com_link ) . '">', '</a>' ),
 					'default'     => 'flow',
 				),
 			)
