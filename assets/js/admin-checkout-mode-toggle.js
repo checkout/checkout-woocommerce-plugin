@@ -113,6 +113,11 @@
 			// Ensure save button is always visible
 			this.ensureSaveButtonVisible();
 
+			// Standalone Flow component fields (tickboxes + order selects) + their section title.
+			const standaloneEls = $('[data-checkout-mode="flow"][data-cko-component], [data-checkout-mode="flow"][data-cko-order]');
+			const standaloneRows = standaloneEls.closest('tr');
+			const componentsTitle = $('#flow_components_title');
+
 			if (mode === 'flow') {
 				// Flow mode: Show Enabled Payment Methods, Hide Alternative Payment Methods
 				if (flowRow.length) {
@@ -121,6 +126,10 @@
 				if (apmRow.length) {
 					apmRow.css('display', 'none').hide();
 				}
+				// Show the standalone component section, then apply the component-specific rules.
+				standaloneRows.css('display', 'table-row').show();
+				componentsTitle.show().nextUntil('table, h3').show();
+				this.refreshComponentRows();
 			} else if (mode === 'classic') {
 				// Classic mode: Hide Enabled Payment Methods, Show Alternative Payment Methods
 				if (flowRow.length) {
@@ -129,10 +138,148 @@
 				if (apmRow.length) {
 					apmRow.css('display', 'table-row').show();
 				}
+				// Hide the entire standalone component section.
+				standaloneRows.css('display', 'none').hide();
+				componentsTitle.hide().nextUntil('table, h3').hide();
 			}
 
 			// Double-check save button visibility
 			this.ensureSaveButtonVisible();
+		},
+
+		/**
+		 * Apply component-selection rules within Flow mode:
+		 * - When "Flow" (all-in-one) is ticked, hide the individual method tickboxes and order selects
+		 *   (Checkout.com owns the ordering) and show an explanatory note.
+		 * - Otherwise show the individual tickboxes; each method's order select is visible only when ticked.
+		 */
+		refreshComponentRows: function() {
+			const self = this;
+			const components = ['card', 'googlepay', 'applepay'];
+			const flowCheckbox = $('input[data-cko-component="flow"]');
+			const flowChecked = flowCheckbox.is(':checked');
+
+			components.forEach(function(name) {
+				const cb = $('input[data-cko-component="' + name + '"]');
+				const cbRow = cb.closest('tr');
+				const orderRow = $('select[data-cko-order="' + name + '"]').closest('tr');
+
+				if (flowChecked) {
+					cbRow.hide();
+					orderRow.hide();
+				} else {
+					cbRow.css('display', 'table-row').show();
+					if (cb.is(':checked')) {
+						orderRow.css('display', 'table-row').show();
+					} else {
+						orderRow.hide();
+					}
+				}
+			});
+
+			self.toggleFlowNote(flowChecked);
+			self.enforceOrderUniqueness();
+		},
+
+		/**
+		 * Enforce unique First/Second/Third positions across the ticked standalone components.
+		 * Disables order options already taken by another ticked component and surfaces a warning
+		 * if a clash or empty selection state is detected.
+		 */
+		enforceOrderUniqueness: function() {
+			const components = ['card', 'googlepay', 'applepay'];
+			const flowChecked = $('input[data-cko-component="flow"]').is(':checked');
+
+			// Count chosen positions among ticked components to detect duplicates.
+			const counts = {};
+			let checkedCount = 0;
+			components.forEach(function(name) {
+				if ($('input[data-cko-component="' + name + '"]').is(':checked')) {
+					checkedCount++;
+					const v = $('select[data-cko-order="' + name + '"]').val();
+					counts[v] = (counts[v] || 0) + 1;
+				}
+			});
+			let duplicate = false;
+			Object.keys(counts).forEach(function(v) {
+				if (counts[v] > 1) {
+					duplicate = true;
+				}
+			});
+
+			// Disable, on each select, the positions already taken by a different ticked component.
+			components.forEach(function(name) {
+				const cb = $('input[data-cko-component="' + name + '"]');
+				const sel = $('select[data-cko-order="' + name + '"]');
+				const myVal = sel.val();
+				sel.find('option').each(function() {
+					const optVal = $(this).val();
+					let takenByOther = false;
+					components.forEach(function(other) {
+						if (other === name) {
+							return;
+						}
+						const ocb = $('input[data-cko-component="' + other + '"]');
+						if (ocb.is(':checked') && $('select[data-cko-order="' + other + '"]').val() === optVal) {
+							takenByOther = true;
+						}
+					});
+					$(this).prop('disabled', takenByOther && optVal !== myVal);
+				});
+			});
+
+			// Warn on duplicate positions, or when no method is selected at all in Flow mode.
+			let message = '';
+			if (!flowChecked && checkedCount === 0) {
+				message = 'Select at least one payment method (or tick "Flow" to show all).';
+			} else if (duplicate) {
+				message = 'Each payment method must have a unique display order (First, Second, Third).';
+			}
+			this.toggleOrderWarning(message);
+		},
+
+		/**
+		 * Show/hide the note explaining that Checkout.com controls ordering when "Flow" is selected.
+		 */
+		toggleFlowNote: function(show) {
+			let note = $('#cko-flow-all-note');
+			if (!note.length) {
+				const flowRow = $('input[data-cko-component="flow"]').closest('tr');
+				if (!flowRow.length) {
+					return;
+				}
+				flowRow.after('<tr id="cko-flow-all-note"><td colspan="2"><em>' +
+					'When "Flow" is selected, all payment methods are shown and Checkout.com controls the display order.' +
+					'</em></td></tr>');
+				note = $('#cko-flow-all-note');
+			}
+			if (show) {
+				note.show();
+			} else {
+				note.hide();
+			}
+		},
+
+		/**
+		 * Show/hide an inline warning message for the ordering controls.
+		 */
+		toggleOrderWarning: function(message) {
+			let warn = $('#cko-flow-order-warning');
+			if (!warn.length) {
+				const anchorRow = $('select[data-cko-order="applepay"]').closest('tr');
+				if (!anchorRow.length) {
+					return;
+				}
+				anchorRow.after('<tr id="cko-flow-order-warning"><td colspan="2">' +
+					'<span style="color:#b32d2e;"></span></td></tr>');
+				warn = $('#cko-flow-order-warning');
+			}
+			if (message) {
+				warn.find('span').text(message);
+				warn.show();
+			} else {
+				warn.hide();
+			}
 		},
 
 		/**
@@ -176,6 +323,16 @@
 	$(document).on('change', 'select[name*="ckocom_checkout_mode"], select[id*="ckocom_checkout_mode"]', function() {
 		const mode = $(this).val() || 'flow';
 		CheckoutModeToggle.setVisibility(mode);
+	});
+
+	// Standalone Flow component tickboxes: re-evaluate visibility/order rules on change.
+	$(document).on('change', 'input[data-cko-component]', function() {
+		CheckoutModeToggle.refreshComponentRows();
+	});
+
+	// Per-component order selects: re-enforce unique First/Second/Third positions on change.
+	$(document).on('change', 'select[data-cko-order]', function() {
+		CheckoutModeToggle.enforceOrderUniqueness();
 	});
 	
 	// CRITICAL: Fix field name on form submit to ensure it's saved

@@ -248,6 +248,130 @@ class WC_Checkoutcom_Cards_Settings {
 			),
 		);
 
+		/*
+		 * Flow standalone payment-method selection + display order.
+		 *
+		 * These control which Flow components are rendered at checkout and in what order.
+		 * "Flow" = the all-in-one component (Checkout.com owns the order; order selectors hidden/ignored).
+		 * Card / Google Pay / Apple Pay = standalone components rendered in the chosen First/Second/Third order.
+		 * Stored alongside the other Flow settings in woocommerce_wc_checkout_com_flow_settings.
+		 * Shown only in Flow mode (toggled by assets/js/admin-checkout-mode-toggle.js).
+		 */
+		$existing_component_flow      = isset( $flow_settings['flow_component_flow'] ) ? $flow_settings['flow_component_flow'] : 'yes';
+		$existing_component_card      = isset( $flow_settings['flow_component_card'] ) ? $flow_settings['flow_component_card'] : 'no';
+		$existing_component_googlepay = isset( $flow_settings['flow_component_googlepay'] ) ? $flow_settings['flow_component_googlepay'] : 'no';
+		$existing_component_applepay  = isset( $flow_settings['flow_component_applepay'] ) ? $flow_settings['flow_component_applepay'] : 'no';
+		$existing_order_card          = isset( $flow_settings['flow_component_order_card'] ) ? $flow_settings['flow_component_order_card'] : '1';
+		$existing_order_googlepay     = isset( $flow_settings['flow_component_order_googlepay'] ) ? $flow_settings['flow_component_order_googlepay'] : '2';
+		$existing_order_applepay      = isset( $flow_settings['flow_component_order_applepay'] ) ? $flow_settings['flow_component_order_applepay'] : '3';
+
+		$order_options = array(
+			'1' => __( 'First', 'checkout-com-unified-payments-api' ),
+			'2' => __( 'Second', 'checkout-com-unified-payments-api' ),
+			'3' => __( 'Third', 'checkout-com-unified-payments-api' ),
+		);
+
+		$settings['flow_components_title'] = array(
+			'id'          => 'flow_components_title',
+			'title'       => __( 'Flow Payment Methods', 'checkout-com-unified-payments-api' ),
+			'type'        => 'title',
+			'description' => __( 'Choose which payment methods to display in the Flow checkout and in what order. Tick "Flow" to show all methods enabled on your Checkout.com account (Checkout.com controls the order). Or tick individual methods and set their display order.', 'checkout-com-unified-payments-api' ),
+		);
+
+		$settings['flow_component_flow'] = array(
+			'id'                => 'flow_component_flow',
+			'title'             => __( 'Flow', 'checkout-com-unified-payments-api' ),
+			'type'              => 'checkbox',
+			'desc'              => __( "By selecting 'Flow' all payment methods enabled on your Checkout account will be available for your customers.", 'checkout-com-unified-payments-api' ),
+			'default'           => 'yes',
+			'value'             => $existing_component_flow,
+			'custom_attributes' => array(
+				'data-checkout-mode' => 'flow',
+				'data-cko-component' => 'flow',
+			),
+		);
+
+		$settings['flow_component_card'] = array(
+			'id'                => 'flow_component_card',
+			'title'             => __( 'Card', 'checkout-com-unified-payments-api' ),
+			'type'              => 'checkbox',
+			'desc'              => __( "By selecting 'Card' only Card payment methods would be displayed; Google Pay and Apple Pay will not be available.", 'checkout-com-unified-payments-api' ),
+			'default'           => 'no',
+			'value'             => $existing_component_card,
+			'custom_attributes' => array(
+				'data-checkout-mode' => 'flow',
+				'data-cko-component' => 'card',
+			),
+		);
+
+		$settings['flow_component_order_card'] = array(
+			'id'                => 'flow_component_order_card',
+			'title'             => __( 'Card display order', 'checkout-com-unified-payments-api' ),
+			'type'              => 'select',
+			'class'             => 'cko-flow-order',
+			'options'           => $order_options,
+			'default'           => '1',
+			'value'             => $existing_order_card,
+			'custom_attributes' => array(
+				'data-checkout-mode' => 'flow',
+				'data-cko-order'     => 'card',
+			),
+		);
+
+		$settings['flow_component_googlepay'] = array(
+			'id'                => 'flow_component_googlepay',
+			'title'             => __( 'Google Pay', 'checkout-com-unified-payments-api' ),
+			'type'              => 'checkbox',
+			'desc'              => __( "By selecting 'Google Pay' only Google Pay would be displayed.", 'checkout-com-unified-payments-api' ),
+			'default'           => 'no',
+			'value'             => $existing_component_googlepay,
+			'custom_attributes' => array(
+				'data-checkout-mode' => 'flow',
+				'data-cko-component' => 'googlepay',
+			),
+		);
+
+		$settings['flow_component_order_googlepay'] = array(
+			'id'                => 'flow_component_order_googlepay',
+			'title'             => __( 'Google Pay display order', 'checkout-com-unified-payments-api' ),
+			'type'              => 'select',
+			'class'             => 'cko-flow-order',
+			'options'           => $order_options,
+			'default'           => '2',
+			'value'             => $existing_order_googlepay,
+			'custom_attributes' => array(
+				'data-checkout-mode' => 'flow',
+				'data-cko-order'     => 'googlepay',
+			),
+		);
+
+		$settings['flow_component_applepay'] = array(
+			'id'                => 'flow_component_applepay',
+			'title'             => __( 'Apple Pay', 'checkout-com-unified-payments-api' ),
+			'type'              => 'checkbox',
+			'desc'              => __( "By selecting 'Apple Pay' only Apple Pay would be displayed.", 'checkout-com-unified-payments-api' ),
+			'default'           => 'no',
+			'value'             => $existing_component_applepay,
+			'custom_attributes' => array(
+				'data-checkout-mode' => 'flow',
+				'data-cko-component' => 'applepay',
+			),
+		);
+
+		$settings['flow_component_order_applepay'] = array(
+			'id'                => 'flow_component_order_applepay',
+			'title'             => __( 'Apple Pay display order', 'checkout-com-unified-payments-api' ),
+			'type'              => 'select',
+			'class'             => 'cko-flow-order',
+			'options'           => $order_options,
+			'default'           => '3',
+			'value'             => $existing_order_applepay,
+			'custom_attributes' => array(
+				'data-checkout-mode' => 'flow',
+				'data-cko-order'     => 'applepay',
+			),
+		);
+
 		// Always add Alternative Payment Methods field (will be shown/hidden by JavaScript based on checkout mode)
 		// Load existing value from Alternative Payments settings
 		$apm_settings = get_option( 'woocommerce_wc_checkout_com_alternative_payments_settings', array() );
@@ -1975,15 +2099,9 @@ class WC_Checkoutcom_Cards_Settings {
 				'flow_component_name'                        => array(
 					'id'          => 'flow_component_name',
 					'title'       => __( 'Flow Payment method', 'checkout-com-unified-payments-api' ),
-					'type'        => 'radio',
-					'options'     => array(
-						'flow'      => __( 'Flow — All payment methods enabled on your Checkout.com account are displayed.', 'checkout-com-unified-payments-api' ),
-						'card'      => __( 'Card — Only Card payment methods are displayed (Google Pay and Apple Pay not shown).', 'checkout-com-unified-payments-api' ),
-						'googlepay' => __( 'Google Pay — Only Google Pay is displayed.', 'checkout-com-unified-payments-api' ),
-						'applepay'  => __( 'Apple Pay — Only Apple Pay is displayed.', 'checkout-com-unified-payments-api' ),
-					),
+					'type'        => 'text',
 					/* translators: 1: HTML anchor opening tag, 2: HTML anchor closing tag. */
-					'description' => sprintf( __( 'You can %1$s read more about flow component name here %2$s in the Checkout.com Hub. "Flow" will render all the available payment methods.', 'checkout-com-unified-payments-api' ), '<a class="checkoutcom-key-docs" target="_blank" href="' . esc_url( $flow_com_link ) . '">', '</a>' ),
+					'description' => sprintf( __( 'You can %1$s read more about flow component name here %2$s in the Checkout.com Hub. "flow" option will render all the available payment methods.', 'checkout-com-unified-payments-api' ), '<a class="checkoutcom-key-docs" target="_blank" href="' . esc_url( $flow_com_link ) . '">', '</a>' ),
 					'default'     => 'flow',
 				),
 			)
