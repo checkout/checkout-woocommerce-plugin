@@ -17,3 +17,14 @@ docker-start.sh
 !releases/
 releases/*
 !releases/*.zip
+
+# Internal dev/AI scratch notes — keep these out of the public repo.
+# (Curated docs live in docs/ and README.md and are committed normally.)
+# If a doc matching one of these patterns ever needs tracking: git add -f <file>
+*_ANALYSIS*.md
+*_FIX*.md
+*_SUMMARY.md
+*_EXPLAINED.md
+*_REVIEW.md
+*_QUICK_REF.md
+*_TROUBLESHOOTING.md
