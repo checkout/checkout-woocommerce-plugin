@@ -295,7 +295,8 @@ add_action( 'woocommerce_new_order', 'cko_update_order_id_in_session', 5 );
 /**
  * Constants.
  */
-define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '5.1.3.7' );
+// NOSONAR (S1313): "5.1.3.7" is the plugin version (WordPress semver-style), not a hardcoded IP address.
+define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '5.1.3.7' ); // NOSONAR
 define( 'WC_CHECKOUTCOM_PLUGIN_URL', untrailingslashit( plugins_url( basename( plugin_dir_path( __FILE__ ) ), basename( __FILE__ ) ) ) );
 define( 'WC_CHECKOUTCOM_PLUGIN_PATH', untrailingslashit( plugin_dir_path( __FILE__ ) ) );
 
