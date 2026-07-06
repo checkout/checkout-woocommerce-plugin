@@ -2708,11 +2708,13 @@ let showError = function (error_message) {
 
 	// WooCommerce returns response.messages as an HTML string (e.g. <ul class="woocommerce-error"><li>...</li></ul>).
 	// Extract plain text from <li> elements so we don't render raw HTML tags as visible text.
+	// Parse with DOMParser (not innerHTML): DOMParser produces an INERT document with no browsing
+	// context, so scripts never run and resources (e.g. <img onerror>) never load — safe to parse
+	// an untrusted server string. The extracted text is still rendered via .text() below.
 	if (typeof error_message === 'string' && error_message.trim().startsWith('<')) {
-		const div = document.createElement('div');
-		div.innerHTML = error_message;
-		const items = Array.from(div.querySelectorAll('li')).map(function(li) { return li.textContent.trim(); }).filter(Boolean);
-		error_message = items.length ? items : [div.textContent.trim()];
+		const parsed = new DOMParser().parseFromString(error_message, 'text/html');
+		const items = Array.from(parsed.querySelectorAll('li')).map(function(li) { return li.textContent.trim(); }).filter(Boolean);
+		error_message = items.length ? items : [(parsed.body.textContent || '').trim()];
 	}
 
 	if ("string" === typeof error_message) {
