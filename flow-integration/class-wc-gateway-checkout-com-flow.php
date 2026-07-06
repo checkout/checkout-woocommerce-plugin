@@ -471,9 +471,25 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 		// Always allow transitions TO terminal states (refund/cancel are legitimate actions)
 		if ( in_array( $new_status, $terminal_states, true ) ) {
-			WC_Checkoutcom_Utility::logger( 
+			WC_Checkoutcom_Utility::logger(
 				sprintf(
 					'[STATUS GUARD] ✅ ALLOWED transition to terminal state: Order %d from "%s" to "%s"',
+					$order_id,
+					$old_status,
+					$new_status
+				)
+			);
+			return;
+		}
+
+		// Always allow a transition to the configured Flagged status (e.g. Suspected Fraud). A
+		// payment flagged by Checkout.com's risk engine must be able to hold the order for review
+		// even if a capture webhook has already advanced it to processing (out-of-order webhooks).
+		$flagged_status = str_replace( 'wc-', '', WC_Admin_Settings::get_option( 'ckocom_order_flagged', 'flagged' ) );
+		if ( $new_status === $flagged_status ) {
+			WC_Checkoutcom_Utility::logger(
+				sprintf(
+					'[STATUS GUARD] ✅ ALLOWED transition to flagged/review state: Order %d from "%s" to "%s"',
 					$order_id,
 					$old_status,
 					$new_status
@@ -7059,11 +7075,18 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					if ( $order_id ) {
 						$order = wc_get_order( $order_id );
 						if ( $order ) {
-							$order->add_order_note( 
-								sprintf( 
-									__( 'Payment approved webhook received (Payment ID: %s). "Skip Authorization Status Update" enabled - waiting for payment_captured webhook to complete order.', 'checkout-com-unified-payments-api' ), 
-									$payment_id 
-								) 
+							// Honour the fraud flag even when authorisation status updates are skipped:
+							// route a flagged payment to the Flagged status instead of waiting for capture.
+							if ( WC_Checkout_Com_Webhook::is_payment_flagged( $data ) ) {
+								WC_Checkout_Com_Webhook::flag_order_for_review( $order, $payment_id, $action_id );
+								$response = true;
+								break;
+							}
+							$order->add_order_note(
+								sprintf(
+									__( 'Payment approved webhook received (Payment ID: %s). "Skip Authorization Status Update" enabled - waiting for payment_captured webhook to complete order.', 'checkout-com-unified-payments-api' ),
+									$payment_id
+								)
 							);
 							// Set authorized meta for tracking
 							$order->update_meta_data( 'cko_payment_authorized', true );
@@ -7541,6 +7564,14 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				unset( $payment_session_request['shipping'] );
 			}
 			WC_Checkoutcom_Utility::logger( '[PAYMENT SESSION] Add-payment-method mode — amount=0, capture=false, cards-only, items dropped, reference detached, address ' . ( isset( $payment_session_request['billing'] ) ? 'kept' : 'dropped' ) . '. User ID: ' . get_current_user_id() );
+		}
+
+		// Safety net: never send the payment session without a currency. The client derives currency
+		// from #cart-info, which can be empty when init fires early (e.g. browser autocomplete),
+		// producing Checkout.com's "currency is missing" error. Default to the store currency.
+		if ( empty( $payment_session_request['currency'] ) ) {
+			$payment_session_request['currency'] = get_woocommerce_currency();
+			WC_Checkoutcom_Utility::logger( '[PAYMENT SESSION] Currency missing from request — defaulted to store currency: ' . $payment_session_request['currency'] );
 		}
 
 		// Determine API URL based on environment

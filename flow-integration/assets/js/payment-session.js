@@ -352,6 +352,12 @@ var ckoFlow = {
 		ckoLogger.debug('🔍 Payment Type - Final value before paymentSessionRequest:', payment_type);
 
 		// Remove is_subscription from all orders.
+		// Guard against missing/incomplete cart data: browser autocomplete can trigger init before
+		// #cart-info is populated, so order_lines (orders) may be undefined. Normalise to an array
+		// rather than throwing "Cannot read properties of undefined (reading 'forEach')".
+		if (!Array.isArray(orders)) {
+			orders = [];
+		}
 		orders.forEach(order => {
 			delete order.is_subscription;
 		});

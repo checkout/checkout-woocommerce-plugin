@@ -439,7 +439,19 @@
 			} else if (!this.isValidEmail(email)) {
 				missingFields.push(labels.emailInvalid);
 			}
-			
+
+			// "Don't require billing address" mode: only the email is required, so don't list any
+			// address/name fields in the waiting message (they aren't collected on these checkouts).
+			if (typeof cko_flow_vars !== 'undefined' && ( cko_flow_vars.address_not_required === true || cko_flow_vars.address_not_required === '1' || cko_flow_vars.address_not_required === 1 )) {
+				let apmMessage = labels.allComplete;
+				if (missingFields.length === 1) {
+					apmMessage = labels.missingField + ' ' + missingFields[0];
+				} else if (missingFields.length > 1) {
+					apmMessage = labels.missingFields + ' ' + missingFields.join(', ');
+				}
+				return { missingFields: missingFields, message: apmMessage, isComplete: missingFields.length === 0 };
+			}
+
 			// Check billing address fields
 			const firstName = this.getCheckoutFieldValue("billing_first_name");
 			const lastName = this.getCheckoutFieldValue("billing_last_name");

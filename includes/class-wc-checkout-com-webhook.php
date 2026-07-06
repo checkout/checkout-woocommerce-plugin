@@ -123,7 +123,16 @@ class WC_Checkout_Com_Webhook {
 		
 		$payment_id = $webhook_data->id;
 		$action_id  = $webhook_data->action_id;
-		
+
+		// FRAUD FLAG: Checkout.com's risk engine can flag a payment for manual review. The flag
+		// rides on the payment_approved webhook as data.risk.flagged. Route the order to the
+		// configured Flagged status (e.g. Suspected Fraud) instead of the normal authorised status,
+		// so fulfilment automation that triggers on Processing does not run for a suspected-fraud
+		// order. The synchronous 3DS path already honours this flag; the webhook path did not.
+		if ( self::is_payment_flagged( $data ) ) {
+			return self::flag_order_for_review( $order, $payment_id, $action_id );
+		}
+
 		// MULTI-TAB DETECTION: Check if this payment ID is different from the order's primary payment
 		$order_primary_payment_id = $order->get_meta( '_cko_payment_id' );
 		$order_flow_payment_id = $order->get_meta( '_cko_flow_payment_id' );
@@ -743,6 +752,16 @@ class WC_Checkout_Com_Webhook {
 
 		// Get cko capture status configured in admin.
 		$status = WC_Admin_Settings::get_option( 'ckocom_order_captured', 'processing' );
+
+		// FRAUD FLAG: if this payment was flagged for review (on this webhook, or on a prior
+		// payment_approved that set the _cko_flagged meta), hold the order in the Flagged status
+		// rather than advancing to the captured status — otherwise auto-capture would push a
+		// suspected-fraud order straight to Processing and trigger fulfilment.
+		if ( self::is_payment_flagged( $data ) || 'yes' === $order->get_meta( '_cko_flagged' ) ) {
+			$order->update_meta_data( '_cko_flagged', 'yes' );
+			$status = WC_Admin_Settings::get_option( 'ckocom_order_flagged', 'flagged' );
+			$order->add_order_note( __( 'Payment flagged for review by Checkout.com — order held in the flagged status instead of advancing on capture.', 'checkout-com-unified-payments-api' ) );
+		}
 
 		$formatted_amount = wc_price( WC_Checkoutcom_Utility::decimal_to_value( $amount, $order->get_currency() ), array( 'currency' => $order->get_currency() ) );
 		/* translators: %1$s: Payment ID, %2$s: Action ID, %3$s: Amount. */
@@ -1599,6 +1618,65 @@ class WC_Checkout_Com_Webhook {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order status updated to: ' . $status . ' (or skipped if already successful)' );
 			WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: decline_payment END (SUCCESS) ===' );
 		}
+		return true;
+	}
+
+	/**
+	 * Whether a webhook payload indicates the payment was flagged for review by
+	 * Checkout.com's risk engine (data.risk.flagged === true).
+	 *
+	 * @param object $data Full webhook event object.
+	 * @return bool
+	 */
+	public static function is_payment_flagged( $data ) {
+		return isset( $data->data->risk->flagged )
+			&& ( true === $data->data->risk->flagged
+				|| 'true' === $data->data->risk->flagged
+				|| 1 === $data->data->risk->flagged
+				|| '1' === $data->data->risk->flagged );
+	}
+
+	/**
+	 * Route a flagged payment's order to the configured Flagged status (e.g. Suspected Fraud)
+	 * and record it, so fulfilment automation that triggers on "Processing" does not run for a
+	 * suspected-fraud order. Shared by the payment_approved and payment_captured webhook paths.
+	 *
+	 * @param WC_Order $order      Order to flag.
+	 * @param string   $payment_id Checkout.com payment id.
+	 * @param string   $action_id  Checkout.com action id.
+	 * @return bool Always true (webhook acknowledged).
+	 */
+	public static function flag_order_for_review( $order, $payment_id, $action_id ) {
+		$order_id = $order->get_id();
+		$status   = WC_Admin_Settings::get_option( 'ckocom_order_flagged', 'flagged' );
+
+		$order->update_meta_data( '_cko_flagged', 'yes' );
+		$order->update_meta_data( 'cko_payment_authorized', true );
+		if ( ! empty( $payment_id ) ) {
+			$order->update_meta_data( '_cko_payment_id', $payment_id );
+		}
+		if ( ! empty( $action_id ) ) {
+			$order->set_transaction_id( $action_id );
+		}
+		$order->add_order_note(
+			sprintf(
+				/* translators: %1$s: Payment ID, %2$s: Action ID. */
+				__( 'Checkout.com flagged this payment for review (risk.flagged = true). Order held for manual review — Payment ID: %1$s, Action ID: %2$s.', 'checkout-com-unified-payments-api' ),
+				$payment_id ? $payment_id : 'N/A',
+				$action_id ? $action_id : 'N/A'
+			)
+		);
+		$order->save();
+
+		// Apply the flagged status unless the order has already reached a final paid state.
+		clean_post_cache( $order_id );
+		$order = wc_get_order( $order_id );
+		if ( $order && 'completed' !== $order->get_status() ) {
+			$order->update_status( $status );
+		}
+
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Payment flagged for review — order ' . $order_id . ' routed to "' . $status . '" status.' );
+
 		return true;
 	}
 

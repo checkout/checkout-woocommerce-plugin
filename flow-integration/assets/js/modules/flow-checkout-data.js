@@ -22,12 +22,23 @@
 			if (!cartInfo || jQuery.isEmptyObject(cartInfo)) {
 				cartInfo = jQuery("#order-pay-info").data("order-pay");
 			}
-			
+
+			// Defensive: browser autocomplete can trigger Flow init before WooCommerce has
+			// populated #cart-info (its data-cart attribute), leaving cartInfo undefined. Treat it
+			// as an empty object so the reads below never throw; the DOM / cko_flow_vars fallbacks
+			// then supply amount and currency.
+			cartInfo = cartInfo || {};
+
 			// Extract basic information
 			// CRITICAL: Read amount from DOM first (most up-to-date after coupon changes)
 			// The #cart-info data attribute may have stale amount if coupon was applied
 			let amount = this.getAmountFromDOM() || cartInfo["order_amount"];
-			let currency = cartInfo["purchase_currency"];
+			// Currency: prefer the cart data, then fall back to the store currency injected by PHP.
+			// Without this fallback an incomplete #cart-info (e.g. during autocomplete) sends an empty
+			// currency and Checkout.com rejects the session with "currency is missing".
+			let currency = cartInfo["purchase_currency"]
+				|| (typeof cko_flow_vars !== 'undefined' ? cko_flow_vars.store_currency : '')
+				|| '';
 			let reference = "WOO" + (cko_flow_vars.ref_session || 'default');
 			
 			// Read from DOM fields first (fresh data), then fall back to cartInfo

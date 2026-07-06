@@ -5,7 +5,7 @@
  * Description: Extends WooCommerce by Adding the Checkout.com Gateway.
  * Author: Checkout.com
  * Author URI: https://www.checkout.com/
- * Version: 5.1.3.6
+ * Version: 5.1.3.7
  * Requires at least: 5.0
  * Tested up to: 6.7.0
  * WC requires at least: 3.0
@@ -152,12 +152,64 @@ function cko_is_flow_mode() {
 	return 'flow' === $checkout_mode && $flow_enabled;
 }
 
+/**
+ * Whether the current checkout actually needs a payment method to be offered.
+ *
+ * Single source of truth used by every gateway-availability filter below so that
+ * payment methods are hidden when the customer owes nothing today — while still
+ * being shown for subscriptions that require a card for automatic future renewals.
+ *
+ * This intentionally defers to WooCommerce's own WC()->cart->needs_payment(),
+ * which WooCommerce Subscriptions filters via `woocommerce_cart_needs_payment`:
+ *   - one-time £0 order (100% coupon, free product) -> needs_payment() false -> hide
+ *   - £0 free-trial / auto-renew subscription        -> WCS forces true       -> show (tokenise card)
+ *   - £0 subscription with manual renewals allowed    -> WCS returns false      -> hide
+ *
+ * Card-management flows (Add payment method / Change payment method) carry no
+ * order amount but must always offer Flow so a card can be tokenised, so they
+ * short-circuit to true.
+ *
+ * @since 5.1.3.7
+ *
+ * @return bool True when a gateway should be offered; false to let WooCommerce hide them.
+ */
+function cko_flow_checkout_requires_payment() {
+	// No cart context (e.g. order-pay for an existing order, admin, REST) — never interfere.
+	if ( ! function_exists( 'WC' ) || is_null( WC()->cart ) ) {
+		return true;
+	}
+
+	// Saving/replacing a card has no amount due but must still offer the gateway to tokenise it.
+	if ( function_exists( 'is_add_payment_method_page' ) && is_add_payment_method_page() ) {
+		return true;
+	}
+
+	// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only context check, no state change.
+	if ( isset( $_GET['change_payment_method'] ) ) {
+		return true;
+	}
+
+	$needs_payment = (bool) WC()->cart->needs_payment();
+
+	/**
+	 * Filters whether Checkout.com Flow should be offered when WooCommerce reports no payment is due.
+	 *
+	 * Return true to keep the gateway visible at a £0 checkout (e.g. to always tokenise a card),
+	 * or false to hide it. Defaults to WC()->cart->needs_payment().
+	 *
+	 * @since 5.1.3.7
+	 *
+	 * @param bool $needs_payment Result of WC()->cart->needs_payment().
+	 */
+	return (bool) apply_filters( 'cko_flow_checkout_requires_payment', $needs_payment );
+}
+
 function cko_force_flow_gateway_available( $available_gateways ) {
 	// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce verified by WooCommerce checkout
 	$payment_method      = isset( $_POST['payment_method'] ) ? sanitize_text_field( wp_unslash( $_POST['payment_method'] ) ) : '';
 	$is_checkout_context = is_checkout() || is_wc_endpoint_url( 'order-pay' ) || ( defined( 'DOING_AJAX' ) && DOING_AJAX ) || ( 'wc_checkout_com_flow' === $payment_method );
 
-	if ( $is_checkout_context && cko_is_flow_mode() ) {
+	if ( $is_checkout_context && cko_is_flow_mode() && cko_flow_checkout_requires_payment() ) {
 		$all_gateways = WC()->payment_gateways()->payment_gateways();
 		if ( isset( $all_gateways['wc_checkout_com_flow'] ) ) {
 			$available_gateways['wc_checkout_com_flow'] = $all_gateways['wc_checkout_com_flow'];
@@ -175,7 +227,7 @@ add_filter( 'woocommerce_available_payment_gateways', 'cko_force_flow_gateway_av
  * @return array Filtered available payment gateways.
  */
 function cko_backup_force_flow_gateway_available( $available_gateways ) {
-	if ( cko_is_flow_mode() && ! isset( $available_gateways['wc_checkout_com_flow'] ) ) {
+	if ( cko_is_flow_mode() && cko_flow_checkout_requires_payment() && ! isset( $available_gateways['wc_checkout_com_flow'] ) ) {
 		$all_gateways = WC()->payment_gateways()->payment_gateways();
 		if ( isset( $all_gateways['wc_checkout_com_flow'] ) ) {
 			$available_gateways['wc_checkout_com_flow'] = $all_gateways['wc_checkout_com_flow'];
@@ -188,7 +240,7 @@ add_filter( 'woocommerce_available_payment_gateways', 'cko_backup_force_flow_gat
 // Re-add Flow at very high priority to counteract multilingual plugins (e.g. Polylang)
 // that strip gateways between priority 999 and 99999.
 add_filter( 'woocommerce_available_payment_gateways', function( $gateways ) {
-	if ( cko_is_flow_mode() && ! isset( $gateways['wc_checkout_com_flow'] ) ) {
+	if ( cko_is_flow_mode() && cko_flow_checkout_requires_payment() && ! isset( $gateways['wc_checkout_com_flow'] ) ) {
 		$all_gateways = WC()->payment_gateways()->payment_gateways();
 		if ( isset( $all_gateways['wc_checkout_com_flow'] ) ) {
 			$gateways['wc_checkout_com_flow'] = $all_gateways['wc_checkout_com_flow'];
@@ -196,6 +248,25 @@ add_filter( 'woocommerce_available_payment_gateways', function( $gateways ) {
 	}
 	return $gateways;
 }, 99999 );
+
+/**
+ * Authoritative final word: remove Flow when nothing is due today.
+ *
+ * Flow's is_available() returns true unconditionally, so WooCommerce core adds
+ * Flow to the list before the force filters above ever run. This filter runs
+ * last (after every force filter and any multilingual plugin) and strips Flow
+ * when no payment is required, letting WooCommerce hide the payment section for
+ * genuinely free one-time orders while leaving auto-renew subscriptions intact.
+ *
+ * @param array $gateways Available payment gateways.
+ * @return array
+ */
+add_filter( 'woocommerce_available_payment_gateways', function( $gateways ) {
+	if ( cko_is_flow_mode() && isset( $gateways['wc_checkout_com_flow'] ) && ! cko_flow_checkout_requires_payment() ) {
+		unset( $gateways['wc_checkout_com_flow'] );
+	}
+	return $gateways;
+}, PHP_INT_MAX );
 
 
 /**
@@ -224,7 +295,7 @@ add_action( 'woocommerce_new_order', 'cko_update_order_id_in_session', 5 );
 /**
  * Constants.
  */
-define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '5.1.3.6' );
+define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '5.1.3.7' );
 define( 'WC_CHECKOUTCOM_PLUGIN_URL', untrailingslashit( plugins_url( basename( plugin_dir_path( __FILE__ ) ), basename( __FILE__ ) ) ) );
 define( 'WC_CHECKOUTCOM_PLUGIN_PATH', untrailingslashit( plugin_dir_path( __FILE__ ) ) );
 
@@ -1599,6 +1670,10 @@ function cko_enqueue_frontend_assets() {
 			$flow_vars['add_payment_method_currency'] = get_woocommerce_currency();
 		}
 
+		// Store currency, used by JS as a fallback when #cart-info is not yet populated (e.g. browser
+		// autocomplete triggering Flow init early) so the payment session always carries a currency.
+		$flow_vars['store_currency'] = get_woocommerce_currency();
+
 		wp_set_script_translations( 'checkout-com-flow-payment-session-script', 'checkout-com-unified-payments-api' );
 
 		wp_localize_script( 'checkout-com-flow-payment-session-script', 'cko_flow_vars', $flow_vars );
@@ -2172,8 +2247,11 @@ function cko_get_payment_session() {
 		// Get Checkout.com API settings
 		$core_settings = cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' );
 		$environment   = ! empty( $core_settings['ckocom_environment'] ) ? $core_settings['ckocom_environment'] : 'sandbox';
-		$secret_key    = $environment === 'sandbox'
-			? ( ! empty( $core_settings['ckocom_sk'] ) ? $core_settings['ckocom_sk'] : '' )
+		// See cko_get_payment_status(): the active secret key lives in ckocom_sk for both
+		// environments; ckocom_sk_live is never written. Read ckocom_sk (fallback to legacy
+		// ckocom_sk_live) so Live mode does not send an empty key and get a 401.
+		$secret_key    = ! empty( $core_settings['ckocom_sk'] )
+			? $core_settings['ckocom_sk']
 			: ( ! empty( $core_settings['ckocom_sk_live'] ) ? $core_settings['ckocom_sk_live'] : '' );
 		
 		if ( empty( $secret_key ) ) {
@@ -2281,9 +2359,13 @@ function cko_get_payment_status( $request ) {
 	$core_settings = cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' );
 	$env           = ! empty( $core_settings['ckocom_environment'] ) ? $core_settings['ckocom_environment'] : 'sandbox';
 	
-	// Use correct secret key based on environment
-	$secret_key = ( 'sandbox' === $env )
-		? ( ! empty( $core_settings['ckocom_sk'] ) ? $core_settings['ckocom_sk'] : '' )
+	// The settings UI stores the active secret key in ckocom_sk for BOTH environments (only the
+	// API URL below changes with the environment); ckocom_sk_live is never populated by the plugin.
+	// Read ckocom_sk — falling back to the legacy ckocom_sk_live — so Live mode does not send an
+	// empty key ("Authorization: Bearer ") and get a 401, which previously prevented _cko_source_id
+	// from being saved on new Live subscriptions (breaking their first renewal).
+	$secret_key = ! empty( $core_settings['ckocom_sk'] )
+		? $core_settings['ckocom_sk']
 		: ( ! empty( $core_settings['ckocom_sk_live'] ) ? $core_settings['ckocom_sk_live'] : '' );
 
 	if ( empty( $payment_id ) ) {
