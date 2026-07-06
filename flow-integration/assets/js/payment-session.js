@@ -5191,7 +5191,10 @@ document.addEventListener("DOMContentLoaded", function () {
 			if (!target.checked) {
 				return;
 			}
-			const applePayActive = (typeof ckoFlow !== 'undefined' && ckoFlow.selectedPaymentType === 'applepay');
+			// ckoFlow is defined in this file (var above), so no typeof guard is needed. Coerce to a
+			// string for the comparison: selectedPaymentType starts as null and is set to the chosen
+			// type on component change, and String() keeps this a string-vs-string compare.
+			const applePayActive = String(ckoFlow.selectedPaymentType) === 'applepay';
 			if (!applePayActive) {
 				return;
 			}
