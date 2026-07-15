@@ -188,52 +188,50 @@
 		 */
 		enforceOrderUniqueness: function() {
 			const components = ['card', 'googlepay', 'applepay'];
+			const positions = ['1', '2', '3'];
 			const flowChecked = $('input[data-cko-component="flow"]').is(':checked');
 
-			// Count chosen positions among ticked components to detect duplicates.
-			const counts = {};
-			let checkedCount = 0;
-			components.forEach(function(name) {
-				if ($('input[data-cko-component="' + name + '"]').is(':checked')) {
-					checkedCount++;
-					const v = $('select[data-cko-order="' + name + '"]').val();
-					counts[v] = (counts[v] || 0) + 1;
-				}
-			});
-			let duplicate = false;
-			Object.keys(counts).forEach(function(v) {
-				if (counts[v] > 1) {
-					duplicate = true;
-				}
+			// Ticked components, kept in the fixed `components` order — this order is the tiebreak
+			// priority used when resolving position collisions below.
+			const checked = components.filter(function(name) {
+				return $('input[data-cko-component="' + name + '"]').is(':checked');
 			});
 
-			// Disable, on each select, the positions already taken by a different ticked component.
-			components.forEach(function(name) {
-				const cb = $('input[data-cko-component="' + name + '"]');
+			// Resolve collisions up front: walk the ticked components in priority order and, if a
+			// component's selected position is already claimed by an earlier one, reassign it to the
+			// lowest free position. This guarantees each ticked method holds a unique First/Second/
+			// Third slot, which is what the frontend relies on to order the components deterministically.
+			// It also removes the transient window where a just-ticked method could momentarily sit on
+			// an already-taken slot (e.g. Google Pay briefly offering "First" while Card holds it), and
+			// auto-lands a third method on its only free slot instead of leaving a taken one selectable.
+			const taken = {};
+			checked.forEach(function(name) {
 				const sel = $('select[data-cko-order="' + name + '"]');
-				const myVal = sel.val();
+				let val = sel.val();
+				if (taken[val]) {
+					const free = positions.filter(function(p) { return !taken[p]; })[0];
+					if (free && free !== val) {
+						val = free;
+						sel.val(free);
+					}
+				}
+				taken[val] = name;
+			});
+
+			// Disable, on every select, the positions already taken by a different ticked component.
+			components.forEach(function(name) {
+				const sel = $('select[data-cko-order="' + name + '"]');
 				sel.find('option').each(function() {
 					const optVal = $(this).val();
-					let takenByOther = false;
-					components.forEach(function(other) {
-						if (other === name) {
-							return;
-						}
-						const ocb = $('input[data-cko-component="' + other + '"]');
-						if (ocb.is(':checked') && $('select[data-cko-order="' + other + '"]').val() === optVal) {
-							takenByOther = true;
-						}
-					});
-					$(this).prop('disabled', takenByOther && optVal !== myVal);
+					$(this).prop('disabled', !!taken[optVal] && taken[optVal] !== name);
 				});
 			});
 
-			// Warn on duplicate positions, or when no method is selected at all in Flow mode.
+			// With collisions auto-resolved, the only remaining warning case is an empty selection
+			// while in components mode (Flow not ticked and no individual method chosen).
 			let message = '';
-			if (!flowChecked && checkedCount === 0) {
+			if (!flowChecked && checked.length === 0) {
 				message = 'Select at least one payment method (or tick "Flow" to show all).';
-			} else if (duplicate) {
-				message = 'Each payment method must have a unique display order (First, Second, Third).';
 			}
 			this.toggleOrderWarning(message);
 		},

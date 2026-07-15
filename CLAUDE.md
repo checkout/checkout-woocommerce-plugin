@@ -202,3 +202,26 @@ Separate the payment methods instead of the default 'flow' which displays all pa
   https://www.checkout.com/docs/payments/accept-payments/accept-a-payment-on-your-website/flow-library-reference/flowcomponent
 
   https://api-reference.checkout.com/tag/Flow?_gl=1*12x8yui*_gcl_au*MTUzMzQwNjc3MS4xNzgxNzE0MDY2*_ga*MjA4MDI4NjA1Ni4xNzY0MDgyNTU2*_ga_B9CRR7CRMP*czE3ODI1NjI4NjYkbzE2JGcxJHQxNzgyNTYyOTUxJGo0MiRsMCRoMA..#operation/CreatePaymentSession
+
+## Current Behavior at 15 July 2026:
+1. Backend/Admin user selects [] "By selecting 'Flow' all payment methods enabled on your Checkout account will be available for your customers." Only
+  Front end/checkout UI behavior is as expected 
+
+2. Backend/Admin user selects []  "By selecting 'Card' only Card payment methods would be displayed; Google Pay and Apple Pay will not be available"
+Card display order = 'First' selected
+   Front end/checkout UI behavior is as expected 
+
+3. Backend/Admin user []  "By selecting 'Card' only Card payment methods would be displayed; Google Pay and Apple Pay will not be available"
+Card display order = 'First' selected
+Google Pay display order initially showed the option to select 'First' then later greyed out 'First' and gives option for 'Second' and 'Third' as expected, please review why option to select 'First' was briefly allowed.
+User now selects 'Second'
+  Front end/checkout UI behavior is not as expected, Google Pay component is being displayed before card component.
+  Expected behaviour Card component should be first then Google Pay component second
+
+4. Backend/Admin user User selects []  "By selecting 'Card' only Card payment methods would be displayed; Google Pay and Apple Pay will not be available"
+Card display order = 'First' selected
+Google Pay display = Second
+Apple Pay display order is showing 'First' and 'Third'.
+Backend/Admin expected behaviour, grey out 'First' and 'Second' and only 'Third' should be available to select because Card and Google Pay have already taken the 'First' and 'Second' options for display ordering.
+  Front end/checkout UI behavior is displaying Apple Pay component 'First' the 'Google Pay' second the Card third.
+  Expected behaviour, Card component should be displayed First, Google Pay displayed second then Apple Pay third as per the backend/admin order.

@@ -2593,8 +2593,14 @@ var ckoFlow = {
 
 		ckoFlow.standaloneComponents = [];
 
-		// Create each component, gate on availability, and mount into an ordered child container.
-		const creationPromises = componentNames.map((name) => {
+		// STEP 1 — Synchronously create the ordered child containers up front, in the exact
+		// configured display order. This MUST happen before the async isAvailable() checks:
+		// appendChild() moves an existing node to the end of the parent, so iterating
+		// componentNames in order guarantees the DOM order matches the merchant's chosen order
+		// regardless of the (non-deterministic) order in which isAvailable() promises resolve.
+		// Previously the containers were appended inside the async callbacks, so a wallet whose
+		// isAvailable() resolved first would render before Card even when Card was configured first.
+		const componentEntries = componentNames.map((name) => {
 			let component;
 			try {
 				// Card uses the WooCommerce place-order button (no built-in pay button);
@@ -2604,42 +2610,55 @@ var ckoFlow = {
 				});
 			} catch (error) {
 				ckoLogger.error('Error creating standalone component "' + name + '":', error);
-				return Promise.resolve(null);
+				return null;
 			}
 
-			return component.isAvailable().then((available) => {
-				if (!available) {
-					ckoLogger.debug('Standalone component not available, skipping:', name);
-					return null;
-				}
+			// Create (or reuse) the ordered child container and (re)append it so the DOM order
+			// reflects the configured order. Hidden until we confirm availability, to avoid a
+			// flash of empty containers for methods that turn out to be unavailable.
+			let child = document.getElementById('cko-standalone-' + name);
+			if (!child) {
+				child = document.createElement('div');
+				child.id = 'cko-standalone-' + name;
+				child.className = 'cko-standalone-component cko-standalone-component--' + name;
+			}
+			child.style.display = 'none';
+			flowContainer.appendChild(child);
 
-				// Create (or reuse) the ordered child container.
-				let child = document.getElementById('cko-standalone-' + name);
-				if (!child) {
-					child = document.createElement('div');
-					child.id = 'cko-standalone-' + name;
-					child.className = 'cko-standalone-component cko-standalone-component--' + name;
-					flowContainer.appendChild(child);
+			return { name: name, component: component, container: child };
+		}).filter(Boolean);
+
+		// STEP 2 — Gate each component on availability and mount it into its pre-ordered
+		// container. Promise.all preserves array order, so `mounted` stays in configured order.
+		const creationPromises = componentEntries.map((entry) => {
+			return entry.component.isAvailable().then((available) => {
+				if (!available) {
+					ckoLogger.debug('Standalone component not available, skipping:', entry.name);
+					// Remove the placeholder container so it doesn't leave a gap in the layout.
+					if (entry.container && entry.container.parentNode) {
+						entry.container.parentNode.removeChild(entry.container);
+					}
+					return null;
 				}
 
 				try {
-					component.mount(child);
+					entry.container.style.display = '';
+					entry.component.mount(entry.container);
 				} catch (error) {
-					ckoLogger.error('Error mounting standalone component "' + name + '":', error);
+					ckoLogger.error('Error mounting standalone component "' + entry.name + '":', error);
 					return null;
 				}
 
-				const entry = { name: name, component: component, container: child };
 				ckoFlow.standaloneComponents.push(entry);
 
 				// The card component is the primary submit target for the place-order button.
-				if (name === 'card') {
-					ckoFlow.flowComponent = component;
+				if (entry.name === 'card') {
+					ckoFlow.flowComponent = entry.component;
 				}
 
 				return entry;
 			}).catch((error) => {
-				ckoLogger.error('isAvailable() failed for standalone component "' + name + '":', error);
+				ckoLogger.error('isAvailable() failed for standalone component "' + entry.name + '":', error);
 				return null;
 			});
 		});

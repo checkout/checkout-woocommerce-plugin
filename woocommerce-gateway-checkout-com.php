@@ -1126,17 +1126,24 @@ function cko_enqueue_frontend_assets() {
 	$flow_all_in_one = ! isset( $flow_customization['flow_component_flow'] ) || 'yes' === $flow_customization['flow_component_flow'];
 
 	$flow_standalone = array();
-	foreach ( array( 'card', 'googlepay', 'applepay' ) as $cko_component ) {
+	$flow_component_priority = array( 'card', 'googlepay', 'applepay' );
+	foreach ( $flow_component_priority as $priority_index => $cko_component ) {
 		if ( isset( $flow_customization[ 'flow_component_' . $cko_component ] ) && 'yes' === $flow_customization[ 'flow_component_' . $cko_component ] ) {
 			$flow_standalone[] = array(
-				'name'  => $cko_component,
-				'order' => isset( $flow_customization[ 'flow_component_order_' . $cko_component ] ) ? (int) $flow_customization[ 'flow_component_order_' . $cko_component ] : 99,
+				'name'     => $cko_component,
+				'order'    => isset( $flow_customization[ 'flow_component_order_' . $cko_component ] ) ? (int) $flow_customization[ 'flow_component_order_' . $cko_component ] : 99,
+				'priority' => $priority_index,
 			);
 		}
 	}
 	usort(
 		$flow_standalone,
 		function ( $a, $b ) {
+			// Sort by configured display order; fall back to a fixed priority so that legacy
+			// settings with a duplicate order still yield a deterministic (never ambiguous) order.
+			if ( $a['order'] === $b['order'] ) {
+				return $a['priority'] - $b['priority'];
+			}
 			return $a['order'] - $b['order'];
 		}
 	);
