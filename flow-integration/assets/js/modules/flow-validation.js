@@ -283,6 +283,33 @@
 		 * @returns {boolean} True if all required fields are filled and valid
 		 */
 		requiredFieldsFilledAndValid: function() {
+			// Add-Payment-Method branch — /my-account/add-payment-method/. No checkout form/cart here;
+			// the customer's billing data comes from PHP via cko_flow_vars.customer_data_for_setup.
+			// (wp_localize_script stringifies booleans, so compare against true/"1"/1.)
+			if (typeof cko_flow_vars !== 'undefined' && ( cko_flow_vars.is_add_payment_method === true || cko_flow_vars.is_add_payment_method === '1' || cko_flow_vars.is_add_payment_method === 1 )) {
+				const setup = (cko_flow_vars.customer_data_for_setup) || {};
+				const email = (setup.email || '').toString().trim();
+				if (!email || !this.isValidEmail(email)) {
+					if (typeof window.ckoLogger !== 'undefined') {
+						window.ckoLogger.debug('requiredFieldsFilledAndValid: [add-payment-method] customer email missing or invalid');
+					}
+					return false;
+				}
+				return true;
+			}
+
+			// "Don't require billing address" mode (gateway setting flow_no_billing_address). The checkout
+			// only collects name & email (no address fields), so validate the email only — a default
+			// billing country is supplied server-side for the payment session.
+			if (typeof cko_flow_vars !== 'undefined' && ( cko_flow_vars.address_not_required === true || cko_flow_vars.address_not_required === '1' || cko_flow_vars.address_not_required === 1 )) {
+				const apmEmail = this.getCheckoutFieldValue('billing_email');
+				const ok = !!(apmEmail && this.isValidEmail(apmEmail));
+				if (typeof window.ckoLogger !== 'undefined') {
+					window.ckoLogger.debug('requiredFieldsFilledAndValid: [no-billing-address] email-only check = ' + ok);
+				}
+				return ok;
+			}
+
 			// Check if we're on order-pay page and have order data
 			const isOrderPayPage = window.location.pathname.includes('/order-pay/');
 			let orderPayInfo = null;
@@ -412,7 +439,19 @@
 			} else if (!this.isValidEmail(email)) {
 				missingFields.push(labels.emailInvalid);
 			}
-			
+
+			// "Don't require billing address" mode: only the email is required, so don't list any
+			// address/name fields in the waiting message (they aren't collected on these checkouts).
+			if (typeof cko_flow_vars !== 'undefined' && ( cko_flow_vars.address_not_required === true || cko_flow_vars.address_not_required === '1' || cko_flow_vars.address_not_required === 1 )) {
+				let apmMessage = labels.allComplete;
+				if (missingFields.length === 1) {
+					apmMessage = labels.missingField + ' ' + missingFields[0];
+				} else if (missingFields.length > 1) {
+					apmMessage = labels.missingFields + ' ' + missingFields.join(', ');
+				}
+				return { missingFields: missingFields, message: apmMessage, isComplete: missingFields.length === 0 };
+			}
+
 			// Check billing address fields
 			const firstName = this.getCheckoutFieldValue("billing_first_name");
 			const lastName = this.getCheckoutFieldValue("billing_last_name");
@@ -478,6 +517,15 @@
 				const fieldId = label.closest("label").getAttribute("for");
 				if (fieldId) {
 					fieldIds.push(fieldId);
+				}
+			});
+
+			// Also scan validate-required rows — catches fields that are required server-side
+			// but whose label doesn't contain a .required span (e.g. billing_phone on some themes).
+			document.querySelectorAll('.woocommerce-checkout .form-row.validate-required').forEach((row) => {
+				const input = row.querySelector('input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]), select, textarea');
+				if (input && input.id && !fieldIds.includes(input.id)) {
+					fieldIds.push(input.id);
 				}
 			});
 

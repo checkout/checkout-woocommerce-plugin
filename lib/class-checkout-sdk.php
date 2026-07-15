@@ -44,7 +44,9 @@ class Checkout_SDK {
 			return;
 		}
 		
-		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		$core_settings = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		
 		// Validate that API keys are present before initializing SDK
 		// This prevents errors when keys are being registered/updated

@@ -133,7 +133,9 @@ class WC_Checkoutcom_Diagnostics {
 	 * @return array
 	 */
 	private static function run_csr_test() {
-		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		$core_settings  = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$secret_key_raw = isset( $core_settings['ckocom_sk'] ) ? $core_settings['ckocom_sk'] : '';
 
 		if ( empty( $secret_key_raw ) ) {

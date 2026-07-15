@@ -734,17 +734,12 @@ jQuery( function ( $ ) {
                     return;
                 }
 
-                // Use API v1 structure (same as classic Google Pay) to match working configuration
-                // This ensures compatibility with Google Pay merchant configuration
-                
                 // Format amount based on currency decimal places
-                // Zero-decimal currencies (JPY, KRW, etc.) should be rounded to integers
-                // Two-decimal currencies (USD, EUR, etc.) use 2 decimal places
                 const currencyCode = cko_google_pay_vars.currency_code || 'USD';
                 const zeroDecimalCurrencies = ['JPY', 'KRW', 'VND', 'CLP', 'ISK', 'UGX', 'XAF', 'XOF', 'XPF', 'BIF', 'DJF', 'GNF', 'KMF', 'PYG', 'RWF', 'VUV'];
                 const isZeroDecimal = zeroDecimalCurrencies.includes(currencyCode.toUpperCase());
                 const formattedAmount = isZeroDecimal ? Math.round(cartTotal).toString() : cartTotal.toFixed(2);
-                
+
                 const paymentDataRequest = {
                     merchantId: cko_google_pay_vars.merchant_id.trim(),
                     paymentMethodTokenizationParameters: {
@@ -757,7 +752,6 @@ jQuery( function ( $ ) {
                     allowedPaymentMethods: ['CARD', 'TOKENIZED_CARD'],
                     cardRequirements: {
                         allowedCardNetworks: ['AMEX', 'DISCOVER', 'JCB', 'MASTERCARD', 'VISA'],
-                        // Request ECv2 by specifying allowedCardAuthMethods (CRYPTOGRAM_3DS is ECv2, PAN_ONLY may be ECv1)
                         allowedCardAuthMethods: ['CRYPTOGRAM_3DS']
                     },
                     transactionInfo: {
@@ -766,9 +760,7 @@ jQuery( function ( $ ) {
                         totalPrice: formattedAmount,
                         totalPriceLabel: 'Total'
                     },
-                    // Add display items for breakdown in popup (API v1 supports this)
                     displayItems: displayItems,
-                    // Request shipping address and email (API v1 supports these)
                     shippingAddressRequired: true,
                     emailRequired: true,
                     shippingAddressParameters: {
@@ -791,7 +783,7 @@ jQuery( function ( $ ) {
                         // Parse the token JSON string to extract the token data (same as classic)
                         tokenData = JSON.parse(paymentData.paymentMethodToken.token);
                         cko_google_pay_vars.debug && console.log('[Google Pay Express] Token data extracted - protocolVersion:', tokenData.protocolVersion);
-                        
+
                         // Create a modified payment data object with the token data properly formatted
                         // This ensures the signedMessage is in the exact same format as classic Google Pay
                         // Note: We use a new variable to avoid reassigning const

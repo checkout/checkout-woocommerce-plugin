@@ -411,8 +411,37 @@ class WC_Checkoutcom_Api_Request {
 			$payment->capture            = true;
 
 			if ( 'wc_checkout_com_alternative_payments_sepa' !== $order->get_payment_method() ) {
-				$parent_order                 = wc_get_order( $arg['parent_order_id'] );
-				$payment->previous_payment_id = $parent_order->get_meta( '_cko_payment_id', true ) ?? null;
+				// previous_payment_id (the scheme transaction id reference) for the MIT renewal.
+				// Prefer a value stored directly on the subscription (passed in $arg) — this covers
+				// migrated subscriptions that have no CKO parent order, and card-changed subscriptions.
+				// Fall back to the parent order's _cko_payment_id for native CKO subscriptions.
+				// NOTE: guard wc_get_order() — migrated/parent-less subscriptions return 0 here, and
+				// the previous code ($parent_order->get_meta() with no guard) would fatal on `false`.
+				$previous_payment_id = ! empty( $arg['previous_payment_id'] ) ? $arg['previous_payment_id'] : '';
+				$prev_source         = $previous_payment_id ? 'subscription' : 'none';
+
+				if ( empty( $previous_payment_id ) && ! empty( $arg['parent_order_id'] ) ) {
+					$parent_order = wc_get_order( $arg['parent_order_id'] );
+					if ( $parent_order ) {
+						$previous_payment_id = $parent_order->get_meta( '_cko_payment_id', true );
+						if ( $previous_payment_id ) {
+							$prev_source = 'parent_order';
+						}
+					}
+				}
+
+				if ( ! empty( $previous_payment_id ) ) {
+					$payment->previous_payment_id = $previous_payment_id;
+				}
+
+				// Make the credential-chain reference visible in the gateway log (for verifying native /
+				// card-changed / migrated subscriptions and for support).
+				WC_Checkoutcom_Utility::logger(
+					'[RENEWAL] MIT for order ' . $order->get_id()
+					. ': source_id=' . ( isset( $arg['source_id'] ) ? $arg['source_id'] : 'n/a' )
+					. ', previous_payment_id=' . ( $previous_payment_id ?: 'NONE' )
+					. ' (source: ' . $prev_source . ')'
+				);
 			}
 		} elseif ( function_exists( 'wcs_order_contains_subscription' ) ) {
 			if ( wcs_order_contains_subscription( $order, 'parent' ) ) {
@@ -1016,7 +1045,9 @@ class WC_Checkoutcom_Api_Request {
 	 * @return array|mixed
 	 */
 	public static function refund_payment( $order_id, $order ) {
-		$core_settings      = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$core_settings      = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$is_fallback_active = ( 'yes' === ( $core_settings['enable_fallback_ac'] ?? 'no' ) );
 
 		$cko_payment_id = $order->get_meta( '_cko_payment_id' );
@@ -2065,7 +2096,9 @@ class WC_Checkoutcom_Api_Request {
 			return false;
 		}
 
-		$core_settings      = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$core_settings      = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$is_fallback_active = ( 'yes' === ( $core_settings['enable_fallback_ac'] ?? 'no' ) );
 
 		$core_settings['ckocom_sk'] = cko_is_nas_account() ? 'Bearer ' . $core_settings['ckocom_sk'] : $core_settings['ckocom_sk'];

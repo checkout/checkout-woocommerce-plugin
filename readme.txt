@@ -2,7 +2,7 @@
 Contributors: checkoutintegration
 Tags: checkout, payments, credit card, payment gateway, apple pay, google pay, payment request
 Requires at least: 5.0
-Stable tag: 5.1.2
+Stable tag: 5.1.4
 Requires PHP: 7.3
 Tested up to: 6.7.0
 License: GPLv2 or later
@@ -179,6 +179,14 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v5.1.4 8th July 2026
+- **[Fixes]**:
+- Live subscriptions:Fixed a Live-only issue where the secret key was read from the wrong setting, causing a 401 when saving the card source. New subscriptions on Live now correctly store the source ID so their first renewal succeeds.
+- Fraud checks:Payments flagged for review by Checkout.com's risk engine are now set toSuspected Fraud(instead of Processing) and held there — so flagged orders aren't auto-fulfilled. Works across webhook timing and with "Skip Authorization Status Update".
+- Checkout stability:Resolved a stuck payment form / "currency is missing" error that could occur when browser autocomplete filled the checkout before the cart finished loading.
+- Free (£0) orders:Payment methods are now hidden when nothing is due today, while still shown for auto-renewing free-trial subscriptions so the card can be saved for future payments.
+- Security:Hardened rendering of WooCommerce error messages (parse instead of inject HTML).
+
 v5.1.2 22nd April 2026
 - **[Security]**:
 Removed sensitive data from logs (API responses, POST/GET payloads, webhook bodies)

@@ -74,7 +74,9 @@ class WC_Checkoutcom_Cards_Settings {
 	 * @return mixed
 	 */
 	public static function quick_settings() {
-		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$core_settings = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings' );
 		$nas_docs      = 'https://www.checkout.com/docs/four/resources/api-authentication/api-keys';
 		$abc_docs      = 'https://www.checkout.com/docs/the-hub/update-your-hub-settings#Manage_the_API_keys';
 		$docs_link     = $nas_docs; // Default to NAS docs since account type is NAS
@@ -406,6 +408,18 @@ class WC_Checkoutcom_Cards_Settings {
 				'data-checkout-mode' => 'classic',
 				'data-field-type' => 'alternative-payment-methods'
 			),
+		);
+
+		// Flow: allow checkouts that collect only name & email (e.g. quick / micro payments) to load the
+		// card form without a billing address. Store base country is sent so card payments can be served.
+		$settings['flow_no_billing_address'] = array(
+			'id'          => 'flow_no_billing_address',
+			'title'       => __( 'Don\'t require billing address (Flow)', 'checkout-com-unified-payments-api' ),
+			'type'        => 'checkbox',
+			'desc'        => __( 'Enable for checkouts that collect only name & email. Flow loads without requiring a billing address, and the store\'s base country is sent so card payments can be served. 3DS still applies as configured. (You still remove the address fields in your checkout config.)', 'checkout-com-unified-payments-api' ),
+			'desc_tip'    => true,
+			'default'     => 'no',
+			'value'       => isset( $core_settings['flow_no_billing_address'] ) ? $core_settings['flow_no_billing_address'] : 'no',
 		);
 
 		return apply_filters( 'wc_checkout_com_quick_settings', $settings );

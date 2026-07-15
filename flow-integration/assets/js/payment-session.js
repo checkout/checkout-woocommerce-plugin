@@ -101,6 +101,17 @@ if (typeof window.FlowSessionStorage === 'undefined') {
 }
 
 /*
+ * Build a wc-ajax URL for a given endpoint name, falling back to admin-ajax.php.
+ * Using /?wc-ajax= avoids Cloudflare WAF rules that block admin-ajax.php POST requests.
+ */
+function getCkoAjaxUrl(endpoint) {
+	if (typeof cko_flow_vars !== 'undefined' && cko_flow_vars.wc_ajax_url) {
+		return cko_flow_vars.wc_ajax_url.replace('%%endpoint%%', endpoint);
+	}
+	return (typeof cko_flow_vars !== 'undefined') ? cko_flow_vars.ajax_url : ajaxurl;
+}
+
+/*
  * The main object managing the Checkout.com flow payment integration.
  */
 var ckoFlow = {
@@ -170,7 +181,7 @@ var ckoFlow = {
 		
 		ckoLogger.debug('loadFlow: Validation passed - proceeding with payment session creation');
 		
-		ckoLogger.version('5.1.2');
+		ckoLogger.version('5.1.4');
 		
 		// Check if we're on a redirect page with payment parameters - if so, don't initialize Flow
 		const urlParams = new URLSearchParams(window.location.search);
@@ -254,30 +265,56 @@ var ckoFlow = {
 			return;
 		}
 		
-		const checkoutData = window.FlowInitialization.collectCheckoutData();
-		if (!checkoutData) {
-			ckoLogger.error('loadFlow: Checkout data not available');
-			hideLoadingOverlay();
-			showError('Please complete required fields to continue with payment.');
-			return;
-		}
-		
-		if (typeof window.FlowValidation !== 'undefined' && window.FlowValidation.validateCheckoutData) {
-			const dataValidation = window.FlowValidation.validateCheckoutData(checkoutData);
-			if (!dataValidation.isValid) {
-				if (dataValidation.reason === 'INVALID_EMAIL') {
-					ckoLogger.error('❌ BLOCKED: Invalid email during data collection', { email: dataValidation.email });
-					hideLoadingOverlay();
-					showError('Please enter a valid email address to continue with payment.');
-				} else {
-					ckoLogger.error('❌ BLOCKED: Invalid checkout data', { reason: dataValidation.reason });
-					hideLoadingOverlay();
-					showError('Please complete required fields to continue with payment.');
-				}
+		// Add-Payment-Method mode: no cart/checkout form on /my-account/add-payment-method/, so build
+		// a synthetic checkoutData from the customer profile PHP injected into customer_data_for_setup.
+		// amount/capture are forced to a $0 verification server-side in ajax_create_payment_session()
+		// AND ajax_submit_payment_session() — the values here are placeholders.
+		const isAddPaymentMethodMode = (typeof cko_flow_vars !== 'undefined' && ( cko_flow_vars.is_add_payment_method === true || cko_flow_vars.is_add_payment_method === '1' || cko_flow_vars.is_add_payment_method === 1 ));
+		let checkoutData;
+		if (isAddPaymentMethodMode) {
+			const setup = (cko_flow_vars.customer_data_for_setup) || {};
+			checkoutData = {
+				amount: 0,
+				currency: cko_flow_vars.add_payment_method_currency || 'USD',
+				reference: 'cko-add-payment-method',
+				email: setup.email || '',
+				family_name: setup.last_name || '',
+				given_name: setup.first_name || '',
+				phone: '',
+				address1: setup.address_1 || '', address2: setup.address_2 || '',
+				city: setup.city || '', state: setup.state || '', zip: setup.postcode || '', country: setup.country || '',
+				shippingAddress1: setup.address_1 || '', shippingAddress2: setup.address_2 || '',
+				shippingCity: setup.city || '', shippingState: setup.state || '', shippingZip: setup.postcode || '', shippingCountry: setup.country || '',
+				orders: [], description: 'Add payment method', orderId: null,
+				payment_type: cko_flow_vars.regular_payment_type || 'Regular',
+			};
+			ckoLogger.debug('loadFlow: [add-payment-method] using synthetic checkoutData from customer_data_for_setup');
+		} else {
+			checkoutData = window.FlowInitialization.collectCheckoutData();
+			if (!checkoutData) {
+				ckoLogger.error('loadFlow: Checkout data not available');
+				hideLoadingOverlay();
+				showError('Please complete required fields to continue with payment.');
 				return;
 			}
+
+			if (typeof window.FlowValidation !== 'undefined' && window.FlowValidation.validateCheckoutData) {
+				const dataValidation = window.FlowValidation.validateCheckoutData(checkoutData);
+				if (!dataValidation.isValid) {
+					if (dataValidation.reason === 'INVALID_EMAIL') {
+						ckoLogger.error('❌ BLOCKED: Invalid email during data collection', { email: dataValidation.email });
+						hideLoadingOverlay();
+						showError('Please enter a valid email address to continue with payment.');
+					} else {
+						ckoLogger.error('❌ BLOCKED: Invalid checkout data', { reason: dataValidation.reason });
+						hideLoadingOverlay();
+						showError('Please complete required fields to continue with payment.');
+					}
+					return;
+				}
+			}
 		}
-		
+
 		// Extract variables from checkoutData for use in rest of function
 		let amount = checkoutData.amount;
 		let currency = checkoutData.currency;
@@ -316,6 +353,12 @@ var ckoFlow = {
 		ckoLogger.debug('🔍 Payment Type - Final value before paymentSessionRequest:', payment_type);
 
 		// Remove is_subscription from all orders.
+		// Guard against missing/incomplete cart data: browser autocomplete can trigger init before
+		// #cart-info is populated, so order_lines (orders) may be undefined. Normalise to an array
+		// rather than throwing "Cannot read properties of undefined (reading 'forEach')".
+		if (!Array.isArray(orders)) {
+			orders = [];
+		}
 		orders.forEach(order => {
 			delete order.is_subscription;
 		});
@@ -500,7 +543,9 @@ var ckoFlow = {
 				metadata: metadata,
 				payment_method_configuration: {
 					card: {
-						store_payment_details: "enabled",
+						// On Add Payment Method the card must be stored to be reusable, so force enabled
+						// there; otherwise follow the merchant's Save Card setting.
+						store_payment_details: ( isAddPaymentMethodMode || cko_flow_vars.save_card === "1" || cko_flow_vars.save_card === true || cko_flow_vars.save_card === "yes") ? "enabled" : "disabled",
 					},
 				},
 				capture: cko_flow_vars.auto_capture === true || cko_flow_vars.auto_capture === "true" || cko_flow_vars.auto_capture === "1" || cko_flow_vars.auto_capture === 1,
@@ -827,9 +872,35 @@ var ckoFlow = {
 			
 			ckoLogger.debug('✅ Email validated before API call', { email: paymentSessionRequest.customer.email });
 
+			// Add-Payment-Method: route Flow's success/failure (incl. after 3DS) to the dedicated
+			// token-save endpoint, so the verified card is tokenised regardless of the 3DS path.
+			const ckoIsAddPaymentMethod = (typeof cko_flow_vars !== 'undefined' && ( cko_flow_vars.is_add_payment_method === true || cko_flow_vars.is_add_payment_method === '1' || cko_flow_vars.is_add_payment_method === 1 ));
+			if (ckoIsAddPaymentMethod) {
+				const apmNonce = cko_flow_vars.save_card_nonce || '';
+				const apmUrl = window.location.origin + "/?wc-api=wc_checkoutcom_flow_add_payment_method&cko-apm-nonce=" + encodeURIComponent(apmNonce);
+				paymentSessionRequest.success_url = apmUrl;
+				paymentSessionRequest.failure_url = apmUrl + "&cko-apm-failed=1";
+				ckoLogger.debug('[PAYMENT SESSION] Add-payment-method mode — routing success/failure to token-save endpoint');
+			}
+
 			formData.append('payment_session_request', JSON.stringify(paymentSessionRequest));
 
-			let response = await fetch(cko_flow_vars.ajax_url, {
+			if (ckoIsAddPaymentMethod) {
+				formData.append('is_add_payment_method', '1');
+			}
+
+			// Subscription "Change payment method" flow. WCS routes the customer/admin card-change
+			// through an order-pay page carrying ?change_payment_method=<id> in the URL. Flag it so
+			// the server can build a zero-amount, capture:false card-verification session (no charge
+			// for swapping a card) and recognise this as a recurring-method update.
+			const ckoChangePaymentMethod = new URLSearchParams(window.location.search).get('change_payment_method');
+			if (ckoChangePaymentMethod) {
+				formData.append('is_subscription_payment_change', '1');
+				formData.append('change_payment_method', ckoChangePaymentMethod);
+				ckoLogger.debug('[PAYMENT SESSION] Subscription change-payment-method mode detected — flagging request', { subscription: ckoChangePaymentMethod });
+			}
+
+			let response = await fetch(getCkoAjaxUrl('cko_flow_create_payment_session'), {
 				method: "POST",
 				body: formData,
 			});
@@ -973,15 +1044,15 @@ var ckoFlow = {
 			// Save payment session ID asynchronously (fire and forget - don't wait for response)
 			// NOTE: This only works for order-pay pages where order already exists
 			// For regular checkout, payment session ID is saved via hidden field in process_payment()
-			if (paymentSession.id && orderIdToSave && cko_flow_vars && cko_flow_vars.ajax_url && cko_flow_vars.payment_session_nonce) {
+			if (paymentSession.id && orderIdToSave && cko_flow_vars && cko_flow_vars.payment_session_nonce) {
 				const saveFormData = new FormData();
 				saveFormData.append('action', 'cko_flow_save_payment_session_id');
 				saveFormData.append('nonce', cko_flow_vars.payment_session_nonce);
 				saveFormData.append('order_id', orderIdToSave);
 				saveFormData.append('payment_session_id', paymentSession.id);
-				
+
 				// Fire and forget - don't wait for response (non-blocking)
-				fetch(cko_flow_vars.ajax_url, {
+				fetch(getCkoAjaxUrl('cko_flow_save_payment_session_id'), {
 					method: 'POST',
 					body: saveFormData
 				}).then(response => {
@@ -1181,6 +1252,7 @@ var ckoFlow = {
 					
 					// Note: Save card checkbox visibility is controlled by the onChange event
 					// It will only show when payment type is "card" and hide for other payment methods
+
 				} catch (error) {
 					ckoLogger.error('onReady ERROR:', error);
 					ckoLogger.error('Error stack:', error.stack);
@@ -1621,20 +1693,25 @@ var ckoFlow = {
 					
 					ckoLogger.debug('===== onChange END =====');
 						
-					// Pre-validate for apple pay.
-					if ( component.selectedType === "applepay" ) {
-						const applePayButton = document.querySelector('button[aria-label="Apple Pay"]');
-						if (applePayButton) {
-							applePayButton.disabled = true;
-
-							const form = jQuery("form.checkout");
-
-							if ( ! orderId ) {
-								validateCheckout(form, function (response) {
-									if (applePayButton) applePayButton.disabled = false;
-								});
-							}
-						}
+					// Pre-validate and pre-create order for Apple Pay.
+					// Apple Pay's native sheet requires ApplePaySession.begin() to fire
+					// synchronously from the user gesture. Any async work inside handleClick
+					// (validateCheckout + createOrderBeforePayment) breaches that timing
+					// window and causes payment_method_attempt_failed on the first tap.
+					// By doing both steps here in onChange — before the user taps Apple Pay —
+					// the order already exists when handleClick runs, so it returns
+					// { continue: true } synchronously with no AJAX delay.
+					//
+					// Two preconditions can block pre-creation:
+					//   1. Terms checkbox not yet ticked — createOrderBeforePayment aborts
+					//      with a user-facing error if terms is required but not accepted.
+					//      We pre-empt that check here and skip silently; a one-time terms
+					//      checkbox listener (below) re-triggers pre-creation when the user
+					//      ticks it while Apple Pay is selected.
+					//   2. Apple Pay button DOM lookup fails — irrelevant to the actual fix;
+					//      the button disable is only UX feedback.
+					if ( component.selectedType === "applepay" && ! orderId ) {
+						window.ckoApplePayPreCreate();
 					}
 
 					// Control Save to Account checkbox visibility based on payment type
@@ -1696,6 +1773,25 @@ var ckoFlow = {
 					if (orderId) {
 						ckoLogger.debug('[handleClick] Order already exists (order-pay page) - proceeding immediately');
 						return { continue: true };
+					}
+
+					// For Apple Pay specifically: if a pre-creation kicked off by onChange or the
+					// terms-checkbox listener is still in flight, await it instead of starting our
+					// own AJAX cycle. Without this, fast users (tap Apple Pay within ~500ms of
+					// ticking terms) trigger a parallel validateCheckout + createOrderBeforePayment
+					// here, the duplicate stalls 500ms on the in-progress lock, and the iOS gesture
+					// window is gone before Apple Pay can begin.
+					if (component.type === 'applepay' && window.ckoApplePayPreCreatePromise) {
+						ckoLogger.debug('[handleClick] Apple Pay pre-creation in flight — awaiting it before proceeding');
+						return window.ckoApplePayPreCreatePromise.then(function () {
+							const preCreatedOrderId = jQuery('input[name="order_id"]').val() || FlowSessionStorage.getOrderId();
+							if (preCreatedOrderId) {
+								ckoLogger.debug('[handleClick] Pre-creation completed — Order ID:', preCreatedOrderId);
+								return { continue: true };
+							}
+							ckoLogger.warn('[handleClick] Pre-creation finished but no order ID found — falling back to slow path');
+							return { continue: false };
+						});
 					}
 
 					// Check if order was already created in this session
@@ -1952,7 +2048,13 @@ var ckoFlow = {
 						ckoLogger.debug('[HANDLE SUBMIT] ✅ Reference with order ID being sent:', orderIdToUse);
 					}
 
-					const response = await fetch(cko_flow_vars.ajax_url, {
+					// Add-payment-method: flag the submit so the server keeps it a $0, capture:false
+					// card verification (this page posts no order_id/reference).
+					if (typeof cko_flow_vars !== 'undefined' && ( cko_flow_vars.is_add_payment_method === true || cko_flow_vars.is_add_payment_method === '1' || cko_flow_vars.is_add_payment_method === 1 )) {
+						formData.append('is_add_payment_method', '1');
+					}
+
+					const response = await fetch(getCkoAjaxUrl('cko_flow_submit_payment_session'), {
 						method: 'POST',
 						body: formData
 					});
@@ -2771,13 +2873,33 @@ var ckoFlow = {
  * Displays error messages at the top of the WooCommerce form.
  */
 let showError = function (error_message) {
+	// Background pre-creation flows (e.g. Apple Pay onReady pre-create) set this flag
+	// so validation errors raised by validateCheckout / createOrderBeforePayment don't
+	// surface to the user. The user hasn't tried to pay yet — showing them
+	// "Email is required" while they're still looking at the page would be wrong.
+	if (window.ckoSuppressErrorDisplay) {
+		ckoLogger.debug('[showError] suppressed (background pre-create):', error_message);
+		return;
+	}
+
 	ckoLogger.error("showError() called with message:", error_message);
-	
+
 	if (!error_message) {
 		ckoLogger.error("showError() called with empty/null message");
 		return;
 	}
-	
+
+	// WooCommerce returns response.messages as an HTML string (e.g. <ul class="woocommerce-error"><li>...</li></ul>).
+	// Extract plain text from <li> elements so we don't render raw HTML tags as visible text.
+	// Parse with DOMParser (not innerHTML): DOMParser produces an INERT document with no browsing
+	// context, so scripts never run and resources (e.g. <img onerror>) never load — safe to parse
+	// an untrusted server string. The extracted text is still rendered via .text() below.
+	if (typeof error_message === 'string' && error_message.trim().startsWith('<')) {
+		const parsed = new DOMParser().parseFromString(error_message, 'text/html');
+		const items = Array.from(parsed.querySelectorAll('li')).map(function(li) { return li.textContent.trim(); }).filter(Boolean);
+		error_message = items.length ? items : [(parsed.body.textContent || '').trim()];
+	}
+
 	if ("string" === typeof error_message) {
 		error_message = [error_message];
 	}
@@ -3102,7 +3224,25 @@ function canInitializeFlow() {
 		ckoLogger.debug('canInitializeFlow: Already initialized');
 		return true; // Already initialized
 	}
-	
+
+	// "Don't require billing address" mode (gateway setting): the checkout collects only name & email,
+	// so skip the cart/address/logged-in checks below and gate purely on a valid email. A default
+	// billing country is supplied server-side for the payment session.
+	if (typeof cko_flow_vars !== 'undefined' && ( cko_flow_vars.address_not_required === true || cko_flow_vars.address_not_required === '1' || cko_flow_vars.address_not_required === 1 )) {
+		const noAddrOk = (typeof requiredFieldsFilledAndValid === 'function') ? requiredFieldsFilledAndValid() : true;
+		ckoLogger.debug('canInitializeFlow: [no-billing-address mode] email-only validation = ' + noAddrOk);
+		return noAddrOk;
+	}
+
+	// Add-Payment-Method page (/my-account/add-payment-method/): no cart, no checkout form, so
+	// the cart/address/required-field checks below would all fail. Flow is selected and the
+	// container exists (verified above); the session is forced to a $0 verification server-side,
+	// so we can initialize straight away. (Boolean arrives as "1" from wp_localize_script.)
+	if (typeof cko_flow_vars !== 'undefined' && ( cko_flow_vars.is_add_payment_method === true || cko_flow_vars.is_add_payment_method === '1' || cko_flow_vars.is_add_payment_method === 1 )) {
+		ckoLogger.debug('canInitializeFlow: [add-payment-method] bypassing cart/address/required-field checks');
+		return true;
+	}
+
 	// Check cart has items
 	// Note: cart_total might not be available in cko_flow_vars
 	// If we're on checkout page, WooCommerce ensures cart has items (redirects empty carts)
@@ -4188,6 +4328,32 @@ document.addEventListener("DOMContentLoaded", function () {
 	const loadTime = Date.now();
 	window.ckoPageLoadTimestamps.push(loadTime);
 
+	// Subscription "Change payment method" + Add Payment Method: client-side fallback to hide the
+	// saved-cards list and the save-card checkbox. The server already suppresses these (see
+	// saved_payment_methods()), but this guarantees they're gone even if a cached/older server
+	// render slipped through — and prevents picking a saved card whose stale source would otherwise
+	// be applied to the subscription. Keyed on the real browser URL, which always carries the param.
+	(function ckoHideSavedCardsOnNewCardPages() {
+		const isChangePm = !!new URLSearchParams(window.location.search).get('change_payment_method');
+		const isAddPm = (typeof cko_flow_vars !== 'undefined' && ( cko_flow_vars.is_add_payment_method === true || cko_flow_vars.is_add_payment_method === '1' || cko_flow_vars.is_add_payment_method === 1 ));
+		if (!isChangePm && !isAddPm) return;
+		const hide = function () {
+			jQuery('.cko-flow__saved-cards-accordion-container, .woocommerce-SavedPaymentMethods.wc-saved-payment-methods, .woocommerce-SavedPaymentMethods-saveNew, .cko-save-card-checkbox').hide();
+			// Deselect any saved-card radio so it can't be submitted as the (stale) source.
+			jQuery('input[name="wc-wc_checkout_com_flow-payment-token"]').prop('checked', false);
+			// Hide the WCS "Use this payment method for all of my current subscriptions" checkbox.
+			// Our redirect-based change-payment flow can't honour it reliably, so we hide it and
+			// uncheck it; customers update each subscription individually (which works).
+			jQuery('#update_all_subscriptions_payment_method, input[name="update_all_subscriptions_payment_method"]')
+				.prop('checked', false)
+				.closest('p, .form-row, li').hide();
+		};
+		hide();
+		// Re-apply after any async re-render of the payment area.
+		jQuery(document.body).on('updated_checkout', hide);
+		ckoLogger.debug('[CKO] Hiding saved cards + save-card checkbox (new-card page: change-payment/add-payment-method)');
+	})();
+
 	normalizeFlowPaymentLabelText();
 	
 	jQuery(document.body).on('updated_checkout', function() {
@@ -4752,11 +4918,31 @@ document.addEventListener("DOMContentLoaded", function () {
 			}
 			
 			ckoLogger.debug('[CREATE ORDER] Creating order before payment processing...');
-			
+
+			// Validate terms acceptance before making the AJAX call.
+			// WooCommerce requires terms=1 in POST data; if not present, it returns a
+			// validation failure. We check client-side to give immediate feedback.
+			const termsCheckbox = jQuery('input[name="terms"]');
+			if (termsCheckbox.length && !termsCheckbox.is(':checked')) {
+				ckoLogger.error('[CREATE ORDER] Terms checkbox required but not accepted - blocking AJAX call');
+				const termsMsg = (typeof cko_flow_vars !== 'undefined' && cko_flow_vars.i18n && cko_flow_vars.i18n.terms_required)
+					? cko_flow_vars.i18n.terms_required
+					: 'Please read and accept the terms and conditions to proceed with your order.';
+				showError(termsMsg);
+				FlowState.set('orderCreationInProgress', false);
+				if (placeOrderButton.length) {
+					placeOrderButton.prop('disabled', false);
+					placeOrderButton.removeClass('processing');
+					const savedText = placeOrderButton.data('original-text');
+					if (savedText) placeOrderButton.text(savedText);
+				}
+				return null;
+			}
+
 			// Get form data
 			const formData = form.serialize();
 			const formDataObj = Object.fromEntries(new URLSearchParams(formData));
-			
+
 			// Get nonce from form or page
 			let nonceValue = '';
 			const nonceField = jQuery('input[name="woocommerce-process-checkout-nonce"]');
@@ -5099,7 +5285,130 @@ document.addEventListener("DOMContentLoaded", function () {
 	
 	// Expose createOrderBeforePayment globally so it can be called from handleClick (inside ckoFlow.loadFlow)
 	window.createOrderBeforePayment = createOrderBeforePayment;
-	
+
+	// Apple Pay pre-creation helper.
+	// Why this exists: iOS Apple Pay requires ApplePaySession.begin() to fire synchronously
+	// from a user gesture. The Flow SDK's handleClick runs validateCheckout +
+	// createOrderBeforePayment async on first tap, blowing the gesture window and producing
+	// "[PaymentMethod]: Unexpected failure [payment_method_attempt_failed]". By pre-creating
+	// the order BEFORE the user taps Apple Pay (triggered from onChange and from a terms-
+	// checkbox listener), handleClick finds the order via FlowSessionStorage and returns
+	// { continue: true } synchronously.
+	window.ckoApplePayPreCreate = function () {
+		// Order already exists for this checkout session — nothing to do.
+		if ((typeof FlowSessionStorage !== 'undefined' && FlowSessionStorage.getOrderId()) ||
+			jQuery('input[name="order_id"]').val()) {
+			ckoLogger.debug('[ApplePayPreCreate] Order already exists — skipping');
+			return Promise.resolve();
+		}
+
+		// If a pre-creation is already running, return its Promise so callers (especially
+		// handleClick) can await the same one instead of starting another AJAX cycle.
+		// Without this dedupe, click + change firing on a single checkbox tick spawn two
+		// pre-creations — the second hits createOrderBeforePayment's in-progress lock,
+		// stalls 500ms, and returns null, eating the time we wanted to give the first one.
+		if (window.ckoApplePayPreCreatePromise) {
+			ckoLogger.debug('[ApplePayPreCreate] Pre-creation already in flight — reusing existing promise');
+			return window.ckoApplePayPreCreatePromise;
+		}
+
+		// Terms checkbox required but not yet ticked. Skip silently and rely on the
+		// terms-checkbox listener (set up below) to retry once the user ticks it.
+		// Calling createOrderBeforePayment here would surface a user-facing
+		// "Please accept the terms" error which is confusing — the user has only just
+		// selected Apple Pay; they have not yet attempted to pay.
+		const termsCheckbox = jQuery('input[name="terms"]');
+		if (termsCheckbox.length && !termsCheckbox.is(':checked')) {
+			ckoLogger.debug('[ApplePayPreCreate] Terms not yet ticked — waiting for terms listener to retry');
+			return Promise.resolve();
+		}
+
+		ckoLogger.debug('[ApplePayPreCreate] Starting pre-validation and pre-order creation');
+
+		const applePayButton = document.querySelector('button[aria-label="Apple Pay"]');
+		if (applePayButton) applePayButton.disabled = true;
+
+		// Show a "preparing payment" overlay on the Flow component while the AJAX runs.
+		// The overlay sets pointer-events:none on the Flow component so the user
+		// physically cannot tap Apple Pay before the order exists. This is the visual
+		// half of the iOS Apple Pay first-tap fix: if the Apple Pay button is
+		// unclickable until pre-creation finishes, the user gesture that DOES initiate
+		// Apple Pay always finds an existing order, and handleClick returns
+		// synchronously — keeping iOS's gesture window intact for ApplePaySession.begin().
+		document.body.classList.add('cko-applepay-preparing');
+
+		// Pre-creation runs in the background. If validation fails (e.g. autofill hasn't
+		// populated required fields yet on page load), we must not surface the error to
+		// the user — they haven't even tapped Apple Pay yet. The flag is checked inside
+		// showError; we restore it once pre-creation finishes either way.
+		window.ckoSuppressErrorDisplay = true;
+
+		const form = jQuery("form.checkout");
+		window.ckoApplePayPreCreatePromise = new Promise(function (resolve) {
+			const cleanup = function () {
+				if (applePayButton) applePayButton.disabled = false;
+				document.body.classList.remove('cko-applepay-preparing');
+				window.ckoSuppressErrorDisplay = false;
+				window.ckoApplePayPreCreatePromise = null;
+			};
+			validateCheckout(form, async function () {
+				try {
+					const preCreatedOrderId = await window.createOrderBeforePayment();
+					ckoLogger.debug('[ApplePayPreCreate] Pre-order created — Order ID:', preCreatedOrderId);
+					resolve(preCreatedOrderId);
+				} catch (e) {
+					ckoLogger.error('[ApplePayPreCreate] Pre-order creation failed:', e);
+					resolve(null);
+				}
+				cleanup();
+			}, function () {
+				ckoLogger.debug('[ApplePayPreCreate] Validation failed — deferring (user must complete the form)');
+				cleanup();
+				resolve(null);
+			});
+		});
+		return window.ckoApplePayPreCreatePromise;
+	};
+
+	// One-time terms checkbox listener: when the user ticks terms while Apple Pay is the
+	// currently selected payment method, retry pre-creation. This is the second half of
+	// the Apple Pay first-tap fix — without it, users who select Apple Pay before ticking
+	// terms would still hit the slow path on their first payment tap.
+	//
+	// IMPORTANT: We MUST use a native capture-phase listener here. The existing
+	// flow-terms-prevention.js module attaches a delegated change handler that calls
+	// e.stopImmediatePropagation() to block update_checkout from firing on terms toggle.
+	// stopImmediatePropagation kills every later-attached bubble-phase handler — so a
+	// jQuery delegated listener attached on document never fires. Capture phase runs
+	// before any bubble-phase handler can intercept it.
+	if (typeof window.ckoApplePayTermsListenerAttached === 'undefined') {
+		window.ckoApplePayTermsListenerAttached = true;
+		const handleTermsChange = function (event) {
+			const target = event.target;
+			if (!target || (target.name !== 'terms' && target.id !== 'terms')) {
+				return;
+			}
+			if (!target.checked) {
+				return;
+			}
+			// ckoFlow is defined in this file (var above), so no typeof guard is needed. Coerce to a
+			// string for the comparison: selectedPaymentType starts as null and is set to the chosen
+			// type on component change, and String() keeps this a string-vs-string compare.
+			const applePayActive = String(ckoFlow.selectedPaymentType) === 'applepay';
+			if (!applePayActive) {
+				return;
+			}
+			ckoLogger.debug('[Terms Listener] Terms ticked while Apple Pay selected — pre-creating order');
+			window.ckoApplePayPreCreate();
+		};
+		// Capture phase for change. Some browsers fire `change` after `click` on
+		// checkboxes; we listen to both to start pre-creation as soon as possible.
+		document.addEventListener('change', handleTermsChange, true);
+		// For click on a checkbox the .checked property is already updated when the
+		// click handler fires, so we can read it directly.
+		document.addEventListener('click', handleTermsChange, true);
+	}
+
 	document.addEventListener("click", function (event) {
 		const flowPayment = document.getElementById(
 			"payment_method_wc_checkout_com_flow"
@@ -5165,7 +5474,33 @@ document.addEventListener("DOMContentLoaded", function () {
 					}
 					return; // Exit early - don't create order via AJAX, don't use Flow component
 				}
-				
+
+				// Add Payment Method page: WC's "Add payment method" button is id="place_order", so this
+				// handler fires here too — but there's no checkout/order-pay form to submit. Drive the Flow
+				// $0 card verification directly; Flow then redirects to wc_checkoutcom_flow_add_payment_method,
+				// which tokenises the card. (default was prevented above, so the WC form won't submit.)
+				if (typeof cko_flow_vars !== 'undefined' && ( cko_flow_vars.is_add_payment_method === true || cko_flow_vars.is_add_payment_method === '1' || cko_flow_vars.is_add_payment_method === 1 )) {
+					if (ckoFlow.flowComponent && typeof ckoFlow.flowComponent.submit === 'function') {
+						const apmValid = (typeof ckoFlow.flowComponent.isValid === 'function') ? ckoFlow.flowComponent.isValid() : true;
+						if (!apmValid) {
+							ckoLogger.error('[ADD PAYMENT METHOD] Flow component invalid - cannot submit');
+							showError('Please complete the card details.');
+							return;
+						}
+						ckoLogger.debug('[ADD PAYMENT METHOD] Submitting Flow component for $0 card verification');
+						try {
+							ckoFlow.flowComponent.submit();
+						} catch (e) {
+							ckoLogger.error('[ADD PAYMENT METHOD] Flow submit failed:', e);
+							showError('Could not add the card. Please try again.');
+						}
+					} else {
+						ckoLogger.error('[ADD PAYMENT METHOD] Flow component not ready');
+						showError('Payment component not ready. Please refresh the page and try again.');
+					}
+					return;
+				}
+
 				// CRITICAL: Validate checkout form FIRST before creating order
 				// This ensures orders are only created when form is valid
 				const form = jQuery("form.checkout");

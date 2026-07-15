@@ -18,8 +18,7 @@ class WC_Checkout_Com_Webhook {
 	 * @return bool
 	 */
 	private static function is_webhook_debug_enabled() {
-		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
-		return ( isset( $core_settings['cko_gateway_responses'] ) && $core_settings['cko_gateway_responses'] === 'yes' );
+		return WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
 	}
 
 	/**
@@ -92,6 +91,14 @@ class WC_Checkout_Com_Webhook {
 			return false;
 		}
 		
+		// Safety: never apply order-status changes to a WC_Subscription. A subscription card-change
+		// verification ($0 auth) must not flip the subscription's status — that is managed by WCS,
+		// not by payment webhooks. Acknowledge (return true so Checkout.com doesn't retry) and stop.
+		if ( function_exists( 'wcs_is_subscription' ) && wcs_is_subscription( $order ) ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: resolved order ' . $order->get_id() . ' is a subscription — skipping status update (managed by WCS).' );
+			return true;
+		}
+
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order loaded successfully - Order ID: ' . $order->get_id() . ', Status: ' . $order->get_status() );
 		}
@@ -116,7 +123,16 @@ class WC_Checkout_Com_Webhook {
 		
 		$payment_id = $webhook_data->id;
 		$action_id  = $webhook_data->action_id;
-		
+
+		// FRAUD FLAG: Checkout.com's risk engine can flag a payment for manual review. The flag
+		// rides on the payment_approved webhook as data.risk.flagged. Route the order to the
+		// configured Flagged status (e.g. Suspected Fraud) instead of the normal authorised status,
+		// so fulfilment automation that triggers on Processing does not run for a suspected-fraud
+		// order. The synchronous 3DS path already honours this flag; the webhook path did not.
+		if ( self::is_payment_flagged( $data ) ) {
+			return self::flag_order_for_review( $order, $payment_id, $action_id );
+		}
+
 		// MULTI-TAB DETECTION: Check if this payment ID is different from the order's primary payment
 		$order_primary_payment_id = $order->get_meta( '_cko_payment_id' );
 		$order_flow_payment_id = $order->get_meta( '_cko_flow_payment_id' );
@@ -293,29 +309,40 @@ class WC_Checkout_Com_Webhook {
 			return true;
 		}
 
-		// Set action id as woo transaction id.
-		$order->set_transaction_id( $action_id );
-		$order->update_meta_data( '_cko_payment_id', $payment_id );
-		$order->update_meta_data( 'cko_payment_authorized', true );
-
-		// Ensure payment method title is correct before status update (for Flow gateway)
+		// Resolve the correct payment method title using the current $order object (safe:
+		// reads meta only, does not depend on status). We resolve BEFORE the reload below
+		// so we don't lose the stale object's meta context.
+		$correct_title = null;
 		if ( $order->get_payment_method() === 'wc_checkout_com_flow' ) {
 			$payment_type = $order->get_meta( '_cko_flow_payment_type' );
-			
 			if ( ! empty( $payment_type ) ) {
 				$available_gateways = WC()->payment_gateways()->get_available_payment_gateways();
 				$gateway = isset( $available_gateways[ $order->get_payment_method() ] ) ? $available_gateways[ $order->get_payment_method() ] : null;
-				
 				if ( $gateway && is_callable( array( $gateway, 'get_payment_method_title_by_type' ) ) ) {
 					$correct_title = $gateway->get_payment_method_title_by_type( $order, null );
-					$order->set_payment_method_title( $correct_title );
-					$order->save();
-					
-					clean_post_cache( $order_id );
-					$order = wc_get_order( $order_id );
 				}
 			}
 		}
+
+		// CRITICAL: Reload order before any save to prevent the stale "pending" status on this
+		// handler's $order object (loaded at handler start) from overwriting a "completed" status
+		// that a concurrent capture webhook may have already committed to the DB.
+		// Previously, $order->save() was called while $order still carried the original "pending"
+		// status, silently clobbering the capture's update and causing the final guard below to
+		// read "pending" and then proceed to set "on-hold".
+		clean_post_cache( $order_id );
+		$order = wc_get_order( $order_id );
+
+		// Apply auth metadata and optional title correction, then persist once.
+		$order->set_transaction_id( $action_id );
+		$order->update_meta_data( '_cko_payment_id', $payment_id );
+		$order->update_meta_data( 'cko_payment_authorized', true );
+		if ( null !== $correct_title ) {
+			$order->set_payment_method_title( $correct_title );
+		}
+		$order->save();
+		clean_post_cache( $order_id );
+		$order = wc_get_order( $order_id );
 
 		// CRITICAL: Final guard before update_status - order may have been updated by capture webhook
 		// during Flow payment title processing (save/reload above). Never downgrade completed/processing.
@@ -375,8 +402,17 @@ class WC_Checkout_Com_Webhook {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Payment ID: ' . ($webhook_data->id ?? 'NULL') );
 		}
 
-		// Return false if no order id.
+		// Return if no order id. Card-change / add-payment-method verifications are intentionally
+		// detached from any order (a $0 card verification with a non-numeric reference like
+		// "cko-card-change-123" / "cko-add-payment-method-4"), so card_verified arriving with no
+		// numeric order is EXPECTED — the token/source is saved by our own return handler, not here.
+		// Acknowledge it quietly (return true, no retry) instead of logging a misleading error.
 		if ( empty( $order_id ) || ! is_numeric( $order_id ) ) {
+			$ref = isset( $webhook_data->reference ) ? (string) $webhook_data->reference : '';
+			if ( 0 === strpos( $ref, 'cko-card-change-' ) || 0 === strpos( $ref, 'cko-add-payment-method-' ) ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: card_verified for a standalone card verification (reference: ' . $ref . ') — no order to update, acknowledging.' );
+				return true;
+			}
 			// Always log errors
 			WC_Checkoutcom_Utility::logger( "WEBHOOK PROCESS: ERROR - Invalid/Empty order_id: " . ($order_id ?? 'NULL') );
 			if ( $webhook_debug_enabled ) {
@@ -400,6 +436,14 @@ class WC_Checkout_Com_Webhook {
 			return false;
 		}
 		
+		// Safety: never apply order-status changes to a WC_Subscription. A subscription card-change
+		// verification ($0 auth) must not flip the subscription's status — that is managed by WCS,
+		// not by payment webhooks. Acknowledge (return true so Checkout.com doesn't retry) and stop.
+		if ( function_exists( 'wcs_is_subscription' ) && wcs_is_subscription( $order ) ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: resolved order ' . $order->get_id() . ' is a subscription — skipping status update (managed by WCS).' );
+			return true;
+		}
+
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order loaded successfully - Order ID: ' . $order->get_id() . ', Status: ' . $order->get_status() );
 		}
@@ -504,6 +548,12 @@ class WC_Checkout_Com_Webhook {
 		}
 		
 		$order_id = $order->get_id();
+
+		// Safety: never apply order-status changes to a WC_Subscription (see authorize_payment).
+		if ( function_exists( 'wcs_is_subscription' ) && wcs_is_subscription( $order ) ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: resolved order ' . $order_id . ' is a subscription — skipping status update (managed by WCS).' );
+			return true;
+		}
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order loaded successfully - Order ID: ' . $order_id . ', Status: ' . $order->get_status() );
 		}
@@ -703,6 +753,16 @@ class WC_Checkout_Com_Webhook {
 		// Get cko capture status configured in admin.
 		$status = WC_Admin_Settings::get_option( 'ckocom_order_captured', 'processing' );
 
+		// FRAUD FLAG: if this payment was flagged for review (on this webhook, or on a prior
+		// payment_approved that set the _cko_flagged meta), hold the order in the Flagged status
+		// rather than advancing to the captured status — otherwise auto-capture would push a
+		// suspected-fraud order straight to Processing and trigger fulfilment.
+		if ( self::is_payment_flagged( $data ) || 'yes' === $order->get_meta( '_cko_flagged' ) ) {
+			$order->update_meta_data( '_cko_flagged', 'yes' );
+			$status = WC_Admin_Settings::get_option( 'ckocom_order_flagged', 'flagged' );
+			$order->add_order_note( __( 'Payment flagged for review by Checkout.com — order held in the flagged status instead of advancing on capture.', 'checkout-com-unified-payments-api' ) );
+		}
+
 		$formatted_amount = wc_price( WC_Checkoutcom_Utility::decimal_to_value( $amount, $order->get_currency() ), array( 'currency' => $order->get_currency() ) );
 		/* translators: %1$s: Payment ID, %2$s: Action ID, %3$s: Amount. */
 		$order_message = sprintf( esc_html__( 'Checkout.com Payment Captured - Payment ID: %1$s, Action ID: %2$s, Amount: %3$s', 'checkout-com-unified-payments-api' ), $payment_id, $action_id, $formatted_amount );
@@ -820,6 +880,14 @@ class WC_Checkout_Com_Webhook {
 			return false;
 		}
 		
+		// Safety: never apply order-status changes to a WC_Subscription. A subscription card-change
+		// verification ($0 auth) must not flip the subscription's status — that is managed by WCS,
+		// not by payment webhooks. Acknowledge (return true so Checkout.com doesn't retry) and stop.
+		if ( function_exists( 'wcs_is_subscription' ) && wcs_is_subscription( $order ) ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: resolved order ' . $order->get_id() . ' is a subscription — skipping status update (managed by WCS).' );
+			return true;
+		}
+
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order loaded successfully - Order ID: ' . $order->get_id() . ', Status: ' . $order->get_status() );
 		}
@@ -909,6 +977,12 @@ class WC_Checkout_Com_Webhook {
 		}
 		
 		$order_id = $order->get_id();
+
+		// Safety: never apply order-status changes to a WC_Subscription (see authorize_payment).
+		if ( function_exists( 'wcs_is_subscription' ) && wcs_is_subscription( $order ) ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: resolved order ' . $order_id . ' is a subscription — skipping status update (managed by WCS).' );
+			return true;
+		}
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order loaded successfully - Order ID: ' . $order_id . ', Status: ' . $order->get_status() );
 		}
@@ -1059,6 +1133,12 @@ class WC_Checkout_Com_Webhook {
 		}
 		
 		$order_id = $order->get_id();
+
+		// Safety: never apply order-status changes to a WC_Subscription (see authorize_payment).
+		if ( function_exists( 'wcs_is_subscription' ) && wcs_is_subscription( $order ) ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: resolved order ' . $order_id . ' is a subscription — skipping status update (managed by WCS).' );
+			return true;
+		}
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order loaded successfully - Order ID: ' . $order_id . ', Status: ' . $order->get_status() );
 		}
@@ -1388,6 +1468,14 @@ class WC_Checkout_Com_Webhook {
 			return false;
 		}
 		
+		// Safety: never apply order-status changes to a WC_Subscription. A subscription card-change
+		// verification ($0 auth) must not flip the subscription's status — that is managed by WCS,
+		// not by payment webhooks. Acknowledge (return true so Checkout.com doesn't retry) and stop.
+		if ( function_exists( 'wcs_is_subscription' ) && wcs_is_subscription( $order ) ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: resolved order ' . $order->get_id() . ' is a subscription — skipping status update (managed by WCS).' );
+			return true;
+		}
+
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order loaded successfully - Order ID: ' . $order->get_id() . ', Status: ' . $order->get_status() );
 		}
@@ -1530,6 +1618,65 @@ class WC_Checkout_Com_Webhook {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order status updated to: ' . $status . ' (or skipped if already successful)' );
 			WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: decline_payment END (SUCCESS) ===' );
 		}
+		return true;
+	}
+
+	/**
+	 * Whether a webhook payload indicates the payment was flagged for review by
+	 * Checkout.com's risk engine (data.risk.flagged === true).
+	 *
+	 * @param object $data Full webhook event object.
+	 * @return bool
+	 */
+	public static function is_payment_flagged( $data ) {
+		return isset( $data->data->risk->flagged )
+			&& ( true === $data->data->risk->flagged
+				|| 'true' === $data->data->risk->flagged
+				|| 1 === $data->data->risk->flagged
+				|| '1' === $data->data->risk->flagged );
+	}
+
+	/**
+	 * Route a flagged payment's order to the configured Flagged status (e.g. Suspected Fraud)
+	 * and record it, so fulfilment automation that triggers on "Processing" does not run for a
+	 * suspected-fraud order. Shared by the payment_approved and payment_captured webhook paths.
+	 *
+	 * @param WC_Order $order      Order to flag.
+	 * @param string   $payment_id Checkout.com payment id.
+	 * @param string   $action_id  Checkout.com action id.
+	 * @return bool Always true (webhook acknowledged).
+	 */
+	public static function flag_order_for_review( $order, $payment_id, $action_id ) {
+		$order_id = $order->get_id();
+		$status   = WC_Admin_Settings::get_option( 'ckocom_order_flagged', 'flagged' );
+
+		$order->update_meta_data( '_cko_flagged', 'yes' );
+		$order->update_meta_data( 'cko_payment_authorized', true );
+		if ( ! empty( $payment_id ) ) {
+			$order->update_meta_data( '_cko_payment_id', $payment_id );
+		}
+		if ( ! empty( $action_id ) ) {
+			$order->set_transaction_id( $action_id );
+		}
+		$order->add_order_note(
+			sprintf(
+				/* translators: %1$s: Payment ID, %2$s: Action ID. */
+				__( 'Checkout.com flagged this payment for review (risk.flagged = true). Order held for manual review — Payment ID: %1$s, Action ID: %2$s.', 'checkout-com-unified-payments-api' ),
+				$payment_id ? $payment_id : 'N/A',
+				$action_id ? $action_id : 'N/A'
+			)
+		);
+		$order->save();
+
+		// Apply the flagged status unless the order has already reached a final paid state.
+		clean_post_cache( $order_id );
+		$order = wc_get_order( $order_id );
+		if ( $order && 'completed' !== $order->get_status() ) {
+			$order->update_status( $status );
+		}
+
+		WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Payment flagged for review — order ' . $order_id . ' routed to "' . $status . '" status.' );
+
 		return true;
 	}
 

@@ -58,8 +58,7 @@ class WC_Checkout_Com_Webhook_Queue {
 	 * @return bool
 	 */
 	private static function is_webhook_debug_enabled() {
-		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
-		return ( isset( $core_settings['cko_gateway_responses'] ) && $core_settings['cko_gateway_responses'] === 'yes' );
+		return WC_Admin_Settings::get_option( 'cko_gateway_responses' ) === 'yes';
 	}
 
 	/**
