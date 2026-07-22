@@ -5,7 +5,7 @@
  * Description: Extends WooCommerce by Adding the Checkout.com Gateway.
  * Author: Checkout.com
  * Author URI: https://www.checkout.com/
- * Version: 5.1.4
+ * Version: 5.1.4.1
  * Requires at least: 5.0
  * Tested up to: 6.7.0
  * WC requires at least: 3.0
@@ -98,25 +98,22 @@ function cko_get_raw_option( $option_name, $default = array() ) {
 function cko_update_raw_option( $option_name, $value ) {
 	global $wpdb;
 	$serialized = maybe_serialize( $value );
-	$updated    = $wpdb->update(
-		$wpdb->options,
-		array( 'option_value' => $serialized ),
-		array( 'option_name'  => $option_name ),
-		array( '%s' ),
-		array( '%s' )
+
+	// Single atomic upsert. A previous UPDATE-then-INSERT pattern was unsafe: $wpdb->update()
+	// returns 0 BOTH when no row matched AND when a row matched but the value was unchanged. The
+	// latter (identical value, common on the settings-sync path) wrongly triggered a fallback
+	// INSERT against an existing option_name and failed on the unique key, throwing DB errors on
+	// nearly every run. INSERT ... ON DUPLICATE KEY UPDATE avoids the false insert and is race-safe.
+	// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- $wpdb->options is a trusted table name; values are prepared.
+	$wpdb->query(
+		$wpdb->prepare(
+			"INSERT INTO {$wpdb->options} ( option_name, option_value, autoload ) VALUES ( %s, %s, 'yes' )
+			ON DUPLICATE KEY UPDATE option_value = VALUES( option_value )",
+			$option_name,
+			$serialized
+		)
 	);
-	if ( false === $updated || 0 === $updated ) {
-		// Row may not exist yet — insert it.
-		$wpdb->insert(
-			$wpdb->options,
-			array(
-				'option_name'  => $option_name,
-				'option_value' => $serialized,
-				'autoload'     => 'yes',
-			),
-			array( '%s', '%s', '%s' )
-		);
-	}
+
 	// Keep WordPress object cache in sync so same-request get_option() calls see the new value.
 	wp_cache_set( $option_name, $value, 'options' );
 	wp_cache_delete( 'alloptions', 'options' );
@@ -296,7 +293,7 @@ add_action( 'woocommerce_new_order', 'cko_update_order_id_in_session', 5 );
  * Constants.
  */
 // NOSONAR (S1313): "5.1.3.7" is the plugin version (WordPress semver-style), not a hardcoded IP address.
-define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '5.1.4' ); // NOSONAR
+define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '5.1.4.1' ); // NOSONAR
 define( 'WC_CHECKOUTCOM_PLUGIN_URL', untrailingslashit( plugins_url( basename( plugin_dir_path( __FILE__ ) ), basename( __FILE__ ) ) ) );
 define( 'WC_CHECKOUTCOM_PLUGIN_PATH', untrailingslashit( plugin_dir_path( __FILE__ ) ) );
 
