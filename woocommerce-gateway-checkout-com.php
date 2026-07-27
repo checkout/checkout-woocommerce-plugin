@@ -186,6 +186,15 @@ function cko_flow_checkout_requires_payment() {
 		return true;
 	}
 
+	// Subscription management surfaces have an empty cart (needs_payment() is false), but Flow must
+	// stay available there: WooCommerce Subscriptions enumerates subscription-capable gateways to
+	// decide whether to show the "Change payment method" button on the View Subscription page.
+	// Stripping Flow here hid that button and stopped customers changing their card (regression in
+	// 5.1.3.7 introduced by the £0-order hide). Never hide the gateway in this context.
+	if ( function_exists( 'wcs_is_view_subscription_page' ) && wcs_is_view_subscription_page() ) {
+		return true;
+	}
+
 	$needs_payment = (bool) WC()->cart->needs_payment();
 
 	/**
