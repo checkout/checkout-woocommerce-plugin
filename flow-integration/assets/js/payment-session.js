@@ -153,7 +153,7 @@ var ckoFlow = {
 		// REFACTORED: Use initialization helper to validate prerequisites
 		if (typeof window.FlowInitialization === 'undefined' || !window.FlowInitialization.validatePrerequisites) {
 			ckoLogger.error('loadFlow: FlowInitialization module not loaded - cannot initialize');
-			showError('Payment flow initialization failed. Please refresh and try again.');
+			ckoFlowShowError('Payment flow initialization failed. Please refresh and try again.');
 			return;
 		}
 		
@@ -260,7 +260,7 @@ var ckoFlow = {
 		if (typeof window.FlowInitialization === 'undefined' || !window.FlowInitialization.collectCheckoutData) {
 			ckoLogger.error('loadFlow: FlowInitialization.collectCheckoutData not available');
 			hideLoadingOverlay();
-			showError('Payment flow initialization failed. Please refresh and try again.');
+			ckoFlowShowError('Payment flow initialization failed. Please refresh and try again.');
 			return;
 		}
 		
@@ -293,7 +293,7 @@ var ckoFlow = {
 			if (!checkoutData) {
 				ckoLogger.error('loadFlow: Checkout data not available');
 				hideLoadingOverlay();
-				showError('Please complete required fields to continue with payment.');
+				ckoFlowShowError('Please complete required fields to continue with payment.');
 				return;
 			}
 
@@ -303,11 +303,11 @@ var ckoFlow = {
 					if (dataValidation.reason === 'INVALID_EMAIL') {
 						ckoLogger.error('❌ BLOCKED: Invalid email during data collection', { email: dataValidation.email });
 						hideLoadingOverlay();
-						showError('Please enter a valid email address to continue with payment.');
+						ckoFlowShowError('Please enter a valid email address to continue with payment.');
 					} else {
 						ckoLogger.error('❌ BLOCKED: Invalid checkout data', { reason: dataValidation.reason });
 						hideLoadingOverlay();
-						showError('Please complete required fields to continue with payment.');
+						ckoFlowShowError('Please complete required fields to continue with payment.');
 					}
 					return;
 				}
@@ -386,7 +386,7 @@ var ckoFlow = {
 				isEmpty: !email || !email.trim()
 			});
 			hideLoadingOverlay();
-			showError('Please enter a valid email address to continue with payment.');
+			ckoFlowShowError('Please enter a valid email address to continue with payment.');
 			return; // Exit early - don't call API with invalid email
 		}
 		
@@ -858,7 +858,7 @@ var ckoFlow = {
 				} else {
 					// Fields are filled but email is invalid - show error
 					ckoLogger.debug('Fields are filled but email is invalid - showing error message');
-					showError('Please enter a valid email address to continue with payment.');
+					ckoFlowShowError('Please enter a valid email address to continue with payment.');
 					// Reset flags for retry
 					FlowState.set('initialized', false);
 					FlowState.set('initializing', false);
@@ -967,7 +967,7 @@ var ckoFlow = {
 					errorMessage = 'Payment session error: ' + paymentSession.error_codes.join(', ');
 				}
 				
-				showError(errorMessage);
+				ckoFlowShowError(errorMessage);
 				return;
 			}
 
@@ -1095,7 +1095,7 @@ var ckoFlow = {
 				// Check for 3DS specific errors
 				if (paymentSession.error_codes && paymentSession.error_codes.includes('three_ds_invalid')) {
 					ckoLogger.error('3DS Configuration Error:', paymentSession);
-					showError('3DS configuration error. Please check your 3DS settings in the admin panel.');
+					ckoFlowShowError('3DS configuration error. Please check your 3DS settings in the admin panel.');
 					return;
 				}
 
@@ -1113,7 +1113,7 @@ var ckoFlow = {
 				let messages = (paymentSession.error_codes || []).map(
 					(code) => readableErrors[code] || code
 				);
-				showError(messages[0]);
+				ckoFlowShowError(messages[0]);
 				return;
 			}
 
@@ -1144,13 +1144,13 @@ var ckoFlow = {
 		// Additional validation
 		if (!cko_flow_vars.PKey) {
 			ckoLogger.error('CRITICAL: Public key is missing!');
-			showError('Payment gateway configuration error. Please contact support.');
+			ckoFlowShowError('Payment gateway configuration error. Please contact support.');
 			return;
 		}
 		
 		if (!paymentSession.id) {
 			ckoLogger.error('CRITICAL: Payment session ID is missing!');
-			showError('Payment session error. Please try again.');
+			ckoFlowShowError('Payment session error. Please try again.');
 			return;
 		}
 		
@@ -1817,7 +1817,7 @@ var ckoFlow = {
 									
 									if (!createdOrderId) {
 										ckoLogger.error('[handleClick] Failed to create order for APM payment - blocking payment');
-										showError('Failed to create order. Please try again.');
+										ckoFlowShowError('Failed to create order. Please try again.');
 										resolve({ continue: false });
 										return;
 									}
@@ -1826,7 +1826,7 @@ var ckoFlow = {
 									resolve({ continue: true });
 								} catch (error) {
 									ckoLogger.error('[handleClick] Error creating order for APM payment:', error);
-									showError('Failed to create order. Please try again.');
+									ckoFlowShowError('Failed to create order. Please try again.');
 									resolve({ continue: false });
 								}
 							});
@@ -2102,7 +2102,7 @@ var ckoFlow = {
 					ckoFlow.pendingAmountUpdate = null;
 					
 					// Show error message to user
-					showError(error.message || 'Payment submission failed. Please try again.');
+					ckoFlowShowError(error.message || 'Payment submission failed. Please try again.');
 					throw error;
 				}
 			};
@@ -2175,7 +2175,7 @@ var ckoFlow = {
 					
 					// Always show error message to user
 					ckoLogger.error("Displaying error to user:", finalErrorMessage);
-					showError(finalErrorMessage);
+					ckoFlowShowError(finalErrorMessage);
 					
 					// CRITICAL: Create order for declined payments if Place Order was clicked
 					// This ensures failed payment attempts are tracked even when payment fails before form submission
@@ -2411,7 +2411,7 @@ var ckoFlow = {
 					});
 				} catch (error) {
 					ckoLogger.error('Error creating Flow component:', error);
-					showError('Failed to initialize payment component. Please try again.');
+					ckoFlowShowError('Failed to initialize payment component. Please try again.');
 					return;
 				}
 
@@ -2446,7 +2446,7 @@ var ckoFlow = {
 						console.error('[FLOW UI ERROR] Component is not available - showing error message');
 						console.error('[FLOW UI ERROR] This is a CLIENT-SIDE (JavaScript) error');
 
-						showError(
+						ckoFlowShowError(
 							wp.i18n.__(
 								"The selected payment method is not available at this time.",
 								"checkout-com-unified-payments-api"
@@ -2475,7 +2475,7 @@ var ckoFlow = {
 			
 			ckoLogger.error("Error creating payment session:", error);
 
-			showError(
+			ckoFlowShowError(
 				error.message ||
 					wp.i18n.__(
 						"Error creating payment session.",
@@ -2546,7 +2546,7 @@ var ckoFlow = {
 				// Max attempts reached - show error
 				ckoLogger.error('Failed to mount Flow component: Container not found after ' + maxAttempts + ' attempts');
 				hideLoadingOverlay();
-				showError(
+				ckoFlowShowError(
 					wp.i18n.__(
 						"Unable to initialize payment form. Please refresh the page and try again.",
 						"checkout-com-unified-payments-api"
@@ -2602,7 +2602,7 @@ var ckoFlow = {
 				// Max attempts reached - show error
 				ckoLogger.error('Failed to mount Flow component after ' + maxAttempts + ' attempts:', error);
 				hideLoadingOverlay();
-				showError(
+				ckoFlowShowError(
 					wp.i18n.__(
 						"Unable to initialize payment form. Please refresh the page and try again.",
 						"checkout-com-unified-payments-api"
@@ -2689,20 +2689,20 @@ var ckoFlow = {
 /*
  * Displays error messages at the top of the WooCommerce form.
  */
-let showError = function (error_message) {
+let ckoFlowShowError = function (error_message) {
 	// Background pre-creation flows (e.g. Apple Pay onReady pre-create) set this flag
 	// so validation errors raised by validateCheckout / createOrderBeforePayment don't
 	// surface to the user. The user hasn't tried to pay yet — showing them
 	// "Email is required" while they're still looking at the page would be wrong.
 	if (window.ckoSuppressErrorDisplay) {
-		ckoLogger.debug('[showError] suppressed (background pre-create):', error_message);
+		ckoLogger.debug('[ckoFlowShowError] suppressed (background pre-create):', error_message);
 		return;
 	}
 
-	ckoLogger.error("showError() called with message:", error_message);
+	ckoLogger.error("ckoFlowShowError() called with message:", error_message);
 
 	if (!error_message) {
-		ckoLogger.error("showError() called with empty/null message");
+		ckoLogger.error("ckoFlowShowError() called with empty/null message");
 		return;
 	}
 
@@ -2741,7 +2741,7 @@ let showError = function (error_message) {
 
 	// Try form.checkout first
 	if (jQuery("form.checkout").length) {
-		ckoLogger.error("showError() - Found form.checkout, displaying error");
+		ckoLogger.error("ckoFlowShowError() - Found form.checkout, displaying error");
 		jQuery("form.checkout .woocommerce-NoticeGroup").remove();
 		jQuery("form.checkout").prepend(wcNoticeDiv);
 		jQuery(".woocommerce, .form.checkout").removeClass("processing").unblock();
@@ -2750,7 +2750,7 @@ let showError = function (error_message) {
 	} 
 	// Try .woocommerce-order-pay
 	else if (jQuery(".woocommerce-order-pay").length) {
-		ckoLogger.error("showError() - Found .woocommerce-order-pay, displaying error");
+		ckoLogger.error("ckoFlowShowError() - Found .woocommerce-order-pay, displaying error");
 		jQuery(".woocommerce-order-pay .woocommerce-NoticeGroup").remove();
 		jQuery(".woocommerce-order-pay").prepend(wcNoticeDiv);
 		jQuery(".woocommerce, .woocommerce-order-pay")
@@ -2761,7 +2761,7 @@ let showError = function (error_message) {
 	}
 	// Try .woocommerce-checkout (block theme)
 	else if (jQuery(".woocommerce-checkout").length) {
-		ckoLogger.error("showError() - Found .woocommerce-checkout, displaying error");
+		ckoLogger.error("ckoFlowShowError() - Found .woocommerce-checkout, displaying error");
 		jQuery(".woocommerce-checkout .woocommerce-NoticeGroup").remove();
 		jQuery(".woocommerce-checkout").prepend(wcNoticeDiv);
 		jQuery(".woocommerce-checkout").removeClass("processing").unblock();
@@ -2770,28 +2770,28 @@ let showError = function (error_message) {
 	}
 	// Fallback: Try to use WooCommerce's notice system
 	else if (typeof wc_add_to_notices === 'function') {
-		ckoLogger.error("showError() - Using WooCommerce notice system");
+		ckoLogger.error("ckoFlowShowError() - Using WooCommerce notice system");
 		wc_add_to_notices(error_message, 'error');
 		errorDisplayed = true;
 	}
 	// Last resort: Display at top of body
 	else {
-		ckoLogger.error("showError() - No form found, displaying error at top of body");
+		ckoLogger.error("ckoFlowShowError() - No form found, displaying error at top of body");
 		jQuery("body").prepend(wcNoticeDiv);
 		errorDisplayed = true;
 	}
 
 	if (errorDisplayed) {
-		ckoLogger.error("showError() - Error displayed successfully");
+		ckoLogger.error("ckoFlowShowError() - Error displayed successfully");
 		
 		// Store error message to persist through updated_checkout events
 		// WooCommerce's updated_checkout event replaces the form HTML, clearing our error
 		if (error_message && error_message.length > 0) {
 			FlowState.set('lastError', Array.isArray(error_message) ? error_message[0] : error_message);
-			ckoLogger.error("showError() - Stored error message for persistence:", FlowState.get('lastError'));
+			ckoLogger.error("ckoFlowShowError() - Stored error message for persistence:", FlowState.get('lastError'));
 		}
 	} else {
-		ckoLogger.error("showError() - ERROR: Failed to display error message!");
+		ckoLogger.error("ckoFlowShowError() - ERROR: Failed to display error message!");
 	}
 
 	// Scroll to top of checkout form or error message
@@ -2820,7 +2820,7 @@ jQuery(document.body).on('updated_checkout', function() {
 		ckoLogger.error("updated_checkout fired - Re-displaying stored error:", FlowState.get('lastError'));
 		// Use a small delay to ensure form is fully updated
 		setTimeout(function() {
-			showError(FlowState.get('lastError'));
+			ckoFlowShowError(FlowState.get('lastError'));
 			// Verify error is visible in DOM
 			setTimeout(function() {
 				const errorElement = jQuery("form.checkout .woocommerce-NoticeGroup, .woocommerce-order-pay .woocommerce-NoticeGroup, .woocommerce-checkout .woocommerce-NoticeGroup");
@@ -4728,7 +4728,7 @@ document.addEventListener("DOMContentLoaded", function () {
 				const termsMsg = (typeof cko_flow_vars !== 'undefined' && cko_flow_vars.i18n && cko_flow_vars.i18n.terms_required)
 					? cko_flow_vars.i18n.terms_required
 					: 'Please read and accept the terms and conditions to proceed with your order.';
-				showError(termsMsg);
+				ckoFlowShowError(termsMsg);
 				FlowState.set('orderCreationInProgress', false);
 				if (placeOrderButton.length) {
 					placeOrderButton.prop('disabled', false);
@@ -5023,12 +5023,12 @@ document.addEventListener("DOMContentLoaded", function () {
 					ckoLogger.error('[CREATE ORDER] ❌❌❌ VALIDATION FAILED - ORDER NOT CREATED ❌❌❌');
 					ckoLogger.error('[CREATE ORDER] Error message:', normalizedResponse.data.message);
 					ckoLogger.error('[CREATE ORDER] This is a validation error - order was NOT created');
-					showError(normalizedResponse.data.message);
+					ckoFlowShowError(normalizedResponse.data.message);
 				} else {
 					ckoLogger.error('[CREATE ORDER] ❌❌❌ FAILED TO CREATE ORDER ❌❌❌');
 					ckoLogger.error('[CREATE ORDER] Full response:', JSON.stringify(normalizedResponse, null, 2));
 					ckoLogger.error('[CREATE ORDER] Order creation failed for unknown reason');
-					showError('Failed to create order. Please check your form and try again.');
+					ckoFlowShowError('Failed to create order. Please check your form and try again.');
 				}
 				
 				// Clear lock flag on failure
@@ -5140,7 +5140,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		// Pre-creation runs in the background. If validation fails (e.g. autofill hasn't
 		// populated required fields yet on page load), we must not surface the error to
 		// the user — they haven't even tapped Apple Pay yet. The flag is checked inside
-		// showError; we restore it once pre-creation finishes either way.
+		// ckoFlowShowError; we restore it once pre-creation finishes either way.
 		window.ckoSuppressErrorDisplay = true;
 
 		const form = jQuery("form.checkout");
@@ -5284,7 +5284,7 @@ document.addEventListener("DOMContentLoaded", function () {
 						const apmValid = (typeof ckoFlow.flowComponent.isValid === 'function') ? ckoFlow.flowComponent.isValid() : true;
 						if (!apmValid) {
 							ckoLogger.error('[ADD PAYMENT METHOD] Flow component invalid - cannot submit');
-							showError('Please complete the card details.');
+							ckoFlowShowError('Please complete the card details.');
 							return;
 						}
 						ckoLogger.debug('[ADD PAYMENT METHOD] Submitting Flow component for $0 card verification');
@@ -5292,11 +5292,11 @@ document.addEventListener("DOMContentLoaded", function () {
 							ckoFlow.flowComponent.submit();
 						} catch (e) {
 							ckoLogger.error('[ADD PAYMENT METHOD] Flow submit failed:', e);
-							showError('Could not add the card. Please try again.');
+							ckoFlowShowError('Could not add the card. Please try again.');
 						}
 					} else {
 						ckoLogger.error('[ADD PAYMENT METHOD] Flow component not ready');
-						showError('Payment component not ready. Please refresh the page and try again.');
+						ckoFlowShowError('Payment component not ready. Please refresh the page and try again.');
 					}
 					return;
 				}
@@ -5358,11 +5358,11 @@ document.addEventListener("DOMContentLoaded", function () {
 											ckoFlow.flowComponent.submit();
 										} catch (error) {
 											ckoLogger.error('Flow component submit failed:', error);
-											showError('Payment processing failed. Please try again.');
+											ckoFlowShowError('Payment processing failed. Please try again.');
 										}
 									} else {
 										ckoLogger.error('Flow component is invalid, cannot submit');
-										showError('Payment form is not valid. Please check your payment details and try again.');
+										ckoFlowShowError('Payment form is not valid. Please check your payment details and try again.');
 									}
 								} else {
 									// Fallback: submit without validation check
@@ -5378,11 +5378,11 @@ document.addEventListener("DOMContentLoaded", function () {
 											ckoFlow.flowComponent.submit();
 										} else {
 											ckoLogger.error('Flow component submit method not available');
-											showError('Payment component not ready. Please refresh the page and try again.');
+											ckoFlowShowError('Payment component not ready. Please refresh the page and try again.');
 										}
 									} catch (error) {
 										ckoLogger.error('Flow component submit failed (fallback):', error);
-										showError('Payment processing failed. Please try again.');
+										ckoFlowShowError('Payment processing failed. Please try again.');
 									}
 								}
 							}
@@ -5410,7 +5410,7 @@ document.addEventListener("DOMContentLoaded", function () {
 						const isValid = ckoFlow.flowComponent.isValid();
 						if (!isValid) {
 							ckoLogger.error('[VALIDATION] ❌ Flow component is invalid - blocking order creation');
-							showError('Payment form is not valid. Please check your payment details and try again.');
+							ckoFlowShowError('Payment form is not valid. Please check your payment details and try again.');
 							return; // Exit early - don't create order
 						}
 						ckoLogger.debug('[VALIDATION] ✅ Flow component is valid - proceeding with order creation');
@@ -5481,11 +5481,11 @@ document.addEventListener("DOMContentLoaded", function () {
 										ckoFlow.flowComponent.submit();
 									} catch (error) {
 										ckoLogger.error('Flow component submit failed:', error);
-										showError('Payment processing failed. Please try again.');
+										ckoFlowShowError('Payment processing failed. Please try again.');
 									}
 								} else {
 									ckoLogger.error('Flow component is invalid - cannot submit');
-									showError('Payment form is not valid. Please check your payment details and try again.');
+									ckoFlowShowError('Payment form is not valid. Please check your payment details and try again.');
 								}
 							} else {
 								// Fallback: submit without validation check
@@ -5501,18 +5501,18 @@ document.addEventListener("DOMContentLoaded", function () {
 										ckoFlow.flowComponent.submit();
 									} else {
 										ckoLogger.error('Flow component submit method not available');
-										showError('Payment component not ready. Please refresh the page and try again.');
+										ckoFlowShowError('Payment component not ready. Please refresh the page and try again.');
 									}
 								} catch (error) {
 									ckoLogger.error('Flow component submit failed (fallback):', error);
-									showError('Payment processing failed. Please try again.');
+									ckoFlowShowError('Payment processing failed. Please try again.');
 								}
 							}
 						})();
 						}
 					} else {
 					ckoLogger.error('[CHECKOUT] Flow component not found - cannot process payment');
-						showError('Payment component not loaded. Please refresh the page and try again.');
+						ckoFlowShowError('Payment component not loaded. Please refresh the page and try again.');
 					}
 
 				// Place order for saved card when Flow component isn't available.
@@ -5615,7 +5615,7 @@ function validateCheckout(form, onSuccess, onError) {
 			} else {
 				
 				// Show an error message and trigger the onError callback if provided.
-				showError(normalizedResponse.data.message);
+				ckoFlowShowError(normalizedResponse.data.message);
 				if (onError) onError(normalizedResponse);
 			}
 		},
@@ -5623,7 +5623,7 @@ function validateCheckout(form, onSuccess, onError) {
 
 			// If the request fails, display the flow container and show a generic error message.
 			document.getElementById("flow-container").style.display = "block";
-			showError(
+			ckoFlowShowError(
 				wp.i18n.__(
 					"An error occurred. Please try again.",
 					"checkout-com-unified-payments-api"
