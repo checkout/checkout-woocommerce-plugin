@@ -9,7 +9,7 @@
  * file that was distributed with this source code.
  */
 
-namespace Monolog\Formatter;
+namespace CheckoutComWC\Vendor\Monolog\Formatter;
 
 /**
  * Formats data into an associative array of scalar values.

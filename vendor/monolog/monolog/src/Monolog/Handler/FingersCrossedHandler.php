@@ -9,14 +9,14 @@
  * file that was distributed with this source code.
  */
 
-namespace Monolog\Handler;
+namespace CheckoutComWC\Vendor\Monolog\Handler;
 
-use Monolog\Handler\FingersCrossed\ErrorLevelActivationStrategy;
-use Monolog\Handler\FingersCrossed\ActivationStrategyInterface;
-use Monolog\Logger;
-use Monolog\ResettableInterface;
-use Monolog\Formatter\FormatterInterface;
-use Psr\Log\LogLevel;
+use CheckoutComWC\Vendor\Monolog\Handler\FingersCrossed\ErrorLevelActivationStrategy;
+use CheckoutComWC\Vendor\Monolog\Handler\FingersCrossed\ActivationStrategyInterface;
+use CheckoutComWC\Vendor\Monolog\Logger;
+use CheckoutComWC\Vendor\Monolog\ResettableInterface;
+use CheckoutComWC\Vendor\Monolog\Formatter\FormatterInterface;
+use CheckoutComWC\Vendor\Psr\Log\LogLevel;
 
 /**
  * Buffers all records until a certain level is reached

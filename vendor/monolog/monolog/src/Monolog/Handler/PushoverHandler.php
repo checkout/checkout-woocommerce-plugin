@@ -9,11 +9,11 @@
  * file that was distributed with this source code.
  */
 
-namespace Monolog\Handler;
+namespace CheckoutComWC\Vendor\Monolog\Handler;
 
-use Monolog\Logger;
-use Monolog\Utils;
-use Psr\Log\LogLevel;
+use CheckoutComWC\Vendor\Monolog\Logger;
+use CheckoutComWC\Vendor\Monolog\Utils;
+use CheckoutComWC\Vendor\Psr\Log\LogLevel;
 
 /**
  * Sends notifications through the pushover api to mobile phones

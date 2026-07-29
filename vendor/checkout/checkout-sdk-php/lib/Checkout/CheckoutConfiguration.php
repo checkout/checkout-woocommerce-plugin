@@ -2,7 +2,7 @@
 
 namespace Checkout;
 
-use Psr\Log\LoggerInterface;
+use CheckoutComWC\Vendor\Psr\Log\LoggerInterface;
 
 final class CheckoutConfiguration
 {

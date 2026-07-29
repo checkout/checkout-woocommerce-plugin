@@ -9,9 +9,9 @@
  * file that was distributed with this source code.
  */
 
-namespace Monolog\Processor;
+namespace CheckoutComWC\Vendor\Monolog\Processor;
 
-use Monolog\Utils;
+use CheckoutComWC\Vendor\Monolog\Utils;
 
 /**
  * Processes a record's message according to PSR-3 rules
@@ -59,7 +59,7 @@ class PsrLogMessageProcessor implements ProcessorInterface
             if (is_null($val) || is_scalar($val) || (is_object($val) && method_exists($val, "__toString"))) {
                 $replacements[$placeholder] = $val;
             } elseif ($val instanceof \DateTimeInterface) {
-                if (!$this->dateFormat && $val instanceof \Monolog\DateTimeImmutable) {
+                if (!$this->dateFormat && $val instanceof \CheckoutComWC\Vendor\Monolog\DateTimeImmutable) {
                     // handle monolog dates using __toString if no specific dateFormat was asked for
                     // so that it follows the useMicroseconds flag
                     $replacements[$placeholder] = (string) $val;

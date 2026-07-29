@@ -2,9 +2,9 @@
 
 namespace Checkout;
 
-use Monolog\Handler\StreamHandler;
-use Monolog\Logger;
-use Psr\Log\LoggerInterface;
+use CheckoutComWC\Vendor\Monolog\Handler\StreamHandler;
+use CheckoutComWC\Vendor\Monolog\Logger;
+use CheckoutComWC\Vendor\Psr\Log\LoggerInterface;
 
 abstract class AbstractCheckoutSdkBuilder
 {

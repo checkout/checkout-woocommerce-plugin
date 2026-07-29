@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace GuzzleHttp\Psr7;
+namespace CheckoutComWC\Vendor\GuzzleHttp\Psr7;
 
-use Psr\Http\Message\StreamInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\StreamInterface;
 
 /**
  * Converts Guzzle streams into PHP stream resources.
@@ -44,7 +44,13 @@ final class StreamWrapper
                 .'writable, or both.');
         }
 
-        return fopen('guzzle://stream', $mode, false, self::createStreamContext($stream));
+        $resource = @fopen('guzzle://stream', $mode, false, self::createStreamContext($stream));
+
+        if ($resource === false) {
+            throw new \RuntimeException('Unable to create stream resource');
+        }
+
+        return $resource;
     }
 
     /**

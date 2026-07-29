@@ -9,11 +9,11 @@
  * file that was distributed with this source code.
  */
 
-namespace Monolog\Handler;
+namespace CheckoutComWC\Vendor\Monolog\Handler;
 
-use Monolog\Logger;
-use Psr\Log\LoggerInterface;
-use Monolog\Formatter\FormatterInterface;
+use CheckoutComWC\Vendor\Monolog\Logger;
+use CheckoutComWC\Vendor\Psr\Log\LoggerInterface;
+use CheckoutComWC\Vendor\Monolog\Formatter\FormatterInterface;
 
 /**
  * Proxies log messages to an existing PSR-3 compliant logger.

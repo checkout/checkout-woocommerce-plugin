@@ -4,6 +4,7 @@ tests/node
 node_modules/
 **/**.mp4
 vendor/
+bin/strauss.phar
 checkout-com-unified-payments-api.zip
 composer.phar
 

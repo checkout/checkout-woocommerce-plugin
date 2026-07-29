@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace GuzzleHttp\Promise;
+namespace CheckoutComWC\Vendor\GuzzleHttp\Promise;
 
 /**
  * A promise that has been fulfilled.

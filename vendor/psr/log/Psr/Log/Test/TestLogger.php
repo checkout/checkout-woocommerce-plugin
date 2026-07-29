@@ -1,8 +1,8 @@
 <?php
 
-namespace Psr\Log\Test;
+namespace CheckoutComWC\Vendor\Psr\Log\Test;
 
-use Psr\Log\AbstractLogger;
+use CheckoutComWC\Vendor\Psr\Log\AbstractLogger;
 
 /**
  * Used for testing purposes.

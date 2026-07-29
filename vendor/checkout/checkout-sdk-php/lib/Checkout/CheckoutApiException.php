@@ -2,7 +2,7 @@
 
 namespace Checkout;
 
-use GuzzleHttp\Exception\RequestException;
+use CheckoutComWC\Vendor\GuzzleHttp\Exception\RequestException;
 
 class CheckoutApiException extends CheckoutException
 {

@@ -9,9 +9,9 @@
  * file that was distributed with this source code.
  */
 
-namespace Monolog\Formatter;
+namespace CheckoutComWC\Vendor\Monolog\Formatter;
 
-use Monolog\Utils;
+use CheckoutComWC\Vendor\Monolog\Utils;
 
 /**
  * Formats incoming records into a one-line string

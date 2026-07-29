@@ -9,7 +9,7 @@
  * file that was distributed with this source code.
  */
 
-namespace Monolog;
+namespace CheckoutComWC\Vendor\Monolog;
 
 use InvalidArgumentException;
 
@@ -20,8 +20,8 @@ use InvalidArgumentException;
  * via static method calls on this class.
  *
  * <code>
- * $application = new Monolog\Logger('application');
- * $api = new Monolog\Logger('api');
+ * $application = new \CheckoutComWC\Vendor\Monolog\Logger('application');
+ * $api = new \CheckoutComWC\Vendor\Monolog\Logger('api');
  *
  * Monolog\Registry::addLogger($application);
  * Monolog\Registry::addLogger($api);

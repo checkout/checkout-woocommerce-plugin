@@ -9,7 +9,7 @@
  * file that was distributed with this source code.
  */
 
-namespace Monolog\Formatter;
+namespace CheckoutComWC\Vendor\Monolog\Formatter;
 
 use Throwable;
 
@@ -190,6 +190,10 @@ class JsonFormatter extends NormalizerFormatter
             // if the object has specific json serializability we want to make sure we skip the __toString treatment below
             if ($data instanceof \JsonSerializable) {
                 return $data;
+            }
+
+            if (\get_class($data) === '__PHP_Incomplete_Class') {
+                return new \ArrayObject($data);
             }
 
             if (method_exists($data, '__toString')) {

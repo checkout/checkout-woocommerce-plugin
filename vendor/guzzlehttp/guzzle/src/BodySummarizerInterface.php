@@ -1,8 +1,8 @@
 <?php
 
-namespace GuzzleHttp;
+namespace CheckoutComWC\Vendor\GuzzleHttp;
 
-use Psr\Http\Message\MessageInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\MessageInterface;
 
 interface BodySummarizerInterface
 {

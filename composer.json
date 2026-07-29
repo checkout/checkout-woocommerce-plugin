@@ -16,5 +16,37 @@
         "wp-cli/wp-cli-bundle": "^2.6",
         "automattic/vipwpcs": "^3",
         "phpcompatibility/phpcompatibility-wp": "^2"
+    },
+    "scripts": {
+        "prefix-namespaces": [
+            "sh -c 'test -f ./bin/strauss.phar || curl -sSL -o bin/strauss.phar https://github.com/BrianHenryIE/strauss/releases/latest/download/strauss.phar'",
+            "@php bin/strauss.phar",
+            "@composer dump-autoload"
+        ],
+        "post-install-cmd": [
+            "@prefix-namespaces"
+        ],
+        "post-update-cmd": [
+            "@prefix-namespaces"
+        ]
+    },
+    "extra": {
+        "strauss": {
+            "target_directory": "vendor",
+            "namespace_prefix": "CheckoutComWC\\Vendor\\",
+            "classmap_prefix": "CheckoutComWC_Vendor_",
+            "packages": [
+                "monolog/monolog",
+                "checkout/checkout-sdk-php"
+            ],
+            "exclude_from_prefix": {
+                "packages": [
+                    "checkout/checkout-sdk-php"
+                ]
+            },
+            "update_call_sites": true,
+            "delete_vendor_packages": false,
+            "classmap_output": true
+        }
     }
 }

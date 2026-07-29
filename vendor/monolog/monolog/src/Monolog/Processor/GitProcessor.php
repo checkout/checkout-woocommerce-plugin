@@ -9,10 +9,10 @@
  * file that was distributed with this source code.
  */
 
-namespace Monolog\Processor;
+namespace CheckoutComWC\Vendor\Monolog\Processor;
 
-use Monolog\Logger;
-use Psr\Log\LogLevel;
+use CheckoutComWC\Vendor\Monolog\Logger;
+use CheckoutComWC\Vendor\Psr\Log\LogLevel;
 
 /**
  * Injects Git branch and Git commit SHA in all records
@@ -64,7 +64,7 @@ class GitProcessor implements ProcessorInterface
             return self::$cache;
         }
 
-        $branches = `git branch -v --no-abbrev`;
+        $branches = shell_exec('git branch -v --no-abbrev');
         if ($branches && preg_match('{^\* (.+?)\s+([a-f0-9]{40})(?:\s|$)}m', $branches, $matches)) {
             return self::$cache = [
                 'branch' => $matches[1],

@@ -9,23 +9,24 @@
  * file that was distributed with this source code.
  */
 
-namespace Monolog\Handler;
+namespace CheckoutComWC\Vendor\Monolog\Handler;
 
+use MongoDB\Client;
+use MongoDB\Collection;
 use MongoDB\Driver\BulkWrite;
 use MongoDB\Driver\Manager;
-use MongoDB\Client;
-use Monolog\Logger;
-use Monolog\Formatter\FormatterInterface;
-use Monolog\Formatter\MongoDBFormatter;
+use CheckoutComWC\Vendor\Monolog\Formatter\FormatterInterface;
+use CheckoutComWC\Vendor\Monolog\Formatter\MongoDBFormatter;
+use CheckoutComWC\Vendor\Monolog\Logger;
 
 /**
  * Logs to a MongoDB database.
  *
  * Usage example:
  *
- *   $log = new \Monolog\Logger('application');
+ *   $log = new \CheckoutComWC\Vendor\Monolog\Logger('application');
  *   $client = new \MongoDB\Client('mongodb://localhost:27017');
- *   $mongodb = new \Monolog\Handler\MongoDBHandler($client, 'logs', 'prod');
+ *   $mongodb = new \CheckoutComWC\Vendor\Monolog\Handler\MongoDBHandler($client, 'logs', 'prod');
  *   $log->pushHandler($mongodb);
  *
  * The above examples uses the MongoDB PHP library's client class; however, the
@@ -33,12 +34,12 @@ use Monolog\Formatter\MongoDBFormatter;
  */
 class MongoDBHandler extends AbstractProcessingHandler
 {
-    /** @var \MongoDB\Collection */
+    /** @var Collection */
     private $collection;
     /** @var Client|Manager */
     private $manager;
-    /** @var string */
-    private $namespace;
+    /** @var string|null */
+    private $namespace = null;
 
     /**
      * Constructor.
@@ -54,7 +55,7 @@ class MongoDBHandler extends AbstractProcessingHandler
         }
 
         if ($mongodb instanceof Client) {
-            $this->collection = $mongodb->selectCollection($database, $collection);
+            $this->collection = method_exists($mongodb, 'getCollection') ? $mongodb->getCollection($database, $collection) : $mongodb->selectCollection($database, $collection);
         } else {
             $this->manager = $mongodb;
             $this->namespace = $database . '.' . $collection;

@@ -9,9 +9,9 @@
  * file that was distributed with this source code.
  */
 
-namespace Monolog\Processor;
+namespace CheckoutComWC\Vendor\Monolog\Processor;
 
-use Monolog\ResettableInterface;
+use CheckoutComWC\Vendor\Monolog\ResettableInterface;
 
 /**
  * Adds a unique identifier into records

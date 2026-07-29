@@ -9,12 +9,12 @@
  * file that was distributed with this source code.
  */
 
-namespace Monolog\Handler;
+namespace CheckoutComWC\Vendor\Monolog\Handler;
 
-use Monolog\Formatter\LineFormatter;
-use Monolog\Formatter\FormatterInterface;
-use Monolog\Logger;
-use Monolog\Utils;
+use CheckoutComWC\Vendor\Monolog\Formatter\LineFormatter;
+use CheckoutComWC\Vendor\Monolog\Formatter\FormatterInterface;
+use CheckoutComWC\Vendor\Monolog\Logger;
+use CheckoutComWC\Vendor\Monolog\Utils;
 
 /**
  * Stores to PHP error_log() handler.

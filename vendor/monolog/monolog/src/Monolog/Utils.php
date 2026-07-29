@@ -9,7 +9,7 @@
  * file that was distributed with this source code.
  */
 
-namespace Monolog;
+namespace CheckoutComWC\Vendor\Monolog;
 
 final class Utils
 {
@@ -122,7 +122,7 @@ final class Utils
         if (is_string($data)) {
             self::detectAndCleanUtf8($data);
         } elseif (is_array($data)) {
-            array_walk_recursive($data, array('Monolog\Utils', 'detectAndCleanUtf8'));
+            array_walk_recursive($data, array('CheckoutComWC\Vendor\Monolog\Utils', 'detectAndCleanUtf8'));
         } else {
             self::throwEncodeError($code, $data);
         }
@@ -249,7 +249,7 @@ final class Utils
         }
 
         $val = (int) $match['val'];
-        switch (strtolower($match['unit'] ?? '')) {
+        switch (strtolower($match['unit'])) {
             case 'g':
                 $val *= 1024;
             case 'm':

@@ -9,9 +9,9 @@
  * file that was distributed with this source code.
  */
 
-namespace Monolog\Formatter;
+namespace CheckoutComWC\Vendor\Monolog\Formatter;
 
-use Monolog\Logger;
+use CheckoutComWC\Vendor\Monolog\Logger;
 
 /**
  * Formats a log message according to the ChromePHP array format

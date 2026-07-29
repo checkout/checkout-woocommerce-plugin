@@ -1,6 +1,6 @@
 <?php
 
-namespace GuzzleHttp\Exception;
+namespace CheckoutComWC\Vendor\GuzzleHttp\Exception;
 
 class TooManyRedirectsException extends RequestException
 {

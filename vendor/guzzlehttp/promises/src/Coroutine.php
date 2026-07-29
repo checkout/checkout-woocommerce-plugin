@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace GuzzleHttp\Promise;
+namespace CheckoutComWC\Vendor\GuzzleHttp\Promise;
 
 use Generator;
 use Throwable;
@@ -18,7 +18,7 @@ use Throwable;
  * This can lead to less verbose code when doing lots of sequential async calls
  * with minimal processing in between.
  *
- *     use GuzzleHttp\Promise;
+ *     use CheckoutComWC\Vendor\GuzzleHttp\Promise;
  *
  *     function createPromise($value) {
  *         return new Promise\FulfilledPromise($value);
@@ -117,7 +117,10 @@ final class Coroutine implements PromiseInterface
 
     public function cancel(): void
     {
-        $this->currentPromise->cancel();
+        if (isset($this->currentPromise)) {
+            $this->currentPromise->cancel();
+        }
+
         $this->result->cancel();
     }
 

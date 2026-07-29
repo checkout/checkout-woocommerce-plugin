@@ -1,11 +1,11 @@
 <?php
 
-namespace GuzzleHttp;
+namespace CheckoutComWC\Vendor\GuzzleHttp;
 
-use GuzzleHttp\Exception\GuzzleException;
-use GuzzleHttp\Promise\PromiseInterface;
-use Psr\Http\Message\ResponseInterface;
-use Psr\Http\Message\UriInterface;
+use CheckoutComWC\Vendor\GuzzleHttp\Exception\GuzzleException;
+use CheckoutComWC\Vendor\GuzzleHttp\Promise\PromiseInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\ResponseInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\UriInterface;
 
 /**
  * Client interface for sending HTTP requests.

@@ -9,10 +9,10 @@
  * file that was distributed with this source code.
  */
 
-namespace Monolog\Handler\FingersCrossed;
+namespace CheckoutComWC\Vendor\Monolog\Handler\FingersCrossed;
 
-use Monolog\Logger;
-use Psr\Log\LogLevel;
+use CheckoutComWC\Vendor\Monolog\Logger;
+use CheckoutComWC\Vendor\Psr\Log\LogLevel;
 
 /**
  * Channel and Error level based monolog activation strategy. Allows to trigger activation
@@ -60,7 +60,7 @@ class ChannelLevelActivationStrategy implements ActivationStrategyInterface
     public function __construct($defaultActionLevel, array $channelToActionLevel = [])
     {
         $this->defaultActionLevel = Logger::toMonologLevel($defaultActionLevel);
-        $this->channelToActionLevel = array_map('Monolog\Logger::toMonologLevel', $channelToActionLevel);
+        $this->channelToActionLevel = array_map('CheckoutComWC\Vendor\Monolog\Logger::toMonologLevel', $channelToActionLevel);
     }
 
     /**

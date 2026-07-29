@@ -9,11 +9,11 @@
  * file that was distributed with this source code.
  */
 
-namespace Monolog\Handler;
+namespace CheckoutComWC\Vendor\Monolog\Handler;
 
-use Monolog\Logger;
-use Monolog\ResettableInterface;
-use Psr\Log\LogLevel;
+use CheckoutComWC\Vendor\Monolog\Logger;
+use CheckoutComWC\Vendor\Monolog\ResettableInterface;
+use CheckoutComWC\Vendor\Psr\Log\LogLevel;
 
 /**
  * Base Handler class providing basic level/bubble support

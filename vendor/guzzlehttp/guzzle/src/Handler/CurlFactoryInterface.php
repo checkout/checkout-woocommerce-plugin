@@ -1,8 +1,8 @@
 <?php
 
-namespace GuzzleHttp\Handler;
+namespace CheckoutComWC\Vendor\GuzzleHttp\Handler;
 
-use Psr\Http\Message\RequestInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\RequestInterface;
 
 interface CurlFactoryInterface
 {

@@ -1,9 +1,9 @@
 <?php
 
-namespace GuzzleHttp\Cookie;
+namespace CheckoutComWC\Vendor\GuzzleHttp\Cookie;
 
-use Psr\Http\Message\RequestInterface;
-use Psr\Http\Message\ResponseInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\RequestInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\ResponseInterface;
 
 /**
  * Stores HTTP cookies.

@@ -1,6 +1,6 @@
 <?php
 
-namespace Psr\Log;
+namespace CheckoutComWC\Vendor\Psr\Log;
 
 /**
  * This Logger can be used to avoid conditional log calls.
@@ -21,7 +21,7 @@ class NullLogger extends AbstractLogger
      *
      * @return void
      *
-     * @throws \Psr\Log\InvalidArgumentException
+     * @throws \CheckoutComWC\Vendor\Psr\Log\InvalidArgumentException
      */
     public function log($level, $message, array $context = array())
     {

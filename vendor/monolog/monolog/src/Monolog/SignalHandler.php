@@ -9,10 +9,10 @@
  * file that was distributed with this source code.
  */
 
-namespace Monolog;
+namespace CheckoutComWC\Vendor\Monolog;
 
-use Psr\Log\LoggerInterface;
-use Psr\Log\LogLevel;
+use CheckoutComWC\Vendor\Psr\Log\LoggerInterface;
+use CheckoutComWC\Vendor\Psr\Log\LogLevel;
 use ReflectionExtension;
 
 /**
@@ -80,6 +80,7 @@ class SignalHandler
      */
     public function handleSignal(int $signo, $siginfo = null): void
     {
+        /** @var array<int, string> $signals */
         static $signals = [];
 
         if (!$signals && extension_loaded('pcntl')) {

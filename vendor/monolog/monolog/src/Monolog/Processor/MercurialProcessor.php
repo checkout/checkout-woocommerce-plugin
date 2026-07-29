@@ -9,10 +9,10 @@
  * file that was distributed with this source code.
  */
 
-namespace Monolog\Processor;
+namespace CheckoutComWC\Vendor\Monolog\Processor;
 
-use Monolog\Logger;
-use Psr\Log\LogLevel;
+use CheckoutComWC\Vendor\Monolog\Logger;
+use CheckoutComWC\Vendor\Psr\Log\LogLevel;
 
 /**
  * Injects Hg branch and Hg revision number in all records
@@ -63,7 +63,7 @@ class MercurialProcessor implements ProcessorInterface
             return self::$cache;
         }
 
-        $result = explode(' ', trim(`hg id -nb`));
+        $result = explode(' ', trim((string) shell_exec('hg id -nb')));
 
         if (count($result) >= 3) {
             return self::$cache = [

@@ -9,7 +9,7 @@
  * file that was distributed with this source code.
  */
 
-namespace Monolog;
+namespace CheckoutComWC\Vendor\Monolog;
 
 use ArrayAccess;
 
@@ -17,7 +17,7 @@ use ArrayAccess;
  * Monolog log record interface for forward compatibility with Monolog 3.0
  *
  * This is just present in Monolog 2.4+ to allow interoperable code to be written against
- * both versions by type-hinting arguments as `array|\Monolog\LogRecord $record`
+ * both versions by type-hinting arguments as `array|\CheckoutComWC\Vendor\Monolog\LogRecord $record`
  *
  * Do not rely on this interface for other purposes, and do not implement it.
  *

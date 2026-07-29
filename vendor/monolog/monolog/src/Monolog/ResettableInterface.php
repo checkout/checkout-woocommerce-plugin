@@ -9,7 +9,7 @@
  * file that was distributed with this source code.
  */
 
-namespace Monolog;
+namespace CheckoutComWC\Vendor\Monolog;
 
 /**
  * Handler or Processor implementing this interface will be reset when Logger::reset() is called.

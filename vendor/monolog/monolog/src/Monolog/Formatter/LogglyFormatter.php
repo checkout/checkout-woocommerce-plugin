@@ -9,7 +9,7 @@
  * file that was distributed with this source code.
  */
 
-namespace Monolog\Formatter;
+namespace CheckoutComWC\Vendor\Monolog\Formatter;
 
 /**
  * Encodes message information into JSON in a format compatible with Loggly.
@@ -31,7 +31,7 @@ class LogglyFormatter extends JsonFormatter
      * Appends the 'timestamp' parameter for indexing by Loggly.
      *
      * @see https://www.loggly.com/docs/automated-parsing/#json
-     * @see \Monolog\Formatter\JsonFormatter::format()
+     * @see \CheckoutComWC\Vendor\Monolog\Formatter\JsonFormatter::format()
      */
     public function format(array $record): string
     {

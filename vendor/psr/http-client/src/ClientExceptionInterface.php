@@ -1,6 +1,6 @@
 <?php
 
-namespace Psr\Http\Client;
+namespace CheckoutComWC\Vendor\Psr\Http\Client;
 
 /**
  * Every HTTP client related exception MUST implement this interface.

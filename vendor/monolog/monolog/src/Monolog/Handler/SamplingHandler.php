@@ -9,9 +9,9 @@
  * file that was distributed with this source code.
  */
 
-namespace Monolog\Handler;
+namespace CheckoutComWC\Vendor\Monolog\Handler;
 
-use Monolog\Formatter\FormatterInterface;
+use CheckoutComWC\Vendor\Monolog\Formatter\FormatterInterface;
 
 /**
  * Sampling handler

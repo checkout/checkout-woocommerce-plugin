@@ -1,13 +1,13 @@
 <?php
 
-if (!function_exists('getallheaders')) {
+if (!function_exists('checkoutcomwc_vendor_getallheaders')) {
 
     /**
      * Get all HTTP header key/values as an associative array for the current request.
      *
      * @return string[string] The HTTP header key/value pairs.
      */
-    function getallheaders()
+    function checkoutcomwc_vendor_getallheaders()
     {
         $headers = array();
 

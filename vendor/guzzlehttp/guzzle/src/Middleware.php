@@ -1,14 +1,14 @@
 <?php
 
-namespace GuzzleHttp;
+namespace CheckoutComWC\Vendor\GuzzleHttp;
 
-use GuzzleHttp\Cookie\CookieJarInterface;
-use GuzzleHttp\Exception\RequestException;
-use GuzzleHttp\Promise as P;
-use GuzzleHttp\Promise\PromiseInterface;
-use Psr\Http\Message\RequestInterface;
-use Psr\Http\Message\ResponseInterface;
-use Psr\Log\LoggerInterface;
+use CheckoutComWC\Vendor\GuzzleHttp\Cookie\CookieJarInterface;
+use CheckoutComWC\Vendor\GuzzleHttp\Exception\RequestException;
+use CheckoutComWC\Vendor\GuzzleHttp\Promise as P;
+use CheckoutComWC\Vendor\GuzzleHttp\Promise\PromiseInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\RequestInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\ResponseInterface;
+use CheckoutComWC\Vendor\Psr\Log\LoggerInterface;
 
 /**
  * Functions used to create and wrap handlers with handler middleware.
@@ -29,7 +29,7 @@ final class Middleware
             return static function ($request, array $options) use ($handler) {
                 if (empty($options['cookies'])) {
                     return $handler($request, $options);
-                } elseif (!($options['cookies'] instanceof CookieJarInterface)) {
+                } elseif (!$options['cookies'] instanceof CookieJarInterface) {
                     throw new \InvalidArgumentException('cookies must be an instance of GuzzleHttp\Cookie\CookieJarInterface');
                 }
                 $cookieJar = $options['cookies'];
@@ -187,11 +187,11 @@ final class Middleware
      * Middleware that logs requests, responses, and errors using a message
      * formatter.
      *
-     * @phpstan-param \Psr\Log\LogLevel::* $logLevel  Level at which to log requests.
-     *
      * @param LoggerInterface                            $logger    Logs messages.
      * @param MessageFormatterInterface|MessageFormatter $formatter Formatter used to create message strings.
      * @param string                                     $logLevel  Level at which to log requests.
+     *
+     * @phpstan-param \Psr\Log\LogLevel::* $logLevel Level at which to log requests.
      *
      * @return callable Returns a function that accepts the next handler.
      */

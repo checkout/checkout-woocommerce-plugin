@@ -1,9 +1,9 @@
 <?php
 
-namespace GuzzleHttp;
+namespace CheckoutComWC\Vendor\GuzzleHttp;
 
-use Psr\Http\Message\RequestInterface;
-use Psr\Http\Message\ResponseInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\RequestInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\ResponseInterface;
 
 interface MessageFormatterInterface
 {

@@ -3,13 +3,13 @@
 namespace Checkout;
 
 use DateTime;
-use GuzzleHttp\Psr7\Response;
+use CheckoutComWC\Vendor\GuzzleHttp\Psr7\Response;
 
 class CheckoutUtils
 {
 
     const PROJECT_NAME = "checkout-sdk-php";
-    const PROJECT_VERSION = "3.2.6";
+    const PROJECT_VERSION = "3.2.8";
 
     /**
      * @param DateTime $date

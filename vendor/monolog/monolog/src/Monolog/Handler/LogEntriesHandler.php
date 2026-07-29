@@ -9,9 +9,9 @@
  * file that was distributed with this source code.
  */
 
-namespace Monolog\Handler;
+namespace CheckoutComWC\Vendor\Monolog\Handler;
 
-use Monolog\Logger;
+use CheckoutComWC\Vendor\Monolog\Logger;
 
 /**
  * @author Robert Kaufmann III <rok3@rok3.me>

@@ -9,11 +9,11 @@
  * file that was distributed with this source code.
  */
 
-namespace Monolog\Test;
+namespace CheckoutComWC\Vendor\Monolog\Test;
 
-use Monolog\Logger;
-use Monolog\DateTimeImmutable;
-use Monolog\Formatter\FormatterInterface;
+use CheckoutComWC\Vendor\Monolog\Logger;
+use CheckoutComWC\Vendor\Monolog\DateTimeImmutable;
+use CheckoutComWC\Vendor\Monolog\Formatter\FormatterInterface;
 
 /**
  * Lets you easily generate log records and a dummy formatter for testing purposes

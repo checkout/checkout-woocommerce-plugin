@@ -1,6 +1,6 @@
 <?php
 
-namespace Psr\Http\Message;
+namespace CheckoutComWC\Vendor\Psr\Http\Message;
 
 interface UploadedFileFactoryInterface
 {

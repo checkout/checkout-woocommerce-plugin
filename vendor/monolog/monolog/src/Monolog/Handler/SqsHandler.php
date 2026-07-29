@@ -9,11 +9,11 @@
  * file that was distributed with this source code.
  */
 
-namespace Monolog\Handler;
+namespace CheckoutComWC\Vendor\Monolog\Handler;
 
 use Aws\Sqs\SqsClient;
-use Monolog\Logger;
-use Monolog\Utils;
+use CheckoutComWC\Vendor\Monolog\Logger;
+use CheckoutComWC\Vendor\Monolog\Utils;
 
 /**
  * Writes to any sqs queue.

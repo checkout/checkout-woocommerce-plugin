@@ -9,7 +9,7 @@
  * file that was distributed with this source code.
  */
 
-namespace Monolog\Processor;
+namespace CheckoutComWC\Vendor\Monolog\Processor;
 
 /**
  * Adds a tags array into record

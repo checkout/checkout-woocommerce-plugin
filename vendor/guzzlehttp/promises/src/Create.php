@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace GuzzleHttp\Promise;
+namespace CheckoutComWC\Vendor\GuzzleHttp\Promise;
 
 final class Create
 {
@@ -72,6 +72,16 @@ final class Create
 
         if (is_array($value)) {
             return new \ArrayIterator($value);
+        }
+
+        if (!is_iterable($value)) {
+            checkoutcomwc_vendor_trigger_deprecation(
+                'guzzlehttp/promises',
+                '2.5',
+                'Passing a non-iterable to %s::%s() is deprecated; guzzlehttp/promises 3.0 will require an iterable.',
+                __CLASS__,
+                __FUNCTION__
+            );
         }
 
         return new \ArrayIterator([$value]);

@@ -47,6 +47,49 @@ echo ""
 echo "📦 Building zip file: $ZIP_NAME"
 echo ""
 
+# --- Dependency namespace scoping check (GH #27 fix) -----------------------
+# Monolog (bundled via checkout-sdk-php) must be namespace-scoped before we
+# package a release, otherwise a merchant loading their own Monolog v3 fatals
+# against ours. `composer install`/`composer update` already runs Strauss
+# automatically via the post-install-cmd/post-update-cmd hooks in
+# composer.json, scoping the Monolog classes IN PLACE inside vendor/ (there is
+# no separate vendor-prefixed/ folder — extra.strauss.target_directory is set
+# to "vendor", so the renamed classes live in the normal vendor/ tree and ship
+# exactly like any other dependency). This block is just a safety net so we
+# never ship an unscoped (or half-scoped) build by accident.
+
+# The SDK's one internal reference to Monolog (lib/Checkout/AbstractCheckoutSdkBuilder.php)
+# must have been rewritten by Strauss to point at the scoped namespace, or the SDK would
+# fatal looking for a `Monolog\Logger` class that no longer exists once Monolog is renamed.
+SDK_BUILDER_FILE="vendor/checkout/checkout-sdk-php/lib/Checkout/AbstractCheckoutSdkBuilder.php"
+if [ -f "$SDK_BUILDER_FILE" ] && grep -qE "use Monolog\\\\(Logger|Handler)" "$SDK_BUILDER_FILE"; then
+    echo "❌ ERROR: ${SDK_BUILDER_FILE} still references the unscoped Monolog\\ namespace."
+    echo "   Strauss did not rewrite this call site. Either:"
+    echo "     a) confirm Strauss's update_call_sites handled cross-package references and"
+    echo "        re-run 'composer install', or"
+    echo "     b) manually update the 'use Monolog\\...' lines in that file to"
+    echo "        'use CheckoutComWC\\Vendor\\Monolog\\...' before building a release."
+    exit 1
+fi
+
+# Run the actual regression test (autoload resolution AND the real merchant-collision
+# simulation — a stub Monolog\Logger loaded before our autoloader, in an isolated
+# process). The lighter checks above catch the common failure fast; this is the one
+# that actually proves the reported bug is fixed. Do not ship a zip without this passing.
+if command -v php >/dev/null 2>&1; then
+    php tests/test-monolog-namespace-scoping.php || {
+        echo ""
+        echo "❌ ERROR: Monolog namespace scoping regression test FAILED (see output above)."
+        echo "   Do not ship this build to the client until this passes."
+        exit 1
+    }
+else
+    echo "❌ ERROR: php not found on PATH — cannot verify the Monolog scoping fix."
+    echo "   Do not ship a build without running: php tests/test-monolog-namespace-scoping.php"
+    exit 1
+fi
+echo ""
+
 # Create temp directory with plugin folder structure
 TEMP_DIR=$(mktemp -d)
 PLUGIN_DIR="${TEMP_DIR}/${PLUGIN_FOLDER}"
@@ -88,6 +131,7 @@ rsync -av --inplace \
   --exclude='diagnose-header-error.py' \
   --exclude='php-uploads.ini' \
   --exclude='composer.phar' \
+  --exclude='bin/strauss.phar' \
   --exclude='vendor/wp-cli' \
   "${PLUGIN_SOURCE_DIR}/" "${PLUGIN_DIR}/" > /dev/null 2>&1
 

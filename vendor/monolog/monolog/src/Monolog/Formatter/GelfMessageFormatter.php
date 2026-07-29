@@ -9,11 +9,11 @@
  * file that was distributed with this source code.
  */
 
-namespace Monolog\Formatter;
+namespace CheckoutComWC\Vendor\Monolog\Formatter;
 
-use Monolog\Logger;
+use CheckoutComWC\Vendor\Monolog\Logger;
 use Gelf\Message;
-use Monolog\Utils;
+use CheckoutComWC\Vendor\Monolog\Utils;
 
 /**
  * Serializes a log message to GELF
@@ -73,7 +73,7 @@ class GelfMessageFormatter extends NormalizerFormatter
     public function __construct(?string $systemName = null, ?string $extraPrefix = null, string $contextPrefix = 'ctxt_', ?int $maxLength = null)
     {
         if (!class_exists(Message::class)) {
-            throw new \RuntimeException('Composer package graylog2/gelf-php is required to use Monolog\'s GelfMessageFormatter');
+            throw new \RuntimeException('Composer package graylog2/gelf-php is required to use CheckoutComWC\Vendor\Monolog\'s GelfMessageFormatter');
         }
 
         parent::__construct('U.u');

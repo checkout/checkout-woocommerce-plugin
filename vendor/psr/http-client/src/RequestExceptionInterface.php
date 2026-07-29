@@ -1,8 +1,8 @@
 <?php
 
-namespace Psr\Http\Client;
+namespace CheckoutComWC\Vendor\Psr\Http\Client;
 
-use Psr\Http\Message\RequestInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\RequestInterface;
 
 /**
  * Exception for when a request failed.

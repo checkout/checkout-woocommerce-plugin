@@ -9,11 +9,11 @@
  * file that was distributed with this source code.
  */
 
-namespace Monolog\Handler;
+namespace CheckoutComWC\Vendor\Monolog\Handler;
 
 use Rollbar\RollbarLogger;
 use Throwable;
-use Monolog\Logger;
+use CheckoutComWC\Vendor\Monolog\Logger;
 
 /**
  * Sends errors to Rollbar

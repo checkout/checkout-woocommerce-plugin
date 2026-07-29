@@ -1,11 +1,11 @@
 <?php
 
-namespace GuzzleHttp;
+namespace CheckoutComWC\Vendor\GuzzleHttp;
 
-use GuzzleHttp\Promise as P;
-use GuzzleHttp\Promise\PromiseInterface;
-use Psr\Http\Message\RequestInterface;
-use Psr\Http\Message\ResponseInterface;
+use CheckoutComWC\Vendor\GuzzleHttp\Promise as P;
+use CheckoutComWC\Vendor\GuzzleHttp\Promise\PromiseInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\RequestInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\ResponseInterface;
 
 /**
  * Middleware that retries requests based on the boolean result of
@@ -44,16 +44,22 @@ class RetryMiddleware
     {
         $this->decider = $decider;
         $this->nextHandler = $nextHandler;
-        $this->delay = $delay ?: __CLASS__.'::exponentialDelay';
+        $this->delay = $delay ?: static function (int $retries): int {
+            return (int) 2 ** ($retries - 1) * 1000;
+        };
     }
 
     /**
      * Default exponential backoff delay function.
      *
      * @return int milliseconds.
+     *
+     * @deprecated since 7.11, will be removed in 8.0.
      */
     public static function exponentialDelay(int $retries): int
     {
+        checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.11', '%s::%s() is deprecated and will be removed in 8.0.', __CLASS__, __FUNCTION__);
+
         return (int) 2 ** ($retries - 1) * 1000;
     }
 

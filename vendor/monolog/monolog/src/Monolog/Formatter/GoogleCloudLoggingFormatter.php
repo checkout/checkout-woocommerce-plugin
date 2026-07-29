@@ -9,10 +9,10 @@
  * file that was distributed with this source code.
  */
 
-namespace Monolog\Formatter;
+namespace CheckoutComWC\Vendor\Monolog\Formatter;
 
 use DateTimeInterface;
-use Monolog\LogRecord;
+use CheckoutComWC\Vendor\Monolog\LogRecord;
 
 /**
  * Encodes message information into JSON in a format compatible with Cloud logging.

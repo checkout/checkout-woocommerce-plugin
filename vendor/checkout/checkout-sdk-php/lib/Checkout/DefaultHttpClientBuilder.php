@@ -2,20 +2,16 @@
 
 namespace Checkout;
 
-use GuzzleHttp\Client as GuzzleHttpClient;
-
+use CheckoutComWC\Vendor\GuzzleHttp\Client as GuzzleHttpClient;
 final class DefaultHttpClientBuilder implements HttpClientBuilderInterface
 {
-
     private $client;
-
     public function __construct($config)
     {
         $this->client = new GuzzleHttpClient($config);
     }
-
     /**
-     * @return GuzzleHttpClient
+     * @return \GuzzleHttpClient
      */
     public function getClient()
     {

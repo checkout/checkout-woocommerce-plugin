@@ -9,12 +9,12 @@
  * file that was distributed with this source code.
  */
 
-namespace Monolog\Handler;
+namespace CheckoutComWC\Vendor\Monolog\Handler;
 
 use DateTimeInterface;
-use Monolog\Logger;
-use Monolog\Handler\SyslogUdp\UdpSocket;
-use Monolog\Utils;
+use CheckoutComWC\Vendor\Monolog\Logger;
+use CheckoutComWC\Vendor\Monolog\Handler\SyslogUdp\UdpSocket;
+use CheckoutComWC\Vendor\Monolog\Utils;
 
 /**
  * A Handler for logging to a remote syslogd server.

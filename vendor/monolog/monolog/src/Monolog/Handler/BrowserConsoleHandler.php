@@ -9,12 +9,12 @@
  * file that was distributed with this source code.
  */
 
-namespace Monolog\Handler;
+namespace CheckoutComWC\Vendor\Monolog\Handler;
 
-use Monolog\Formatter\FormatterInterface;
-use Monolog\Formatter\LineFormatter;
-use Monolog\Utils;
-use Monolog\Logger;
+use CheckoutComWC\Vendor\Monolog\Formatter\FormatterInterface;
+use CheckoutComWC\Vendor\Monolog\Formatter\LineFormatter;
+use CheckoutComWC\Vendor\Monolog\Utils;
+use CheckoutComWC\Vendor\Monolog\Logger;
 
 use function count;
 use function headers_list;
@@ -117,7 +117,7 @@ class BrowserConsoleHandler extends AbstractProcessingHandler
     protected function registerShutdownFunction(): void
     {
         if (PHP_SAPI !== 'cli') {
-            register_shutdown_function(['Monolog\Handler\BrowserConsoleHandler', 'send']);
+            register_shutdown_function(['CheckoutComWC\Vendor\Monolog\Handler\BrowserConsoleHandler', 'send']);
         }
     }
 

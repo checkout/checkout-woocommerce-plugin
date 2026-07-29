@@ -5,8 +5,8 @@ namespace Checkout;
 use Checkout\Common\AbstractQueryFilter;
 use Checkout\Files\FileRequest;
 use Exception;
-use GuzzleHttp\Exception\RequestException;
-use GuzzleHttp\Psr7\Response;
+use CheckoutComWC\Vendor\GuzzleHttp\Exception\RequestException;
+use CheckoutComWC\Vendor\GuzzleHttp\Psr7\Response;
 
 class ApiClient
 {

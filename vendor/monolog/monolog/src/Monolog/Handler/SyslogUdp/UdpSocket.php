@@ -9,9 +9,9 @@
  * file that was distributed with this source code.
  */
 
-namespace Monolog\Handler\SyslogUdp;
+namespace CheckoutComWC\Vendor\Monolog\Handler\SyslogUdp;
 
-use Monolog\Utils;
+use CheckoutComWC\Vendor\Monolog\Utils;
 use Socket;
 
 class UdpSocket

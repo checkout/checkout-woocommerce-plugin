@@ -9,7 +9,7 @@
  * file that was distributed with this source code.
  */
 
-namespace Monolog\Formatter;
+namespace CheckoutComWC\Vendor\Monolog\Formatter;
 
 /**
  * Encodes message information into JSON in a format compatible with Logmatic.
@@ -48,7 +48,7 @@ class LogmaticFormatter extends JsonFormatter
      * Appends the 'hostname' and 'appname' parameter for indexing by Logmatic.
      *
      * @see http://doc.logmatic.io/docs/basics-to-send-data
-     * @see \Monolog\Formatter\JsonFormatter::format()
+     * @see \CheckoutComWC\Vendor\Monolog\Formatter\JsonFormatter::format()
      */
     public function format(array $record): string
     {
