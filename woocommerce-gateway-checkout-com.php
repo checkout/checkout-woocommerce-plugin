@@ -5,7 +5,7 @@
  * Description: Extends WooCommerce by Adding the Checkout.com Gateway.
  * Author: Checkout.com
  * Author URI: https://www.checkout.com/
- * Version: 5.1.4.1
+ * Version: 5.1.4.2
  * Requires at least: 5.0
  * Tested up to: 6.7.0
  * WC requires at least: 3.0
@@ -195,6 +195,21 @@ function cko_flow_checkout_requires_payment() {
 		return true;
 	}
 
+	// order-pay ("Pay for order") settles an existing ORDER whose amount lives on the order, not the
+	// cart. WooCommerce still instantiates an (empty) cart here, so needs_payment() would be false and
+	// wrongly hide Flow — this blocked payment on admin/MOTO orders, payment links, and failed-payment
+	// retries. Never judge availability by the cart on the pay-for-order page.
+	if ( function_exists( 'is_checkout_pay_page' ) && is_checkout_pay_page() ) {
+		return true;
+	}
+
+	// An empty cart means there is no cart-based amount to evaluate (order-pay, My Account add/change
+	// payment method, View Subscription, account pages). Only a cart WITH items can be a genuinely-free
+	// (£0) checkout that should hide the gateway — so never hide when the cart is empty.
+	if ( WC()->cart->is_empty() ) {
+		return true;
+	}
+
 	$needs_payment = (bool) WC()->cart->needs_payment();
 
 	/**
@@ -302,7 +317,7 @@ add_action( 'woocommerce_new_order', 'cko_update_order_id_in_session', 5 );
  * Constants.
  */
 // NOSONAR (S1313): "5.1.3.7" is the plugin version (WordPress semver-style), not a hardcoded IP address.
-define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '5.1.4.1' ); // NOSONAR
+define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '5.1.4.2' ); // NOSONAR
 define( 'WC_CHECKOUTCOM_PLUGIN_URL', untrailingslashit( plugins_url( basename( plugin_dir_path( __FILE__ ) ), basename( __FILE__ ) ) ) );
 define( 'WC_CHECKOUTCOM_PLUGIN_PATH', untrailingslashit( plugin_dir_path( __FILE__ ) ) );
 

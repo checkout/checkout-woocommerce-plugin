@@ -302,7 +302,15 @@
 			// only collects name & email (no address fields), so validate the email only — a default
 			// billing country is supplied server-side for the payment session.
 			if (typeof cko_flow_vars !== 'undefined' && ( cko_flow_vars.address_not_required === true || cko_flow_vars.address_not_required === '1' || cko_flow_vars.address_not_required === 1 )) {
-				const apmEmail = this.getCheckoutFieldValue('billing_email');
+				let apmEmail = this.getCheckoutFieldValue('billing_email');
+				// order-pay page (failed-payment retry, pay-for-order links) renders no billing_email
+				// input — the email lives on the order, so read it from #order-pay-info instead.
+				if (!apmEmail && window.location.pathname.includes('/order-pay/') && typeof jQuery !== 'undefined') {
+					const opi = jQuery("#order-pay-info")?.data("order-pay");
+					if (opi && opi.billing_address) {
+						apmEmail = opi.billing_address.email || opi.billing_address.Email || '';
+					}
+				}
 				const ok = !!(apmEmail && this.isValidEmail(apmEmail));
 				if (typeof window.ckoLogger !== 'undefined') {
 					window.ckoLogger.debug('requiredFieldsFilledAndValid: [no-billing-address] email-only check = ' + ok);
@@ -433,7 +441,14 @@
 			};
 			
 			// Check email
-			const email = this.getCheckoutFieldValue("billing_email");
+			let email = this.getCheckoutFieldValue("billing_email");
+			// order-pay page renders no billing_email input — read the email from the order data.
+			if (!email && window.location.pathname.includes('/order-pay/') && typeof jQuery !== 'undefined') {
+				const opi = jQuery("#order-pay-info")?.data("order-pay");
+				if (opi && opi.billing_address) {
+					email = opi.billing_address.email || opi.billing_address.Email || '';
+				}
+			}
 			if (!email) {
 				missingFields.push(labels.email);
 			} else if (!this.isValidEmail(email)) {
