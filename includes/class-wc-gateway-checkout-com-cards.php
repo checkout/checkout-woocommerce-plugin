@@ -483,18 +483,40 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 
 			// If Flow mode, also save enabled payment methods to Flow settings
 			if ( isset( $settings['ckocom_checkout_mode'] ) && 'flow' === $settings['ckocom_checkout_mode'] ) {
+				$flow_settings = function_exists( 'cko_get_raw_option' )
+					? cko_get_raw_option( 'woocommerce_wc_checkout_com_flow_settings' )
+					: get_option( 'woocommerce_wc_checkout_com_flow_settings', array() );
+				if ( ! is_array( $flow_settings ) ) {
+					$flow_settings = array();
+				}
+
 				if ( isset( $_POST['flow_enabled_payment_methods'] ) ) {
-					$flow_settings = function_exists( 'cko_get_raw_option' )
-						? cko_get_raw_option( 'woocommerce_wc_checkout_com_flow_settings' )
-						: get_option( 'woocommerce_wc_checkout_com_flow_settings', array() );
 					$flow_settings['flow_enabled_payment_methods'] = is_array( $_POST['flow_enabled_payment_methods'] ) ? array_map( 'sanitize_text_field', $_POST['flow_enabled_payment_methods'] ) : array();
-					update_option( 'woocommerce_wc_checkout_com_flow_settings', $flow_settings );
-					if ( function_exists( 'cko_update_raw_option' ) ) {
-						cko_update_raw_option( 'woocommerce_wc_checkout_com_flow_settings', $flow_settings );
+				}
+
+				// Standalone component tickboxes (unchecked checkboxes are not posted -> treat as 'no').
+				foreach ( array( 'flow', 'card', 'googlepay', 'applepay' ) as $cko_component ) {
+					$flow_settings[ 'flow_component_' . $cko_component ] = isset( $_POST[ 'flow_component_' . $cko_component ] ) ? 'yes' : 'no';
+				}
+
+				// Per-component display order (First/Second/Third => 1/2/3).
+				foreach ( array( 'card', 'googlepay', 'applepay' ) as $cko_component ) {
+					$order_key = 'flow_component_order_' . $cko_component;
+					if ( isset( $_POST[ $order_key ] ) ) {
+						$order_value = sanitize_text_field( wp_unslash( $_POST[ $order_key ] ) );
+						if ( in_array( $order_value, array( '1', '2', '3' ), true ) ) {
+							$flow_settings[ $order_key ] = $order_value;
+						}
 					}
 				}
+
+				update_option( 'woocommerce_wc_checkout_com_flow_settings', $flow_settings );
+				// Force-write directly to wp_options so Polylang filter cannot block or redirect the save.
+				if ( function_exists( 'cko_update_raw_option' ) ) {
+					cko_update_raw_option( 'woocommerce_wc_checkout_com_flow_settings', $flow_settings );
+				}
 			}
-			
+
 			// If Classic mode, also save alternative payment methods to Alternative Payments settings
 			if ( isset( $settings['ckocom_checkout_mode'] ) && 'classic' === $settings['ckocom_checkout_mode'] ) {
 				if ( isset( $_POST['ckocom_apms_selector'] ) ) {

@@ -185,6 +185,14 @@ document.addEventListener("DOMContentLoaded", function () {
 // Component name section.
 window.componentName = cko_flow_customization_vars.flow_component_name || 'flow';
 
+// Standalone payment-method display config (set in the backend "Payment Method Display Options").
+// flowDisplayMode: 'flow' = single all-in-one component; 'components' = render the ordered list.
+// flowDisplayComponents: ordered list of standalone component names ('card' | 'googlepay' | 'applepay').
+window.flowDisplayMode = cko_flow_customization_vars.flow_display_mode || 'flow';
+window.flowDisplayComponents = Array.isArray(cko_flow_customization_vars.flow_display_components)
+	? cko_flow_customization_vars.flow_display_components
+	: [];
+
 // Locale and Translation section.
 // Use Flow locale setting if provided, otherwise fallback to WordPress locale
 // WordPress locale is passed as wp_locale (full locale like 'fr_FR') or can be extracted from browser

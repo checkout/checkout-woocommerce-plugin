@@ -1270,6 +1270,51 @@ function cko_enqueue_frontend_assets() {
 		$flow_customization['flow_component_name'] = 'flow';
 	}
 
+	/*
+	 * Build the normalized standalone-component display config for the frontend.
+	 *
+	 * flow_display_mode:
+	 *   'flow'       -> render the single all-in-one Flow component (Checkout.com owns the order).
+	 *   'components' -> render the listed standalone components, in the given order.
+	 * flow_display_components: ordered list of component names ('card' | 'googlepay' | 'applepay').
+	 *
+	 * "Flow" ticked (or nothing valid selected) falls back to the all-in-one component to preserve
+	 * existing behavior for installs that have not configured the new options.
+	 */
+	$flow_all_in_one = ! isset( $flow_customization['flow_component_flow'] ) || 'yes' === $flow_customization['flow_component_flow'];
+
+	$flow_standalone = array();
+	$flow_component_priority = array( 'card', 'googlepay', 'applepay' );
+	foreach ( $flow_component_priority as $priority_index => $cko_component ) {
+		if ( isset( $flow_customization[ 'flow_component_' . $cko_component ] ) && 'yes' === $flow_customization[ 'flow_component_' . $cko_component ] ) {
+			$flow_standalone[] = array(
+				'name'     => $cko_component,
+				'order'    => isset( $flow_customization[ 'flow_component_order_' . $cko_component ] ) ? (int) $flow_customization[ 'flow_component_order_' . $cko_component ] : 99,
+				'priority' => $priority_index,
+			);
+		}
+	}
+	usort(
+		$flow_standalone,
+		function ( $a, $b ) {
+			// Sort by configured display order; fall back to a fixed priority so that legacy
+			// settings with a duplicate order still yield a deterministic (never ambiguous) order.
+			if ( $a['order'] === $b['order'] ) {
+				return $a['priority'] - $b['priority'];
+			}
+			return $a['order'] - $b['order'];
+		}
+	);
+	$flow_standalone_names = wp_list_pluck( $flow_standalone, 'name' );
+
+	if ( $flow_all_in_one || empty( $flow_standalone_names ) ) {
+		$flow_customization['flow_display_mode']       = 'flow';
+		$flow_customization['flow_display_components']  = array();
+	} else {
+		$flow_customization['flow_display_mode']       = 'components';
+		$flow_customization['flow_display_components']  = array_values( $flow_standalone_names );
+	}
+
 	if ( 'flow' === $checkout_mode ) {
 		// Add resource hints for faster DNS resolution and connection to Checkout.com
 		add_action( 'wp_head', 'cko_add_flow_resource_hints', 1 );

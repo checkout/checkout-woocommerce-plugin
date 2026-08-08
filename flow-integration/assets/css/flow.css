@@ -521,6 +521,17 @@ body[data-saved-payment-order="new_payment_first"].cko-flow--ready .payment_meth
 	border-width: 1px;
 }
 
+/* Standalone payment-method components (Payment Method Display Options).
+   Each selected component (card / Google Pay / Apple Pay) is mounted into its own
+   container inside #flow-container, rendered in the merchant-configured order. */
+.cko-standalone-component {
+	margin-bottom: 16px;
+}
+
+.cko-standalone-component:last-child {
+	margin-bottom: 0;
+}
+
 /* Apple Pay first-tap fix: while ckoApplePayPreCreate is in flight (background
    AJAX to validate + create the WooCommerce order), overlay a spinner on the
    Flow payment component and block pointer events on the Apple Pay button.
