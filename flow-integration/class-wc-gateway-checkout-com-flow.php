@@ -9143,12 +9143,6 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Including reference: ' . $reference );
 		}
 		
-		// Add reference if provided (WooCommerce order ID for tracking in Checkout.com dashboard)
-		if ( ! empty( $reference ) ) {
-			$request_body['reference'] = $reference;
-			WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Including reference: ' . $reference );
-		}
-		
 		// Add billing address if provided (dynamic address adjustment).
 		// Only include it when the country is a valid 2-letter ISO code — sending an empty/invalid
 		// country triggers Checkout.com's billing_address_country_invalid (common on the add-payment-
