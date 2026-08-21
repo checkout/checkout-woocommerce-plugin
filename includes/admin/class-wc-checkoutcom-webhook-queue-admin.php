@@ -119,9 +119,10 @@ class WC_Checkoutcom_Webhook_Queue_Admin {
 			echo '<div class="notice notice-success is-dismissible"><p>';
 			if ( $total_deleted > 0 ) {
 				printf(
-					esc_html__( 'Old webhooks cleaned up successfully. Deleted %d processed webhook(s) and %d unprocessed webhook(s).', 'checkout-com-unified-payments-api' ),
-					$processed_deleted,
-					$unprocessed_deleted
+					/* translators: 1: number of processed webhooks deleted, 2: number of unprocessed webhooks deleted. */
+					esc_html__( 'Old webhooks cleaned up successfully. Deleted %1$d processed webhook(s) and %2$d unprocessed webhook(s).', 'checkout-com-unified-payments-api' ),
+					esc_html( $processed_deleted ),
+					esc_html( $unprocessed_deleted )
 				);
 			} else {
 				echo esc_html__( 'Cleanup completed. No old webhooks found to delete.', 'checkout-com-unified-payments-api' );
@@ -136,7 +137,8 @@ class WC_Checkoutcom_Webhook_Queue_Admin {
 		
 		if ( ! $table_exists ) {
 			echo '<div class="wrap"><h1>' . esc_html__( 'Webhook Queue', 'checkout-com-unified-payments-api' ) . '</h1>';
-			echo '<div class="notice notice-error"><p>' . sprintf( 
+			echo '<div class="notice notice-error"><p>' . sprintf(
+				/* translators: %s: database table name. */
 				esc_html__( 'Table %s does not exist. Please ensure the plugin is activated.', 'checkout-com-unified-payments-api' ),
 				'<code>' . esc_html( $table_name ) . '</code>'
 			) . '</p></div></div>';
@@ -255,7 +257,12 @@ class WC_Checkoutcom_Webhook_Queue_Admin {
 				</table>
 				<?php if ( $total_count > 100 ) : ?>
 					<p style="margin-top: 20px; color: #646970;">
-						<em><?php printf( esc_html__( 'Showing latest 100 records. Total: %d records.', 'checkout-com-unified-payments-api' ), esc_html( $total_count ) ); ?></em>
+						<em>
+						<?php
+						/* translators: %d: total number of webhook records. */
+						printf( esc_html__( 'Showing latest 100 records. Total: %d records.', 'checkout-com-unified-payments-api' ), esc_html( $total_count ) );
+						?>
+						</em>
 					</p>
 				<?php endif; ?>
 			<?php endif; ?>

@@ -60,7 +60,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Klarna extends WC_Gateway_Che
 			}
 
 			if ( ! empty( $client_token ) ) {
-				printf( '<input type="hidden" id="klarna-client-token" value="%s">', $client_token );
+				printf( '<input type="hidden" id="klarna-client-token" value="%s">', esc_attr( $client_token ) );
 			} else {
 				?>
 				<script>

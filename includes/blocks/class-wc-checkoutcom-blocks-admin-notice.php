@@ -66,7 +66,7 @@ class WC_Checkoutcom_Blocks_Admin_Notice {
                     type: 'POST',
                     data: {
                         action: 'checkoutcom_dismiss_blocks_notice',
-                        nonce: '<?php echo wp_create_nonce( 'checkoutcom_dismiss_blocks_notice' ); ?>'
+                        nonce: '<?php echo esc_js( wp_create_nonce( 'checkoutcom_dismiss_blocks_notice' ) ); ?>'
                     }
                 });
             });
