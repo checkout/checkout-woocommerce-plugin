@@ -60,39 +60,39 @@ class WC_Checkoutcom_Logging_Settings {
         $log_stats = $log_manager->get_log_statistics();
         ?>
         <div class="wrap">
-            <h1><?php _e('Checkout.com Enhanced Logging', 'checkout-com-unified-payments-api'); ?></h1>
+            <h1><?php esc_html_e('Checkout.com Enhanced Logging', 'checkout-com-unified-payments-api'); ?></h1>
             
             <div class="notice notice-info">
-                <p><?php _e('Enhanced logging provides better performance, structured data, and improved debugging capabilities.', 'checkout-com-unified-payments-api'); ?></p>
+                <p><?php esc_html_e('Enhanced logging provides better performance, structured data, and improved debugging capabilities.', 'checkout-com-unified-payments-api'); ?></p>
             </div>
 
             <div class="cko-logging-dashboard">
                 <div class="postbox">
-                    <h2 class="hndle"><?php _e('Log Statistics', 'checkout-com-unified-payments-api'); ?></h2>
+                    <h2 class="hndle"><?php esc_html_e('Log Statistics', 'checkout-com-unified-payments-api'); ?></h2>
                     <div class="inside">
                         <table class="widefat">
                             <tr>
-                                <td><strong><?php _e('Total Log Files:', 'checkout-com-unified-payments-api'); ?></strong></td>
+                                <td><strong><?php esc_html_e('Total Log Files:', 'checkout-com-unified-payments-api'); ?></strong></td>
                                 <td><?php echo esc_html($log_stats['total_files']); ?></td>
                             </tr>
                             <tr>
-                                <td><strong><?php _e('Total Size:', 'checkout-com-unified-payments-api'); ?></strong></td>
+                                <td><strong><?php esc_html_e('Total Size:', 'checkout-com-unified-payments-api'); ?></strong></td>
                                 <td><?php echo esc_html($log_stats['total_size_mb']); ?> MB</td>
                             </tr>
                             <tr>
-                                <td><strong><?php _e('Oldest File:', 'checkout-com-unified-payments-api'); ?></strong></td>
+                                <td><strong><?php esc_html_e('Oldest File:', 'checkout-com-unified-payments-api'); ?></strong></td>
                                 <td><?php echo esc_html($log_stats['oldest_file']['name'] ?? 'N/A'); ?></td>
                             </tr>
                             <tr>
-                                <td><strong><?php _e('Newest File:', 'checkout-com-unified-payments-api'); ?></strong></td>
+                                <td><strong><?php esc_html_e('Newest File:', 'checkout-com-unified-payments-api'); ?></strong></td>
                                 <td><?php echo esc_html($log_stats['newest_file']['name'] ?? 'N/A'); ?></td>
                             </tr>
                         </table>
                         
                         <p>
-                            <button type="button" class="button" id="refresh-stats"><?php _e('Refresh Stats', 'checkout-com-unified-payments-api'); ?></button>
-                            <button type="button" class="button" id="export-logs"><?php _e('Export Logs', 'checkout-com-unified-payments-api'); ?></button>
-                            <button type="button" class="button button-secondary" id="clear-logs"><?php _e('Clear All Logs', 'checkout-com-unified-payments-api'); ?></button>
+                            <button type="button" class="button" id="refresh-stats"><?php esc_html_e('Refresh Stats', 'checkout-com-unified-payments-api'); ?></button>
+                            <button type="button" class="button" id="export-logs"><?php esc_html_e('Export Logs', 'checkout-com-unified-payments-api'); ?></button>
+                            <button type="button" class="button button-secondary" id="clear-logs"><?php esc_html_e('Clear All Logs', 'checkout-com-unified-payments-api'); ?></button>
                         </p>
                     </div>
                 </div>
@@ -101,11 +101,11 @@ class WC_Checkoutcom_Logging_Settings {
                     <?php wp_nonce_field('cko_logging_settings', 'cko_logging_nonce'); ?>
                     
                     <div class="postbox">
-                        <h2 class="hndle"><?php _e('Logging Configuration', 'checkout-com-unified-payments-api'); ?></h2>
+                        <h2 class="hndle"><?php esc_html_e('Logging Configuration', 'checkout-com-unified-payments-api'); ?></h2>
                         <div class="inside">
                             <table class="form-table">
                                 <tr>
-                                    <th scope="row"><?php _e('Log Level', 'checkout-com-unified-payments-api'); ?></th>
+                                    <th scope="row"><?php esc_html_e('Log Level', 'checkout-com-unified-payments-api'); ?></th>
                                     <td>
                                         <select name="cko_log_level">
                                             <?php
@@ -128,61 +128,61 @@ class WC_Checkoutcom_Logging_Settings {
                                             }
                                             ?>
                                         </select>
-                                        <p class="description"><?php _e('Set the minimum log level to record. Lower levels include higher levels.', 'checkout-com-unified-payments-api'); ?></p>
+                                        <p class="description"><?php esc_html_e('Set the minimum log level to record. Lower levels include higher levels.', 'checkout-com-unified-payments-api'); ?></p>
                                     </td>
                                 </tr>
                                 
                                 <tr>
-                                    <th scope="row"><?php _e('Max Log File Size (MB)', 'checkout-com-unified-payments-api'); ?></th>
+                                    <th scope="row"><?php esc_html_e('Max Log File Size (MB)', 'checkout-com-unified-payments-api'); ?></th>
                                     <td>
                                         <input type="number" name="cko_log_max_size_mb" value="<?php echo esc_attr(get_option('cko_log_max_size_mb', 10)); ?>" min="1" max="100" />
-                                        <p class="description"><?php _e('Maximum size for individual log files before rotation.', 'checkout-com-unified-payments-api'); ?></p>
+                                        <p class="description"><?php esc_html_e('Maximum size for individual log files before rotation.', 'checkout-com-unified-payments-api'); ?></p>
                                     </td>
                                 </tr>
                                 
                                 <tr>
-                                    <th scope="row"><?php _e('Max Log Files', 'checkout-com-unified-payments-api'); ?></th>
+                                    <th scope="row"><?php esc_html_e('Max Log Files', 'checkout-com-unified-payments-api'); ?></th>
                                     <td>
                                         <input type="number" name="cko_log_max_files" value="<?php echo esc_attr(get_option('cko_log_max_files', 5)); ?>" min="1" max="50" />
-                                        <p class="description"><?php _e('Maximum number of rotated log files to keep.', 'checkout-com-unified-payments-api'); ?></p>
+                                        <p class="description"><?php esc_html_e('Maximum number of rotated log files to keep.', 'checkout-com-unified-payments-api'); ?></p>
                                     </td>
                                 </tr>
                                 
                                 <tr>
-                                    <th scope="row"><?php _e('Log Retention (Days)', 'checkout-com-unified-payments-api'); ?></th>
+                                    <th scope="row"><?php esc_html_e('Log Retention (Days)', 'checkout-com-unified-payments-api'); ?></th>
                                     <td>
                                         <input type="number" name="cko_log_retention_days" value="<?php echo esc_attr(get_option('cko_log_retention_days', 30)); ?>" min="1" max="365" />
-                                        <p class="description"><?php _e('Number of days to keep log files before automatic deletion.', 'checkout-com-unified-payments-api'); ?></p>
+                                        <p class="description"><?php esc_html_e('Number of days to keep log files before automatic deletion.', 'checkout-com-unified-payments-api'); ?></p>
                                     </td>
                                 </tr>
                                 
                                 <tr>
-                                    <th scope="row"><?php _e('Async Logging', 'checkout-com-unified-payments-api'); ?></th>
+                                    <th scope="row"><?php esc_html_e('Async Logging', 'checkout-com-unified-payments-api'); ?></th>
                                     <td>
                                         <label>
                                             <input type="checkbox" name="cko_async_logging" value="yes" <?php checked(get_option('cko_async_logging', 'yes'), 'yes'); ?> />
-                                            <?php _e('Enable asynchronous logging for better performance', 'checkout-com-unified-payments-api'); ?>
+                                            <?php esc_html_e('Enable asynchronous logging for better performance', 'checkout-com-unified-payments-api'); ?>
                                         </label>
-                                        <p class="description"><?php _e('Buffer log entries and write them in batches to reduce I/O blocking.', 'checkout-com-unified-payments-api'); ?></p>
+                                        <p class="description"><?php esc_html_e('Buffer log entries and write them in batches to reduce I/O blocking.', 'checkout-com-unified-payments-api'); ?></p>
                                     </td>
                                 </tr>
                                 
                                 <tr>
-                                    <th scope="row"><?php _e('Log Buffer Size', 'checkout-com-unified-payments-api'); ?></th>
+                                    <th scope="row"><?php esc_html_e('Log Buffer Size', 'checkout-com-unified-payments-api'); ?></th>
                                     <td>
                                         <input type="number" name="cko_log_buffer_size" value="<?php echo esc_attr(get_option('cko_log_buffer_size', 100)); ?>" min="10" max="1000" />
-                                        <p class="description"><?php _e('Number of log entries to buffer before writing to disk.', 'checkout-com-unified-payments-api'); ?></p>
+                                        <p class="description"><?php esc_html_e('Number of log entries to buffer before writing to disk.', 'checkout-com-unified-payments-api'); ?></p>
                                     </td>
                                 </tr>
                                 
                                 <tr>
-                                    <th scope="row"><?php _e('Performance Logging', 'checkout-com-unified-payments-api'); ?></th>
+                                    <th scope="row"><?php esc_html_e('Performance Logging', 'checkout-com-unified-payments-api'); ?></th>
                                     <td>
                                         <label>
                                             <input type="checkbox" name="cko_performance_logging" value="yes" <?php checked(get_option('cko_performance_logging', 'no'), 'yes'); ?> />
-                                            <?php _e('Enable performance monitoring and logging', 'checkout-com-unified-payments-api'); ?>
+                                            <?php esc_html_e('Enable performance monitoring and logging', 'checkout-com-unified-payments-api'); ?>
                                         </label>
-                                        <p class="description"><?php _e('Track and log performance metrics for debugging and optimization.', 'checkout-com-unified-payments-api'); ?></p>
+                                        <p class="description"><?php esc_html_e('Track and log performance metrics for debugging and optimization.', 'checkout-com-unified-payments-api'); ?></p>
                                     </td>
                                 </tr>
                             </table>
@@ -194,14 +194,14 @@ class WC_Checkoutcom_Logging_Settings {
 
                 <?php if (class_exists('WC_Checkoutcom_Performance_Monitor')): ?>
                 <div class="postbox">
-                    <h2 class="hndle"><?php _e('Performance Monitor', 'checkout-com-unified-payments-api'); ?></h2>
+                    <h2 class="hndle"><?php esc_html_e('Performance Monitor', 'checkout-com-unified-payments-api'); ?></h2>
                     <div class="inside">
                         <div id="performance-stats">
-                            <p><?php _e('Loading performance statistics...', 'checkout-com-unified-payments-api'); ?></p>
+                            <p><?php esc_html_e('Loading performance statistics...', 'checkout-com-unified-payments-api'); ?></p>
                         </div>
                         <p>
-                            <button type="button" class="button" id="refresh-performance"><?php _e('Refresh Performance Stats', 'checkout-com-unified-payments-api'); ?></button>
-                            <button type="button" class="button" id="export-performance"><?php _e('Export Performance Data', 'checkout-com-unified-payments-api'); ?></button>
+                            <button type="button" class="button" id="refresh-performance"><?php esc_html_e('Refresh Performance Stats', 'checkout-com-unified-payments-api'); ?></button>
+                            <button type="button" class="button" id="export-performance"><?php esc_html_e('Export Performance Data', 'checkout-com-unified-payments-api'); ?></button>
                         </p>
                     </div>
                 </div>
@@ -218,23 +218,23 @@ class WC_Checkoutcom_Logging_Settings {
 
             // Export logs
             $('#export-logs').on('click', function() {
-                if (confirm('<?php _e('This will download a JSON file with recent log data. Continue?', 'checkout-com-unified-payments-api'); ?>')) {
-                    window.location.href = ajaxurl + '?action=cko_export_logs&nonce=' + '<?php echo wp_create_nonce('cko_export_logs'); ?>';
+                if (confirm('<?php esc_html_e('This will download a JSON file with recent log data. Continue?', 'checkout-com-unified-payments-api'); ?>')) {
+                    window.location.href = ajaxurl + '?action=cko_export_logs&nonce=' + '<?php echo esc_js( wp_create_nonce( 'cko_export_logs' ) ); ?>';
                 }
             });
 
             // Clear logs
             $('#clear-logs').on('click', function() {
-                if (confirm('<?php _e('This will permanently delete all log files. This action cannot be undone. Continue?', 'checkout-com-unified-payments-api'); ?>')) {
+                if (confirm('<?php esc_html_e('This will permanently delete all log files. This action cannot be undone. Continue?', 'checkout-com-unified-payments-api'); ?>')) {
                     $.post(ajaxurl, {
                         action: 'cko_clear_logs',
-                        nonce: '<?php echo wp_create_nonce('cko_clear_logs'); ?>'
+                        nonce: '<?php echo esc_js( wp_create_nonce( 'cko_clear_logs' ) ); ?>'
                     }, function(response) {
                         if (response.success) {
-                            alert('<?php _e('Logs cleared successfully.', 'checkout-com-unified-payments-api'); ?>');
+                            alert('<?php esc_html_e('Logs cleared successfully.', 'checkout-com-unified-payments-api'); ?>');
                             location.reload();
                         } else {
-                            alert('<?php _e('Error clearing logs: ', 'checkout-com-unified-payments-api'); ?>' + response.data);
+                            alert('<?php esc_html_e('Error clearing logs: ', 'checkout-com-unified-payments-api'); ?>' + response.data);
                         }
                     });
                 }
@@ -270,7 +270,7 @@ class WC_Checkoutcom_Logging_Settings {
      */
     private static function save_logging_settings() {
         if (!wp_verify_nonce($_POST['cko_logging_nonce'], 'cko_logging_settings')) {
-            wp_die(__('Security check failed.', 'checkout-com-unified-payments-api'));
+            wp_die( esc_html__( 'Security check failed.', 'checkout-com-unified-payments-api' ) );
         }
 
         $settings = [
@@ -287,7 +287,7 @@ class WC_Checkoutcom_Logging_Settings {
             update_option($key, $value);
         }
 
-        echo '<div class="notice notice-success"><p>' . __('Settings saved successfully.', 'checkout-com-unified-payments-api') . '</p></div>';
+        echo '<div class="notice notice-success"><p>' . esc_html__( 'Settings saved successfully.', 'checkout-com-unified-payments-api' ) . '</p></div>';
     }
 
     /**
@@ -295,18 +295,19 @@ class WC_Checkoutcom_Logging_Settings {
      */
     public static function export_logs() {
         if (!wp_verify_nonce($_GET['nonce'], 'cko_export_logs')) {
-            wp_die(__('Security check failed.', 'checkout-com-unified-payments-api'));
+            wp_die( esc_html__( 'Security check failed.', 'checkout-com-unified-payments-api' ) );
         }
 
         if (!current_user_can('manage_woocommerce')) {
-            wp_die(__('Insufficient permissions.', 'checkout-com-unified-payments-api'));
+            wp_die( esc_html__( 'Insufficient permissions.', 'checkout-com-unified-payments-api' ) );
         }
 
         $log_manager = WC_Checkoutcom_Log_Manager::get_instance();
         $export_data = $log_manager->export_logs(7); // Export last 7 days
 
         header('Content-Type: application/json');
-        header('Content-Disposition: attachment; filename="checkout-com-logs-' . date('Y-m-d') . '.json"');
+        header('Content-Disposition: attachment; filename="checkout-com-logs-' . gmdate('Y-m-d') . '.json"');
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- $export_data is a JSON string streamed as a file download; HTML-escaping it would corrupt the JSON.
         echo $export_data;
         exit;
     }
