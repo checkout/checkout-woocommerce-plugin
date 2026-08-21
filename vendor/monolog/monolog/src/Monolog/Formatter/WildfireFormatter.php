@@ -20,7 +20,7 @@ use CheckoutComWC\Vendor\Monolog\Logger;
  * @author Christophe Coevoet <stof@notk.org>
  * @author Kirill chEbba Chebunin <iam@chebba.org>
  *
- * @phpstan-import-type Level from \Monolog\Logger
+ * @phpstan-import-type Level from \CheckoutComWC\Vendor\Monolog\Logger
  */
 class WildfireFormatter extends NormalizerFormatter
 {

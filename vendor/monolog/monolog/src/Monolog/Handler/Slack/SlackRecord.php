@@ -24,8 +24,8 @@ use CheckoutComWC\Vendor\Monolog\Formatter\FormatterInterface;
  * @see    https://api.slack.com/incoming-webhooks
  * @see    https://api.slack.com/docs/message-attachments
  *
- * @phpstan-import-type FormattedRecord from \Monolog\Handler\AbstractProcessingHandler
- * @phpstan-import-type Record from \Monolog\Logger
+ * @phpstan-import-type FormattedRecord from \CheckoutComWC\Vendor\Monolog\Handler\AbstractProcessingHandler
+ * @phpstan-import-type Record from \CheckoutComWC\Vendor\Monolog\Logger
  */
 class SlackRecord
 {

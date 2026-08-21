@@ -19,8 +19,8 @@ use CheckoutComWC\Vendor\Psr\Log\LogLevel;
  *
  * @author Jonathan A. Schweder <jonathanschweder@gmail.com>
  *
- * @phpstan-import-type LevelName from \Monolog\Logger
- * @phpstan-import-type Level from \Monolog\Logger
+ * @phpstan-import-type LevelName from \CheckoutComWC\Vendor\Monolog\Logger
+ * @phpstan-import-type Level from \CheckoutComWC\Vendor\Monolog\Logger
  */
 class MercurialProcessor implements ProcessorInterface
 {

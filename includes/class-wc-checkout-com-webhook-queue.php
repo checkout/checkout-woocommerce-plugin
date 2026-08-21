@@ -118,8 +118,9 @@ class WC_Checkout_Com_Webhook_Queue {
 		// CRITICAL: Check for duplicate webhook before queuing (prevent duplicate queue entries)
 		// Check if same payment_id + webhook_type combination already exists and is unprocessed
 		$existing_query = $wpdb->prepare(
-			"SELECT id FROM {$table_name} 
-			WHERE payment_id = %s 
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- {$table_name} = $wpdb->prefix . 'cko_pending_webhooks' (internal, not user input); %i requires WP 6.2, plugin min is WP 5.0.
+			"SELECT id FROM {$table_name}
+			WHERE payment_id = %s
 			AND webhook_type = %s 
 			AND processed_at IS NULL 
 			LIMIT 1",
@@ -456,6 +457,7 @@ class WC_Checkout_Com_Webhook_Queue {
 
 		$deleted = $wpdb->query(
 			$wpdb->prepare(
+				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- {$table_name} = $wpdb->prefix . 'cko_pending_webhooks' (internal, not user input); %i requires WP 6.2, plugin min is WP 5.0.
 				"DELETE FROM {$table_name} WHERE processed_at IS NOT NULL AND processed_at < %s",
 				$cutoff_date
 			)
@@ -482,6 +484,7 @@ class WC_Checkout_Com_Webhook_Queue {
 
 		$deleted = $wpdb->query(
 			$wpdb->prepare(
+				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- {$table_name} = $wpdb->prefix . 'cko_pending_webhooks' (internal, not user input); %i requires WP 6.2, plugin min is WP 5.0.
 				"DELETE FROM {$table_name} WHERE processed_at IS NULL AND created_at < %s",
 				$cutoff_date
 			)

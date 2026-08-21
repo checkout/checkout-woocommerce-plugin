@@ -19,7 +19,7 @@ use PhpAmqpLib\Channel\AMQPChannel;
 use AMQPExchange;
 
 /**
- * @phpstan-import-type Record from \Monolog\Logger
+ * @phpstan-import-type Record from \CheckoutComWC\Vendor\Monolog\Logger
  */
 class AmqpHandler extends AbstractProcessingHandler
 {

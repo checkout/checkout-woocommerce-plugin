@@ -513,8 +513,8 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 			$manual_keys = array( 'flow_component_cardholder_name_position', 'flow_show_card_holder_name', 'flow_saved_payment' );
 			$manual_updated = false;
 			foreach ( $manual_keys as $manual_key ) {
-				$nested_value = $_POST['woocommerce_wc_checkout_com_cards_settings'][ $manual_key ] ?? null;
-				$direct_value = $_POST[ $manual_key ] ?? null;
+				$nested_value = isset( $_POST['woocommerce_wc_checkout_com_cards_settings'][ $manual_key ] ) ? sanitize_text_field( wp_unslash( $_POST['woocommerce_wc_checkout_com_cards_settings'][ $manual_key ] ) ) : null;
+				$direct_value = isset( $_POST[ $manual_key ] ) ? sanitize_text_field( wp_unslash( $_POST[ $manual_key ] ) ) : null;
 				$source_value = null;
 
 				if ( null !== $nested_value ) {
@@ -882,9 +882,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 			session_start();
 		}
 
-		if ( $_REQUEST['cko-session-id'] ) {
-			$cko_session_id = $_REQUEST['cko-session-id'];
-		}
+		$cko_session_id = isset( $_REQUEST['cko-session-id'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['cko-session-id'] ) ) : '';
 
 		// Verify session id.
 		$result = (array) ( new WC_Checkoutcom_Api_Request() )->verify_session( $cko_session_id );
@@ -1244,7 +1242,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		$formatted_amount = wc_price( $refund_amount, array( 'currency' => $order->get_currency() ) );
 
 		if ( isset( $_SESSION['cko-refund-is-less'] ) ) {
-			if ( $_SESSION['cko-refund-is-less'] ) {
+			if ( (bool) $_SESSION['cko-refund-is-less'] ) {
 				WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Partial refund completed" );
 				/* translators: %1$s: Payment ID, %2$s: Action ID, %3$s: Amount. */
 				$order->add_order_note( sprintf( esc_html__( 'Checkout.com Payment Partially refunded from Admin – Payment ID: %1$s, Action ID: %2$s, Amount: %3$s', 'checkout-com-unified-payments-api' ), $payment_id, $result['action_id'], $formatted_amount ) );

@@ -31,14 +31,14 @@ use PhpConsole\Helper;
  * 4. Example (result will looks like http://i.hizliresim.com/vg3Pz4.png)
  *
  *      $logger = new \CheckoutComWC\Vendor\Monolog\Logger('all', array(new \CheckoutComWC\Vendor\Monolog\Handler\PHPConsoleHandler()));
- *      \Monolog\ErrorHandler::register($logger);
+ *      \CheckoutComWC\Vendor\Monolog\ErrorHandler::register($logger);
  *      echo $undefinedVar;
  *      $logger->debug('SELECT * FROM users', array('db', 'time' => 0.012));
  *      PC::debug($_SERVER); // PHP Console debugger for any type of vars
  *
  * @author Sergey Barbushin https://www.linkedin.com/in/barbushin
  *
- * @phpstan-import-type Record from \Monolog\Logger
+ * @phpstan-import-type Record from \CheckoutComWC\Vendor\Monolog\Logger
  * @deprecated Since 2.8.0 and 3.2.0, PHPConsole is abandoned and thus we will drop this handler in Monolog 4
  */
 class PHPConsoleHandler extends AbstractProcessingHandler
@@ -46,7 +46,7 @@ class PHPConsoleHandler extends AbstractProcessingHandler
     /** @var array<string, mixed> */
     private $options = [
         'enabled' => true, // bool Is PHP Console server enabled
-        'classesPartialsTraceIgnore' => ['CheckoutComWC\\Vendor\\Monolog\\'], // array Hide calls of classes started with...
+        'classesPartialsTraceIgnore' => ['CheckoutComWC\Vendor\Monolog\\'], // array Hide calls of classes started with...
         'debugTagsKeysInContext' => [0, 'tag'], // bool Is PHP Console server enabled
         'useOwnErrorsHandler' => false, // bool Enable errors handling
         'useOwnExceptionsHandler' => false, // bool Enable exceptions handling
@@ -71,7 +71,7 @@ class PHPConsoleHandler extends AbstractProcessingHandler
     private $connector;
 
     /**
-     * @param  array<string, mixed> $options   See \Monolog\Handler\PHPConsoleHandler::$options for more details
+     * @param  array<string, mixed> $options   See \CheckoutComWC\Vendor\Monolog\Handler\PHPConsoleHandler::$options for more details
      * @param  Connector|null       $connector Instance of \PhpConsole\Connector class (optional)
      * @throws \RuntimeException
      */

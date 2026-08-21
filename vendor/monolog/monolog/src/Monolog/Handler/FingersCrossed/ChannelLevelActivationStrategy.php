@@ -34,9 +34,9 @@ use CheckoutComWC\Vendor\Psr\Log\LogLevel;
  *
  * @author Mike Meessen <netmikey@gmail.com>
  *
- * @phpstan-import-type Record from \Monolog\Logger
- * @phpstan-import-type Level from \Monolog\Logger
- * @phpstan-import-type LevelName from \Monolog\Logger
+ * @phpstan-import-type Record from \CheckoutComWC\Vendor\Monolog\Logger
+ * @phpstan-import-type Level from \CheckoutComWC\Vendor\Monolog\Logger
+ * @phpstan-import-type LevelName from \CheckoutComWC\Vendor\Monolog\Logger
  */
 class ChannelLevelActivationStrategy implements ActivationStrategyInterface
 {
@@ -60,7 +60,7 @@ class ChannelLevelActivationStrategy implements ActivationStrategyInterface
     public function __construct($defaultActionLevel, array $channelToActionLevel = [])
     {
         $this->defaultActionLevel = Logger::toMonologLevel($defaultActionLevel);
-        $this->channelToActionLevel = array_map('CheckoutComWC\Vendor\Monolog\Logger::toMonologLevel', $channelToActionLevel);
+        $this->channelToActionLevel = array_map('Monolog\Logger::toMonologLevel', $channelToActionLevel);
     }
 
     /**

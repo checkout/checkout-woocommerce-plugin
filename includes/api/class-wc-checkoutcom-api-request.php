@@ -651,9 +651,9 @@ class WC_Checkoutcom_Api_Request {
 			// In case payment is from pay_order.
 			// Get billing and shipping details from order.
 			if ( ! empty( $_GET['order_id'] ) ) {
-				$order_id = $_GET['order_id'];
+				$order_id = absint( wp_unslash( $_GET['order_id'] ) );
 			} elseif ( ! empty( $_GET['key'] ) ) {
-				$order_id = wc_get_order_id_by_order_key( $_GET['key'] );
+				$order_id = wc_get_order_id_by_order_key( sanitize_text_field( wp_unslash( $_GET['key'] ) ) );
 			}
 
 			$order = wc_get_order( $order_id );
@@ -825,8 +825,10 @@ class WC_Checkoutcom_Api_Request {
 		// For express AJAX, the data comes directly and may already be in the correct format
 		// wp_unslash on signedMessage can reduce it from 672 to 658 chars, corrupting it
 		// So we should check if wp_unslash changes the length, and if so, use the original
-		$signature_raw = $_POST['cko-google-signature'];
-		$signed_message_raw = $_POST['cko-google-signedMessage'];
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- base64/JSON-encoded Google Pay signature; preserved byte-for-byte for cryptographic verification (unslash handled below); sanitisation would corrupt it.
+		$signature_raw = ( isset( $_POST['cko-google-signature'] ) && is_string( $_POST['cko-google-signature'] ) ) ? $_POST['cko-google-signature'] : '';
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- base64/JSON-encoded Google Pay signedMessage; preserved byte-for-byte for cryptographic verification (unslash handled below); sanitisation would corrupt it.
+		$signed_message_raw = ( isset( $_POST['cko-google-signedMessage'] ) && is_string( $_POST['cko-google-signedMessage'] ) ) ? $_POST['cko-google-signedMessage'] : '';
 		
 		// Apply wp_unslash to match classic Google Pay form POST behavior
 		$signature = wp_unslash( $signature_raw );
@@ -2025,7 +2027,8 @@ class WC_Checkoutcom_Api_Request {
 	 * @return mixed|void
 	 */
 	public static function generate_apple_token() {
-		$apple_token          = $_POST['token'];
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Apple Pay token is a structured array of signed cryptographic values used verbatim for the Checkout.com API; unslashing/sanitising would corrupt the crypto.
+		$apple_token          = ( isset( $_POST['token'] ) && is_array( $_POST['token'] ) ) ? $_POST['token'] : array();
 		$transaction_id       = $apple_token['header']['transactionId'];
 		$public_key_hash      = $apple_token['header']['publicKeyHash'];
 		$ephemeral_public_key = $apple_token['header']['ephemeralPublicKey'];

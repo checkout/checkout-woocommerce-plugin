@@ -25,8 +25,8 @@ use CheckoutComWC\Vendor\Psr\Log\LogLevel;
  *
  * @author Jordi Boggiano <j.boggiano@seld.be>
  *
- * @phpstan-import-type Level from \Monolog\Logger
- * @phpstan-import-type LevelName from \Monolog\Logger
+ * @phpstan-import-type Level from \CheckoutComWC\Vendor\Monolog\Logger
+ * @phpstan-import-type LevelName from \CheckoutComWC\Vendor\Monolog\Logger
  */
 class IntrospectionProcessor implements ProcessorInterface
 {
@@ -51,7 +51,7 @@ class IntrospectionProcessor implements ProcessorInterface
     public function __construct($level = Logger::DEBUG, array $skipClassesPartials = [], int $skipStackFramesCount = 0)
     {
         $this->level = Logger::toMonologLevel($level);
-        $this->skipClassesPartials = array_merge(['CheckoutComWC\\Vendor\\Monolog\\'], $skipClassesPartials);
+        $this->skipClassesPartials = array_merge(['CheckoutComWC\Vendor\Monolog\\'], $skipClassesPartials);
         $this->skipStackFramesCount = $skipStackFramesCount;
     }
 

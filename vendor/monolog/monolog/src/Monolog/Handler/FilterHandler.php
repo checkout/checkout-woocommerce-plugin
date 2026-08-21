@@ -24,9 +24,9 @@ use CheckoutComWC\Vendor\Psr\Log\LogLevel;
  * @author Hennadiy Verkh
  * @author Jordi Boggiano <j.boggiano@seld.be>
  *
- * @phpstan-import-type Record from \Monolog\Logger
- * @phpstan-import-type Level from \Monolog\Logger
- * @phpstan-import-type LevelName from \Monolog\Logger
+ * @phpstan-import-type Record from \CheckoutComWC\Vendor\Monolog\Logger
+ * @phpstan-import-type Level from \CheckoutComWC\Vendor\Monolog\Logger
+ * @phpstan-import-type LevelName from \CheckoutComWC\Vendor\Monolog\Logger
  */
 class FilterHandler extends Handler implements ProcessableHandlerInterface, ResettableInterface, FormattableHandlerInterface
 {
@@ -95,7 +95,7 @@ class FilterHandler extends Handler implements ProcessableHandlerInterface, Rese
     public function setAcceptedLevels($minLevelOrList = Logger::DEBUG, $maxLevel = Logger::EMERGENCY): self
     {
         if (is_array($minLevelOrList)) {
-            $acceptedLevels = array_map('CheckoutComWC\Vendor\Monolog\Logger::toMonologLevel', $minLevelOrList);
+            $acceptedLevels = array_map('Monolog\Logger::toMonologLevel', $minLevelOrList);
         } else {
             $minLevelOrList = Logger::toMonologLevel($minLevelOrList);
             $maxLevel = Logger::toMonologLevel($maxLevel);

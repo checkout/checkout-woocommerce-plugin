@@ -17,7 +17,7 @@ namespace CheckoutComWC\Vendor\Monolog\Handler;
  *
  * @author Craig D'Amelio <craig@damelio.ca>
  *
- * @phpstan-import-type Record from \Monolog\Logger
+ * @phpstan-import-type Record from \CheckoutComWC\Vendor\Monolog\Logger
  */
 class WhatFailureGroupHandler extends GroupHandler
 {

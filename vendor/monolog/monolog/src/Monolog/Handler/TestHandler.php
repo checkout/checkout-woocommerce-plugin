@@ -66,9 +66,9 @@ use CheckoutComWC\Vendor\Psr\Log\LogLevel;
  * @method bool hasInfoThatPasses($message)
  * @method bool hasDebugThatPasses($message)
  *
- * @phpstan-import-type Record from \Monolog\Logger
- * @phpstan-import-type Level from \Monolog\Logger
- * @phpstan-import-type LevelName from \Monolog\Logger
+ * @phpstan-import-type Record from \CheckoutComWC\Vendor\Monolog\Logger
+ * @phpstan-import-type Level from \CheckoutComWC\Vendor\Monolog\Logger
+ * @phpstan-import-type LevelName from \CheckoutComWC\Vendor\Monolog\Logger
  */
 class TestHandler extends AbstractProcessingHandler
 {
@@ -217,7 +217,7 @@ class TestHandler extends AbstractProcessingHandler
     {
         if (preg_match('/(.*)(Debug|Info|Notice|Warning|Error|Critical|Alert|Emergency)(.*)/', $method, $matches) > 0) {
             $genericMethod = $matches[1] . ('Records' !== $matches[3] ? 'Record' : '') . $matches[3];
-            $level = constant('CheckoutComWC\Vendor\Monolog\Logger::' . strtoupper($matches[2]));
+            $level = constant('Monolog\Logger::' . strtoupper($matches[2]));
             $callback = [$this, $genericMethod];
             if (is_callable($callback)) {
                 $args[] = $level;

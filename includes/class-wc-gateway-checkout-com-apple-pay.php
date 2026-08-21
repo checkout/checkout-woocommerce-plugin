@@ -1268,7 +1268,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		// Express now sends the same field, so we can use the same process_payment method
 		
 		// Get payment data for email and address extraction
-		$payment_data_json = isset( $_POST['payment_data'] ) ? wp_unslash( $_POST['payment_data'] ) : '';
+		$payment_data_json = ( isset( $_POST['payment_data'] ) && is_string( $_POST['payment_data'] ) ) ? wp_unslash( $_POST['payment_data'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Apple Pay JSON payload; unslashed then json_decode()d and validated below; text sanitisation would corrupt the JSON.
 		$payment_data = ! empty( $payment_data_json ) ? json_decode( $payment_data_json, true ) : array();
 		
 		// Extract email and address from payment data
@@ -1617,7 +1617,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		$order = new WC_Order( $order_id );
 
 		// create apple token from apple payment data.
-		$apple_token = $_POST['cko-apple-card-token'] ?? ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$apple_token = ( isset( $_POST['cko-apple-card-token'] ) && is_string( $_POST['cko-apple-card-token'] ) ) ? $_POST['cko-apple-card-token'] : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- opaque Apple Pay payment token; used verbatim to preserve exact bytes; unslashing/sanitising would invalidate it.
 
 		// Check if apple token is not empty.
 		if ( empty( $apple_token ) ) {
@@ -1709,7 +1709,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		$formatted_amount = wc_price( $refund_amount, array( 'currency' => $order->get_currency() ) );
 
 		if ( isset( $_SESSION['cko-refund-is-less'] ) ) {
-			if ( $_SESSION['cko-refund-is-less'] ) {
+			if ( (bool) $_SESSION['cko-refund-is-less'] ) {
 				/* translators: %1$s: Payment ID, %2$s: Action ID, %3$s: Amount. */
 				$order->add_order_note( sprintf( __( 'Checkout.com Payment Partially refunded from Admin – Payment ID: %1$s, Action ID: %2$s, Amount: %3$s', 'checkout-com-unified-payments-api' ), $payment_id, $result['action_id'], $formatted_amount ) );
 
@@ -2209,7 +2209,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			] );
 		}
 
-		$certificate_base64_raw = wp_unslash( $_POST['certificate'] );
+		$certificate_base64_raw = is_string( $_POST['certificate'] ) ? wp_unslash( $_POST['certificate'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- base64-encoded Apple Pay certificate (DER); unslashed then base64_decode()d/validated; text sanitisation would corrupt it.
 		
 		// The certificate from Apple is in DER format (binary)
 		// JavaScript FileReader already converts it to base64
@@ -2814,7 +2814,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			return;
 		}
 
-		$file_content = wp_unslash( $_POST['file_content'] );
+		$file_content = is_string( $_POST['file_content'] ) ? wp_unslash( $_POST['file_content'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Apple domain-association file content written verbatim to .well-known; text sanitisation would alter the association file.
 		
 		// Get the correct .well-known directory path
 		$well_known_info = $this->get_well_known_path();
@@ -3048,7 +3048,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			return;
 		}
 
-		$certificate_base64 = wp_unslash( $_POST['certificate'] );
+		$certificate_base64 = is_string( $_POST['certificate'] ) ? wp_unslash( $_POST['certificate'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- base64-encoded Apple Pay certificate (DER); unslashed then base64_decode()d/validated; text sanitisation would corrupt it.
 		
 		// Decode base64 to get DER format
 		$certificate_der = base64_decode( $certificate_base64 );

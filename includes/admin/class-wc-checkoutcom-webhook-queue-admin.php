@@ -146,12 +146,13 @@ class WC_Checkoutcom_Webhook_Queue_Admin {
 		}
 
 		// Get statistics
-		$total_count = $wpdb->get_var( "SELECT COUNT(*) FROM {$table_name}" );
-		$pending_count = $wpdb->get_var( "SELECT COUNT(*) FROM {$table_name} WHERE processed_at IS NULL" );
-		$processed_count = $wpdb->get_var( "SELECT COUNT(*) FROM {$table_name} WHERE processed_at IS NOT NULL" );
+		// {$table_name} = $wpdb->prefix . 'cko_pending_webhooks' (internal, not user input); %i requires WP 6.2, plugin min is WP 5.0.
+		$total_count = $wpdb->get_var( "SELECT COUNT(*) FROM {$table_name}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$pending_count = $wpdb->get_var( "SELECT COUNT(*) FROM {$table_name} WHERE processed_at IS NULL" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$processed_count = $wpdb->get_var( "SELECT COUNT(*) FROM {$table_name} WHERE processed_at IS NOT NULL" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 		// Get records
-		$records = $wpdb->get_results( "SELECT * FROM {$table_name} ORDER BY created_at DESC LIMIT 100" );
+		$records = $wpdb->get_results( "SELECT * FROM {$table_name} ORDER BY created_at DESC LIMIT 100" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 		?>
 		<div class="wrap">

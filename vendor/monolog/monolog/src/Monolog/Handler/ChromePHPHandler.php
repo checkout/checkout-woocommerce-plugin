@@ -23,7 +23,7 @@ use CheckoutComWC\Vendor\Monolog\Utils;
  *
  * @author Christophe Coevoet <stof@notk.org>
  *
- * @phpstan-import-type Record from \Monolog\Logger
+ * @phpstan-import-type Record from \CheckoutComWC\Vendor\Monolog\Logger
  */
 class ChromePHPHandler extends AbstractProcessingHandler
 {
@@ -70,7 +70,7 @@ class ChromePHPHandler extends AbstractProcessingHandler
     {
         parent::__construct($level, $bubble);
         if (!function_exists('json_encode')) {
-            throw new \RuntimeException('PHP\'s json extension is required to use CheckoutComWC\Vendor\Monolog\'s ChromePHPHandler');
+            throw new \RuntimeException('PHP\'s json extension is required to use Monolog\'s ChromePHPHandler');
         }
     }
 

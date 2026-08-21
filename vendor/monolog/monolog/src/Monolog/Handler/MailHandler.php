@@ -19,7 +19,7 @@ use CheckoutComWC\Vendor\Monolog\Formatter\HtmlFormatter;
  *
  * @author Gyula Sallai
  *
- * @phpstan-import-type Record from \Monolog\Logger
+ * @phpstan-import-type Record from \CheckoutComWC\Vendor\Monolog\Logger
  */
 abstract class MailHandler extends AbstractProcessingHandler
 {

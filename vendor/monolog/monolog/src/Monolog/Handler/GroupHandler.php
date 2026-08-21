@@ -19,7 +19,7 @@ use CheckoutComWC\Vendor\Monolog\ResettableInterface;
  *
  * @author Lenar Lõhmus <lenar@city.ee>
  *
- * @phpstan-import-type Record from \Monolog\Logger
+ * @phpstan-import-type Record from \CheckoutComWC\Vendor\Monolog\Logger
  */
 class GroupHandler extends Handler implements ProcessableHandlerInterface, ResettableInterface
 {

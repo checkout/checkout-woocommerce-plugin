@@ -11,6 +11,7 @@
  * WC requires at least: 3.0
  * WC tested up to: 8.3.1
  * Requires PHP: 7.3
+ * Requires Plugins: woocommerce
  * Text Domain: checkout-com-unified-payments-api
  * Domain Path: /languages
  * License: GPL v2 or later
@@ -985,8 +986,9 @@ function cko_check_incomplete_orders() {
 	
 	// Get order ID from URL
 	$order_id = 0;
-	if ( isset( $_GET['post'] ) && get_post_type( $_GET['post'] ) === 'shop_order' ) {
-		$order_id = intval( $_GET['post'] );
+	$posted_post_id = isset( $_GET['post'] ) ? absint( wp_unslash( $_GET['post'] ) ) : 0;
+	if ( $posted_post_id && get_post_type( $posted_post_id ) === 'shop_order' ) {
+		$order_id = $posted_post_id;
 	}
 	
 	if ( ! $order_id ) {
@@ -1101,8 +1103,9 @@ function cko_show_validation_notices() {
 	global $post;
 	$order_id = 0;
 	
-	if ( isset( $_GET['post'] ) && get_post_type( $_GET['post'] ) === 'shop_order' ) {
-		$order_id = intval( $_GET['post'] );
+	$posted_post_id = isset( $_GET['post'] ) ? absint( wp_unslash( $_GET['post'] ) ) : 0;
+	if ( $posted_post_id && get_post_type( $posted_post_id ) === 'shop_order' ) {
+		$order_id = $posted_post_id;
 	} elseif ( $post && $post->post_type === 'shop_order' ) {
 		$order_id = $post->ID;
 	}

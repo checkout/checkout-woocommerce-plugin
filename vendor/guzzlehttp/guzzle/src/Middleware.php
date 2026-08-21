@@ -191,7 +191,7 @@ final class Middleware
      * @param MessageFormatterInterface|MessageFormatter $formatter Formatter used to create message strings.
      * @param string                                     $logLevel  Level at which to log requests.
      *
-     * @phpstan-param \Psr\Log\LogLevel::* $logLevel Level at which to log requests.
+     * @phpstan-param \CheckoutComWC\Vendor\Psr\Log\LogLevel::* $logLevel Level at which to log requests.
      *
      * @return callable Returns a function that accepts the next handler.
      */

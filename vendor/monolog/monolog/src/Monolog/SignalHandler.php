@@ -20,8 +20,8 @@ use ReflectionExtension;
  *
  * @author Robert Gust-Bardon <robert@gust-bardon.org>
  *
- * @phpstan-import-type Level from \Monolog\Logger
- * @phpstan-import-type LevelName from \Monolog\Logger
+ * @phpstan-import-type Level from \CheckoutComWC\Vendor\Monolog\Logger
+ * @phpstan-import-type LevelName from \CheckoutComWC\Vendor\Monolog\Logger
  */
 class SignalHandler
 {

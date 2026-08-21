@@ -19,7 +19,7 @@ use CheckoutComWC\Vendor\Monolog\Processor\ProcessorInterface;
  *
  * @author Jordi Boggiano <j.boggiano@seld.be>
  *
- * @phpstan-import-type Record from \Monolog\Logger
+ * @phpstan-import-type Record from \CheckoutComWC\Vendor\Monolog\Logger
  */
 trait ProcessableHandlerTrait
 {

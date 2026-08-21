@@ -904,21 +904,53 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	}
 
 	/**
-	 * Show frames js on checkout page.
+	 * Normalise the stored "flow saved payment" display-order setting.
+	 *
+	 * The setting is a fixed enum with exactly two developer-defined values:
+	 * 'saved_cards_first' (default) and 'new_payment_first'. This reads the raw
+	 * stored option (Card settings first, then Flow settings for backward
+	 * compatibility) and constrains it to one of those two hard-coded string
+	 * literals. Any unexpected, corrupt or legacy value falls back safely to
+	 * 'saved_cards_first', so no arbitrary stored option value can ever reach
+	 * the JavaScript output.
+	 *
+	 * @return string Either 'saved_cards_first' or 'new_payment_first'.
 	 */
-	public function payment_fields() {
-
-		$save_card = WC_Admin_Settings::get_option( 'ckocom_card_saved' );
-		
-		// Safely get flow saved card setting with fallback
-		// Check Card settings first (new location), then Flow settings (backward compatibility)
+	private function get_flow_saved_card_setting() {
+		// Check Card settings first (new location), then Flow settings (backward compatibility).
 		$card_settings = function_exists( 'cko_get_raw_option' )
 			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
 			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$flow_settings = function_exists( 'cko_get_raw_option' )
 			? cko_get_raw_option( 'woocommerce_wc_checkout_com_flow_settings' )
 			: get_option( 'woocommerce_wc_checkout_com_flow_settings', array() );
-		$flow_saved_card = isset( $card_settings['flow_saved_payment'] ) ? $card_settings['flow_saved_payment'] : ( isset( $flow_settings['flow_saved_payment'] ) ? $flow_settings['flow_saved_payment'] : 'saved_cards_first' );
+
+		if ( isset( $card_settings['flow_saved_payment'] ) ) {
+			$raw_value = $card_settings['flow_saved_payment'];
+		} elseif ( isset( $flow_settings['flow_saved_payment'] ) ) {
+			$raw_value = $flow_settings['flow_saved_payment'];
+		} else {
+			$raw_value = 'saved_cards_first';
+		}
+
+		// Constrain to the allowed enum literals; anything else falls back safely.
+		return ( 'new_payment_first' === $raw_value ) ? 'new_payment_first' : 'saved_cards_first';
+	}
+
+	/**
+	 * Show frames js on checkout page.
+	 */
+	public function payment_fields() {
+
+		$save_card = WC_Admin_Settings::get_option( 'ckocom_card_saved' );
+
+		// Resolve the flow saved-card display order as a hard-coded enum literal
+		// ('saved_cards_first' | 'new_payment_first'); never a raw stored value.
+		$flow_saved_card = $this->get_flow_saved_card_setting();
+
+		$flow_settings = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_flow_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_flow_settings', array() );
 		$flow_debug_logging = isset( $flow_settings['flow_debug_logging'] ) && 'yes' === $flow_settings['flow_debug_logging'];
 
 		$order_pay_order_id = null;
@@ -1000,7 +1032,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					<?php else : ?>
 					<script>
 						// Expose saved payment display order to JavaScript
-						window.saved_payment = '<?php echo esc_js( $flow_saved_card ); ?>';
+						window.saved_payment = <?php echo wp_json_encode( $flow_saved_card ); ?>;
 						
 						jQuery(document).ready(function($) {
 							
@@ -1228,7 +1260,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 						}, 0);
 
 				// Show both Flow and saved cards on the same page
-				const displayOrder = '<?php echo esc_js( $flow_saved_card ); ?>';
+				const displayOrder = <?php echo wp_json_encode( $flow_saved_card ); ?>;
 				flowLog('Display order:', displayOrder, 'Total saved cards:', totalCount);
 				flowLog('CSS will control saved cards visibility via data-saved-payment-order attribute');
 
@@ -1430,7 +1462,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				<?php else : ?>
 				<script>
 					// Expose saved payment display order to JavaScript
-					window.saved_payment = '<?php echo esc_js( $flow_saved_card ); ?>';
+					window.saved_payment = <?php echo wp_json_encode( $flow_saved_card ); ?>;
 					
 					jQuery(document).ready(function($) {
 						
@@ -1635,7 +1667,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				}, 0);
 
 				// Show both Flow and saved cards on the same page
-				const displayOrder = '<?php echo esc_js( $flow_saved_card ); ?>';
+				const displayOrder = <?php echo wp_json_encode( $flow_saved_card ); ?>;
 				flowLog('Display order:', displayOrder, 'Total saved cards:', totalCount);
 				flowLog('CSS will control saved cards visibility via data-saved-payment-order attribute');
 
@@ -1855,7 +1887,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	<!-- Inline script to immediately hide place order button before CSS/JS loads (prevents flash) -->
 	<script>
 		// Expose saved payment display order to JavaScript
-		window.saved_payment = '<?php echo esc_js( $flow_saved_card ); ?>';
+		window.saved_payment = <?php echo wp_json_encode( $flow_saved_card ); ?>;
 		// Debug logging flag for PHP-generated JavaScript
 		// Use window object to prevent duplicate declaration errors
 		if (typeof window.flowDebugLogging === 'undefined') {
@@ -1869,7 +1901,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		var flowLog = window.flowLog;
 		
 		(function() {
-			var displayOrder = '<?php echo esc_js( $flow_saved_card ); ?>';
+			var displayOrder = <?php echo wp_json_encode( $flow_saved_card ); ?>;
 			
 			// CRITICAL: Set data attribute on body immediately for CSS targeting
 			document.body.setAttribute('data-saved-payment-order', displayOrder);
@@ -4162,7 +4194,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		
 		WC_Checkoutcom_Utility::logger( '[FLOW 3DS CHECKOUT] 3DS return detected on checkout page - Processing server-side' );
 		WC_Checkoutcom_Utility::logger( '[FLOW 3DS CHECKOUT] Payment ID: ' . $payment_id . ', Session ID: ' . $session_id . ', Payment Session ID: ' . $payment_session_id );
-		WC_Checkoutcom_Utility::logger( '[FLOW 3DS CHECKOUT] Request URI: ' . ( isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : 'N/A' ) );
+		WC_Checkoutcom_Utility::logger( '[FLOW 3DS CHECKOUT] Request URI: ' . ( isset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : 'N/A' ) );
 		
 		// Process the 3DS return (this will redirect to success page)
 		try {
@@ -4211,7 +4243,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		$is_debug = defined( 'WP_DEBUG' ) && WP_DEBUG;
 		if ( $is_debug ) {
 			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ========== ENTRY POINT ==========' );
-			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Request URI: ' . ( isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : 'N/A' ) );
+			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Request URI: ' . ( isset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : 'N/A' ) );
 		}
 		
 		$payment_id = isset( $_GET['cko-payment-id'] ) ? sanitize_text_field( wp_unslash( $_GET['cko-payment-id'] ) ) : '';
@@ -5559,7 +5591,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			if ( isset( $_POST['billing_email'] ) ) $order->set_billing_email( sanitize_email( wp_unslash( $_POST['billing_email'] ) ) );
 			
 			// Set shipping address
-			$ship_to_different_address = isset( $_POST['ship_to_different_address'] ) ? (bool) wp_unslash( $_POST['ship_to_different_address'] ) : false;
+			$ship_to_different_address = isset( $_POST['ship_to_different_address'] ) ? (bool) sanitize_text_field( wp_unslash( $_POST['ship_to_different_address'] ) ) : false;
 			if ( $ship_to_different_address ) {
 				if ( isset( $_POST['shipping_first_name'] ) ) $order->set_shipping_first_name( sanitize_text_field( wp_unslash( $_POST['shipping_first_name'] ) ) );
 				if ( isset( $_POST['shipping_last_name'] ) ) $order->set_shipping_last_name( sanitize_text_field( wp_unslash( $_POST['shipping_last_name'] ) ) );
@@ -6251,7 +6283,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		$formatted_amount = wc_price( $refund_amount, array( 'currency' => $order->get_currency() ) );
 
 		if ( isset( $_SESSION['cko-refund-is-less'] ) ) {
-			if ( $_SESSION['cko-refund-is-less'] ) {
+			if ( (bool) $_SESSION['cko-refund-is-less'] ) {
 				/* translators: %1$s: Payment ID, %2$s: Action ID, %3$s: Amount. */
 				$order->add_order_note( sprintf( esc_html__( 'Checkout.com Payment Partially refunded from Admin – Payment ID: %1$s, Action ID: %2$s, Amount: %3$s', 'checkout-com-unified-payments-api' ), $payment_id, $result['action_id'], $formatted_amount ) );
 
@@ -6345,11 +6377,11 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( '=== WEBHOOK DEBUG: Flow webhook handler started ===' );
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Request method: ' . $_SERVER['REQUEST_METHOD'] );
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Request URI: ' . $_SERVER['REQUEST_URI'] );
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: User agent: ' . ($_SERVER['HTTP_USER_AGENT'] ?? 'Not set') );
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Content type: ' . ($_SERVER['CONTENT_TYPE'] ?? 'Not set') );
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Content length: ' . ($_SERVER['CONTENT_LENGTH'] ?? 'Not set') );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Request method: ' . sanitize_text_field( wp_unslash( $_SERVER['REQUEST_METHOD'] ?? '' ) ) );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Request URI: ' . sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ?? '' ) ) );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: User agent: ' . sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ?? 'Not set' ) ) );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Content type: ' . sanitize_text_field( wp_unslash( $_SERVER['CONTENT_TYPE'] ?? 'Not set' ) ) );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Content length: ' . sanitize_text_field( wp_unslash( $_SERVER['CONTENT_LENGTH'] ?? 'Not set' ) ) );
 		}
 
 		// Check if Flow mode is enabled - if not, let Cards handler process the webhook
@@ -7421,7 +7453,9 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		}
 
 		// Decode and sanitize the payment session request
-		$payment_session_request = json_decode( wp_unslash( $_POST['payment_session_request'] ), true );
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Flow payment-session JSON payload; unslashed, json_decode()d and validated via json_last_error below; sanitising JSON would corrupt the structured payment-session payload.
+		$payment_session_request_json = ( isset( $_POST['payment_session_request'] ) && is_string( $_POST['payment_session_request'] ) ) ? wp_unslash( $_POST['payment_session_request'] ) : '';
+		$payment_session_request = json_decode( $payment_session_request_json, true );
 		
 		if ( json_last_error() !== JSON_ERROR_NONE || ! is_array( $payment_session_request ) ) {
 			WC_Checkoutcom_Utility::logger( 'Error: Invalid JSON in payment session request: ' . json_last_error_msg() );

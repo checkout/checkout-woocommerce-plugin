@@ -11,7 +11,7 @@ namespace CheckoutComWC\Vendor\GuzzleHttp\Promise;
  * maintains a constant stack size. You can use the task queue asynchronously
  * by calling the `run()` function of the global task queue in an event loop.
  *
- *     GuzzleHttp\Promise\Utils::queue()->run();
+ *     CheckoutComWC\Vendor\GuzzleHttp\Promise\Utils::queue()->run();
  *
  * @final
  */

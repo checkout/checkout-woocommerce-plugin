@@ -224,7 +224,7 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 		
 		if ( $has_classic_token_fields ) {
 			// Get payment data for email and address extraction
-			$payment_data_json = isset( $_POST['payment_data'] ) ? wp_unslash( $_POST['payment_data'] ) : '';
+			$payment_data_json = ( isset( $_POST['payment_data'] ) && is_string( $_POST['payment_data'] ) ) ? wp_unslash( $_POST['payment_data'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Google Pay JSON payload; unslashed then json_decode()d and structurally validated below; text sanitisation would corrupt the JSON.
 			$payment_data = ! empty( $payment_data_json ) ? json_decode( $payment_data_json, true ) : array();
 			
 			// Extract email and address from payment data
@@ -335,7 +335,7 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 			return; // Exit early since we've handled the payment
 		} else {
 			// Fallback to old approach (for backwards compatibility)
-			$payment_data_json = isset( $_POST['payment_data'] ) ? wp_unslash( $_POST['payment_data'] ) : '';
+			$payment_data_json = ( isset( $_POST['payment_data'] ) && is_string( $_POST['payment_data'] ) ) ? wp_unslash( $_POST['payment_data'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Google Pay JSON payload; unslashed then json_decode()d and structurally validated below; text sanitisation would corrupt the JSON.
 			
 			if ( empty( $payment_data_json ) ) {
 				wp_send_json_error( array( 'messages' => 'Missing payment data for Google Pay Express checkout.' ) );
@@ -383,10 +383,14 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 			// Check if we have extracted token fields (new approach matching classic)
 			if ( $has_extracted_token_fields ) {
 				// Use extracted token fields directly (same format as classic Google Pay)
+				// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Google Pay token signature is signed cryptographic data; unslashed and used verbatim for API verification; sanitisation would invalidate it.
+				$gp_token_signature      = ( isset( $_POST['token_signature'] ) && is_string( $_POST['token_signature'] ) ) ? wp_unslash( $_POST['token_signature'] ) : '';
+				// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Google Pay signedMessage is signed cryptographic data; unslashed and used verbatim for API verification; sanitisation would invalidate it.
+				$gp_token_signed_message = ( isset( $_POST['token_signedMessage'] ) && is_string( $_POST['token_signedMessage'] ) ) ? wp_unslash( $_POST['token_signedMessage'] ) : '';
 				$token_data = array(
-					'signature'       => wp_unslash( $_POST['token_signature'] ),
+					'signature'       => $gp_token_signature,
 					'protocolVersion' => sanitize_text_field( $_POST['token_protocolVersion'] ),
-					'signedMessage'  => wp_unslash( $_POST['token_signedMessage'] ),
+					'signedMessage'  => $gp_token_signed_message,
 				);
 			}
 			// API v1 structure: paymentMethodToken.token (string that needs JSON.parse)
@@ -1158,7 +1162,7 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 		$message = sprintf( esc_html__( 'Checkout.com Payment refunded - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
 
 		if ( isset( $_SESSION['cko-refund-is-less'] ) ) {
-			if ( $_SESSION['cko-refund-is-less'] ) {
+			if ( (bool) $_SESSION['cko-refund-is-less'] ) {
 				/* translators: %s: Action ID. */
 				$order->add_order_note( sprintf( esc_html__( 'Checkout.com Payment Partially refunded - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] ) );
 

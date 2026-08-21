@@ -41,7 +41,7 @@ class NormalizerFormatter implements FormatterInterface
     {
         $this->dateFormat = null === $dateFormat ? static::SIMPLE_DATE : $dateFormat;
         if (!function_exists('json_encode')) {
-            throw new \RuntimeException('PHP\'s json extension is required to use CheckoutComWC\Vendor\Monolog\'s NormalizerFormatter');
+            throw new \RuntimeException('PHP\'s json extension is required to use Monolog\'s NormalizerFormatter');
         }
     }
 

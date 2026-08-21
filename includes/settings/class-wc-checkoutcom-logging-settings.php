@@ -269,7 +269,7 @@ class WC_Checkoutcom_Logging_Settings {
      * Save logging settings.
      */
     private static function save_logging_settings() {
-        if (!wp_verify_nonce($_POST['cko_logging_nonce'], 'cko_logging_settings')) {
+        if (!wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['cko_logging_nonce'] ?? '')), 'cko_logging_settings')) {
             wp_die( esc_html__( 'Security check failed.', 'checkout-com-unified-payments-api' ) );
         }
 
@@ -294,7 +294,7 @@ class WC_Checkoutcom_Logging_Settings {
      * Export logs via AJAX.
      */
     public static function export_logs() {
-        if (!wp_verify_nonce($_GET['nonce'], 'cko_export_logs')) {
+        if (!wp_verify_nonce(sanitize_text_field(wp_unslash($_GET['nonce'] ?? '')), 'cko_export_logs')) {
             wp_die( esc_html__( 'Security check failed.', 'checkout-com-unified-payments-api' ) );
         }
 
@@ -316,7 +316,7 @@ class WC_Checkoutcom_Logging_Settings {
      * Clear logs via AJAX.
      */
     public static function clear_logs() {
-        if (!wp_verify_nonce($_POST['nonce'], 'cko_clear_logs')) {
+        if (!wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['nonce'] ?? '')), 'cko_clear_logs')) {
             wp_send_json_error(__('Security check failed.', 'checkout-com-unified-payments-api'));
         }
 
@@ -338,7 +338,7 @@ class WC_Checkoutcom_Logging_Settings {
      * Get log statistics via AJAX.
      */
     public static function get_log_stats() {
-        if (!wp_verify_nonce($_POST['nonce'], 'cko_log_stats')) {
+        if (!wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['nonce'] ?? '')), 'cko_log_stats')) {
             wp_send_json_error(__('Security check failed.', 'checkout-com-unified-payments-api'));
         }
 

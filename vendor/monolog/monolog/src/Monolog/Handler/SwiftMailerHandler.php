@@ -23,7 +23,7 @@ use Swift;
  *
  * @author Gyula Sallai
  *
- * @phpstan-import-type Record from \Monolog\Logger
+ * @phpstan-import-type Record from \CheckoutComWC\Vendor\Monolog\Logger
  * @deprecated Since Monolog 2.6. Use SymfonyMailerHandler instead.
  */
 class SwiftMailerHandler extends MailHandler

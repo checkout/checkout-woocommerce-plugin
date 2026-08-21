@@ -18,7 +18,7 @@ use CheckoutComWC\Vendor\Monolog\Formatter\LineFormatter;
 /**
  * Common syslog functionality
  *
- * @phpstan-import-type Level from \Monolog\Logger
+ * @phpstan-import-type Level from \CheckoutComWC\Vendor\Monolog\Logger
  */
 abstract class AbstractSyslogHandler extends AbstractProcessingHandler
 {

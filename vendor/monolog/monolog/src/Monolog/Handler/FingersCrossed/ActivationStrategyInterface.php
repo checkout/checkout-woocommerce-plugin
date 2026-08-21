@@ -16,7 +16,7 @@ namespace CheckoutComWC\Vendor\Monolog\Handler\FingersCrossed;
  *
  * @author Johannes M. Schmitt <schmittjoh@gmail.com>
  *
- * @phpstan-import-type Record from \Monolog\Logger
+ * @phpstan-import-type Record from \CheckoutComWC\Vendor\Monolog\Logger
  */
 interface ActivationStrategyInterface
 {
