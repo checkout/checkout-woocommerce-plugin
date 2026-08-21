@@ -102,6 +102,11 @@ echo "📁 Creating plugin folder structure..."
 rsync -av --inplace \
   --exclude='.git' \
   --exclude='.gitignore' \
+  --exclude='.gitattributes' \
+  --exclude='.github' \
+  --exclude='.editorconfig' \
+  --exclude='.nvmrc' \
+  --exclude='.claude' \
   --exclude='.tmp' \
   --exclude='*.zip' \
   --exclude='*.md' \
@@ -116,6 +121,9 @@ rsync -av --inplace \
   --exclude='.env' \
   --exclude='.env.*' \
   --exclude='.cursor' \
+  --exclude='bin' \
+  --exclude='check-database-indexes.php' \
+  --exclude='view-webhook-queue.php' \
   --exclude='check-domain-association-file.php' \
   --exclude='diagnose-*.php' \
   --exclude='generate-*.php' \

@@ -193,7 +193,9 @@ jQuery(function () {
       var logo = document.getElementById("logo-payment-method");
 
       if (pm) {
-        var name = pm.toLowerCase();
+        // Icon filenames use hyphens instead of spaces (e.g. "American Express" -> "american-express.svg")
+        // so the plugin passes WordPress.org / Marketplace filename checks (no spaces in filenames).
+        var name = pm.toLowerCase().replace(/\s+/g, "-");
         var test = document.getElementById("cko-icons").value;
 
         logo.setAttribute("src", test + name + ".svg");
