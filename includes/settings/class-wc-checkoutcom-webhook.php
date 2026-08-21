@@ -435,7 +435,8 @@ class WC_Checkoutcom_Webhook {
 			ob_clean();
 			$message = $match_count === 1 
 				? __( 'Webhook already registered for this URL. No action needed.', 'checkout-com-unified-payments-api' )
-				: sprintf( 
+				: sprintf(
+					/* translators: %d: number of duplicate webhooks found. */
 					__( 'Multiple webhooks already registered for this URL (%d found). Please delete duplicates before registering a new one.', 'checkout-com-unified-payments-api' ),
 					$match_count
 				);
@@ -822,6 +823,7 @@ class WC_Checkoutcom_Webhook {
 					$suggestions[] = esc_html__( '3. Your server can connect to Checkout.com API', 'checkout-com-unified-payments-api' );
 					$suggestions[] = esc_html__( '4. Enable "Gateway Responses" logging to see detailed error messages', 'checkout-com-unified-payments-api' );
 				} else {
+					/* translators: %d: number of registered webhooks. */
 					$suggestions[] = sprintf( esc_html__( 'Found %d webhook(s) registered, but none match your site URL:', 'checkout-com-unified-payments-api' ), count( $all_webhooks ) );
 					$suggestions[] = '<strong>' . esc_html__( 'Your site URL:', 'checkout-com-unified-payments-api' ) . '</strong> <code>' . esc_html( $webhook_url ) . '</code>';
 					
@@ -853,6 +855,7 @@ class WC_Checkoutcom_Webhook {
 					$suggestions[] = esc_html__( '3. Your server can connect to Checkout.com API', 'checkout-com-unified-payments-api' );
 					$suggestions[] = esc_html__( '4. Enable "Gateway Responses" logging to see detailed error messages', 'checkout-com-unified-payments-api' );
 				} else {
+					/* translators: %d: number of registered workflows. */
 					$suggestions[] = sprintf( esc_html__( 'Found %d workflow(s) registered, but none match your site URL:', 'checkout-com-unified-payments-api' ), count( $all_workflows ) );
 					$suggestions[] = '<strong>' . esc_html__( 'Your site URL:', 'checkout-com-unified-payments-api' ) . '</strong> <code>' . esc_html( $webhook_url ) . '</code>';
 					
