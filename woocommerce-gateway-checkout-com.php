@@ -7,7 +7,7 @@
  * Author URI: https://www.checkout.com/
  * Version: 5.1.4.2
  * Requires at least: 5.0
- * Tested up to: 6.7.0
+ * Tested up to: 7.1
  * WC requires at least: 3.0
  * WC tested up to: 8.3.1
  * Requires PHP: 7.3
