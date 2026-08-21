@@ -170,6 +170,7 @@ class WC_Checkoutcom_Log_Manager {
         $rotated_file = str_replace('.log', "-{$timestamp}.log", $log_file_path);
         
         // Move current log to rotated file
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.rename_rename -- atomic same-directory log rotation; WP_Filesystem::move offers no benefit and adds credential-prompt risk.
         if (rename($log_file_path, $rotated_file)) {
             // Compress the rotated file
             $this->compress_log_file($rotated_file);
@@ -196,6 +197,7 @@ class WC_Checkoutcom_Log_Manager {
         
         $gz_file = $file_path . '.gz';
         
+        // phpcs:disable WordPress.WP.AlternativeFunctions -- streaming gzip compression of a log file; WP_Filesystem provides no streaming/gzip API.
         $fp_in = fopen($file_path, 'rb');
         $fp_out = gzopen($gz_file, 'wb9');
         
@@ -209,6 +211,7 @@ class WC_Checkoutcom_Log_Manager {
         
         fclose($fp_in);
         gzclose($fp_out);
+        // phpcs:enable WordPress.WP.AlternativeFunctions
         
         // Remove original file after successful compression
         wp_delete_file($file_path);

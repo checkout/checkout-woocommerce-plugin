@@ -84,7 +84,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Klarna extends WC_Gateway_Che
 			<div id="klarna_container"></div>
 
 			<!-- cko klarna js file -->
-			<script src='<?php echo esc_url( WC_CHECKOUTCOM_PLUGIN_URL . '/assets/js/klarna.js' ); ?>'></script>
+			<?php wp_enqueue_script( 'cko-klarna', WC_CHECKOUTCOM_PLUGIN_URL . '/assets/js/klarna.js', array( 'jquery' ), WC_CHECKOUTCOM_PLUGIN_VERSION, true ); ?>
 
 			<?php
 		}

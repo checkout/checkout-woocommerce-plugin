@@ -1557,6 +1557,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			'https' === wp_parse_url( $url, PHP_URL_SCHEME ) &&
 			substr( wp_parse_url( $url, PHP_URL_HOST ), - 10 ) === '.apple.com'
 		) {
+			// phpcs:disable WordPress.WP.AlternativeFunctions -- Apple Pay merchant/session validation requires client-certificate (mutual TLS) auth via CURLOPT_SSLCERT/SSLKEY, which the WordPress HTTP API (wp_remote_*) does not support.
 			$ch = curl_init();
 
 			$data =
@@ -1580,6 +1581,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 
 			// close cURL resource, and free up system resources.
 			curl_close( $ch );
+			// phpcs:enable WordPress.WP.AlternativeFunctions
 
 			exit();
 		}
@@ -2261,8 +2263,10 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 					$certificate_final = preg_replace( '/-----BEGIN CERTIFICATE-----|-----END CERTIFICATE-----|\s/', '', $pem_content );
 				}
 				
+				// phpcs:disable WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- closing temporary certificate file handles used for the openssl DER->PEM conversion.
 				fclose( $temp_der );
 				fclose( $temp_pem );
+				// phpcs:enable WordPress.WP.AlternativeFunctions.file_system_operations_fclose
 			}
 		}
 		
@@ -2861,6 +2865,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		}
 
 		// Set appropriate file permissions
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_chmod -- restrictive permissions on the plugin's own certificate/key/config file; direct chmod is required and reliable here.
 		@chmod( $file_path, 0644 );
 		
 		// For non-Bitnami installations, ensure .well-known directory is accessible
@@ -2872,6 +2877,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		if ( ! $is_bitnami ) {
 			$file_path_no_ext = $well_known_dir . '/apple-developer-merchantid-domain-association';
 			file_put_contents( $file_path_no_ext, $file_content );
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_chmod -- restrictive permissions on the plugin's own certificate/key/config file; direct chmod is required and reliable here.
 			@chmod( $file_path_no_ext, 0644 );
 		}
 
@@ -3000,6 +3006,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		}
 
 		// Set appropriate file permissions (readable only by owner)
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_chmod -- restrictive permissions on the plugin's own certificate/key/config file; direct chmod is required and reliable here.
 		chmod( $key_file, 0600 );
 
 		// Return CSR and private key as base64 for download, and also return server paths
@@ -3109,6 +3116,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		}
 
 		// Set appropriate file permissions
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_chmod -- restrictive permissions on the plugin's own certificate/key/config file; direct chmod is required and reliable here.
 		chmod( $certificate_file, 0600 );
 
 		// Check if key file exists from previous step
@@ -3205,6 +3213,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		$api_url = 'https://apple-pay-gateway.apple.com/paymentservices/paymentSession';
 		
 		// Use cURL for certificate-based authentication
+		// phpcs:disable WordPress.WP.AlternativeFunctions -- Apple Pay merchant/session validation requires client-certificate (mutual TLS) auth via CURLOPT_SSLCERT/SSLKEY, which the WordPress HTTP API (wp_remote_*) does not support.
 		$ch = curl_init();
 		curl_setopt( $ch, CURLOPT_URL, $api_url );
 		curl_setopt( $ch, CURLOPT_POST, true );
@@ -3222,6 +3231,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		$http_code = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
 		$curl_error = curl_error( $ch );
 		curl_close( $ch );
+		// phpcs:enable WordPress.WP.AlternativeFunctions
 
 		if ( ! empty( $curl_error ) ) {
 			wp_send_json_error( [ 
@@ -3273,6 +3283,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		// Only write if file doesn't exist or doesn't have our rule
 		if ( ! file_exists( $htaccess_file ) || strpos( file_get_contents( $htaccess_file ), 'apple-developer-merchantid-domain-association' ) === false ) {
 			file_put_contents( $htaccess_file, $htaccess_content );
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_chmod -- restrictive permissions on the plugin's own certificate/key/config file; direct chmod is required and reliable here.
 			chmod( $htaccess_file, 0644 );
 		}
 		
