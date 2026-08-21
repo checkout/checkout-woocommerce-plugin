@@ -790,7 +790,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 				var isOrderPayPage = jQuery(document.body).hasClass('woocommerce-order-pay');
 				
 				if( !isOrderPayPage ) {
-					var checkoutFields = '<?php echo $checkout_fields; ?>';
+					var checkoutFields = '<?php echo esc_js( $checkout_fields ); ?>';
 					var result = isValidFormField(checkoutFields);
 				}
 				
@@ -1575,7 +1575,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 
 			// TODO: throw error and log it.
 			if ( curl_exec( $ch ) === false ) {
-				echo '{"curlError":"' . curl_error( $ch ) . '"}';
+				echo wp_json_encode( array( 'curlError' => curl_error( $ch ) ) );
 			}
 
 			// close cURL resource, and free up system resources.
@@ -1594,6 +1594,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		// Generate apple token.
 		$token = WC_Checkoutcom_Api_Request::generate_apple_token();
 
+		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- $token is the Apple Pay merchant-session JSON payload returned to the JS SDK; HTML-escaping it would corrupt the payload.
 		echo $token;
 
 		exit();
@@ -2823,7 +2824,8 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 				if ( ! wp_mkdir_p( $well_known_dir ) && ! is_dir( $well_known_dir ) ) {
 					wp_send_json_error( [ 
 						'message' => sprintf(
-							__( 'Failed to create .well-known directory at %s. For Bitnami installations, you may need to create it manually via SSH: sudo mkdir -p %s && sudo chmod 755 %s', 'checkout-com-unified-payments-api' ),
+							/* translators: 1: .well-known directory path, 2: directory path for mkdir, 3: directory path for chmod. */
+							__( 'Failed to create .well-known directory at %1$s. For Bitnami installations, you may need to create it manually via SSH: sudo mkdir -p %2$s && sudo chmod 755 %3$s', 'checkout-com-unified-payments-api' ),
 							$well_known_dir,
 							$well_known_dir,
 							$well_known_dir
@@ -2849,7 +2851,8 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		if ( false === $file_saved ) {
 			wp_send_json_error( [ 
 				'message' => sprintf(
-					__( 'Failed to save domain association file to %s. Please check file permissions. For Bitnami, you may need to set permissions manually: sudo chmod 644 %s', 'checkout-com-unified-payments-api' ),
+					/* translators: 1: domain association file path, 2: file path for chmod. */
+					__( 'Failed to save domain association file to %1$s. Please check file permissions. For Bitnami, you may need to set permissions manually: sudo chmod 644 %2$s', 'checkout-com-unified-payments-api' ),
 					$file_path,
 					$file_path
 				),

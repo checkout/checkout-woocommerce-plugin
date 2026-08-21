@@ -300,8 +300,8 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 			],
 		];
 
-		echo '<h3>' . $this->method_title . ' </h3>';
-		echo '<p>' . $this->method_description . ' </p>';
+		echo '<h3>' . esc_html( $this->method_title ) . ' </h3>';
+		echo '<p>' . esc_html( $this->method_description ) . ' </p>';
 		$this->generate_screen_button_html( 'screen_button', $test );
 
 		if ( 'quick_settings' === $screen ) {
@@ -564,15 +564,15 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		$iframe_style          = WC_Admin_Settings::get_option( 'ckocom_iframe_style', '0' );
 
 		?>
-		<input type="hidden" id="debug" value='<?php echo WC_Admin_Settings::get_option( 'cko_console_logging' ); ?>' />
-		<input type="hidden" id="public-key" value='<?php echo $this->get_option( 'ckocom_pk' ); ?>'/>
-		<input type="hidden" id="localization" value='<?php echo $this->get_localisation(); ?>'/>
-		<input type="hidden" id="multiFrame" value='<?php echo $iframe_style; ?>'/>
-		<input type="hidden" id="cko-icons" value='<?php echo WC_CHECKOUTCOM_PLUGIN_URL . '/assets/images/card-icons/'; ?>'/>
-		<input type="hidden" id="is-mada" value='<?php echo $mada_enable; ?>'/>
-		<input type="hidden" id="mada-token" value='<?php echo $is_mada_token; ?>'/>
-		<input type="hidden" id="user-logged-in" value='<?php echo is_user_logged_in(); ?>'/>
-		<input type="hidden" id="card-validation-alert" value='<?php echo $card_validation_alert; ?>'/>
+		<input type="hidden" id="debug" value='<?php echo esc_attr( WC_Admin_Settings::get_option( 'cko_console_logging' ) ); ?>' />
+		<input type="hidden" id="public-key" value='<?php echo esc_attr( $this->get_option( 'ckocom_pk' ) ); ?>'/>
+		<input type="hidden" id="localization" value='<?php echo esc_attr( $this->get_localisation() ); ?>'/>
+		<input type="hidden" id="multiFrame" value='<?php echo esc_attr( $iframe_style ); ?>'/>
+		<input type="hidden" id="cko-icons" value='<?php echo esc_url( WC_CHECKOUTCOM_PLUGIN_URL . '/assets/images/card-icons/' ); ?>'/>
+		<input type="hidden" id="is-mada" value='<?php echo esc_attr( $mada_enable ); ?>'/>
+		<input type="hidden" id="mada-token" value='<?php echo esc_attr( $is_mada_token ); ?>'/>
+		<input type="hidden" id="user-logged-in" value='<?php echo esc_attr( is_user_logged_in() ); ?>'/>
+		<input type="hidden" id="card-validation-alert" value='<?php echo esc_attr( $card_validation_alert ); ?>'/>
 
 		<?php if ( ! is_user_logged_in() ) : ?>
 		<script>
@@ -798,6 +798,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 
 			$order->add_order_note(
 				sprintf(
+					/* translators: %s: 3DS redirect URL. */
 					esc_html__( 'Checkout.com 3d Redirect waiting. URL : %s', 'checkout-com-unified-payments-api' ),
 					$result['3d']
 				)
