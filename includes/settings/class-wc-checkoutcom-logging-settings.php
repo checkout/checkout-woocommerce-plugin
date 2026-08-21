@@ -39,13 +39,13 @@ class WC_Checkoutcom_Logging_Settings {
      * Register logging settings.
      */
     public static function register_logging_settings() {
-        register_setting('cko_logging_settings', 'cko_log_level');
-        register_setting('cko_logging_settings', 'cko_log_max_size_mb');
-        register_setting('cko_logging_settings', 'cko_log_max_files');
-        register_setting('cko_logging_settings', 'cko_log_retention_days');
-        register_setting('cko_logging_settings', 'cko_performance_logging');
-        register_setting('cko_logging_settings', 'cko_async_logging');
-        register_setting('cko_logging_settings', 'cko_log_buffer_size');
+        register_setting('cko_logging_settings', 'cko_log_level', array( 'sanitize_callback' => 'sanitize_text_field' ));
+        register_setting('cko_logging_settings', 'cko_log_max_size_mb', array( 'sanitize_callback' => 'absint' ));
+        register_setting('cko_logging_settings', 'cko_log_max_files', array( 'sanitize_callback' => 'absint' ));
+        register_setting('cko_logging_settings', 'cko_log_retention_days', array( 'sanitize_callback' => 'absint' ));
+        register_setting('cko_logging_settings', 'cko_performance_logging', array( 'sanitize_callback' => 'sanitize_text_field' ));
+        register_setting('cko_logging_settings', 'cko_async_logging', array( 'sanitize_callback' => 'sanitize_text_field' ));
+        register_setting('cko_logging_settings', 'cko_log_buffer_size', array( 'sanitize_callback' => 'absint' ));
     }
 
     /**

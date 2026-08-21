@@ -5,6 +5,8 @@
  * @package wc_checkout_com
  */
 
+defined( 'ABSPATH' ) || exit;
+
 use Checkout\CheckoutApiException;
 use Checkout\CheckoutUtils;
 use Checkout\Common\Address;

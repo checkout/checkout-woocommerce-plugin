@@ -2672,7 +2672,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		}
 
 		// Get site domain for certificate subject
-		$site_domain = parse_url( home_url(), PHP_URL_HOST );
+		$site_domain = wp_parse_url( home_url(), PHP_URL_HOST );
 		if ( empty( $site_domain ) ) {
 			$site_domain = 'example.com';
 		}
@@ -2911,7 +2911,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		}
 
 		// Get site domain for certificate subject
-		$site_domain = parse_url( home_url(), PHP_URL_HOST );
+		$site_domain = wp_parse_url( home_url(), PHP_URL_HOST );
 		if ( empty( $site_domain ) ) {
 			$site_domain = 'example.com';
 		}
@@ -3073,7 +3073,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			$certificate_pem = shell_exec( $command );
 			
 			// Clean up temp file
-			@unlink( $temp_der );
+			wp_delete_file( $temp_der );
 		}
 
 		if ( empty( $certificate_pem ) ) {

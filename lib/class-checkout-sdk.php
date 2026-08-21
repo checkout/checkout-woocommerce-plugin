@@ -5,6 +5,8 @@
  * @package wc_checkout_com
  */
 
+defined( 'ABSPATH' ) || exit;
+
 use Checkout\CheckoutSdk;
 use Checkout\Environment;
 use Checkout\CheckoutArgumentException;

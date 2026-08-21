@@ -340,7 +340,7 @@ class WC_Checkoutcom_Performance_Monitor {
             'operations' => $operation_stats,
             'api_calls' => $api_stats,
             'database_queries' => $db_stats,
-            'timestamp' => date('Y-m-d H:i:s'),
+            'timestamp' => gmdate('Y-m-d H:i:s'),
         ];
     }
 
@@ -422,7 +422,7 @@ class WC_Checkoutcom_Performance_Monitor {
             'memory_statistics' => $this->get_memory_statistics(),
             'api_calls' => $this->api_calls,
             'db_queries' => $this->db_queries,
-            'export_timestamp' => date('Y-m-d H:i:s'),
+            'export_timestamp' => gmdate('Y-m-d H:i:s'),
         ];
     }
 

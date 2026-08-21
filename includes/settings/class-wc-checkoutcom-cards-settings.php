@@ -1975,16 +1975,14 @@ class WC_Checkoutcom_Cards_Settings {
 					'type'        => 'textarea',
 					/* translators: 1: HTML anchor opening tag, 2: HTML anchor closing tag. */
 					'description' => sprintf( __( 'Add data in JSON format. You can %1$s check out about translations here %2$s in the Checkout.com Hub', 'checkout-com-unified-payments-api' ), '<a class="checkoutcom-key-docs" target="_blank" href="' . esc_url( $translation_link ) . '">', '</a>' ),
-					'placeholder' => <<<JSON
-					{
+					'placeholder' => '					{
 						"en": {
 							"form.required": "Please provide this field",
 							"pay_button.pay": "Pay now",
 							"pay_button.payment_failed": "Payment failed, please try again"
 						},
 						"fr": {.........}
-					}
-					JSON,
+					}',
 				),
 				'flow_component_name'                        => array(
 					'id'          => 'flow_component_name',
