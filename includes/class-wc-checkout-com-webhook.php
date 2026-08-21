@@ -1372,7 +1372,8 @@ class WC_Checkout_Com_Webhook {
 			
 			// If order is completed or processing, don't cancel - needs manual review
 			if ( in_array( $current_status, array( 'completed', 'processing' ), true ) ) {
-				$order->add_order_note( __( 'Cancel webhook received but order is already ' . $current_status . '. Manual review required.', 'checkout-com-unified-payments-api' ) );
+				// translators: %s: current order status.
+				$order->add_order_note( sprintf( __( 'Cancel webhook received but order is already %s. Manual review required.', 'checkout-com-unified-payments-api' ), $current_status ) );
 				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: cancel_payment - Order already ' . $current_status . ', skipping status change to cancelled. Order ID: ' . $order_id );
 			} else {
 				$order->update_status( $status );
@@ -1608,7 +1609,8 @@ class WC_Checkout_Com_Webhook {
 		// If order is already in a successful state, don't downgrade to failed
 		// This can happen if a successful payment was processed and a stale decline webhook arrives
 		if ( in_array( $current_status, array( 'completed', 'processing', 'on-hold' ), true ) ) {
-			$order->add_order_note( __( 'Decline webhook received but order is already ' . $current_status . '. This may be a stale webhook for a previous failed attempt. Status unchanged.', 'checkout-com-unified-payments-api' ) );
+			// translators: %s: current order status.
+			$order->add_order_note( sprintf( __( 'Decline webhook received but order is already %s. This may be a stale webhook for a previous failed attempt. Status unchanged.', 'checkout-com-unified-payments-api' ), $current_status ) );
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: decline_payment - Order already ' . $current_status . ', skipping status change to failed. Order ID: ' . $order_id );
 		} else {
 			$order->update_status( $status );

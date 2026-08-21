@@ -1631,7 +1631,7 @@ function cko_enqueue_frontend_assets() {
 			'missing_field'         => esc_html__( 'Missing field:', 'checkout-com-unified-payments-api' ),
 			'missing_fields'        => esc_html__( 'Missing fields:', 'checkout-com-unified-payments-api' ),
 			'all_fields_complete'   => esc_html__( 'All fields are complete', 'checkout-com-unified-payments-api' ),
-			'terms_required'        => esc_html__( 'Please read and accept the terms and conditions to proceed with your order.', 'woocommerce' ),
+			'terms_required'        => esc_html__( 'Please read and accept the terms and conditions to proceed with your order.', 'checkout-com-unified-payments-api' ),
 		),
 		// Preserve card details on checkout updates (coupon apply, address change)
 		'preserve_card_on_update' => ( isset( $flow_settings['flow_preserve_card_on_update'] ) && 'yes' === $flow_settings['flow_preserve_card_on_update'] ),
@@ -2189,7 +2189,7 @@ function cko_validate_checkout() {
 	$nonce_value = wc_get_var( $_REQUEST['woocommerce-process-checkout-nonce'], wc_get_var( $_REQUEST['_wpnonce'], '' ) ); // phpcs:ignore
 	if ( empty( $nonce_value ) || ! wp_verify_nonce( $nonce_value, 'woocommerce-process_checkout' ) ) {
 			WC_Checkoutcom_Utility::logger( '[VALIDATE CHECKOUT] ERROR: Invalid nonce' );
-		wp_send_json_error( array( 'message' => __( 'Session expired. Please refresh.', 'woocommerce' ) ) );
+		wp_send_json_error( array( 'message' => __( 'Session expired. Please refresh.', 'checkout-com-unified-payments-api' ) ) );
 			return;
 	}
 

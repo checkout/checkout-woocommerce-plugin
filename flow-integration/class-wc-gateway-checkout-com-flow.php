@@ -4439,7 +4439,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 								if ( ! empty( $customer_email ) ) {
 									// PERFORMANCE OPTIMIZATION Phase 2: Single query for both pending and failed orders
 									// Use date_query to only check recent orders (same time windows as pre-order creation check)
-									$date_after_pending = date( 'Y-m-d H:i:s', strtotime( '-7 days' ) );
+									$date_after_pending = gmdate( 'Y-m-d H:i:s', strtotime( '-7 days' ) );
 									
 									// Single query for both pending and failed orders (more efficient than two separate queries)
 									$orders_by_email = wc_get_orders( array(
@@ -7665,7 +7665,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ERROR: Nonce is empty' );
 			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Available POST keys: ' . implode( ', ', array_keys( $_POST ) ) );
 			wp_send_json_error( array(
-				'message' => __( 'Session expired. Please refresh.', 'woocommerce' ),
+				'message' => __( 'Session expired. Please refresh.', 'checkout-com-unified-payments-api' ),
 			) );
 			return;
 		}
@@ -7676,7 +7676,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Nonce value: ' . substr( $nonce_value, 0, 10 ) . '...' );
 			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] Nonce verification result: ' . ( $nonce_valid ? 'VALID' : 'INVALID' ) );
 			wp_send_json_error( array(
-				'message' => __( 'Session expired. Please refresh.', 'woocommerce' ),
+				'message' => __( 'Session expired. Please refresh.', 'checkout-com-unified-payments-api' ),
 			) );
 			return;
 		}
@@ -9457,7 +9457,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			WC_Checkoutcom_Utility::logger( '[CREATE FAILED ORDER] Nonce value received: ' . ( ! empty( $nonce_value ) ? substr( $nonce_value, 0, 10 ) . '...' : 'EMPTY' ) );
 			WC_Checkoutcom_Utility::logger( '[CREATE FAILED ORDER] Nonce verification result: ' . ( ! empty( $nonce_value ) ? ( wp_verify_nonce( $nonce_value, 'woocommerce-process_checkout' ) ? 'VALID' : 'INVALID' ) : 'MISSING' ) );
 			wp_send_json_error( array(
-				'message' => __( 'Session expired. Please refresh.', 'woocommerce' ),
+				'message' => __( 'Session expired. Please refresh.', 'checkout-com-unified-payments-api' ),
 			) );
 			return;
 		}
