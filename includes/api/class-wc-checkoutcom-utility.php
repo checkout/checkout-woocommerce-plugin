@@ -289,21 +289,22 @@ class WC_Checkoutcom_Utility {
 			$log_level = 'info';
 		}
 
-		// Check if file logging is enabled.
-		if ( $file_logging ) {
-			// Log message with appropriate level
-			$logger->log( $log_level, $error_message, $context );
-			if ( null !== $exception ) {
-				// If exception is an array, redact and print it properly
-				if ( is_array( $exception ) ) {
-					$logger->log( $log_level, $error_message . ' Data: ' . wc_print_r( self::redact_sensitive( $exception ), true ), $context );
-				} else {
-					$logger->log( $log_level, wc_print_r( $exception, true ), $context );
-				}
+		// Respect the "file logging" setting. Previously the else branch below also called
+		// $logger->log(), so turning logging off was a no-op and the store kept writing logs
+		// continuously. When file logging is disabled, write nothing.
+		if ( ! $file_logging ) {
+			return;
+		}
+
+		// File logging enabled: log message with appropriate level.
+		$logger->log( $log_level, $error_message, $context );
+		if ( null !== $exception ) {
+			// If exception is an array, redact and print it properly
+			if ( is_array( $exception ) ) {
+				$logger->log( $log_level, $error_message . ' Data: ' . wc_print_r( self::redact_sensitive( $exception ), true ), $context );
+			} else {
+				$logger->log( $log_level, wc_print_r( $exception, true ), $context );
 			}
-		} else {
-			// Log only message (still respect log level)
-			$logger->log( $log_level, $error_message, $context );
 		}
 	}
 

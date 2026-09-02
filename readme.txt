@@ -2,11 +2,11 @@
 Contributors: checkoutintegration
 Tags: checkout, payments, credit card, payment gateway, apple pay, google pay, payment request
 Requires at least: 5.0
-Stable tag: 5.1.4.2
+Stable tag: 5.1.4.3
 Requires PHP: 7.3
 Tested up to: 7.1
 WC requires at least: 3.0
-WC tested up to: 8.3.1
+WC tested up to: 11.0.1
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 

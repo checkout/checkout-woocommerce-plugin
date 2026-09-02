@@ -1,0 +1,377 @@
+*** Checkout.com Payment Gateway Changelog ***
+
+2026-08-26 - version 5.1.4.3
+* Fix - Flow declined-payment retry lockout: declined payments no longer write their payment id to the order's primary _cko_payment_id meta (stored under _cko_declined_payment_id instead), which previously poisoned the Flow duplicate-prevention guard.
+* Fix - Duplicate-prevention guard now processes a retry after a declined payment instead of wrongly skipping it and stranding the order on-hold with a misleading "Payment authorized (retry after previous failure)" note. Genuine double-submits and already-authorised/captured orders are still protected against double charging.
+* Fix - Resolved a fatal error ("Call to a member function set() on null") when a declined payment is processed outside a front-end request (admin "Retry Renewal Payment" action, WP-CLI, or cron) by guarding the 3DS session write.
+* Fix - Security: the Apple Pay merchant-identity private key directory under uploads is now protected with .htaccess and index.php, and the private key's public URL is no longer returned to the browser, preventing the key from being downloaded over HTTP.
+* Fix - The .well-known site-root .htaccess rule is now written with WordPress's insert_with_markers() instead of a raw file write, avoiding potential corruption of the root .htaccess.
+* Fix - The webhook status check on the settings screen now shows an inline notice instead of a blocking browser alert, so a fresh install with no secret key no longer blocks the first settings page.
+* Fix - The "file logging" setting is now honoured; when set to No the plugin no longer writes to the WooCommerce logs (previously it logged regardless).
+* Remove - Removed bundled debug scripts (view-webhook-queue.php, check-database-indexes.php).
+
+2026-07-08 - version 5.1.4
+* Fix - Live subscriptions: fixed a Live-only issue where the secret key was read from the wrong setting, causing a 401 when saving the card source. New subscriptions on Live now correctly store the source ID so their first renewal succeeds.
+* Fix - Fraud checks: payments flagged for review by Checkout.com's risk engine are now set to Suspected Fraud (instead of Processing) and held there, so flagged orders aren't auto-fulfilled. Works across webhook timing and with "Skip Authorization Status Update".
+* Fix - Checkout stability: resolved a stuck payment form / "currency is missing" error that could occur when browser autocomplete filled the checkout before the cart finished loading.
+* Fix - Free (zero-total) orders: payment methods are now hidden when nothing is due today, while still shown for auto-renewing free-trial subscriptions so the card can be saved for future payments.
+* Fix - Security: hardened rendering of WooCommerce error messages (parse instead of inject HTML).
+
+2026-04-22 - version 5.1.2
+* Fix - Security: removed sensitive data from logs (API responses, POST/GET payloads, webhook bodies).
+* Fix - Security: added nonce verification to express checkout AJAX endpoints.
+* Fix - Security: generic error messages returned to client; SQL queries hardened.
+* Fix - Security: added log redaction helpers; removed duplicate AJAX handler registrations.
+* Fix - Multi-tab payment retry being incorrectly rejected by webhook.
+* Fix - Status Guard blocking refund/cancel webhooks to terminal states.
+* Tweak - Admin manual order status changes no longer blocked by Status Guard.
+* Tweak - Payment ID and Amount added to refund order notes across all gateways.
+* Tweak - New "Skip Authorization Status Update" setting to prevent webhook race conditions on short capture delays.
+
+2026-03-25 - version 5.1.0
+* Fix - Multi-tab payment protection with "first capture wins" logic.
+* Fix - 3DS decline no longer redirects to success page.
+* Fix - Retry payments work correctly without showing declined messages.
+* Fix - Coupons/discounts now properly applied to payment amounts.
+* Fix - Capture timing calculated at submit time (not session creation).
+* Tweak - Prevent payment authorized webhook from downgrading completed orders.
+* Tweak - Added fuzzy matching (Method 4) for orders when browser closes early.
+* Fix - Duplicate detection issues.
+* Tweak - Idempotent initialization preventing duplicate API calls (~50% faster).
+* Tweak - Address changes no longer trigger Flow reload (preserves card entry).
+* Tweak - Email changes properly trigger reload when needed.
+* Tweak - APM orders created before payment popup.
+* Fix - XSS protection, nonce verification, input sanitization.
+* Dev - Added PHPStan, PHPCS, ESLint automated code review workflows.
+* Dev - E2E test suite with Playwright.
+
+2026-03-05 - version 5.0.4
+* Add - Prevent Flow reload on address changes - send updates via handleSubmit API.
+* Add - State/county and phone fields to dynamic address updates.
+* Fix - Coupon/discount amounts now read from live DOM instead of stale data.
+* Fix - Order-pay page address validation errors.
+* Tweak - Removed verbose debug logs to reduce log noise.
+
+2026-02-17 - version 5.0.3
+* Fix - Use post-discount unit_price for Flow items to satisfy PayPal amount validation.
+* Fix - Don't add shipping line when free shipping is selected (prevents charging for shipping when merchant has no shipping charge).
+
+2026-01-25 - version 5.0.2
+* Add - Implement idempotent Flow initialization to prevent duplicate payment session requests.
+* Add - Generation tracking and single-flight lock mechanism for initialization.
+* Add - Destruction confirmation to handle transient DOM churn.
+* Tweak - Optimize state logging to only log actual value changes.
+* Fix - Name field changes triggering Flow reload after initialization.
+* Tweak - Production-ready improvements with comprehensive error handling.
+
+2026-01-22 - version 5.0.1
+* Fix - Multiple installation issue.
+* Fix - Flow module refactor for stability and 3DS return handling.
+* Fix - Webhook duplicate detection and improved matching.
+* Tweak - Checkout styling updates for payment method title spacing.
+
+2025-12-18 - version 5.0.0
+* Add - Flow integration: initial Flow integration release.
+* Add - Complete Flow Web Components integration.
+* Add - Saved cards functionality.
+* Add - 3D Secure support.
+* Add - Webhook queue system.
+* Add - Enhanced order management.
+* Add - Comprehensive validation and error handling.
+* Add - Google Pay Express Checkout (product, shop, cart pages).
+* Add - Unified Express Checkout container for PayPal and Google Pay.
+* Add - Blocks cart support for Express Checkout.
+* Add - Classic cart support for Express Checkout.
+* Fix - Duplicate Express Checkout containers on cart page.
+* Fix - Inconsistent button sizes in unified container.
+* Fix - PHP syntax error in class-wc-checkoutcom-cards-blocks.php.
+
+2025-03-25 - version 4.9.2
+* Add - Enable Apple Pay on all browsers.
+
+2024-03-18 - version 4.9.1
+* Fix - Payment gateways on order-pay page.
+
+2024-11-19 - version 4.9.0
+* Fix - 422 error on PayPal Payment Gateway.
+
+2024-10-30 - version 4.8.0
+* Remove - Giropay payment support.
+* Add - Multi-region (KSA) on-soil payment processing.
+* Fix - PHP 8.2 and PHPCS.
+
+2024-07-12 - version 4.7.0
+* Tweak - Upgrade Klarna integration.
+
+2024-06-27 - version 4.6.0
+* Add - Upgrade PayPal with Express Checkout.
+* Update - iDEAL APM with latest standard.
+
+2024-03-15 - version 4.5.0
+* Add - Upgrade checkout-sdk-php library.
+* Update - PayPal integration.
+* Fix - PHP notices and warnings.
+
+2024-01-31 - version 4.4.20
+* Tweak - Add order note when 3DS redirection happens.
+* Tweak - Disable new webhook event from webhook registration.
+
+2024-01-17 - version 4.4.19
+* Tweak - Add new webhook event types.
+* Fix - PHP notices and warnings.
+
+2024-01-11 - version 4.4.18
+* Tweak - Apple Pay button condition to show on checkout page.
+* Fix - Idempotency key not working after failed payment request.
+
+2023-12-04 - version 4.4.17
+* Fix - Fix incorrect use of method.
+
+2023-11-24 - version 4.4.16
+* Tweak - WC HPOS related fixes.
+* Tweak - Add new configuration section to add ABC fallback account for refund process.
+* Fix - PHP non-static method call statically error.
+
+2023-09-26 - version 4.4.15
+* Tweak - Update IBAN input field validation and styling.
+
+2023-03-20 - version 4.4.14
+* Tweak - Update Giropay source property and description property.
+
+2023-03-15 - version 4.4.13
+* Tweak - Add payment retry if 3DS redirection link is expired with idempotency key.
+
+2023-03-03 - version 4.4.12
+* Tweak - Update style of co-badged cards choice option.
+* Tweak - Implement idempotency key for payment request to avoid duplicate payment.
+* Fix - Credit card input field not showing on small screen device.
+* Fix - CVV error when new card is used and CVV required for saved card is enabled.
+
+2023-02-08 - version 4.4.11
+* Tweak - Update Google Pay logo and button styles.
+* Fix - WooCommerce order property access warning.
+* Fix - JS error of undefined.
+
+2023-01-17 - version 4.4.10
+* Add - New settings to set custom placeholder for card input fields.
+* Tweak - Always show Refund button for any order status.
+* Tweak - Make CVV input position dynamic for saved cards.
+* Fix - String missing translation.
+
+2022-12-16 - version 4.4.9
+* Add - Accept SEPA payment with free subscription.
+* Tweak - Added new filter checkout_apm_sepa_address on checkout with SEPA for address.
+* Fix - Ideal set hidden value.
+* Fix - Missing string translation.
+
+2022-11-04 - version 4.4.8
+* Fix - Webhook notices logging.
+* Fix - Card holder name send undefined on add payment screen.
+* Tweak - Upgrade minimum required PHP version to 7.3.
+* Tweak - Apple Pay button JS event.
+* Tweak - Gateway icon woocommerce_gateway_icon filter usage.
+* Tweak - Add Google Pay & Apple Pay icon for gateway list on checkout.
+
+2022-08-18 - version 4.4.7
+* Fix - Apple Pay MADA support.
+* Fix - MOTO payment type.
+
+2022-08-08 - version 4.4.6
+* Add - PayPal payment method.
+* Fix - MADA card not working with Apple Pay.
+
+2022-07-22 - version 4.4.5
+* Tweak - Add version number to all script enqueue.
+* Tweak - Use WC session for save card on checkout.
+* Fix - Payment method add not adding new if there is one card saved.
+
+2022-07-07 - version 4.4.4
+* Fix - Frames not showing if saved card is deactivated.
+
+2022-07-07 - version 4.4.3
+* Add - Support for Carte Bancaire card.
+* Add - Google Pay and Apple Pay subscription support added.
+* Update - Upgraded Checkout API SDK to latest version 2.5.1.
+* Tweak - Changed translation domain to match with plugin slug.
+* Tweak - Improved frame and related script enqueue.
+* Tweak - Refactoring code and fix PHPCS error in plugin.
+
+2022-06-16 - version 4.4.2
+* Tweak - Show refund button of completed orders.
+* Fix - Default saved card deselects.
+* Fix - Customer name update on card tokenization.
+
+2022-06-01 - version 4.4.1
+* Tweak - Add condition to not run code if order payment method is not cko.
+* Update - Update function usage from PHP 8 to 7.
+
+2022-05-24 - version 4.4.0
+* Add - Refund support for APMs and Apple Pay.
+* Update - Upgraded Checkout API SDK to latest version 2.4.0.
+* Fix - Order status not changing on webhook received.
+* Fix - Strings added for translation.
+
+2022-04-21 - version 4.3.9
+* Add - NAS account type support.
+* Add - Webhook registration and detection settings.
+* Tweak - Remove order status change in refund webhook.
+* Fix - Failed order status update on payment authorization.
+* Fix - PHP warnings.
+
+2022-04-04 - version 4.3.8
+* Add - Subscription support for SEPA DD payment method.
+* Add - Text domain support with pot file.
+* Tweak - 3DS support to Google Pay method.
+* Update - New 3DS parameter for card type method.
+
+2022-03-07 - version 4.3.7
+* Fix - PHP warning of missing file.
+
+2022-03-01 - version 4.3.6
+* Add - Multibanco payment method added.
+* Tweak - Ability to pass customer IP address in payment requests.
+* Fix - WooCommerce recurring failed to authorize and terminate subscription.
+* Fix - DOC link '404 error' in core settings has been fixed.
+* Update - Trimmed token before sending to checkout.com.
+
+2021-12-15 - version 4.3.5
+* Update - Update cko php sdk to cater for Klarna.
+* Fix - Remove warning concerning php class_exists function used for subscription.
+* Update - Update Ideal logo.
+
+2021-08-11 - version 4.3.4
+* Fix - Conflict with the Woo Subscriptions plugin.
+
+2021-07-29 - version 4.3.3
+* Fix - Conflict with subscription class.
+
+2021-07-28 - version 4.3.2
+* Add - Subscriptions - add payment source id on order.
+* Fix - Handle refunds with amount having comma separator.
+* Fix - Prevent Auth and Capture having same order status on plugin configuration.
+* Fix - Add validation to handle MADA card for Apple Pay for Saudi Arabia.
+* Tweak - Hide place order button when Apple Pay is selected.
+* Fix - Google Pay environment.
+* Fix - Handle PHP notices for PHP 7.4.
+* Tweak - Include cardholder name in Frames.
+* Fix - Apple Pay supported network and country code.
+
+2021-06-09 - version 4.3.1
+* Add - Support for MADA on Apple Pay.
+
+2021-04-14 - version 4.3.0
+* Add - Support to handle recurring payments via WooCommerce Subscriptions.
+* Fix - Payment declined webhook.
+
+2021-03-29 - version 4.2.2
+* Fix - 3DS redirection when protocol is https.
+* Fix - Fawry captured webhook.
+* Tweak - Hide default place order button when Google Pay is selected.
+* Tweak - Refactor Frames.js integration.
+* Tweak - Refactor APMs integration.
+
+2021-02-25 - version 4.2.1
+* Tweak - Set Woo order id in metadata.
+* Tweak - Restrict declined reason in error message in case of risk declined response.
+* Tweak - Improve order note in backend orders.
+* Tweak - Update auto capture flow.
+* Add - Support for approved webhook.
+* Tweak - Update post meta with payment_captured when payment response status is captured.
+* Tweak - Add validation to verify payment id when webhook is sent.
+* Tweak - Set order number as reference when capture and refund action happens.
+* Fix - UI for guest users.
+* Tweak - Change label in Alternative payments setting.
+* Fix - Fawry product mismatch.
+* Fix - Message translation in case of declined errors.
+
+2020-11-25 - version 4.2.0
+* Add - The merchant can perform a partial refund in the Hub and it is reflected in Woo backend.
+* Add - The partial refund amount is deducted from the transaction order amount in Woo.
+* Tweak - The notification in Woo specifies that the transaction has been partially refunded.
+* Add - The merchant is able to perform a partial refund from Woo backend.
+* Update - The merchant is no longer required to use the private shared key for webhook authentication; the new release supports HMAC CKO Signature authentication.
+* Fix - Core settings persist during update of plugin.
+* Tweak - When performing a full refund in the Hub, the notification in Woo specifies that the transaction has been fully refunded.
+
+2020-10-26 - version 4.1.16
+* Fix - Removed saved card checkbox for guest users.
+
+2020-09-29 - version 4.1.15
+* Update - Update MADA bins.
+* Fix - MADA bin file path.
+* Fix - Frames styling.
+* Tweak - Added condition to enqueue Google Pay script only if it's selected.
+* Tweak - Remove timeout setting to allow iframe to load faster.
+
+2020-06-09 - version 4.1.14
+* Add - Display Fawry number in order confirmation page.
+* Fix - Fawry product qty in payment request.
+
+2020-06-09 - version 4.1.13
+* Fix - Fawry payment for virtual product.
+
+2020-05-25 - version 4.1.12
+* Add - Support for payment declined webhook.
+
+2020-05-15 - version 4.1.11
+* Fix - SEPA payment.
+* Add - Country validation based on APMs.
+
+2020-05-05 - version 4.1.10
+* Tweak - Send integration data in udf5.
+* Add - Multi iframe option.
+* Tweak - Minor css fix.
+* Fix - Frames fallback localisation for EN.
+
+2020-03-16 - version 4.1.9
+* Add - Display card icon option in module setting.
+* Add - Alert when place order is clicked and card not valid.
+* Tweak - Add background color in Frames field.
+* Add - Language fallback for Frames localization.
+* Tweak - Make translation text_domain uniform.
+* Fix - JCB icon height and width.
+
+2020-02-17 - version 4.1.8
+* Update - Update Frames.js integration to Frames v2.
+
+2020-02-12 - version 4.1.7
+* Add - Function to get authorization value from header in case not Apache web server.
+* Fix - Remove sanitize text field from Apple token to fix undefined error.
+
+2020-01-06 - version 4.1.6
+* Fix - CVV check validation.
+* Tweak - Auto select new card when there is no saved card.
+* Fix - Apple Pay curl issue.
+* Add - Validation for shipping and billing address.
+
+2019-12-24 - version 4.1.5
+* Fix - Display issue for CVV field.
+
+2019-12-20 - version 4.1.4
+* Fix - Module settings when saving configuration.
+
+2019-12-20 - version 4.1.3
+* Fix - Settings not getting updated.
+
+2019-12-12 - version 4.1.2
+* Tweak - Save default module configuration on initial setup.
+* Fix - Minor bug fix.
+
+2019-12-09 - version 4.1.1
+* Tweak - Update plugin name.
+* Fix - Sanitize post fields.
+* Fix - Bug related to MADA cards.
+
+2019-09-18 - version 4.1.0
+* Add - Support for Apple Pay.
+* Remove - Phone number field from card payment requests.
+* Fix - Klarna bugs.
+
+2019-09-18 - version 4.0.2
+* Tweak - Update metadata with additional information.
+
+2019-09-17 - version 4.0.1
+* Fix - Bug fix.
+
+2019-09-03 - version 4.0.0
+* Add - Checkout.com WooCommerce module for the Unified Payments API.

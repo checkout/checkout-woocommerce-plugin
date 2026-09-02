@@ -142,8 +142,13 @@ class WC_Checkoutcom_Api_Request {
 			} else {
 
 				// Set payment id post meta if the payment id declined.
+				// IMPORTANT: store the declined payment id under a dedicated key, NOT _cko_payment_id.
+				// Writing a declined id to _cko_payment_id poisons the Flow duplicate-prevention guard:
+				// on a retry with no fresh id in POST/GET it falls back to _cko_payment_id and then
+				// compares that value against itself, always matching, so the real retry payment is
+				// skipped and the order is stranded on-hold. Keep the id for correlation/debugging only.
 				if ( 'Declined' === $response['status'] ) {
-					$order->update_meta_data( '_cko_payment_id', $response['id'] );
+					$order->update_meta_data( '_cko_declined_payment_id', $response['id'] );
 					$order->save();
 				}
 
@@ -160,7 +165,12 @@ class WC_Checkoutcom_Api_Request {
 
 				WC_Checkoutcom_Utility::logger( $error_message, $response );
 
-				WC()->session->set( '3ds_action_id', $response['action_id'] );
+				// Guard against a null session: declines can be processed outside a front-end
+				// request (admin "Retry Renewal Payment", WP-CLI, cron), where WC()->session is
+				// null and an unconditional ->set() fatals. Mirrors the guard at the top of this method.
+				if ( ! empty( WC()->session ) ) {
+					WC()->session->set( '3ds_action_id', $response['action_id'] );
+				}
 
 				return [ 'error' => $error_message ];
 			}
@@ -758,9 +768,12 @@ class WC_Checkoutcom_Api_Request {
 			} else {
 
 				// Set payment id post meta if the payment id declined.
+				// Store under a dedicated key, NOT _cko_payment_id — see the note on the sibling
+				// decline branch above: writing a declined id to _cko_payment_id poisons the Flow
+				// duplicate-prevention guard and strands the order on-hold on the next retry.
 				if ( 'Declined' === $response['status'] ) {
 					$order = wc_get_order( $response['metadata']['order_id'] );
-					$order->update_meta_data( '_cko_payment_id', $response['id'] );
+					$order->update_meta_data( '_cko_declined_payment_id', $response['id'] );
 					$order->save();
 				}
 
@@ -778,7 +791,10 @@ class WC_Checkoutcom_Api_Request {
 
 				WC_Checkoutcom_Utility::logger( $error_message, $response );
 
-				WC()->session->set( '3ds_action_id', $response['actions'][0]['id'] );
+				// Guard against a null session (admin retry / WP-CLI / cron), as above.
+				if ( ! empty( WC()->session ) ) {
+					WC()->session->set( '3ds_action_id', $response['actions'][0]['id'] );
+				}
 
 				$arr = [ 'error' => $error_message ];
 

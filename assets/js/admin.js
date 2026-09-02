@@ -342,7 +342,11 @@ jQuery( function ( $ ) {
 					if ( xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message ) {
 						errorMessage = xhr.responseJSON.data.message;
 					}
-					alert( errorMessage );
+					// Show the error inline instead of a blocking alert(). The status check is
+					// auto-fired on page load, and on a fresh install with no secret key it returns
+					// HTTP 400 — a modal alert here froze the settings screen on first load.
+					$( '#checkoutcom-is-register-webhook' ).siblings( '.dashicons-yes' ).addClass( 'hidden' );
+					$( '.checkoutcom-is-register-webhook-text' ).html( '<span style="color: #d63638;">⚠ ' + errorMessage + '</span>' );
 
 				} ).always( function () {
 					$( '#checkoutcom-is-register-webhook' ).prop( 'disabled', false );

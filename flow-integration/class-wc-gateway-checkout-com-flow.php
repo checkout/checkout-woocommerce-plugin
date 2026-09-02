@@ -2527,14 +2527,21 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// DUPLICATE PREVENTION: Check if this order has already been processed
 		$existing_transaction_id = $order->get_transaction_id();
 		$flow_payment_id = isset( $_POST['cko-flow-payment-id'] ) ? sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-id'] ) ) : '';
-		
+		// Track whether the payment id arrived on THIS request (POST/GET) versus being resolved
+		// from the order's own stored meta below. The duplicate-prevention guard must only treat a
+		// request-sourced id as a "duplicate"; comparing an order-meta fallback id against the same
+		// order meta is a tautology that would skip a legitimate retry (see guard further down).
+		$flow_payment_id_from_request = ! empty( $flow_payment_id );
+
 		// Fallback 1: Get payment ID from GET parameter (from handle_3ds_return URL)
 		if ( empty( $flow_payment_id ) && isset( $_GET['cko-payment-id'] ) ) {
 			$flow_payment_id = sanitize_text_field( wp_unslash( $_GET['cko-payment-id'] ) );
+			$flow_payment_id_from_request = ! empty( $flow_payment_id );
 			WC_Checkoutcom_Utility::logger( '[FLOW SAVE CARD] Payment ID retrieved from GET parameter: ' . $flow_payment_id );
 		}
-		
+
 		// Fallback 2: Get payment ID from order metadata if not in POST/GET (webhook may have set it, or 3DS return stored it)
+		// NOTE: an id resolved here is NOT request-sourced ($flow_payment_id_from_request stays false).
 		if ( empty( $flow_payment_id ) ) {
 			$flow_payment_id = $order->get_meta( '_cko_flow_payment_id' );
 			if ( empty( $flow_payment_id ) ) {
@@ -2762,9 +2769,17 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				}
 			}
 			
-			// Check if current order already processed with this payment ID
-			$existing_payment = $order->get_meta( '_cko_payment_id' );
-			if ( $existing_payment === $flow_payment_id ) {
+			// Check if current order already processed with this payment ID.
+			// Treat as a duplicate ONLY when the id came in on this request (POST/GET) and matches
+			// what is stored, OR when the order is genuinely already authorised/captured with that id.
+			// Without this, an id resolved from the order's own _cko_payment_id fallback is compared
+			// against _cko_payment_id itself (always true), skipping a legitimate retry after a
+			// previously declined payment and stranding the order on-hold.
+			$existing_payment  = $order->get_meta( '_cko_payment_id' );
+			$already_processed = $order->get_meta( 'cko_payment_authorized' ) || $order->get_meta( 'cko_payment_captured' );
+			$is_duplicate      = ( '' !== $existing_payment ) && ( $existing_payment === $flow_payment_id )
+				&& ( $flow_payment_id_from_request || $already_processed );
+			if ( $is_duplicate ) {
 				WC_Checkoutcom_Utility::logger( 'DUPLICATE PREVENTION: Order ' . $order_id . ' already processed with payment ID: ' . $flow_payment_id . ' - skipping processing' );
 				
 				// CRITICAL: Still check for card saving even when duplicate prevention kicks in

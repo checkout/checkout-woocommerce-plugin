@@ -2890,6 +2890,39 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 	}
 
 	/**
+	 * Return the Apple Pay certificate/key storage directory, creating it if needed
+	 * and hardening it against web access.
+	 *
+	 * The directory lives under wp-content/uploads, which is web-served, and it holds
+	 * the Apple Pay merchant-identity private key. Without protection the key would be
+	 * downloadable over HTTP at a predictable URL. We drop a .htaccess (Deny from all)
+	 * and an index.php in the directory — the same pattern the plugin's log manager uses
+	 * for its own directory — so the key/cert files cannot be fetched or listed.
+	 *
+	 * @param array $upload_dir Result of wp_upload_dir().
+	 * @return string Absolute path to the protected directory.
+	 */
+	private function get_protected_apple_pay_cert_dir( $upload_dir ) {
+		$certificate_dir = $upload_dir['basedir'] . '/checkout-com-apple-pay';
+		if ( ! file_exists( $certificate_dir ) ) {
+			wp_mkdir_p( $certificate_dir );
+		}
+
+		// Block direct web access to the private key / certificates.
+		$htaccess_file = $certificate_dir . '/.htaccess';
+		if ( ! file_exists( $htaccess_file ) ) {
+			file_put_contents( $htaccess_file, "Order deny,allow\nDeny from all\n" );
+		}
+		// Prevent directory listing.
+		$index_file = $certificate_dir . '/index.php';
+		if ( ! file_exists( $index_file ) ) {
+			file_put_contents( $index_file, "<?php\n// Silence is golden.\n" );
+		}
+
+		return $certificate_dir;
+	}
+
+	/**
 	 * AJAX handler for generating Merchant Identity CSR and private key.
 	 */
 	public function ajax_generate_merchant_identity_csr() {
@@ -2989,10 +3022,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			return;
 		}
 
-		$certificate_dir = $upload_dir['basedir'] . '/checkout-com-apple-pay';
-		if ( ! file_exists( $certificate_dir ) ) {
-			wp_mkdir_p( $certificate_dir );
-		}
+		$certificate_dir = $this->get_protected_apple_pay_cert_dir( $upload_dir );
 
 		// Save key file on server
 		$key_file = $certificate_dir . '/certificate_sandbox.key';
@@ -3017,7 +3047,9 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			'csr_filename' => 'uploadMe.csr',
 			'private_key_filename' => 'certificate_sandbox.key',
 			'key_file_path' => $key_file,
-			'key_file_url' => $upload_dir['baseurl'] . '/checkout-com-apple-pay/certificate_sandbox.key',
+			// Intentionally NOT returning a public URL to the private key: the file lives under
+			// wp-content/uploads and must never be linked/served over HTTP. The base64 payload
+			// above is what the browser uses to offer the key as a download.
 		] );
 	}
 
@@ -3099,10 +3131,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			return;
 		}
 
-		$certificate_dir = $upload_dir['basedir'] . '/checkout-com-apple-pay';
-		if ( ! file_exists( $certificate_dir ) ) {
-			wp_mkdir_p( $certificate_dir );
-		}
+		$certificate_dir = $this->get_protected_apple_pay_cert_dir( $upload_dir );
 
 		// Save as certificate_sandbox.pem to match the key file name
 		$certificate_file = $certificate_dir . '/certificate_sandbox.pem';
@@ -3287,30 +3316,23 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			chmod( $htaccess_file, 0644 );
 		}
 		
-		// Also check main .htaccess and add rule if needed (before WordPress rules)
+		// Also ensure the site-root .htaccess allows .well-known through. Use WordPress's
+		// marker-managed writer (idempotent, keeps its own # BEGIN/# END block) instead of a
+		// raw file_put_contents on the site root .htaccess, which risked corrupting it.
 		$main_htaccess = ABSPATH . '.htaccess';
-		if ( file_exists( $main_htaccess ) ) {
-			$main_htaccess_content = file_get_contents( $main_htaccess );
-			
-			// Check if .well-known rule already exists
-			if ( strpos( $main_htaccess_content, '# BEGIN Allow .well-known' ) === false ) {
-				// Add rule before WordPress rules
-				$well_known_rule = "\n# BEGIN Allow .well-known\n";
-				$well_known_rule .= "<IfModule mod_rewrite.c>\n";
-				$well_known_rule .= "RewriteEngine On\n";
-				$well_known_rule .= "RewriteRule ^\.well-known/ - [L]\n";
-				$well_known_rule .= "</IfModule>\n";
-				$well_known_rule .= "# END Allow .well-known\n";
-				
-				// Insert before # BEGIN WordPress if it exists
-				if ( strpos( $main_htaccess_content, '# BEGIN WordPress' ) !== false ) {
-					$main_htaccess_content = str_replace( '# BEGIN WordPress', $well_known_rule . "\n# BEGIN WordPress", $main_htaccess_content );
-				} else {
-					// If no WordPress section, add at the beginning
-					$main_htaccess_content = $well_known_rule . "\n" . $main_htaccess_content;
-				}
-				
-				file_put_contents( $main_htaccess, $main_htaccess_content );
+		if ( file_exists( $main_htaccess ) && is_writable( $main_htaccess ) ) {
+			if ( ! function_exists( 'insert_with_markers' ) ) {
+				require_once ABSPATH . 'wp-admin/includes/misc.php';
+			}
+
+			if ( function_exists( 'insert_with_markers' ) ) {
+				$well_known_rule = array(
+					'<IfModule mod_rewrite.c>',
+					'RewriteEngine On',
+					'RewriteRule ^\.well-known/ - [L]',
+					'</IfModule>',
+				);
+				insert_with_markers( $main_htaccess, 'Allow .well-known', $well_known_rule );
 			}
 		}
 	}
