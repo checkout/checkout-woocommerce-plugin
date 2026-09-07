@@ -55,7 +55,7 @@ final class WC_Checkoutcom_Flow_Blocks_Integration extends AbstractPaymentMethod
 
         wp_register_script(
             'wc-checkoutcom-flow-blocks',
-            WC_CHECKOUTCOM_PLUGIN_URL . '/assets/js/blocks/flow-blocks.js',
+            WC_CHECKOUTCOM_PLUGIN_URL . '/build/flow-blocks.js',
             $dependencies,
             $version,
             true

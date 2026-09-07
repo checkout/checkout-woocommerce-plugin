@@ -90,6 +90,31 @@ else
 fi
 echo ""
 
+# --- Build WooCommerce Blocks assets (client/ -> build/) -------------------
+# The Blocks payment-method scripts are compiled from client/blocks/*.js into build/
+# by @wordpress/scripts. The PHP payment-method classes register build/*-blocks.js and
+# read build/*-blocks.asset.php, so the release zip MUST contain a fresh build/.
+if command -v npm >/dev/null 2>&1; then
+    echo "📦 Building WooCommerce Blocks assets (npm run build)..."
+    if [ ! -d node_modules ]; then
+        npm ci || npm install
+    fi
+    npm run build || {
+        echo "❌ ERROR: WooCommerce Blocks asset build failed. Do not ship without build/."
+        exit 1
+    }
+    if [ ! -f build/cards-blocks.asset.php ]; then
+        echo "❌ ERROR: build/ was not produced (missing cards-blocks.asset.php)."
+        exit 1
+    fi
+    echo "✅ Blocks assets built"
+else
+    echo "❌ ERROR: npm not found — cannot build the WooCommerce Blocks assets."
+    echo "   Install Node.js/npm, or build 'build/' manually before packaging."
+    exit 1
+fi
+echo ""
+
 # Create temp directory with plugin folder structure
 TEMP_DIR=$(mktemp -d)
 PLUGIN_DIR="${TEMP_DIR}/${PLUGIN_FOLDER}"
@@ -113,6 +138,10 @@ rsync -av --inplace \
   --exclude='tests' \
   --exclude='*.log' \
   --exclude='node_modules' \
+  --exclude='client' \
+  --exclude='webpack.config.js' \
+  --exclude='package-lock.json' \
+  --exclude='.wp-env.json' \
   --exclude='.DS_Store' \
   --exclude='__MACOSX' \
   --exclude='backups' \

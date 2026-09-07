@@ -21,9 +21,33 @@ class WC_Checkoutcom_Blocks_Integration {
             return;
         }
 
-        // Only register if the hook exists
-        if ( has_action( 'woocommerce_blocks_loaded' ) ) {
-            add_action( 'woocommerce_blocks_loaded', [ __CLASS__, 'register_blocks_integration' ] );
+        // Hook into blocks loading. NOTE: do not guard this with has_action() —
+        // has_action( $hook ) reports whether a callback is already attached, not whether
+        // the hook will fire, so guarding our own add_action() behind it meant we only
+        // registered if something else had hooked first (usually nothing → never registered).
+        add_action( 'woocommerce_blocks_loaded', [ __CLASS__, 'register_blocks_integration' ] );
+    }
+
+    /**
+     * Load the individual Blocks payment-method integration classes.
+     *
+     * These files are not covered by any autoloader, so they must be required
+     * explicitly — otherwise the class_exists() checks in register_payment_methods()
+     * all return false and nothing registers.
+     */
+    private static function load_payment_method_classes() {
+        $dir = __DIR__ . '/payment-methods/';
+        $files = [
+            'class-wc-checkoutcom-cards-blocks.php',
+            'class-wc-checkoutcom-paypal-blocks.php',
+            'class-wc-checkoutcom-googlepay-blocks.php',
+            'class-wc-checkoutcom-applepay-blocks.php',
+            'class-wc-checkoutcom-flow-blocks.php',
+        ];
+        foreach ( $files as $file ) {
+            if ( file_exists( $dir . $file ) ) {
+                require_once $dir . $file;
+            }
         }
     }
 
@@ -46,10 +70,11 @@ class WC_Checkoutcom_Blocks_Integration {
      * Register blocks integration.
      */
     public static function register_blocks_integration() {
-        // Only register if the hook exists
-        if ( has_action( 'woocommerce_blocks_payment_method_type_registration' ) ) {
-            add_action( 'woocommerce_blocks_payment_method_type_registration', [ __CLASS__, 'register_payment_methods' ] );
-        }
+        // Make the payment-method classes available before registration runs.
+        self::load_payment_method_classes();
+
+        // Hook the registration callback. As above, do not gate this behind has_action().
+        add_action( 'woocommerce_blocks_payment_method_type_registration', [ __CLASS__, 'register_payment_methods' ] );
     }
 
     /**

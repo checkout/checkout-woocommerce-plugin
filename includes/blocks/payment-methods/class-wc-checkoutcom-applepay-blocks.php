@@ -55,7 +55,7 @@ final class WC_Checkoutcom_ApplePay_Blocks_Integration extends AbstractPaymentMe
 
         wp_register_script(
             'wc-checkoutcom-applepay-blocks',
-            WC_CHECKOUTCOM_PLUGIN_URL . '/assets/js/blocks/applepay-blocks.js',
+            WC_CHECKOUTCOM_PLUGIN_URL . '/build/applepay-blocks.js',
             $dependencies,
             $version,
             true

@@ -55,7 +55,7 @@ final class WC_Checkoutcom_PayPal_Blocks_Integration extends AbstractPaymentMeth
 
         wp_register_script(
             'wc-checkoutcom-paypal-blocks',
-            WC_CHECKOUTCOM_PLUGIN_URL . '/assets/js/blocks/paypal-blocks.js',
+            WC_CHECKOUTCOM_PLUGIN_URL . '/build/paypal-blocks.js',
             $dependencies,
             $version,
             true
