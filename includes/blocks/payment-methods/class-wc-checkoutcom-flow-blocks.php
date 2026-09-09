@@ -73,6 +73,16 @@ final class WC_Checkoutcom_Flow_Blocks_Integration extends AbstractPaymentMethod
         $core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings', [] );
         $environment   = 'sandbox' === ( $core_settings['ckocom_environment'] ?? 'sandbox' );
 
+        // AJAX endpoint for creating the Flow payment session. The Blocks integration must
+        // NOT rely on the classic cko_flow_vars global (that script is not loaded on block
+        // checkout), so provide the endpoint URL directly here.
+        $create_session_url = class_exists( 'WC_AJAX' )
+            ? WC_AJAX::get_endpoint( 'cko_flow_create_payment_session' )
+            : admin_url( 'admin-ajax.php?action=cko_flow_create_payment_session' );
+
+        // ajax_create_payment_session() verifies this nonce (action 'cko_flow_payment_session').
+        $create_session_nonce = wp_create_nonce( 'cko_flow_payment_session' );
+
         return [
             'title'       => $this->get_setting( 'title' ),
             'description' => $this->get_setting( 'description' ),
@@ -80,6 +90,8 @@ final class WC_Checkoutcom_Flow_Blocks_Integration extends AbstractPaymentMethod
             'environment' => $environment ? 'TEST' : 'PRODUCTION',
             'public_key'  => $core_settings['ckocom_pk'] ?? '',
             'currency'    => get_woocommerce_currency(),
+            'create_session_url' => $create_session_url,
+            'create_session_nonce' => $create_session_nonce,
             'enabled_payment_methods' => $this->get_setting( 'flow_enabled_payment_methods', [] ),
             'saved_payment_display_order' => $this->get_setting( 'saved_payment_display_order', 'saved_cards_first' ),
         ];

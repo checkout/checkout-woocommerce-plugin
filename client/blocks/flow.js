@@ -20,20 +20,50 @@ const PAYMENT_METHOD_NAME = 'wc_checkout_com_flow';
 const settings = getSetting( `${ PAYMENT_METHOD_NAME }_data`, {} );
 const FLOW_SDK_SRC = 'https://checkout-web-components.checkout.com/index.js';
 
-const wcAjax = ( endpoint ) => {
-	const vars = window.cko_flow_vars || {};
-	if ( vars.wc_ajax_url ) {
-		return vars.wc_ajax_url.replace( '%%endpoint%%', endpoint );
+/**
+ * Map the WooCommerce Blocks billing address to a Checkout.com payment-session billing block.
+ * Returns null when there's no usable 2-letter country yet (Checkout.com rejects an empty country).
+ */
+const buildBilling = ( billing ) => {
+	const a = ( billing && billing.billingAddress ) || {};
+	if ( ! a.country || ! /^[A-Za-z]{2}$/.test( a.country ) ) {
+		return null;
 	}
-	return vars.ajax_url || window.ajaxurl;
+	return {
+		address: {
+			address_line1: a.address_1 || '',
+			address_line2: a.address_2 || '',
+			city: a.city || '',
+			state: a.state || '',
+			zip: a.postcode || '',
+			country: a.country,
+		},
+	};
+};
+
+const buildCustomer = ( billing ) => {
+	const a = ( billing && billing.billingAddress ) || {};
+	if ( ! a.email ) {
+		return null;
+	}
+	return {
+		email: a.email,
+		name: [ a.first_name, a.last_name ].filter( Boolean ).join( ' ' ).trim(),
+	};
 };
 
 const CheckoutComFlowContent = ( props ) => {
-	const { eventRegistration, emitResponse } = props;
+	const { eventRegistration, emitResponse, billing } = props;
 	const { onPaymentSetup } = eventRegistration;
 	const containerRef = useRef( null );
 	const paymentRef = useRef( { id: '', type: 'card' } );
 	const flowComponentRef = useRef( null );
+
+	// Keep the latest emitResponse in a ref so the onPaymentSetup effect can subscribe
+	// exactly once (stable deps) without re-subscribing every render — re-subscribing on
+	// each render triggers a store update -> re-render loop ("Maximum update depth exceeded").
+	const emitRef = useRef( emitResponse );
+	emitRef.current = emitResponse;
 
 	// Create a payment session and mount the Flow component.
 	useEffect( () => {
@@ -43,13 +73,37 @@ const CheckoutComFlowContent = ( props ) => {
 			try {
 				await loadScript( FLOW_SDK_SRC, 'cko-flow-sdk-blocks' );
 
-				const response = await fetch( wcAjax( 'cko_flow_create_payment_session' ), {
+				if ( ! settings.create_session_url ) {
+					return;
+				}
+
+				// The server re-derives amount/items/currency from the live WooCommerce cart, so this
+				// request only needs the fields the server doesn't fill. Success/failure URLs cover the
+				// 3DS redirect fallback; Flow itself completes via the onPaymentCompleted callback.
+				const paymentSessionRequest = {
+					currency: settings.currency,
+					reference: 'wc-blocks-' + Date.now(),
+					success_url: window.location.origin + '/?wc-api=wc_checkoutcom_flow_process',
+					failure_url: window.location.href,
+				};
+				const billingObj = buildBilling( billing );
+				if ( billingObj ) {
+					paymentSessionRequest.billing = billingObj;
+				}
+				const customerObj = buildCustomer( billing );
+				if ( customerObj ) {
+					paymentSessionRequest.customer = customerObj;
+				}
+
+				const response = await fetch( settings.create_session_url, {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
 					credentials: 'same-origin',
 					body: new URLSearchParams( {
 						action: 'cko_flow_create_payment_session',
+						nonce: settings.create_session_nonce || '',
 						context: 'blocks',
+						payment_session_request: JSON.stringify( paymentSessionRequest ),
 					} ),
 				} );
 				const session = await response.json();
@@ -70,7 +124,9 @@ const CheckoutComFlowContent = ( props ) => {
 					},
 				} );
 
-				flowComponentRef.current = checkout.create( 'flow' );
+				// showPayButton: false — hide Flow's own embedded pay button; the WooCommerce Blocks
+				// "Place Order" button drives submission via flowComponent.submit() in onPaymentSetup.
+				flowComponentRef.current = checkout.create( 'flow', { showPayButton: false } );
 				if ( containerRef.current ) {
 					flowComponentRef.current.mount( containerRef.current );
 				}
@@ -91,6 +147,7 @@ const CheckoutComFlowContent = ( props ) => {
 
 	useEffect( () => {
 		const unsubscribe = onPaymentSetup( async () => {
+			const { responseTypes } = emitRef.current;
 			try {
 				// Ask the mounted Flow component to submit / tokenise.
 				if ( flowComponentRef.current && flowComponentRef.current.submit ) {
@@ -100,13 +157,13 @@ const CheckoutComFlowContent = ( props ) => {
 				const { id, type } = paymentRef.current;
 				if ( ! id ) {
 					return {
-						type: emitResponse.responseTypes.ERROR,
+						type: responseTypes.ERROR,
 						message: __( 'Payment could not be completed. Please try again.', 'checkout-com-unified-payments-api' ),
 					};
 				}
 
 				return {
-					type: emitResponse.responseTypes.SUCCESS,
+					type: responseTypes.SUCCESS,
 					meta: {
 						paymentMethodData: {
 							'cko-flow-payment-id': id,
@@ -116,14 +173,17 @@ const CheckoutComFlowContent = ( props ) => {
 				};
 			} catch ( err ) {
 				return {
-					type: emitResponse.responseTypes.ERROR,
+					type: responseTypes.ERROR,
 					message: ( err && err.message ) || __( 'Payment failed. Please try again.', 'checkout-com-unified-payments-api' ),
 				};
 			}
 		} );
 
 		return () => unsubscribe();
-	}, [ onPaymentSetup, emitResponse ] );
+		// Subscribe exactly once on mount. onPaymentSetup is stable; re-running this effect
+		// tears down/re-adds the observer each render and loops via WooCommerce's store.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [] );
 
 	return (
 		<div className="cko-blocks-flow">

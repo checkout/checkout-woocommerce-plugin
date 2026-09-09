@@ -1221,6 +1221,27 @@ function cko_admin_enqueue_scripts( $hook ) {
 add_action( 'wp_enqueue_scripts', 'cko_enqueue_frontend_assets' );
 
 /**
+ * Whether the current checkout is rendered with the WooCommerce Checkout block
+ * (block-based checkout) rather than the classic [woocommerce_checkout] shortcode.
+ *
+ * On block checkout the Blocks payment-method integration handles Flow, so the classic
+ * Flow front-end scripts must NOT be enqueued — loading both mounts Flow twice and
+ * duplicates the payment-session request.
+ *
+ * @return bool
+ */
+function cko_is_block_checkout() {
+	if ( ! function_exists( 'has_block' ) || ! function_exists( 'wc_get_page_id' ) ) {
+		return false;
+	}
+	if ( function_exists( 'is_checkout' ) && ! is_checkout() ) {
+		return false;
+	}
+	$checkout_page_id = wc_get_page_id( 'checkout' );
+	return ( $checkout_page_id > 0 && has_block( 'woocommerce/checkout', $checkout_page_id ) );
+}
+
+/**
  * Load checkout.com style sheet.
  * Load Google Pay js.
  *
@@ -1273,7 +1294,7 @@ function cko_enqueue_frontend_assets() {
 		$flow_customization['flow_component_name'] = 'flow';
 	}
 
-	if ( 'flow' === $checkout_mode ) {
+	if ( 'flow' === $checkout_mode && ! cko_is_block_checkout() ) {
 		// Add resource hints for faster DNS resolution and connection to Checkout.com
 		add_action( 'wp_head', 'cko_add_flow_resource_hints', 1 );
 		

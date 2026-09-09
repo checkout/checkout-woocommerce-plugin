@@ -24,6 +24,12 @@ const CheckoutComCardsContent = ( props ) => {
 	const tokenRef = useRef( '' );
 	const readyRef = useRef( false );
 
+	// Latest emitResponse/billing in a ref so onPaymentSetup subscribes once with stable
+	// deps — depending on emitResponse/billing (fresh each render) re-subscribes every
+	// render and loops ("Maximum update depth exceeded").
+	const latestRef = useRef( { emitResponse, billing } );
+	latestRef.current = { emitResponse, billing };
+
 	// Load Frames and initialise the card form once.
 	useEffect( () => {
 		let cancelled = false;
@@ -80,16 +86,18 @@ const CheckoutComCardsContent = ( props ) => {
 	// On payment setup, tokenise and return the token as cko-card-token.
 	useEffect( () => {
 		const unsubscribe = onPaymentSetup( async () => {
+			const { emitResponse: emit, billing: bill } = latestRef.current;
+			const { responseTypes } = emit;
 			try {
 				if ( ! window.Frames ) {
 					return {
-						type: emitResponse.responseTypes.ERROR,
+						type: responseTypes.ERROR,
 						message: __( 'Card form is not ready. Please try again.', 'checkout-com-unified-payments-api' ),
 					};
 				}
 
 				// Attach cardholder name before submitting.
-				const name = getCardholderName( billing );
+				const name = getCardholderName( bill );
 				if ( name ) {
 					window.Frames.cardholder = { name };
 				}
@@ -100,13 +108,13 @@ const CheckoutComCardsContent = ( props ) => {
 
 				if ( ! token ) {
 					return {
-						type: emitResponse.responseTypes.ERROR,
+						type: responseTypes.ERROR,
 						message: __( 'Please enter valid card details.', 'checkout-com-unified-payments-api' ),
 					};
 				}
 
 				return {
-					type: emitResponse.responseTypes.SUCCESS,
+					type: responseTypes.SUCCESS,
 					meta: {
 						paymentMethodData: {
 							'cko-card-token': token,
@@ -118,7 +126,7 @@ const CheckoutComCardsContent = ( props ) => {
 					window.Frames.enableSubmitForm();
 				}
 				return {
-					type: emitResponse.responseTypes.ERROR,
+					type: responseTypes.ERROR,
 					message:
 						( err && err.message ) ||
 						__( 'Card tokenization failed. Please check your details and try again.', 'checkout-com-unified-payments-api' ),
@@ -127,7 +135,9 @@ const CheckoutComCardsContent = ( props ) => {
 		} );
 
 		return () => unsubscribe();
-	}, [ onPaymentSetup, emitResponse, billing ] );
+		// Subscribe exactly once on mount (see note in flow.js) to avoid a re-render loop.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [] );
 
 	return <div className="cko-blocks-card-form"><div className="card-frame"></div></div>;
 };
