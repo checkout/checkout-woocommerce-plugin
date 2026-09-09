@@ -9167,6 +9167,23 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		
 		WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] ✅ Nonce verification PASSED' );
 
+		// Blocks save-card: persist the customer's "save card" choice into the WC session here,
+		// at the one step that is guaranteed to run right before payment (and any 3DS full-page
+		// redirect). On the 3DS path the Blocks paymentMethodData is lost, but the session value
+		// survives the redirect and is read by the save-card check in process_payment. Mirrors the
+		// classic cko_flow_store_save_card_preference AJAX, without depending on a separate call.
+		if ( isset( $_POST['save_card'] ) ) {
+			$blocks_save_card = sanitize_text_field( wp_unslash( $_POST['save_card'] ) );
+			$blocks_save_card = ( 'yes' === $blocks_save_card || 'true' === $blocks_save_card ) ? 'yes' : 'no';
+			if ( WC()->session ) {
+				if ( ! WC()->session->has_session() ) {
+					WC()->session->set_customer_session_cookie( true );
+				}
+				WC()->session->set( 'wc-wc_checkout_com_flow-new-payment-method', $blocks_save_card );
+				WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Stored Blocks save-card preference in session: ' . $blocks_save_card );
+			}
+		}
+
 		// Get parameters from POST
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- payment_session_id is alphanumeric ID from Checkout.com
 		$payment_session_id = isset( $_POST['payment_session_id'] ) ? sanitize_text_field( wp_unslash( $_POST['payment_session_id'] ) ) : '';

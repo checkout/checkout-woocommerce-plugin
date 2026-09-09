@@ -53,7 +53,7 @@ const buildCustomer = ( billing ) => {
 };
 
 const CheckoutComFlowContent = ( props ) => {
-	const { eventRegistration, emitResponse, billing } = props;
+	const { eventRegistration, emitResponse, billing, shouldSavePayment } = props;
 	const { onPaymentSetup } = eventRegistration;
 	const containerRef = useRef( null );
 	const paymentRef = useRef( { id: '', type: 'card' } );
@@ -61,6 +61,13 @@ const CheckoutComFlowContent = ( props ) => {
 	const sessionIdRef = useRef( '' );
 	const billingRef = useRef( billing );
 	billingRef.current = billing;
+
+	// Blocks toggles this via the "save payment information" checkbox (shown because the
+	// method supports tokenization). Kept in a ref so the once-subscribed onPaymentSetup
+	// reads the latest value. Sent as cko-flow-save-card-persist so the server stamps
+	// _cko_save_card_preference and flow_save_cards() stores the token after payment.
+	const shouldSaveRef = useRef( shouldSavePayment );
+	shouldSaveRef.current = shouldSavePayment;
 
 	// Keep the latest emitResponse in a ref so the onPaymentSetup effect can subscribe
 	// exactly once (stable deps) without re-subscribing every render — re-subscribing on
@@ -89,6 +96,16 @@ const CheckoutComFlowContent = ( props ) => {
 					reference: 'wc-blocks-' + Date.now(),
 					success_url: window.location.origin + '/?wc-api=wc_checkoutcom_flow_process',
 					failure_url: window.location.href,
+					// Vault the card so Checkout.com returns source.id (needed to store a WC token).
+					// Mirrors the classic payment-session.js: store_payment_details is "enabled"
+					// whenever the admin "Enable Save Cards" setting is on — not the per-order
+					// checkbox. The checkbox only gates whether the WC saved-card token is persisted
+					// afterwards (handled server-side via the save-card preference).
+					payment_method_configuration: {
+						card: {
+							store_payment_details: settings.save_card_enabled ? 'enabled' : 'disabled',
+						},
+					},
 				};
 				const billingObj = buildBilling( billing );
 				if ( billingObj ) {
@@ -135,6 +152,9 @@ const CheckoutComFlowContent = ( props ) => {
 							nonce: settings.create_session_nonce || '',
 							payment_session_id: sessionIdRef.current,
 							session_data: ( submitData && submitData.session_data ) ? submitData.session_data : '',
+							// Persist the save-card choice server-side (into the WC session) at submit time,
+							// so it survives a 3DS full-page redirect where paymentMethodData is lost.
+							save_card: shouldSaveRef.current ? 'yes' : 'no',
 						} );
 						const billingObj2 = buildBilling( bill );
 						if ( billingObj2 ) {
@@ -186,6 +206,28 @@ const CheckoutComFlowContent = ( props ) => {
 		const unsubscribe = onPaymentSetup( async () => {
 			const { responseTypes } = emitRef.current;
 			try {
+				// Persist the save-card choice into the WC session BEFORE submit. On the 3DS
+				// path the payment completes via a full-page redirect (handle_3ds_return) with
+				// no POST body, so the paymentMethodData below never reaches the server; the
+				// session value does, and the save-card check reads it. Mirrors the classic
+				// cko_flow_store_save_card_preference AJAX. Harmless for guests (they can't save).
+				if ( settings.store_save_card_url ) {
+					try {
+						await fetch( settings.store_save_card_url, {
+							method: 'POST',
+							headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+							credentials: 'same-origin',
+							body: new URLSearchParams( {
+								action: 'cko_flow_store_save_card_preference',
+								nonce: settings.create_session_nonce || '',
+								save_card_value: shouldSaveRef.current ? 'yes' : 'no',
+							} ),
+						} );
+					} catch ( persistErr ) {
+						// Non-fatal: the inline (non-3DS) path still carries the flag in paymentMethodData.
+					}
+				}
+
 				// Ask the mounted Flow component to submit / tokenise.
 				if ( flowComponentRef.current && flowComponentRef.current.submit ) {
 					await flowComponentRef.current.submit();
@@ -206,6 +248,7 @@ const CheckoutComFlowContent = ( props ) => {
 							'cko-flow-payment-id': id,
 							'cko-flow-payment-type': type,
 							'cko-flow-payment-session-id': sessionIdRef.current,
+							'cko-flow-save-card-persist': shouldSaveRef.current ? 'yes' : 'no',
 						},
 					},
 				};
@@ -230,14 +273,100 @@ const CheckoutComFlowContent = ( props ) => {
 	);
 };
 
+/**
+ * Rendered when a saved card is selected (instead of the Flow SDK). Replicates the classic
+ * saved-card path: rather than creating/submitting a Flow payment session, it hands the WC
+ * token id to the server under `wc-wc_checkout_com_flow-payment-token`. The existing
+ * process_payment() -> is_using_saved_payment_method() -> create_payment() RequestIdSource
+ * branch then charges the stored source (src_...) directly via the Checkout.com API.
+ *
+ * Blocks passes the selected token id in as the `token` prop.
+ */
+const CheckoutComFlowSavedToken = ( props ) => {
+	const { eventRegistration, emitResponse, token } = props;
+	const { onPaymentSetup } = eventRegistration;
+	const cvvRef = useRef( '' );
+
+	// Latest emitResponse/token in a ref so onPaymentSetup subscribes once (stable deps).
+	const latestRef = useRef( { emitResponse, token } );
+	latestRef.current = { emitResponse, token };
+
+	useEffect( () => {
+		const unsubscribe = onPaymentSetup( async () => {
+			const { emitResponse: emit, token: tok } = latestRef.current;
+			const { responseTypes } = emit;
+
+			if ( ! tok ) {
+				return {
+					type: responseTypes.ERROR,
+					message: __( 'Please select a saved card.', 'checkout-com-unified-payments-api' ),
+				};
+			}
+
+			const paymentMethodData = {
+				// Field the classic is_using_saved_payment_method() reads (value = WC token id).
+				'wc-wc_checkout_com_flow-payment-token': String( tok ),
+				// Ensures the server resolves the Flow token field (not the default cards one).
+				payment_method: PAYMENT_METHOD_NAME,
+			};
+
+			if ( settings.require_cvv ) {
+				if ( ! cvvRef.current ) {
+					return {
+						type: responseTypes.ERROR,
+						message: __( 'Please enter your card security code.', 'checkout-com-unified-payments-api' ),
+					};
+				}
+				// Same field create_payment() reads when CVV is required for saved cards.
+				paymentMethodData[ 'wc_checkout_com_cards-card-cvv' ] = cvvRef.current;
+			}
+
+			return {
+				type: responseTypes.SUCCESS,
+				meta: { paymentMethodData },
+			};
+		} );
+
+		return () => unsubscribe();
+		// Subscribe exactly once on mount (see note in the content component).
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [] );
+
+	if ( ! settings.require_cvv ) {
+		return null;
+	}
+
+	return (
+		<div className="cko-blocks-saved-card-cvv">
+			<label htmlFor="cko-flow-saved-cvv">
+				{ __( 'Card security code', 'checkout-com-unified-payments-api' ) }
+			</label>
+			<input
+				id="cko-flow-saved-cvv"
+				type="text"
+				inputMode="numeric"
+				autoComplete="cc-csc"
+				maxLength="4"
+				onChange={ ( e ) => {
+					cvvRef.current = ( e.target.value || '' ).replace( /\D/g, '' );
+				} }
+			/>
+		</div>
+	);
+};
+
 registerPaymentMethod( {
 	name: PAYMENT_METHOD_NAME,
 	label: settings.title || __( 'Checkout.com', 'checkout-com-unified-payments-api' ),
 	ariaLabel: settings.description || 'Checkout.com Flow',
 	content: <CheckoutComFlowContent />,
+	savedTokenComponent: <CheckoutComFlowSavedToken />,
 	edit: <div>{ settings.title || __( 'Checkout.com', 'checkout-com-unified-payments-api' ) }</div>,
 	canMakePayment: () => true,
 	supports: {
 		features: settings.supports || [ 'products' ],
+		// Render the saved-card radio list and the save-card checkbox (logged-in users only).
+		showSavedCards: true,
+		showSaveOption: true,
 	},
 } );

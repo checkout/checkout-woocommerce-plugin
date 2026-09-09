@@ -89,6 +89,23 @@ final class WC_Checkoutcom_Flow_Blocks_Integration extends AbstractPaymentMethod
         // Both create and submit verify this nonce (action 'cko_flow_payment_session').
         $create_session_nonce = wp_create_nonce( 'cko_flow_payment_session' );
 
+        // admin-ajax endpoint that persists the "save card" choice into the WC session
+        // (action cko_flow_store_save_card_preference, same nonce). Needed so the preference
+        // survives the 3DS full-page redirect — on that path the Blocks paymentMethodData is
+        // lost, exactly as in the classic front-end.
+        $store_save_card_url = admin_url( 'admin-ajax.php' );
+
+        // Whether a CVV is required when paying with a saved card. Mirrors the classic
+        // create_payment() check (WC_Checkoutcom_Api_Request), which reads
+        // wc_checkout_com_cards-card-cvv when this admin setting is on.
+        $require_cvv = (bool) WC_Admin_Settings::get_option( 'ckocom_card_require_cvv' );
+
+        // Whether the "Enable Save Cards" admin feature is on. Classic Flow vaults the card by
+        // sending payment_method_configuration.card.store_payment_details = "enabled" in the
+        // create-session body whenever this admin setting is on (not the per-order checkbox);
+        // that is what makes Checkout.com return source.id so a token can be stored later.
+        $save_card_enabled = (bool) WC_Admin_Settings::get_option( 'ckocom_card_saved' );
+
         return [
             'title'       => $this->get_setting( 'title' ),
             'description' => $this->get_setting( 'description' ),
@@ -98,14 +115,23 @@ final class WC_Checkoutcom_Flow_Blocks_Integration extends AbstractPaymentMethod
             'currency'    => get_woocommerce_currency(),
             'create_session_url' => $create_session_url,
             'submit_session_url' => $submit_session_url,
+            'store_save_card_url' => $store_save_card_url,
             'create_session_nonce' => $create_session_nonce,
+            'is_user_logged_in' => is_user_logged_in(),
             'enabled_payment_methods' => $this->get_setting( 'flow_enabled_payment_methods', [] ),
             'saved_payment_display_order' => $this->get_setting( 'saved_payment_display_order', 'saved_cards_first' ),
+            'require_cvv' => $require_cvv,
+            'save_card_enabled' => $save_card_enabled,
         ];
     }
 
     /**
      * Returns an array of supported features.
+     *
+     * 'tokenization' lets WooCommerce Blocks render the saved-card radio list and the
+     * "save payment information" checkbox for this method. Saved Flow cards are stored as
+     * WC_Payment_Token_CC rows under this gateway id ('wc_checkout_com_flow'), so Blocks
+     * matches and displays them automatically.
      *
      * @return string[]
      */
@@ -113,6 +139,7 @@ final class WC_Checkoutcom_Flow_Blocks_Integration extends AbstractPaymentMethod
         return apply_filters( 'wc_checkoutcom_flow_supported_features', [
             'products',
             'refunds',
+            'tokenization',
         ] );
     }
 }
