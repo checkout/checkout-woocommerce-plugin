@@ -81,8 +81,9 @@ const CheckoutComFlowContent = ( props ) => {
 				}
 
 				// The server re-derives amount/items/currency from the live WooCommerce cart, so this
-				// request only needs the fields the server doesn't fill. Success/failure URLs cover the
-				// 3DS redirect fallback; Flow itself completes via the onPaymentCompleted callback.
+				// request only needs the fields the server doesn't fill. success_url/failure_url are
+				// REQUIRED by Checkout.com's Create Payment Session API — a redirect 3DS challenge
+				// returns to wc_checkoutcom_flow_process, which finalises the order server-side.
 				const paymentSessionRequest = {
 					currency: settings.currency,
 					reference: 'wc-blocks-' + Date.now(),

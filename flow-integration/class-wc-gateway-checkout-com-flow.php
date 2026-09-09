@@ -83,6 +83,12 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// This allows direct redirect to order-received page without showing checkout page
 		add_action( 'woocommerce_api_wc_checkoutcom_flow_process', [ $this, 'handle_3ds_return' ] );
 
+		// WooCommerce Blocks (Store API) checkout does NOT run the classic handle_3ds_return()
+		// path that empties the cart (that runs only on the redirect return used by the classic
+		// checkout). So on a Store API checkout for this gateway, empty the cart once the order is
+		// processed. This action only fires for Blocks/Store API requests, so classic is untouched.
+		add_action( 'woocommerce_store_api_checkout_order_processed', [ $this, 'blocks_empty_cart_after_order' ], 20 );
+
 		// WC API endpoint for the My Account → Add payment method return. Flow redirects here
 		// (incl. after 3DS) once the $0 card verification completes; we tokenise the card.
 		add_action( 'woocommerce_api_wc_checkoutcom_flow_add_payment_method', [ $this, 'handle_add_payment_method_return' ] );
@@ -160,6 +166,28 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		$preserve_card_enabled = isset( $flow_settings['flow_preserve_card_on_update'] ) && 'yes' === $flow_settings['flow_preserve_card_on_update'];
 		if ( $preserve_card_enabled ) {
 			add_filter( 'woocommerce_update_order_review_fragments', [ $this, 'exclude_payment_method_from_fragments' ], 10, 1 );
+		}
+	}
+
+	/**
+	 * Empty the cart after a WooCommerce Blocks (Store API) checkout for this gateway.
+	 *
+	 * The classic checkout empties the cart in handle_3ds_return() (the redirect return path),
+	 * which the Blocks/Store API flow never runs — so without this the cart lingers after a
+	 * successful block-checkout order. Fires only on Store API checkout requests.
+	 *
+	 * @param WC_Order $order The processed order.
+	 * @return void
+	 */
+	public function blocks_empty_cart_after_order( $order ) {
+		if ( ! $order instanceof WC_Order ) {
+			return;
+		}
+		if ( 'wc_checkout_com_flow' !== $order->get_payment_method() ) {
+			return;
+		}
+		if ( function_exists( 'WC' ) && WC()->cart ) {
+			WC()->cart->empty_cart( true );
 		}
 	}
 
@@ -2742,14 +2770,21 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					WC_Checkoutcom_Utility::logger( '[DUPLICATE PREVENTION] ✅ Updated order status from ' . $current_order_status_txn . ' to ' . $auth_status . ' (no webhook yet, transaction ID check) - Order ID: ' . $order_id );
 				}
 			}
-			
+
+			// Payment is finalised on this order — empty the cart. This branch is reached for the
+			// 3DS redirect return (handle_3ds_return -> process_payment) which otherwise never hits
+			// the empty_cart() at the end of process_payment, leaving items in the cart.
+			if ( function_exists( 'WC' ) && WC()->cart ) {
+				WC()->cart->empty_cart();
+			}
+
 			// Return success to prevent error, but don't process again
 			return array(
 				'result'   => 'success',
 				'redirect' => $this->get_return_url( $order ),
 			);
 		}
-		
+
 		// DUPLICATE PREVENTION: Check if this payment ID already has an order (global check)
 		if ( ! empty( $flow_payment_id ) ) {
 			// Check if payment ID already has an order (prevents duplicate orders)
@@ -2911,6 +2946,14 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					}
 				}
 				
+				// Payment is finalised on this order — empty the cart. This payment-ID duplicate branch
+				// is the one reached on the 3DS redirect return (handle_3ds_return -> process_payment),
+				// which otherwise never reaches the empty_cart() at the end of process_payment, leaving
+				// items in the cart on the Blocks checkout.
+				if ( function_exists( 'WC' ) && WC()->cart ) {
+					WC()->cart->empty_cart();
+				}
+
 				// Return success to prevent error, but don't process again
 				return array(
 					'result'   => 'success',
@@ -2918,7 +2961,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				);
 			}
 		}
-		
+
 	$flow_result = null;
 
 	$subs_payment_type = null;
