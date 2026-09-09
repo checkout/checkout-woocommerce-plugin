@@ -58,6 +58,9 @@ const CheckoutComFlowContent = ( props ) => {
 	const containerRef = useRef( null );
 	const paymentRef = useRef( { id: '', type: 'card' } );
 	const flowComponentRef = useRef( null );
+	const sessionIdRef = useRef( '' );
+	const billingRef = useRef( billing );
+	billingRef.current = billing;
 
 	// Keep the latest emitResponse in a ref so the onPaymentSetup effect can subscribe
 	// exactly once (stable deps) without re-subscribing every render — re-subscribing on
@@ -112,10 +115,43 @@ const CheckoutComFlowContent = ( props ) => {
 					return;
 				}
 
+				// Remember the session id — needed by the submit bridge below.
+				sessionIdRef.current = ( session.data && session.data.id ) ? session.data.id : '';
+
 				const checkout = await window.CheckoutWebComponents( {
 					publicKey: settings.public_key,
 					environment: settings.environment === 'PRODUCTION' ? 'production' : 'sandbox',
 					paymentSession: session.data,
+					// The SDK calls handleSubmit when the payment is submitted (we drive submit() from the
+					// Place Order button). This bridges to the server's cko_flow_submit_payment_session,
+					// which re-derives the amount from the cart/order, sets capture_on and enables 3DS,
+					// then calls Checkout.com's /payment-sessions/{id}/submit. Mirrors the classic flow —
+					// the SDK must NOT use its default submit.
+					handleSubmit: async ( _self, submitData ) => {
+						const bill = billingRef.current;
+						const body = new URLSearchParams( {
+							action: 'cko_flow_submit_payment_session',
+							nonce: settings.create_session_nonce || '',
+							payment_session_id: sessionIdRef.current,
+							session_data: ( submitData && submitData.session_data ) ? submitData.session_data : '',
+						} );
+						const billingObj2 = buildBilling( bill );
+						if ( billingObj2 ) {
+							body.append( 'billing', JSON.stringify( billingObj2 ) );
+						}
+						const res = await fetch( settings.submit_session_url, {
+							method: 'POST',
+							headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+							credentials: 'same-origin',
+							body,
+						} );
+						const json = await res.json();
+						if ( ! json || ! json.success ) {
+							throw new Error( ( json && json.data && json.data.message ) || 'Payment submission failed.' );
+						}
+						// Return the Checkout.com submit result to the SDK so it can complete / run 3DS.
+						return json.data;
+					},
 					onPaymentCompleted: ( _component, paymentResponse ) => {
 						paymentRef.current = {
 							id: paymentResponse && paymentResponse.id ? paymentResponse.id : '',
@@ -168,6 +204,7 @@ const CheckoutComFlowContent = ( props ) => {
 						paymentMethodData: {
 							'cko-flow-payment-id': id,
 							'cko-flow-payment-type': type,
+							'cko-flow-payment-session-id': sessionIdRef.current,
 						},
 					},
 				};

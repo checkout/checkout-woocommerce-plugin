@@ -80,7 +80,13 @@ final class WC_Checkoutcom_Flow_Blocks_Integration extends AbstractPaymentMethod
             ? WC_AJAX::get_endpoint( 'cko_flow_create_payment_session' )
             : admin_url( 'admin-ajax.php?action=cko_flow_create_payment_session' );
 
-        // ajax_create_payment_session() verifies this nonce (action 'cko_flow_payment_session').
+        // The submit step (server finalises amount/capture_on and calls Checkout.com's
+        // /payment-sessions/{id}/submit) — same nonce action as create.
+        $submit_session_url = class_exists( 'WC_AJAX' )
+            ? WC_AJAX::get_endpoint( 'cko_flow_submit_payment_session' )
+            : admin_url( 'admin-ajax.php?action=cko_flow_submit_payment_session' );
+
+        // Both create and submit verify this nonce (action 'cko_flow_payment_session').
         $create_session_nonce = wp_create_nonce( 'cko_flow_payment_session' );
 
         return [
@@ -91,6 +97,7 @@ final class WC_Checkoutcom_Flow_Blocks_Integration extends AbstractPaymentMethod
             'public_key'  => $core_settings['ckocom_pk'] ?? '',
             'currency'    => get_woocommerce_currency(),
             'create_session_url' => $create_session_url,
+            'submit_session_url' => $submit_session_url,
             'create_session_nonce' => $create_session_nonce,
             'enabled_payment_methods' => $this->get_setting( 'flow_enabled_payment_methods', [] ),
             'saved_payment_display_order' => $this->get_setting( 'saved_payment_display_order', 'saved_cards_first' ),
