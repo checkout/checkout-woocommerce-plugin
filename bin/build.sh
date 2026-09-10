@@ -131,6 +131,8 @@ rsync -av --inplace \
   --exclude='.github' \
   --exclude='.editorconfig' \
   --exclude='.nvmrc' \
+  --exclude='.husky' \
+  --exclude='package.json' \
   --exclude='.claude' \
   --exclude='.tmp' \
   --exclude='*.zip' \
