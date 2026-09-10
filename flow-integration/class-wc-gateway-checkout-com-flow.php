@@ -98,6 +98,14 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// Priority 1 ensures it runs very early, before other template_redirect hooks
 		add_action( 'template_redirect', [ $this, 'detect_and_process_3ds_return_on_checkout' ], 1 );
 
+		// Hide this plugin's saved cards from the checkout saved-methods list when the admin
+		// "Enable Save Cards" setting is off. WooCommerce builds the Blocks `customerPaymentMethods`
+		// (and the classic saved-card radios) from this list independently of the payment method's
+		// `supports` flags, so gating only the Blocks integration's tokenization/showSavedCards is
+		// not enough — the tokens still render. Not applied on My Account so customers can still
+		// view/delete existing cards there.
+		add_filter( 'woocommerce_saved_payment_methods_list', [ $this, 'maybe_hide_saved_cards_when_disabled' ], 20, 2 );
+
 		// Meta field on subscription edit.
 		add_filter( 'woocommerce_subscription_payment_meta', [ $this, 'add_payment_meta_field' ], 10, 2 );
 		
@@ -189,6 +197,45 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		if ( function_exists( 'WC' ) && WC()->cart ) {
 			WC()->cart->empty_cart( true );
 		}
+	}
+
+	/**
+	 * Remove Checkout.com (Flow + classic Cards) saved cards from the checkout saved-methods
+	 * list when the "Enable Save Cards" admin setting is off, so they are not offered on the
+	 * Blocks or classic checkout. Left intact on My Account so customers can still manage them.
+	 *
+	 * @param array $list        Saved methods grouped by type (e.g. 'cc').
+	 * @param int   $customer_id Customer ID.
+	 * @return array
+	 */
+	public function maybe_hide_saved_cards_when_disabled( $list, $customer_id ) {
+		if ( (bool) WC_Admin_Settings::get_option( 'ckocom_card_saved' ) ) {
+			return $list;
+		}
+
+		// Keep the saved-cards management list on My Account intact.
+		if ( function_exists( 'is_account_page' ) && is_account_page() ) {
+			return $list;
+		}
+
+		$our_gateways = [ 'wc_checkout_com_flow', 'wc_checkout_com_cards' ];
+
+		foreach ( $list as $type => $tokens ) {
+			if ( ! is_array( $tokens ) ) {
+				continue;
+			}
+			foreach ( $tokens as $key => $token ) {
+				$gateway = isset( $token['method']['gateway'] ) ? $token['method']['gateway'] : '';
+				if ( in_array( $gateway, $our_gateways, true ) ) {
+					unset( $list[ $type ][ $key ] );
+				}
+			}
+			if ( empty( $list[ $type ] ) ) {
+				unset( $list[ $type ] );
+			}
+		}
+
+		return $list;
 	}
 
 	/**

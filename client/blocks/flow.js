@@ -14,6 +14,7 @@ import { registerPaymentMethod } from '@woocommerce/blocks-registry';
 import { getSetting } from '@woocommerce/settings';
 import { useEffect, useRef } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
+import { dispatch } from '@wordpress/data';
 import { loadScript } from './shared';
 
 const PAYMENT_METHOD_NAME = 'wc_checkout_com_flow';
@@ -52,6 +53,38 @@ const buildCustomer = ( billing ) => {
 	};
 };
 
+/**
+ * Map a Flow SDK error / decline into a human message, mirroring the classic
+ * payment-session.js onError handling. A declined payment surfaces here (not as an
+ * HTTP error) because Checkout.com returns 201 for a decline and the SDK raises it
+ * via onError as `payment_request_declined`.
+ */
+const mapFlowError = ( error ) => {
+	let raw = '';
+	if ( typeof error === 'string' ) {
+		raw = error;
+	} else if ( error && error.message ) {
+		raw = String( error.message );
+	} else if ( error ) {
+		try {
+			raw = JSON.stringify( error );
+		} catch ( e ) {
+			raw = String( error );
+		}
+	}
+	const lower = raw.toLowerCase();
+	if ( lower.indexOf( 'payment_request_declined' ) !== -1 || lower.indexOf( 'declined' ) !== -1 ) {
+		return __( 'Your payment was declined. Please check your card details and try again, or use a different payment method.', 'checkout-com-unified-payments-api' );
+	}
+	if ( lower.indexOf( 'component_invalid' ) !== -1 ) {
+		return __( 'Please complete your payment details before placing the order.', 'checkout-com-unified-payments-api' );
+	}
+	if ( lower.indexOf( 'payment_request_failed' ) !== -1 || lower.indexOf( 'network' ) !== -1 ) {
+		return __( 'Payment request failed. Please try again.', 'checkout-com-unified-payments-api' );
+	}
+	return __( 'Something went wrong with your payment. Please try again.', 'checkout-com-unified-payments-api' );
+};
+
 const CheckoutComFlowContent = ( props ) => {
 	const { eventRegistration, emitResponse, billing, shouldSavePayment } = props;
 	const { onPaymentSetup } = eventRegistration;
@@ -75,6 +108,11 @@ const CheckoutComFlowContent = ( props ) => {
 	const emitRef = useRef( emitResponse );
 	emitRef.current = emitResponse;
 
+	// Holds the latest real CKO error/decline message (set by the SDK onError or a session
+	// create failure) so onPaymentSetup can surface it in the Blocks notice area instead of
+	// a generic fallback.
+	const errorRef = useRef( '' );
+
 	// Create a payment session and mount the Flow component.
 	useEffect( () => {
 		let cancelled = false;
@@ -95,7 +133,11 @@ const CheckoutComFlowContent = ( props ) => {
 					currency: settings.currency,
 					reference: 'wc-blocks-' + Date.now(),
 					success_url: window.location.origin + '/?wc-api=wc_checkoutcom_flow_process',
-					failure_url: window.location.href,
+					// On a 3DS decline, Checkout.com redirects (full page) to failure_url. Bring the
+					// shopper back to the checkout page with a marker we detect on load to show a
+					// Blocks error notice — otherwise the decline is invisible on Blocks (no classic
+					// WC notice is rendered). See surfaceFailedReturn().
+					failure_url: window.location.origin + window.location.pathname + '?cko_flow_status=failed',
 					// Vault the card so Checkout.com returns source.id (needed to store a WC token).
 					// Mirrors the classic payment-session.js: store_payment_details is "enabled"
 					// whenever the admin "Enable Save Cards" setting is on — not the per-order
@@ -130,6 +172,11 @@ const CheckoutComFlowContent = ( props ) => {
 				const session = await response.json();
 
 				if ( cancelled || ! window.CheckoutWebComponents || ! session || ! session.success ) {
+					// Session creation failed — remember a message so onPaymentSetup can surface it.
+					if ( ! cancelled && session && ! session.success ) {
+						errorRef.current = ( session.data && session.data.message )
+							|| __( 'Unable to start the payment. Please refresh the page and try again.', 'checkout-com-unified-payments-api' );
+					}
 					return;
 				}
 
@@ -170,14 +217,41 @@ const CheckoutComFlowContent = ( props ) => {
 						if ( ! json || ! json.success ) {
 							throw new Error( ( json && json.data && json.data.message ) || 'Payment submission failed.' );
 						}
+						const data = json.data || {};
+						// A declined payment comes back as HTTP 201 "success" with status "Declined"
+						// (approved:false) and NO further action. The SDK doesn't reliably raise this,
+						// so detect it here and throw — that rejects submit() and onPaymentSetup surfaces
+						// the message. A 3DS challenge (data.action.url) is NOT a decline: let it through.
+						const hasAction = !! ( data.action && data.action.url );
+						const isDeclined = data.approved === false
+							|| ( typeof data.status === 'string' && /declin|fail|expired|cancel/i.test( data.status ) );
+						if ( ! hasAction && isDeclined ) {
+							errorRef.current = data.response_summary || mapFlowError( 'payment_request_declined' );
+							throw new Error( errorRef.current );
+						}
 						// Return the Checkout.com submit result to the SDK so it can complete / run 3DS.
-						return json.data;
+						return data;
 					},
 					onPaymentCompleted: ( _component, paymentResponse ) => {
+						// Guard against a declined response arriving here: don't hand a declined
+						// payment id back to Blocks as success.
+						const declined = paymentResponse
+							&& ( paymentResponse.approved === false
+								|| ( typeof paymentResponse.status === 'string' && /declin|fail/i.test( paymentResponse.status ) ) );
+						if ( declined ) {
+							errorRef.current = paymentResponse.response_summary || mapFlowError( 'payment_request_declined' );
+							paymentRef.current = { id: '', type: 'card' };
+							return;
+						}
 						paymentRef.current = {
 							id: paymentResponse && paymentResponse.id ? paymentResponse.id : '',
 							type: ( paymentResponse && paymentResponse.payment_type ) || 'card',
 						};
+					},
+					// Declines and SDK failures come through here (a decline is HTTP 201, so it is
+					// not thrown by handleSubmit). Store the mapped message for onPaymentSetup.
+					onError: ( _component, error ) => {
+						errorRef.current = mapFlowError( error );
 					},
 				} );
 
@@ -206,30 +280,15 @@ const CheckoutComFlowContent = ( props ) => {
 		const unsubscribe = onPaymentSetup( async () => {
 			const { responseTypes } = emitRef.current;
 			try {
-				// Persist the save-card choice into the WC session BEFORE submit. On the 3DS
-				// path the payment completes via a full-page redirect (handle_3ds_return) with
-				// no POST body, so the paymentMethodData below never reaches the server; the
-				// session value does, and the save-card check reads it. Mirrors the classic
-				// cko_flow_store_save_card_preference AJAX. Harmless for guests (they can't save).
-				if ( settings.store_save_card_url ) {
-					try {
-						await fetch( settings.store_save_card_url, {
-							method: 'POST',
-							headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-							credentials: 'same-origin',
-							body: new URLSearchParams( {
-								action: 'cko_flow_store_save_card_preference',
-								nonce: settings.create_session_nonce || '',
-								save_card_value: shouldSaveRef.current ? 'yes' : 'no',
-							} ),
-						} );
-					} catch ( persistErr ) {
-						// Non-fatal: the inline (non-3DS) path still carries the flag in paymentMethodData.
-					}
-				}
+				// Note: the save-card choice is persisted server-side by the submit-session call
+				// (save_card param -> WC session), which is the step guaranteed to run before any
+				// 3DS redirect. No separate preference AJAX is needed here.
 
 				// Ask the mounted Flow component to submit / tokenise.
 				if ( flowComponentRef.current && flowComponentRef.current.submit ) {
+					// Reset any stale decline/error from a previous attempt so onError reflects
+					// this submit. A session-create failure error is kept (no component to submit).
+					errorRef.current = '';
 					await flowComponentRef.current.submit();
 				}
 
@@ -237,7 +296,8 @@ const CheckoutComFlowContent = ( props ) => {
 				if ( ! id ) {
 					return {
 						type: responseTypes.ERROR,
-						message: __( 'Payment could not be completed. Please try again.', 'checkout-com-unified-payments-api' ),
+						message: errorRef.current
+							|| __( 'Payment could not be completed. Please try again.', 'checkout-com-unified-payments-api' ),
 					};
 				}
 
@@ -255,7 +315,11 @@ const CheckoutComFlowContent = ( props ) => {
 			} catch ( err ) {
 				return {
 					type: responseTypes.ERROR,
-					message: ( err && err.message ) || __( 'Payment failed. Please try again.', 'checkout-com-unified-payments-api' ),
+					// Prefer the mapped SDK/decline message; fall back to the thrown server
+					// message (submit HTTP >=400 carries CKO error_codes) then a generic one.
+					message: errorRef.current
+						|| ( err && err.message )
+						|| __( 'Payment failed. Please try again.', 'checkout-com-unified-payments-api' ),
 				};
 			}
 		} );
@@ -355,6 +419,49 @@ const CheckoutComFlowSavedToken = ( props ) => {
 	);
 };
 
+/**
+ * Detect a return from a failed 3DS challenge and surface it as a Blocks error notice.
+ *
+ * On a 3DS decline Checkout.com does a full-page redirect to our failure_url (the checkout
+ * page + `?cko_flow_status=failed`). Blocks does not render the classic WooCommerce notice
+ * that the server sets, so without this the decline is invisible. We push an error notice
+ * into the checkout context and strip the marker (and CKO's appended params) from the URL so
+ * a refresh does not re-show it.
+ */
+const surfaceFailedReturn = () => {
+	try {
+		const params = new URLSearchParams( window.location.search );
+		if ( params.get( 'cko_flow_status' ) !== 'failed' ) {
+			return;
+		}
+
+		const notices = dispatch( 'core/notices' );
+		if ( notices && notices.createErrorNotice ) {
+			notices.createErrorNotice(
+				__( 'Your payment was not completed. Please try again or use a different payment method.', 'checkout-com-unified-payments-api' ),
+				{ context: 'wc/checkout', id: 'cko-flow-failed' }
+			);
+		}
+
+		// Remove our marker and Checkout.com's appended params so the notice is one-shot.
+		[ 'cko_flow_status', 'cko-payment-id', 'cko-payment-session-id', 'cko-session-id' ].forEach(
+			( key ) => params.delete( key )
+		);
+		const qs = params.toString();
+		window.history.replaceState( {}, '', window.location.pathname + ( qs ? '?' + qs : '' ) );
+	} catch ( e ) {
+		// no-op
+	}
+};
+
+if ( window.wp && typeof window.wp.domReady === 'function' ) {
+	window.wp.domReady( surfaceFailedReturn );
+} else if ( document.readyState !== 'loading' ) {
+	surfaceFailedReturn();
+} else {
+	document.addEventListener( 'DOMContentLoaded', surfaceFailedReturn );
+}
+
 registerPaymentMethod( {
 	name: PAYMENT_METHOD_NAME,
 	label: settings.title || __( 'Checkout.com', 'checkout-com-unified-payments-api' ),
@@ -365,8 +472,10 @@ registerPaymentMethod( {
 	canMakePayment: () => true,
 	supports: {
 		features: settings.supports || [ 'products' ],
-		// Render the saved-card radio list and the save-card checkbox (logged-in users only).
-		showSavedCards: true,
-		showSaveOption: true,
+		// Render the saved-card radio list and the save-card checkbox only when the admin
+		// "Enable Save Cards" setting is on — matches classic, which hides the saved-card list
+		// (and disables saving) when ckocom_card_saved is off.
+		showSavedCards: !! settings.save_card_enabled,
+		showSaveOption: !! settings.save_card_enabled,
 	},
 } );

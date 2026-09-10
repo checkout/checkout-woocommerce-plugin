@@ -136,10 +136,19 @@ final class WC_Checkoutcom_Flow_Blocks_Integration extends AbstractPaymentMethod
      * @return string[]
      */
     public function get_supported_features() {
-        return apply_filters( 'wc_checkoutcom_flow_supported_features', [
+        $features = [
             'products',
             'refunds',
-            'tokenization',
-        ] );
+        ];
+
+        // Only advertise tokenization when the admin "Enable Save Cards" setting is on. With it
+        // off, Blocks must not render the saved-card list or the save-card checkbox (matches
+        // classic, which hides both). Declaring tokenization is what makes Blocks surface saved
+        // tokens, so gate it here rather than only on the JS supports flags.
+        if ( (bool) WC_Admin_Settings::get_option( 'ckocom_card_saved' ) ) {
+            $features[] = 'tokenization';
+        }
+
+        return apply_filters( 'wc_checkoutcom_flow_supported_features', $features );
     }
 }
