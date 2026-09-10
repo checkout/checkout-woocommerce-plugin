@@ -933,6 +933,13 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 			return;
 		}
 
+		// Don't load the classic PayPal front-end on the block-based checkout — it mounts a
+		// PayPal button that isn't used there and pulls the PayPal SDK (causing a failed
+		// request). PayPal on Blocks is handled by the Blocks payment-method integration.
+		if ( function_exists( 'cko_is_block_checkout' ) && cko_is_block_checkout() ) {
+			return;
+		}
+
 		$core_settings = function_exists( 'cko_get_raw_option' )
 			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
 			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );

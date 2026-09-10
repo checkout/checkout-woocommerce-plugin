@@ -13,7 +13,7 @@
 import { registerPaymentMethod } from '@woocommerce/blocks-registry';
 import { getSetting } from '@woocommerce/settings';
 import { useEffect, useRef } from '@wordpress/element';
-import { __ } from '@wordpress/i18n';
+import { __, sprintf } from '@wordpress/i18n';
 import { dispatch } from '@wordpress/data';
 import { loadScript } from './shared';
 
@@ -428,19 +428,41 @@ const CheckoutComFlowSavedToken = ( props ) => {
  * into the checkout context and strip the marker (and CKO's appended params) from the URL so
  * a refresh does not re-show it.
  */
-const surfaceFailedReturn = () => {
+const surfaceFailedReturn = async () => {
 	try {
 		const params = new URLSearchParams( window.location.search );
 		if ( params.get( 'cko_flow_status' ) !== 'failed' ) {
 			return;
 		}
 
+		const genericMessage = __( 'Your payment was not completed. Please try again or use a different payment method.', 'checkout-com-unified-payments-api' );
+		let message = genericMessage;
+
+		// Try to show Checkout.com's actual decline reason. The failure return carries the
+		// payment id; the nonce-protected payment-status route returns response_summary/status.
+		const paymentId = params.get( 'cko-payment-id' );
+		if ( paymentId && settings.payment_status_url && settings.create_session_nonce ) {
+			try {
+				const sep = settings.payment_status_url.indexOf( '?' ) !== -1 ? '&' : '?';
+				const url = settings.payment_status_url + sep
+					+ 'paymentId=' + encodeURIComponent( paymentId )
+					+ '&nonce=' + encodeURIComponent( settings.create_session_nonce );
+				const res = await fetch( url, { credentials: 'same-origin' } );
+				const data = await res.json();
+				if ( data && data.response_summary ) {
+					message = data.response_summary;
+				} else if ( data && data.status ) {
+					/* translators: %s: Checkout.com payment status. */
+					message = sprintf( __( 'Payment failed with status: %s', 'checkout-com-unified-payments-api' ), data.status );
+				}
+			} catch ( fetchErr ) {
+				// Keep the generic message.
+			}
+		}
+
 		const notices = dispatch( 'core/notices' );
 		if ( notices && notices.createErrorNotice ) {
-			notices.createErrorNotice(
-				__( 'Your payment was not completed. Please try again or use a different payment method.', 'checkout-com-unified-payments-api' ),
-				{ context: 'wc/checkout', id: 'cko-flow-failed' }
-			);
+			notices.createErrorNotice( message, { context: 'wc/checkout', id: 'cko-flow-failed' } );
 		}
 
 		// Remove our marker and Checkout.com's appended params so the notice is one-shot.

@@ -116,6 +116,9 @@ final class WC_Checkoutcom_Flow_Blocks_Integration extends AbstractPaymentMethod
             'create_session_url' => $create_session_url,
             'submit_session_url' => $submit_session_url,
             'store_save_card_url' => $store_save_card_url,
+            // Nonce-protected REST route to read a payment's status/decline reason by id, used to
+            // show the real decline message after a 3DS-failure return. Same nonce as create/submit.
+            'payment_status_url' => rest_url( 'ckoplugin/v1/payment-status' ),
             'create_session_nonce' => $create_session_nonce,
             'is_user_logged_in' => is_user_logged_in(),
             'enabled_payment_methods' => $this->get_setting( 'flow_enabled_payment_methods', [] ),
