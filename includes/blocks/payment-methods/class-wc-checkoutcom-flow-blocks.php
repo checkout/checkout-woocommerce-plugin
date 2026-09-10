@@ -106,6 +106,34 @@ final class WC_Checkoutcom_Flow_Blocks_Integration extends AbstractPaymentMethod
         // that is what makes Checkout.com return source.id so a token can be stored later.
         $save_card_enabled = (bool) WC_Admin_Settings::get_option( 'ckocom_card_saved' );
 
+        // 3DS configuration for the create-session request. The shared submit handler forces
+        // 3ds.enabled=true, but the detail params (attempt_n3d / challenge_indicator / exemption /
+        // allow_upgrade) are only ever applied at session CREATE — classic sends them from JS, so
+        // the Blocks client must too. Mirrors woocommerce-gateway-checkout-com.php.
+        $three_ds = [
+            'enabled'             => '1' === WC_Admin_Settings::get_option( 'ckocom_card_threed', '0' ),
+            'attempt_n3d'         => '1' === WC_Admin_Settings::get_option( 'ckocom_card_notheed', '0' ),
+            'challenge_indicator' => WC_Admin_Settings::get_option( 'ckocom_card_3ds_challenge_indicator', 'no_preference' ),
+            'exemption'           => WC_Admin_Settings::get_option( 'ckocom_card_3ds_exemption', '' ),
+            'allow_upgrade'       => 'yes' === WC_Admin_Settings::get_option( 'ckocom_card_3ds_allow_upgrade', 'yes' ),
+        ];
+
+        // "Collect only name & email" mode: Flow loads without a billing address and the store base
+        // country is sent so card payments can still be routed. The toggle lives in the cards-settings
+        // array (Quick Setup) with a legacy standalone-option fallback. Mirrors the classic localize in
+        // woocommerce-gateway-checkout-com.php, including the same filters.
+        if ( isset( $core_settings['flow_no_billing_address'] ) ) {
+            $flow_no_billing_value = $core_settings['flow_no_billing_address'];
+        } else {
+            $flow_no_billing_value = WC_Admin_Settings::get_option( 'flow_no_billing_address', '' );
+        }
+        $flow_require_billing  = apply_filters( 'cko_flow_require_billing_address', 'yes' !== $flow_no_billing_value );
+        $address_not_required  = ! $flow_require_billing;
+        $base_country          = '';
+        if ( $address_not_required && function_exists( 'WC' ) && WC()->countries ) {
+            $base_country = apply_filters( 'cko_flow_default_billing_country', WC()->countries->get_base_country() );
+        }
+
         return [
             'title'       => $this->get_setting( 'title' ),
             'description' => $this->get_setting( 'description' ),
@@ -125,6 +153,9 @@ final class WC_Checkoutcom_Flow_Blocks_Integration extends AbstractPaymentMethod
             'saved_payment_display_order' => $this->get_setting( 'saved_payment_display_order', 'saved_cards_first' ),
             'require_cvv' => $require_cvv,
             'save_card_enabled' => $save_card_enabled,
+            'three_ds' => $three_ds,
+            'address_not_required' => $address_not_required,
+            'base_country' => $base_country,
         ];
     }
 

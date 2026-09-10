@@ -27,8 +27,16 @@ const FLOW_SDK_SRC = 'https://checkout-web-components.checkout.com/index.js';
  */
 const buildBilling = ( billing ) => {
 	const a = ( billing && billing.billingAddress ) || {};
-	if ( ! a.country || ! /^[A-Za-z]{2}$/.test( a.country ) ) {
-		return null;
+	let country = a.country;
+	if ( ! country || ! /^[A-Za-z]{2}$/.test( country ) ) {
+		// "Collect only name & email" checkouts don't capture a country. Fall back to the store
+		// base country so Checkout.com can still route card payments (mirrors classic). Only in
+		// this mode — normal checkouts keep the original behaviour (no billing until entered).
+		if ( settings.address_not_required && settings.base_country && /^[A-Za-z]{2}$/.test( settings.base_country ) ) {
+			country = settings.base_country;
+		} else {
+			return null;
+		}
 	}
 	return {
 		address: {
@@ -37,7 +45,7 @@ const buildBilling = ( billing ) => {
 			city: a.city || '',
 			state: a.state || '',
 			zip: a.postcode || '',
-			country: a.country,
+			country,
 		},
 	};
 };
@@ -113,17 +121,38 @@ const CheckoutComFlowContent = ( props ) => {
 	// a generic fallback.
 	const errorRef = useRef( '' );
 
-	// Create a payment session and mount the Flow component.
-	useEffect( () => {
-		let cancelled = false;
+	// Email baked into the active payment session; used to recreate the session when it changes
+	// (customer email is immutable in an existing session and can't be updated at submit).
+	const emailRef = useRef( '' );
+	// Generation token so an in-flight init aborts if a newer create/teardown supersedes it.
+	const initGenRef = useRef( 0 );
 
-		const init = async () => {
+	const teardownFlow = () => {
+		if ( flowComponentRef.current && flowComponentRef.current.unmount ) {
 			try {
-				await loadScript( FLOW_SDK_SRC, 'cko-flow-sdk-blocks' );
+				flowComponentRef.current.unmount();
+			} catch ( e ) {
+				// ignore unmount errors
+			}
+		}
+		flowComponentRef.current = null;
+		sessionIdRef.current = '';
+		paymentRef.current = { id: '', type: 'card' };
+		if ( containerRef.current ) {
+			containerRef.current.innerHTML = '';
+		}
+	};
 
-				if ( ! settings.create_session_url ) {
-					return;
-				}
+	// Create a payment session and mount the Flow component.
+	const initFlow = async () => {
+		const gen = ++initGenRef.current;
+		const isStale = () => gen !== initGenRef.current;
+		try {
+			await loadScript( FLOW_SDK_SRC, 'cko-flow-sdk-blocks' );
+
+			if ( isStale() || ! settings.create_session_url ) {
+				return;
+			}
 
 				// The server re-derives amount/items/currency from the live WooCommerce cart, so this
 				// request only needs the fields the server doesn't fill. success_url/failure_url are
@@ -149,13 +178,31 @@ const CheckoutComFlowContent = ( props ) => {
 						},
 					},
 				};
-				const billingObj = buildBilling( billing );
+
+				// 3DS config — mirrors classic payment-session.js. The detail params are only applied
+				// at session create (the shared submit handler just forces enabled:true), so send them
+				// here from the admin settings: attempt non-3DS, challenge indicator, exemption, upgrade.
+				const threeDs = settings.three_ds || {};
+				const threeDsRequest = {
+					enabled: !! threeDs.enabled,
+					attempt_n3d: !! threeDs.attempt_n3d,
+					challenge_indicator: threeDs.challenge_indicator || 'no_preference',
+					allow_upgrade: !! threeDs.allow_upgrade,
+				};
+				if ( threeDs.exemption ) {
+					threeDsRequest.exemption = threeDs.exemption;
+				}
+				paymentSessionRequest[ '3ds' ] = threeDsRequest;
+
+				const billingObj = buildBilling( billingRef.current );
 				if ( billingObj ) {
 					paymentSessionRequest.billing = billingObj;
 				}
-				const customerObj = buildCustomer( billing );
+				const customerObj = buildCustomer( billingRef.current );
 				if ( customerObj ) {
 					paymentSessionRequest.customer = customerObj;
+					// Remember the email baked into this session so we can detect a later change.
+					emailRef.current = customerObj.email || '';
 				}
 
 				const response = await fetch( settings.create_session_url, {
@@ -171,9 +218,9 @@ const CheckoutComFlowContent = ( props ) => {
 				} );
 				const session = await response.json();
 
-				if ( cancelled || ! window.CheckoutWebComponents || ! session || ! session.success ) {
+				if ( isStale() || ! window.CheckoutWebComponents || ! session || ! session.success ) {
 					// Session creation failed — remember a message so onPaymentSetup can surface it.
-					if ( ! cancelled && session && ! session.success ) {
+					if ( ! isStale() && session && ! session.success ) {
 						errorRef.current = ( session.data && session.data.message )
 							|| __( 'Unable to start the payment. Please refresh the page and try again.', 'checkout-com-unified-payments-api' );
 					}
@@ -255,6 +302,10 @@ const CheckoutComFlowContent = ( props ) => {
 					},
 				} );
 
+				if ( isStale() ) {
+					return;
+				}
+
 				// showPayButton: false — hide Flow's own embedded pay button; the WooCommerce Blocks
 				// "Place Order" button drives submission via flowComponent.submit() in onPaymentSetup.
 				flowComponentRef.current = checkout.create( 'flow', { showPayButton: false } );
@@ -266,15 +317,39 @@ const CheckoutComFlowContent = ( props ) => {
 			}
 		};
 
-		init();
+		// Create the session + mount the component once on mount.
+		useEffect( () => {
+			initFlow();
+			return () => {
+				// Invalidate any in-flight init and unmount.
+				initGenRef.current++;
+				teardownFlow();
+			};
+			// eslint-disable-next-line react-hooks/exhaustive-deps
+		}, [] );
 
-		return () => {
-			cancelled = true;
-			if ( flowComponentRef.current && flowComponentRef.current.unmount ) {
-				flowComponentRef.current.unmount();
+		// Recreate the session when the customer email changes. The email is baked into the payment
+		// session at creation and cannot be changed at submit, so a mid-checkout email change would
+		// otherwise leave a stale session (mirrors classic, which reloads Flow on email change).
+		// Debounced; only once a session exists and the new email is a valid, different address.
+		const currentEmail = ( billing && billing.billingAddress && billing.billingAddress.email ) || '';
+		useEffect( () => {
+			if ( ! sessionIdRef.current ) {
+				return undefined;
 			}
-		};
-	}, [] );
+			if ( ! currentEmail || currentEmail === emailRef.current ) {
+				return undefined;
+			}
+			if ( ! /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test( currentEmail ) ) {
+				return undefined;
+			}
+			const timer = setTimeout( () => {
+				teardownFlow();
+				initFlow();
+			}, 800 );
+			return () => clearTimeout( timer );
+			// eslint-disable-next-line react-hooks/exhaustive-deps
+		}, [ currentEmail ] );
 
 	useEffect( () => {
 		const unsubscribe = onPaymentSetup( async () => {
