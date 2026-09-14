@@ -83,6 +83,12 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// This allows direct redirect to order-received page without showing checkout page
 		add_action( 'woocommerce_api_wc_checkoutcom_flow_process', [ $this, 'handle_3ds_return' ] );
 
+		// WooCommerce Blocks (Store API) checkout does NOT run the classic handle_3ds_return()
+		// path that empties the cart (that runs only on the redirect return used by the classic
+		// checkout). So on a Store API checkout for this gateway, empty the cart once the order is
+		// processed. This action only fires for Blocks/Store API requests, so classic is untouched.
+		add_action( 'woocommerce_store_api_checkout_order_processed', [ $this, 'blocks_empty_cart_after_order' ], 20 );
+
 		// WC API endpoint for the My Account → Add payment method return. Flow redirects here
 		// (incl. after 3DS) once the $0 card verification completes; we tokenise the card.
 		add_action( 'woocommerce_api_wc_checkoutcom_flow_add_payment_method', [ $this, 'handle_add_payment_method_return' ] );
@@ -91,6 +97,14 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// This handles cases where user returns to checkout page with 3DS parameters
 		// Priority 1 ensures it runs very early, before other template_redirect hooks
 		add_action( 'template_redirect', [ $this, 'detect_and_process_3ds_return_on_checkout' ], 1 );
+
+		// Hide this plugin's saved cards from the checkout saved-methods list when the admin
+		// "Enable Save Cards" setting is off. WooCommerce builds the Blocks `customerPaymentMethods`
+		// (and the classic saved-card radios) from this list independently of the payment method's
+		// `supports` flags, so gating only the Blocks integration's tokenization/showSavedCards is
+		// not enough — the tokens still render. Not applied on My Account so customers can still
+		// view/delete existing cards there.
+		add_filter( 'woocommerce_saved_payment_methods_list', [ $this, 'maybe_hide_saved_cards_when_disabled' ], 20, 2 );
 
 		// Meta field on subscription edit.
 		add_filter( 'woocommerce_subscription_payment_meta', [ $this, 'add_payment_meta_field' ], 10, 2 );
@@ -161,6 +175,67 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		if ( $preserve_card_enabled ) {
 			add_filter( 'woocommerce_update_order_review_fragments', [ $this, 'exclude_payment_method_from_fragments' ], 10, 1 );
 		}
+	}
+
+	/**
+	 * Empty the cart after a WooCommerce Blocks (Store API) checkout for this gateway.
+	 *
+	 * The classic checkout empties the cart in handle_3ds_return() (the redirect return path),
+	 * which the Blocks/Store API flow never runs — so without this the cart lingers after a
+	 * successful block-checkout order. Fires only on Store API checkout requests.
+	 *
+	 * @param WC_Order $order The processed order.
+	 * @return void
+	 */
+	public function blocks_empty_cart_after_order( $order ) {
+		if ( ! $order instanceof WC_Order ) {
+			return;
+		}
+		if ( 'wc_checkout_com_flow' !== $order->get_payment_method() ) {
+			return;
+		}
+		if ( function_exists( 'WC' ) && WC()->cart ) {
+			WC()->cart->empty_cart( true );
+		}
+	}
+
+	/**
+	 * Remove Checkout.com (Flow + classic Cards) saved cards from the checkout saved-methods
+	 * list when the "Enable Save Cards" admin setting is off, so they are not offered on the
+	 * Blocks or classic checkout. Left intact on My Account so customers can still manage them.
+	 *
+	 * @param array $list        Saved methods grouped by type (e.g. 'cc').
+	 * @param int   $customer_id Customer ID.
+	 * @return array
+	 */
+	public function maybe_hide_saved_cards_when_disabled( $list, $customer_id ) {
+		if ( (bool) WC_Admin_Settings::get_option( 'ckocom_card_saved' ) ) {
+			return $list;
+		}
+
+		// Keep the saved-cards management list on My Account intact.
+		if ( function_exists( 'is_account_page' ) && is_account_page() ) {
+			return $list;
+		}
+
+		$our_gateways = [ 'wc_checkout_com_flow', 'wc_checkout_com_cards' ];
+
+		foreach ( $list as $type => $tokens ) {
+			if ( ! is_array( $tokens ) ) {
+				continue;
+			}
+			foreach ( $tokens as $key => $token ) {
+				$gateway = isset( $token['method']['gateway'] ) ? $token['method']['gateway'] : '';
+				if ( in_array( $gateway, $our_gateways, true ) ) {
+					unset( $list[ $type ][ $key ] );
+				}
+			}
+			if ( empty( $list[ $type ] ) ) {
+				unset( $list[ $type ] );
+			}
+		}
+
+		return $list;
 	}
 
 	/**
@@ -2742,14 +2817,21 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					WC_Checkoutcom_Utility::logger( '[DUPLICATE PREVENTION] ✅ Updated order status from ' . $current_order_status_txn . ' to ' . $auth_status . ' (no webhook yet, transaction ID check) - Order ID: ' . $order_id );
 				}
 			}
-			
+
+			// Payment is finalised on this order — empty the cart. This branch is reached for the
+			// 3DS redirect return (handle_3ds_return -> process_payment) which otherwise never hits
+			// the empty_cart() at the end of process_payment, leaving items in the cart.
+			if ( function_exists( 'WC' ) && WC()->cart ) {
+				WC()->cart->empty_cart();
+			}
+
 			// Return success to prevent error, but don't process again
 			return array(
 				'result'   => 'success',
 				'redirect' => $this->get_return_url( $order ),
 			);
 		}
-		
+
 		// DUPLICATE PREVENTION: Check if this payment ID already has an order (global check)
 		if ( ! empty( $flow_payment_id ) ) {
 			// Check if payment ID already has an order (prevents duplicate orders)
@@ -2911,6 +2993,14 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					}
 				}
 				
+				// Payment is finalised on this order — empty the cart. This payment-ID duplicate branch
+				// is the one reached on the 3DS redirect return (handle_3ds_return -> process_payment),
+				// which otherwise never reaches the empty_cart() at the end of process_payment, leaving
+				// items in the cart on the Blocks checkout.
+				if ( function_exists( 'WC' ) && WC()->cart ) {
+					WC()->cart->empty_cart();
+				}
+
 				// Return success to prevent error, but don't process again
 				return array(
 					'result'   => 'success',
@@ -2918,7 +3008,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				);
 			}
 		}
-		
+
 	$flow_result = null;
 
 	$subs_payment_type = null;
@@ -7081,6 +7171,18 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			
 			// If order doesn't have payment ID yet, set it from webhook (for first payment attempt)
 			if ( empty( $expected_payment_id ) && ! empty( $webhook_payment_id ) ) {
+				// SECURITY (payment/order confusion, CWE-639): this order was resolved primarily from
+				// the client-influenced reference/metadata (Method 1 tries a numeric reference first)
+				// and has no payment id yet. Adopting the webhook's payment id here is what would let a
+				// low-value payment be bound to an arbitrary higher-value order chosen via `reference`.
+				// Only adopt if the order is genuinely bound to this payment by the server-generated
+				// payment-session id or a tracked attempt (values NOT copied from the webhook). If not,
+				// reject — otherwise fall through would advance an unrelated order to a captured status.
+				if ( ! WC_Checkout_Com_Webhook::order_owns_payment( $order, $data->data ) ) {
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ❌ REJECTING - order ' . $order->get_id() . ' is not bound to payment ' . $webhook_payment_id . ' (no session/attempt match) - possible reference/order confusion. Ignoring webhook.' );
+					$this->send_response( 200, 'Order not bound to this payment' );
+					return;
+				}
 				if ( $webhook_debug_enabled ) {
 					WC_Checkoutcom_Utility::logger( 'Flow webhook: No payment ID found in order, setting from webhook: ' . $webhook_payment_id );
 				}
@@ -9124,6 +9226,23 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		
 		WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] ✅ Nonce verification PASSED' );
 
+		// Blocks save-card: persist the customer's "save card" choice into the WC session here,
+		// at the one step that is guaranteed to run right before payment (and any 3DS full-page
+		// redirect). On the 3DS path the Blocks paymentMethodData is lost, but the session value
+		// survives the redirect and is read by the save-card check in process_payment. Mirrors the
+		// classic cko_flow_store_save_card_preference AJAX, without depending on a separate call.
+		if ( isset( $_POST['save_card'] ) ) {
+			$blocks_save_card = sanitize_text_field( wp_unslash( $_POST['save_card'] ) );
+			$blocks_save_card = ( 'yes' === $blocks_save_card || 'true' === $blocks_save_card ) ? 'yes' : 'no';
+			if ( WC()->session ) {
+				if ( ! WC()->session->has_session() ) {
+					WC()->session->set_customer_session_cookie( true );
+				}
+				WC()->session->set( 'wc-wc_checkout_com_flow-new-payment-method', $blocks_save_card );
+				WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Stored Blocks save-card preference in session: ' . $blocks_save_card );
+			}
+		}
+
 		// Get parameters from POST
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- payment_session_id is alphanumeric ID from Checkout.com
 		$payment_session_id = isset( $_POST['payment_session_id'] ) ? sanitize_text_field( wp_unslash( $_POST['payment_session_id'] ) ) : '';
@@ -9197,6 +9316,13 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 					// Use order amount (always has correct discounted total)
 					$final_amount = $order_amount_minor;
+
+					// SECURITY: bind the Checkout.com `reference` to the SAME order the amount was
+					// derived from. The reference is what the capture webhook uses to resolve the
+					// order, so it must never be an independent client value — otherwise a low-value
+					// payment could be pointed at a different (higher-value) order. Overrides any
+					// client-supplied reference.
+					$reference = (string) $order_id;
 				}
 			} elseif ( WC()->cart && ! WC()->cart->is_empty() ) {
 				// Fallback to cart if no order (shouldn't happen in normal flow)
@@ -9216,18 +9342,13 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			}
 		}
 		
-		// Add reference if provided (WooCommerce order ID for tracking in Checkout.com dashboard)
+		// Add reference (bound server-side to the order above; for order-less flows like add-payment-
+		// method it is the detached non-numeric reference set earlier — never a raw client value).
 		if ( ! empty( $reference ) ) {
 			$request_body['reference'] = $reference;
 			WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Including reference: ' . $reference );
 		}
-		
-		// Add reference if provided (WooCommerce order ID for tracking in Checkout.com dashboard)
-		if ( ! empty( $reference ) ) {
-			$request_body['reference'] = $reference;
-			WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Including reference: ' . $reference );
-		}
-		
+
 		// Add billing address if provided (dynamic address adjustment).
 		// Only include it when the country is a valid 2-letter ISO code — sending an empty/invalid
 		// country triggers Checkout.com's billing_address_country_invalid (common on the add-payment-

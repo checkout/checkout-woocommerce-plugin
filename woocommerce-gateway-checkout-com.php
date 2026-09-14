@@ -5,7 +5,7 @@
  * Description: Extends WooCommerce by Adding the Checkout.com Gateway.
  * Author: Checkout.com
  * Author URI: https://www.checkout.com/
- * Version: 5.1.4.3
+ * Version: 5.1.4.4
  * Requires at least: 5.0
  * Tested up to: 7.1
  * WC requires at least: 3.0
@@ -318,7 +318,7 @@ add_action( 'woocommerce_new_order', 'cko_update_order_id_in_session', 5 );
  * Constants.
  */
 // NOSONAR (S1313): "5.1.3.7" is the plugin version (WordPress semver-style), not a hardcoded IP address.
-define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '5.1.4.3' ); // NOSONAR
+define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '5.1.4.4' ); // NOSONAR
 define( 'WC_CHECKOUTCOM_PLUGIN_URL', untrailingslashit( plugins_url( basename( plugin_dir_path( __FILE__ ) ), basename( __FILE__ ) ) ) );
 define( 'WC_CHECKOUTCOM_PLUGIN_PATH', untrailingslashit( plugin_dir_path( __FILE__ ) ) );
 
@@ -1221,6 +1221,27 @@ function cko_admin_enqueue_scripts( $hook ) {
 add_action( 'wp_enqueue_scripts', 'cko_enqueue_frontend_assets' );
 
 /**
+ * Whether the current checkout is rendered with the WooCommerce Checkout block
+ * (block-based checkout) rather than the classic [woocommerce_checkout] shortcode.
+ *
+ * On block checkout the Blocks payment-method integration handles Flow, so the classic
+ * Flow front-end scripts must NOT be enqueued — loading both mounts Flow twice and
+ * duplicates the payment-session request.
+ *
+ * @return bool
+ */
+function cko_is_block_checkout() {
+	if ( ! function_exists( 'has_block' ) || ! function_exists( 'wc_get_page_id' ) ) {
+		return false;
+	}
+	if ( function_exists( 'is_checkout' ) && ! is_checkout() ) {
+		return false;
+	}
+	$checkout_page_id = wc_get_page_id( 'checkout' );
+	return ( $checkout_page_id > 0 && has_block( 'woocommerce/checkout', $checkout_page_id ) );
+}
+
+/**
  * Load checkout.com style sheet.
  * Load Google Pay js.
  *
@@ -1273,7 +1294,7 @@ function cko_enqueue_frontend_assets() {
 		$flow_customization['flow_component_name'] = 'flow';
 	}
 
-	if ( 'flow' === $checkout_mode ) {
+	if ( 'flow' === $checkout_mode && ! cko_is_block_checkout() ) {
 		// Add resource hints for faster DNS resolution and connection to Checkout.com
 		add_action( 'wp_head', 'cko_add_flow_resource_hints', 1 );
 		

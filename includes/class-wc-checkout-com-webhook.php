@@ -22,6 +22,70 @@ class WC_Checkout_Com_Webhook {
 	}
 
 	/**
+	 * Verify that the resolved WooCommerce order actually owns the payment described by the webhook.
+	 *
+	 * SECURITY (payment/order confusion, CWE-639): the order is resolved primarily from the
+	 * client-influenced `reference`/`metadata.order_id`, both of which are attacker-controllable in
+	 * the public Flow submission path. Without this check, a legitimately-signed capture webhook for
+	 * a low-value payment can be pointed at an unrelated (higher-value) order via `reference` and
+	 * advance it to a fulfilment status. We therefore require the resolved order to be bound to this
+	 * payment by one of the values the plugin persists on the order at session create/submit/return:
+	 *  - the Checkout.com payment id (order meta `_cko_flow_payment_id` / `_cko_payment_id`), or
+	 *  - the payment-session id (order meta `_cko_payment_session_id` == webhook metadata
+	 *    `cko_payment_session_id`), or
+	 *  - the payment id / session id recorded in the order's `_cko_payment_attempts`.
+	 * If none match, the order does not own this payment and the webhook must not mutate it.
+	 *
+	 * @param WC_Order $order        Resolved order.
+	 * @param object   $webhook_data The `data` object from the webhook payload.
+	 * @return bool True if the order legitimately owns this payment.
+	 */
+	public static function order_owns_payment( $order, $webhook_data ) {
+		if ( ! ( $order instanceof WC_Order ) ) {
+			return false;
+		}
+
+		$webhook_payment_id = isset( $webhook_data->id ) ? (string) $webhook_data->id : '';
+		$webhook_session_id = isset( $webhook_data->metadata->cko_payment_session_id )
+			? (string) $webhook_data->metadata->cko_payment_session_id
+			: '';
+
+		// 1) Payment id bound to the order.
+		if ( '' !== $webhook_payment_id ) {
+			foreach ( array( '_cko_flow_payment_id', '_cko_payment_id' ) as $meta_key ) {
+				if ( (string) $order->get_meta( $meta_key ) === $webhook_payment_id ) {
+					return true;
+				}
+			}
+		}
+
+		// 2) Payment-session id bound to the order.
+		if ( '' !== $webhook_session_id
+			&& (string) $order->get_meta( '_cko_payment_session_id' ) === $webhook_session_id ) {
+			return true;
+		}
+
+		// 3) Payment / session id recorded among this order's own attempts.
+		$attempts = $order->get_meta( '_cko_payment_attempts' );
+		if ( is_array( $attempts ) ) {
+			foreach ( $attempts as $attempt ) {
+				if ( '' !== $webhook_payment_id
+					&& isset( $attempt['payment_id'] )
+					&& (string) $attempt['payment_id'] === $webhook_payment_id ) {
+					return true;
+				}
+				if ( '' !== $webhook_session_id
+					&& isset( $attempt['payment_session_id'] )
+					&& (string) $attempt['payment_session_id'] === $webhook_session_id ) {
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
+	/**
 	 * Process webhook for authorize payment.
 	 *
 	 * @param array $data Webhook data.
@@ -123,6 +187,18 @@ class WC_Checkout_Com_Webhook {
 		
 		$payment_id = $webhook_data->id;
 		$action_id  = $webhook_data->action_id;
+
+		// SECURITY: the order was resolved primarily from the client-influenced reference/metadata.
+		// Require that it actually owns this payment before mutating it, so a signed webhook for one
+		// payment cannot be pointed at an unrelated order via `reference` (payment/order confusion).
+		if ( ! self::order_owns_payment( $order, $webhook_data ) ) {
+			WC_Checkoutcom_Utility::logger( sprintf(
+				'WEBHOOK PROCESS: authorize_payment - REJECTED: resolved order %s is not bound to payment %s (reference/order confusion) - ignoring.',
+				$order->get_id(),
+				$payment_id
+			) );
+			return false;
+		}
 
 		// FRAUD FLAG: Checkout.com's risk engine can flag a payment for manual review. The flag
 		// rides on the payment_approved webhook as data.risk.flagged. Route the order to the
@@ -574,11 +650,23 @@ class WC_Checkout_Com_Webhook {
 			return true; // Acknowledge webhook but do not change status.
 		}
 
+		// SECURITY: the order was resolved primarily from the client-influenced reference/metadata.
+		// Require that it actually owns this payment before capturing/advancing it, so a signed
+		// capture webhook for one payment cannot advance an unrelated order via `reference`.
+		if ( ! self::order_owns_payment( $order, $webhook_data ) ) {
+			WC_Checkoutcom_Utility::logger( sprintf(
+				'WEBHOOK PROCESS: capture_payment - REJECTED: resolved order %s is not bound to payment %s (reference/order confusion) - ignoring.',
+				$order_id,
+				isset( $webhook_data->id ) ? $webhook_data->id : 'N/A'
+			) );
+			return false;
+		}
+
 		// Check if payment is already captured.
 		$already_captured = $order->get_meta( 'cko_payment_captured' );
 		$payment_id       = $webhook_data->id;
 		$current_order_status = $order->get_status();
-		
+
 		// MULTI-TAB DETECTION: Check if this payment ID is different from the order's primary payment
 		$order_primary_payment_id = $order->get_meta( '_cko_payment_id' );
 		$order_flow_payment_id = $order->get_meta( '_cko_flow_payment_id' );
@@ -771,8 +859,19 @@ class WC_Checkout_Com_Webhook {
 		/* translators: %1$s: Payment ID, %2$s: Action ID, %3$s: Amount. */
 		$order_message = sprintf( esc_html__( 'Checkout.com Payment Captured - Payment ID: %1$s, Action ID: %2$s, Amount: %3$s', 'checkout-com-unified-payments-api' ), $payment_id, $action_id, $formatted_amount );
 
+		// SECURITY: only an exact amount + currency match may advance the order to a fulfilment
+		// status. An underpayment (or currency mismatch) must not push the order to Processing —
+		// otherwise a low-value capture pointed at a higher-value order (see order_owns_payment)
+		// could trigger fulfilment. Merchants who run a genuine partial-payment workflow can opt in
+		// via the `cko_flow_allow_partial_capture_fulfilment` filter.
+		$webhook_currency  = isset( $webhook_data->currency ) ? strtoupper( (string) $webhook_data->currency ) : '';
+		$currency_mismatch = '' !== $webhook_currency && strtoupper( (string) $order->get_currency() ) !== $webhook_currency;
+		$is_underpaid      = $amount < $order_amount_cents;
+		$amount_ok         = ( ! $is_underpaid && ! $currency_mismatch )
+			|| (bool) apply_filters( 'cko_flow_allow_partial_capture_fulfilment', false, $order, $webhook_data );
+
 		// Check if webhook amount is less than order amount.
-		if ( $amount < $order_amount_cents ) {
+		if ( $is_underpaid ) {
 			/* translators: %1$s: Payment ID, %2$s: Action ID, %3$s: Amount. */
 			$order_message = sprintf( esc_html__( 'Checkout.com Payment partially captured - Payment ID: %1$s, Action ID: %2$s, Amount: %3$s', 'checkout-com-unified-payments-api' ), $payment_id, $action_id, $formatted_amount );
 		}
@@ -804,8 +903,22 @@ class WC_Checkout_Com_Webhook {
 		// add notes for the order and update status.
 		$order->add_order_note( $order_message );
 		
-		// Only update status if not already in a higher/equal state
-		if ( 'completed' === $current_status ) {
+		// Underpayment / currency mismatch: hold the order instead of advancing to fulfilment.
+		if ( ! $amount_ok ) {
+			$order->add_order_note( sprintf(
+				/* translators: 1: captured amount, 2: order total */
+				esc_html__( 'Checkout.com: captured amount/currency does not match the order total (%1$s vs %2$s) — order held on-hold instead of advancing to the captured status.', 'checkout-com-unified-payments-api' ),
+				$formatted_amount,
+				wc_price( $order_amount, array( 'currency' => $order->get_currency() ) )
+			) );
+			WC_Checkoutcom_Utility::logger( sprintf(
+				'WEBHOOK PROCESS: capture_payment - amount/currency mismatch (webhook %s %s vs order %s %s), holding order %s on-hold instead of advancing.',
+				$amount, $webhook_currency, $order_amount_cents, strtoupper( (string) $order->get_currency() ), $order_id
+			) );
+			if ( ! in_array( $current_status, array( 'completed', 'processing', 'on-hold' ), true ) ) {
+				$order->update_status( 'on-hold' );
+			}
+		} elseif ( 'completed' === $current_status ) {
 			// Never downgrade from completed
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: capture_payment - Order already completed, skipping status update to prevent downgrade. Order ID: ' . $order_id );
 		} elseif ( 'processing' === $current_status && 'processing' === $status ) {

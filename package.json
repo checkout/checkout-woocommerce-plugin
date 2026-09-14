@@ -9,6 +9,8 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "wp-scripts build",
+    "start": "wp-scripts start",
     "build:i18n": "npm run i18n:makepot",
     "i18n:makepot": "./vendor/bin/wp i18n make-pot . languages/checkout-com-unified-payments-api.pot --domain=\"checkout-com-unified-payments-api\"",
     "lint:php": "./vendor/bin/phpcs --standard=phpcs.xml -n $(git ls-files | grep .php$)",
@@ -26,6 +28,8 @@
   },
   "homepage": "https://github.com/checkout/checkout-woocommerce-plugin#readme",
   "devDependencies": {
+    "@woocommerce/dependency-extraction-webpack-plugin": "^3.0.1",
+    "@wordpress/scripts": "^27.9.0",
     "husky": "^8.0.0"
   }
 }

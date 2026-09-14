@@ -2,7 +2,7 @@
 Contributors: checkoutintegration
 Tags: checkout, payments, credit card, payment gateway, apple pay, google pay, payment request
 Requires at least: 5.0
-Stable tag: 5.1.4.3
+Stable tag: 5.1.4.4
 Requires PHP: 7.3
 Tested up to: 7.1
 WC requires at least: 3.0
@@ -181,6 +181,16 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v5.1.4.4 14th September 2026
+Security
+- Fixed a payment/order-confusion issue in the Flow webhook path where a legitimately-signed capture for a low-value payment could advance a separate, unrelated (higher-value) order to a fulfilment status. Webhooks now require the resolved order to actually own the payment before updating it, the Checkout.com reference is set server-side from the order the amount is taken from, and an order only advances when the captured amount and currency match exactly (underpayments are held on-hold).
+
+WooCommerce Blocks
+- Added support for the block-based ("Blocks") checkout with Flow: card payments (inline and 3DS), saved cards, decline/error messages, name-&-email-only checkouts, and 3DS options.
+
+Maintenance
+- Removed development files from the distributed package.
+
 v5.1.4.3 3rd September 2026
 Flow declined-payment fixes
 - Fixed a lockout where retrying a declined Flow payment (e.g. a subscription renewal) was silently skipped and the order was strandedon-holdwith a false "Payment authorized" note — retries now process correctly, while genuine duplicates and already-paid orders remain protected from double charging.

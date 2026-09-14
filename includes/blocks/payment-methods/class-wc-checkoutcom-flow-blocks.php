@@ -55,7 +55,7 @@ final class WC_Checkoutcom_Flow_Blocks_Integration extends AbstractPaymentMethod
 
         wp_register_script(
             'wc-checkoutcom-flow-blocks',
-            WC_CHECKOUTCOM_PLUGIN_URL . '/assets/js/blocks/flow-blocks.js',
+            WC_CHECKOUTCOM_PLUGIN_URL . '/build/flow-blocks.js',
             $dependencies,
             $version,
             true
@@ -73,6 +73,67 @@ final class WC_Checkoutcom_Flow_Blocks_Integration extends AbstractPaymentMethod
         $core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings', [] );
         $environment   = 'sandbox' === ( $core_settings['ckocom_environment'] ?? 'sandbox' );
 
+        // AJAX endpoint for creating the Flow payment session. The Blocks integration must
+        // NOT rely on the classic cko_flow_vars global (that script is not loaded on block
+        // checkout), so provide the endpoint URL directly here.
+        $create_session_url = class_exists( 'WC_AJAX' )
+            ? WC_AJAX::get_endpoint( 'cko_flow_create_payment_session' )
+            : admin_url( 'admin-ajax.php?action=cko_flow_create_payment_session' );
+
+        // The submit step (server finalises amount/capture_on and calls Checkout.com's
+        // /payment-sessions/{id}/submit) — same nonce action as create.
+        $submit_session_url = class_exists( 'WC_AJAX' )
+            ? WC_AJAX::get_endpoint( 'cko_flow_submit_payment_session' )
+            : admin_url( 'admin-ajax.php?action=cko_flow_submit_payment_session' );
+
+        // Both create and submit verify this nonce (action 'cko_flow_payment_session').
+        $create_session_nonce = wp_create_nonce( 'cko_flow_payment_session' );
+
+        // admin-ajax endpoint that persists the "save card" choice into the WC session
+        // (action cko_flow_store_save_card_preference, same nonce). Needed so the preference
+        // survives the 3DS full-page redirect — on that path the Blocks paymentMethodData is
+        // lost, exactly as in the classic front-end.
+        $store_save_card_url = admin_url( 'admin-ajax.php' );
+
+        // Whether a CVV is required when paying with a saved card. Mirrors the classic
+        // create_payment() check (WC_Checkoutcom_Api_Request), which reads
+        // wc_checkout_com_cards-card-cvv when this admin setting is on.
+        $require_cvv = (bool) WC_Admin_Settings::get_option( 'ckocom_card_require_cvv' );
+
+        // Whether the "Enable Save Cards" admin feature is on. Classic Flow vaults the card by
+        // sending payment_method_configuration.card.store_payment_details = "enabled" in the
+        // create-session body whenever this admin setting is on (not the per-order checkbox);
+        // that is what makes Checkout.com return source.id so a token can be stored later.
+        $save_card_enabled = (bool) WC_Admin_Settings::get_option( 'ckocom_card_saved' );
+
+        // 3DS configuration for the create-session request. The shared submit handler forces
+        // 3ds.enabled=true, but the detail params (attempt_n3d / challenge_indicator / exemption /
+        // allow_upgrade) are only ever applied at session CREATE — classic sends them from JS, so
+        // the Blocks client must too. Mirrors woocommerce-gateway-checkout-com.php.
+        $three_ds = [
+            'enabled'             => '1' === WC_Admin_Settings::get_option( 'ckocom_card_threed', '0' ),
+            'attempt_n3d'         => '1' === WC_Admin_Settings::get_option( 'ckocom_card_notheed', '0' ),
+            'challenge_indicator' => WC_Admin_Settings::get_option( 'ckocom_card_3ds_challenge_indicator', 'no_preference' ),
+            'exemption'           => WC_Admin_Settings::get_option( 'ckocom_card_3ds_exemption', '' ),
+            'allow_upgrade'       => 'yes' === WC_Admin_Settings::get_option( 'ckocom_card_3ds_allow_upgrade', 'yes' ),
+        ];
+
+        // "Collect only name & email" mode: Flow loads without a billing address and the store base
+        // country is sent so card payments can still be routed. The toggle lives in the cards-settings
+        // array (Quick Setup) with a legacy standalone-option fallback. Mirrors the classic localize in
+        // woocommerce-gateway-checkout-com.php, including the same filters.
+        if ( isset( $core_settings['flow_no_billing_address'] ) ) {
+            $flow_no_billing_value = $core_settings['flow_no_billing_address'];
+        } else {
+            $flow_no_billing_value = WC_Admin_Settings::get_option( 'flow_no_billing_address', '' );
+        }
+        $flow_require_billing  = apply_filters( 'cko_flow_require_billing_address', 'yes' !== $flow_no_billing_value );
+        $address_not_required  = ! $flow_require_billing;
+        $base_country          = '';
+        if ( $address_not_required && function_exists( 'WC' ) && WC()->countries ) {
+            $base_country = apply_filters( 'cko_flow_default_billing_country', WC()->countries->get_base_country() );
+        }
+
         return [
             'title'       => $this->get_setting( 'title' ),
             'description' => $this->get_setting( 'description' ),
@@ -80,20 +141,48 @@ final class WC_Checkoutcom_Flow_Blocks_Integration extends AbstractPaymentMethod
             'environment' => $environment ? 'TEST' : 'PRODUCTION',
             'public_key'  => $core_settings['ckocom_pk'] ?? '',
             'currency'    => get_woocommerce_currency(),
+            'create_session_url' => $create_session_url,
+            'submit_session_url' => $submit_session_url,
+            'store_save_card_url' => $store_save_card_url,
+            // Nonce-protected REST route to read a payment's status/decline reason by id, used to
+            // show the real decline message after a 3DS-failure return. Same nonce as create/submit.
+            'payment_status_url' => rest_url( 'ckoplugin/v1/payment-status' ),
+            'create_session_nonce' => $create_session_nonce,
+            'is_user_logged_in' => is_user_logged_in(),
             'enabled_payment_methods' => $this->get_setting( 'flow_enabled_payment_methods', [] ),
             'saved_payment_display_order' => $this->get_setting( 'saved_payment_display_order', 'saved_cards_first' ),
+            'require_cvv' => $require_cvv,
+            'save_card_enabled' => $save_card_enabled,
+            'three_ds' => $three_ds,
+            'address_not_required' => $address_not_required,
+            'base_country' => $base_country,
         ];
     }
 
     /**
      * Returns an array of supported features.
      *
+     * 'tokenization' lets WooCommerce Blocks render the saved-card radio list and the
+     * "save payment information" checkbox for this method. Saved Flow cards are stored as
+     * WC_Payment_Token_CC rows under this gateway id ('wc_checkout_com_flow'), so Blocks
+     * matches and displays them automatically.
+     *
      * @return string[]
      */
     public function get_supported_features() {
-        return apply_filters( 'wc_checkoutcom_flow_supported_features', [
+        $features = [
             'products',
             'refunds',
-        ] );
+        ];
+
+        // Only advertise tokenization when the admin "Enable Save Cards" setting is on. With it
+        // off, Blocks must not render the saved-card list or the save-card checkbox (matches
+        // classic, which hides both). Declaring tokenization is what makes Blocks surface saved
+        // tokens, so gate it here rather than only on the JS supports flags.
+        if ( (bool) WC_Admin_Settings::get_option( 'ckocom_card_saved' ) ) {
+            $features[] = 'tokenization';
+        }
+
+        return apply_filters( 'wc_checkoutcom_flow_supported_features', $features );
     }
 }

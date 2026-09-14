@@ -62,7 +62,7 @@ final class WC_Checkoutcom_Cards_Blocks_Integration extends Automattic\WooCommer
      * @return array
      */
     public function get_payment_method_script_handles() {
-        $asset_path   = WC_CHECKOUTCOM_PLUGIN_PATH . '/build/index.asset.php';
+        $asset_path   = WC_CHECKOUTCOM_PLUGIN_PATH . '/build/cards-blocks.asset.php';
         $version      = WC_CHECKOUTCOM_PLUGIN_VERSION;
         $dependencies = [ 'wc-blocks-registry', 'wc-settings', 'wp-element', 'wp-html-entities' ];
 
@@ -74,7 +74,7 @@ final class WC_Checkoutcom_Cards_Blocks_Integration extends Automattic\WooCommer
 
         wp_register_script(
             'wc-checkoutcom-cards-blocks',
-            WC_CHECKOUTCOM_PLUGIN_URL . '/assets/js/blocks/cards-blocks.js',
+            WC_CHECKOUTCOM_PLUGIN_URL . '/build/cards-blocks.js',
             $dependencies,
             $version,
             true

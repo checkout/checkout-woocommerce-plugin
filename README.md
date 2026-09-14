@@ -4,7 +4,7 @@ Checkout.com Payment Gateway plugin for WooCommerce with Flow integration suppor
 
 ## Version
 
-**Current Version:** 5.1.4.3
+**Current Version:** 5.1.4.4
 
 ## Features
 

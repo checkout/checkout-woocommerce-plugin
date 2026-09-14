@@ -55,7 +55,7 @@ final class WC_Checkoutcom_GooglePay_Blocks_Integration extends AbstractPaymentM
 
         wp_register_script(
             'wc-checkoutcom-googlepay-blocks',
-            WC_CHECKOUTCOM_PLUGIN_URL . '/assets/js/blocks/googlepay-blocks.js',
+            WC_CHECKOUTCOM_PLUGIN_URL . '/build/googlepay-blocks.js',
             $dependencies,
             $version,
             true
