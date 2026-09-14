@@ -7171,6 +7171,18 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			
 			// If order doesn't have payment ID yet, set it from webhook (for first payment attempt)
 			if ( empty( $expected_payment_id ) && ! empty( $webhook_payment_id ) ) {
+				// SECURITY (payment/order confusion, CWE-639): this order was resolved primarily from
+				// the client-influenced reference/metadata (Method 1 tries a numeric reference first)
+				// and has no payment id yet. Adopting the webhook's payment id here is what would let a
+				// low-value payment be bound to an arbitrary higher-value order chosen via `reference`.
+				// Only adopt if the order is genuinely bound to this payment by the server-generated
+				// payment-session id or a tracked attempt (values NOT copied from the webhook). If not,
+				// reject — otherwise fall through would advance an unrelated order to a captured status.
+				if ( ! WC_Checkout_Com_Webhook::order_owns_payment( $order, $data->data ) ) {
+					WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: ❌ REJECTING - order ' . $order->get_id() . ' is not bound to payment ' . $webhook_payment_id . ' (no session/attempt match) - possible reference/order confusion. Ignoring webhook.' );
+					$this->send_response( 200, 'Order not bound to this payment' );
+					return;
+				}
 				if ( $webhook_debug_enabled ) {
 					WC_Checkoutcom_Utility::logger( 'Flow webhook: No payment ID found in order, setting from webhook: ' . $webhook_payment_id );
 				}
@@ -9304,6 +9316,13 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 					// Use order amount (always has correct discounted total)
 					$final_amount = $order_amount_minor;
+
+					// SECURITY: bind the Checkout.com `reference` to the SAME order the amount was
+					// derived from. The reference is what the capture webhook uses to resolve the
+					// order, so it must never be an independent client value — otherwise a low-value
+					// payment could be pointed at a different (higher-value) order. Overrides any
+					// client-supplied reference.
+					$reference = (string) $order_id;
 				}
 			} elseif ( WC()->cart && ! WC()->cart->is_empty() ) {
 				// Fallback to cart if no order (shouldn't happen in normal flow)
@@ -9323,18 +9342,13 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			}
 		}
 		
-		// Add reference if provided (WooCommerce order ID for tracking in Checkout.com dashboard)
+		// Add reference (bound server-side to the order above; for order-less flows like add-payment-
+		// method it is the detached non-numeric reference set earlier — never a raw client value).
 		if ( ! empty( $reference ) ) {
 			$request_body['reference'] = $reference;
 			WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Including reference: ' . $reference );
 		}
-		
-		// Add reference if provided (WooCommerce order ID for tracking in Checkout.com dashboard)
-		if ( ! empty( $reference ) ) {
-			$request_body['reference'] = $reference;
-			WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Including reference: ' . $reference );
-		}
-		
+
 		// Add billing address if provided (dynamic address adjustment).
 		// Only include it when the country is a valid 2-letter ISO code — sending an empty/invalid
 		// country triggers Checkout.com's billing_address_country_invalid (common on the add-payment-
