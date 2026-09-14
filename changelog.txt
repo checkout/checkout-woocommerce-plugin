@@ -1,5 +1,10 @@
 *** Checkout.com Payment Gateway Changelog ***
 
+2026-09-14 - version 5.1.4.4
+* Fix - Security: closed a payment/order-confusion issue in the Flow webhook path where a legitimately-signed capture for a low-value payment could advance a separate, unrelated (higher-value) order to a fulfilment status. Webhooks now require the resolved order to actually own the payment (by payment id, payment-session id, or a tracked attempt) before mutating it; the Checkout.com reference is set server-side from the order the amount is derived from; and a capture only advances the order when the captured amount and currency exactly match the order total (underpayments are held on-hold, with a cko_flow_allow_partial_capture_fulfilment filter to opt in).
+* Add - WooCommerce Blocks (block-based checkout) support for Flow: card payments (inline and 3DS), saved cards (display, save-on-consent, vaulting, pay-with-token), decline/error surfacing, name-&-email-only checkouts with store base-country fallback, and 3DS detail parameters.
+* Fix - Packaging: development files (.husky, package.json) are no longer included in the distributed plugin zip.
+
 2026-08-26 - version 5.1.4.3
 * Fix - Flow declined-payment retry lockout: declined payments no longer write their payment id to the order's primary _cko_payment_id meta (stored under _cko_declined_payment_id instead), which previously poisoned the Flow duplicate-prevention guard.
 * Fix - Duplicate-prevention guard now processes a retry after a declined payment instead of wrongly skipping it and stranding the order on-hold with a misleading "Payment authorized (retry after previous failure)" note. Genuine double-submits and already-authorised/captured orders are still protected against double charging.
