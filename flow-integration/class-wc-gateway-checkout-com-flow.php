@@ -6493,8 +6493,9 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		$checkout_mode = $core_settings['ckocom_checkout_mode'] ?? 'cards';
 		
 		if ( $webhook_debug_enabled ) {
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Core settings retrieved: ' . wp_json_encode( $core_settings ) );
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Checkout mode: ' . $checkout_mode );
+			// SECURITY: never serialise the whole settings array — it contains the secret key
+			// (ckocom_sk). Log only the non-sensitive fields needed for debugging.
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Core settings retrieved - environment: ' . ( $core_settings['ckocom_environment'] ?? 'n/a' ) . ', account type: ' . ( $core_settings['ckocom_account_type'] ?? 'n/a' ) . ', checkout mode: ' . $checkout_mode );
 		}
 		
 		if ( 'flow' !== $checkout_mode ) {
@@ -9267,6 +9268,33 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				'message' => __( 'Missing required parameters.', 'checkout-com-unified-payments-api' ),
 			) );
 			return;
+		}
+
+		// SECURITY: this endpoint is public (nopriv). It derives the amount from `order_id`, writes
+		// payment meta onto that order, and echoes the order key in the return URL. Verify the caller
+		// is entitled to act on the order before using it. Scoped to reject only the demonstrated
+		// abuse — an order that belongs to a registered customer who is NOT the current visitor and
+		// with no matching order key or checkout-session link — so guest checkouts, owner retries,
+		// and the order-less Blocks path (order_id = 0) are unaffected.
+		if ( $order_id > 0 ) {
+			$submit_order = wc_get_order( $order_id );
+			if ( $submit_order ) {
+				$owner_id     = (int) $submit_order->get_customer_id();
+				$current_uid  = get_current_user_id();
+				$session_oid  = (int) ( WC()->session ? WC()->session->get( 'order_awaiting_payment' ) : 0 );
+				$provided_key = isset( $_POST['order_key'] ) ? sanitize_text_field( wp_unslash( $_POST['order_key'] ) ) : '';
+				$key_ok       = '' !== $provided_key && hash_equals( (string) $submit_order->get_order_key(), $provided_key );
+				$owner_ok     = $owner_id > 0 && $owner_id === $current_uid;
+				$session_ok   = $order_id === $session_oid;
+
+				if ( $owner_id > 0 && ! $owner_ok && ! $key_ok && ! $session_ok ) {
+					WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] REJECTED: order ' . $order_id . ' belongs to another customer and the request carries no matching order key or session link.' );
+					wp_send_json_error( array(
+						'message' => __( 'Security check failed. Please refresh the page and try again.', 'checkout-com-unified-payments-api' ),
+					) );
+					return;
+				}
+			}
 		}
 
 		// Build the request body for Submit Payment Session API

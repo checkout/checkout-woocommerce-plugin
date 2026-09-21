@@ -321,6 +321,12 @@ class WC_Checkoutcom_Webhook {
 
 		check_ajax_referer( 'checkoutcom_register_webhook', 'security' );
 
+		// SECURITY: a nonce proves the request came from our screen, not that the user is allowed
+		// to manage the merchant's Checkout.com webhooks. Require the WooCommerce management cap.
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_send_json_error( [ 'message' => __( 'You do not have permission to do this.', 'checkout-com-unified-payments-api' ) ], 403 );
+		}
+
 		// Prevent any output that might corrupt JSON response
 		ob_start();
 
@@ -675,6 +681,11 @@ class WC_Checkoutcom_Webhook {
 	public function ajax_check_webhook() {
 
 		check_ajax_referer( 'checkoutcom_check_webhook', 'security' );
+
+		// SECURITY: require the WooCommerce management capability (nonce alone is not authorization).
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_send_json_error( [ 'message' => __( 'You do not have permission to do this.', 'checkout-com-unified-payments-api' ) ], 403 );
+		}
 
 		// Prevent any output that might corrupt JSON response
 		ob_start();

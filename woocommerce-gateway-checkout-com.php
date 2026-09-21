@@ -492,6 +492,9 @@ add_action(
 	function () {
 		if ( class_exists( '\Automattic\WooCommerce\Utilities\FeaturesUtil' ) ) {
 			\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility( 'custom_order_tables', __FILE__, true );
+			// Block-based (Cart & Checkout) blocks: the Flow payment method is registered for the
+			// WooCommerce Checkout block (includes/blocks/), so declare compatibility.
+			\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility( 'cart_checkout_blocks', __FILE__, true );
 		}
 	}
 );
@@ -2416,6 +2419,14 @@ function cko_get_payment_status( $request ) {
 
 	if ( empty( $payment_id ) ) {
 		return new WP_REST_Response( array( 'error' => 'Missing paymentId' ), 400 );
+	}
+
+	// SECURITY: only accept a well-formed Checkout.com payment id. Without this, a caller could pass
+	// path segments (e.g. "pay_x/../customers/cus_victim") that get appended to the API URL and
+	// proxied with the store's secret key, turning this into an authenticated read of arbitrary
+	// Checkout.com endpoints. The strict pattern also blocks slashes, dots and traversal.
+	if ( ! preg_match( '/^pay_[A-Za-z0-9]{10,64}$/', $payment_id ) ) {
+		return new WP_REST_Response( array( 'error' => 'Invalid paymentId' ), 400 );
 	}
 
 	// Use correct API URL based on environment
