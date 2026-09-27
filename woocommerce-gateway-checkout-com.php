@@ -870,7 +870,6 @@ function cko_check_if_empty() {
 // Hook into order creation and updates
 add_action( 'woocommerce_new_order', 'cko_validate_manual_order_creation' );
 add_action( 'woocommerce_update_order', 'cko_validate_manual_order_creation' );
-add_action( 'save_post', 'cko_validate_manual_order_on_save' );
 add_action( 'admin_init', 'cko_check_incomplete_orders' );
 
 /**
@@ -911,82 +910,6 @@ function cko_validate_manual_order_creation( $order_id ) {
 		
 		// Set a transient to show notice on next admin page load
 		set_transient( 'cko_validation_address_' . $order_id, true, 60 );
-	}
-}
-
-/**
- * Validate order when saved via admin (different hook)
- *
- * @param int $post_id Post ID.
- */
-function cko_validate_manual_order_on_save( $post_id ) {
-	// Only process shop_order posts
-	if ( get_post_type( $post_id ) !== 'shop_order' ) {
-		return;
-	}
-	
-	$order = wc_get_order( $post_id );
-	
-	// Only validate admin-created orders (manual orders)
-	if ( ! $order || ! $order->is_created_via( 'admin' ) ) {
-		return;
-	}
-	
-	// Log for debugging
-	WC_Checkoutcom_Utility::logger( 'Validating manual order on save. Order ID: ' . $post_id );
-	
-	$validation_errors = array();
-	
-	// Check if billing email is missing or invalid
-	$billing_email = $order->get_billing_email();
-	if ( empty( $billing_email ) || ! is_email( $billing_email ) ) {
-		$validation_errors[] = __( 'Billing email is required for Flow payments to work properly.', 'checkout-com-unified-payments-api' );
-		WC_Checkoutcom_Utility::logger( 'Manual order saved without valid billing email. Order ID: ' . $post_id );
-	}
-	
-	// Check if billing address is missing
-	$billing_address_1 = $order->get_billing_address_1();
-	$billing_city = $order->get_billing_city();
-	$billing_country = $order->get_billing_country();
-	
-	if ( empty( $billing_address_1 ) || empty( $billing_city ) || empty( $billing_country ) ) {
-		$validation_errors[] = __( 'Complete billing address is required for Flow payments to work properly.', 'checkout-com-unified-payments-api' );
-		WC_Checkoutcom_Utility::logger( 'Manual order saved without complete billing address. Order ID: ' . $post_id );
-	}
-	
-	// If there are validation errors, prevent saving and show error
-	if ( ! empty( $validation_errors ) ) {
-		// Log the blocking
-		WC_Checkoutcom_Utility::logger( 'BLOCKING order creation due to validation errors: ' . implode( ', ', $validation_errors ) );
-		
-		// Show error message and stop execution
-		$error_message = '<h2>' . esc_html__( 'Order Creation Blocked', 'checkout-com-unified-payments-api' ) . '</h2>';
-		$error_message .= '<p><strong>' . esc_html__( 'Checkout.com Flow:', 'checkout-com-unified-payments-api' ) . '</strong> ' . esc_html__( 'Cannot create order with missing required information.', 'checkout-com-unified-payments-api' ) . '</p>';
-		$error_message .= '<ul>';
-		foreach ( $validation_errors as $error ) {
-			$error_message .= '<li>' . esc_html( $error ) . '</li>';
-		}
-		$error_message .= '</ul>';
-		$error_message .= '<p><strong>' . esc_html__( 'Please:', 'checkout-com-unified-payments-api' ) . '</strong></p>';
-		$error_message .= '<ol>';
-		$error_message .= '<li>' . esc_html__( 'Go back to the order form', 'checkout-com-unified-payments-api' ) . '</li>';
-		$error_message .= '<li>' . esc_html__( 'Add the missing billing email and address', 'checkout-com-unified-payments-api' ) . '</li>';
-		$error_message .= '<li>' . esc_html__( 'Try creating the order again', 'checkout-com-unified-payments-api' ) . '</li>';
-		$error_message .= '</ol>';
-		$error_message .= '<p><a href="javascript:history.back()">' . esc_html__( 'Go Back', 'checkout-com-unified-payments-api' ) . '</a></p>';
-		
-		// Define allowed HTML for wp_kses
-		$allowed_html = array(
-			'h2'     => array(),
-			'p'      => array(),
-			'strong' => array(),
-			'ul'     => array(),
-			'ol'     => array(),
-			'li'     => array(),
-			'a'      => array( 'href' => array() ),
-		);
-		
-		wp_die( wp_kses( $error_message, $allowed_html ), esc_html__( 'Order Creation Blocked', 'checkout-com-unified-payments-api' ), array( 'response' => 400 ) );
 	}
 }
 
