@@ -1302,7 +1302,15 @@ class WC_Checkout_Com_Webhook {
 		$refund_amount_formatted = wc_price( WC_Checkoutcom_Utility::decimal_to_value( $amount, $order->get_currency() ), array( 'currency' => $order->get_currency() ) );
 		$message          = sprintf( 'Webhook received from checkout.com. Payment refunded - Payment ID: %s, Action ID: %s, Amount: %s', $payment_id, $action_id, $refund_amount_formatted );
 
-		if ( $get_transaction_id === $action_id ) {
+		// Dedupe by refund action id. Each processed refund action is recorded on the order (here
+		// and by the admin-initiated process_refund via the API helper). Without this, a repeated
+		// webhook delivery, or the webhook for a refund already booked from the admin screen, creates
+		// a second WooCommerce refund and over-refunds the order.
+		$processed_refund_ids = (array) $order->get_meta( '_cko_refund_action_ids' );
+		if ( ( '' !== (string) $action_id && in_array( $action_id, $processed_refund_ids, true ) ) || $get_transaction_id === $action_id ) {
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: refund action ' . $action_id . ' already booked - skipping to avoid duplicate refund.' );
+			}
 			return true;
 		}
 
@@ -1350,6 +1358,12 @@ class WC_Checkout_Com_Webhook {
 					'line_items' => [],
 				]
 			);
+		}
+
+		// Record this refund action so a later duplicate delivery is skipped by the dedupe above.
+		if ( isset( $refund ) && ! is_wp_error( $refund ) && '' !== (string) $action_id ) {
+			$processed_refund_ids[] = $action_id;
+			$order->update_meta_data( '_cko_refund_action_ids', $processed_refund_ids );
 		}
 
 		// add notes for the order and update status.
