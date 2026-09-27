@@ -137,6 +137,15 @@ class WC_Checkoutcom_Cards_Settings {
 		$existing_pk = isset( $core_settings['ckocom_pk'] ) ? $core_settings['ckocom_pk'] : '';
 		$existing_title = isset( $core_settings['title'] ) ? $core_settings['title'] : 'Pay by Card with Checkout.com';
 
+		// SECURITY: never render the stored secret key into the form. Show a masked hint only; an
+		// empty submission is treated as "unchanged" (process_admin_options restores the saved key).
+		$sk_hint = '';
+		if ( '' !== $existing_sk ) {
+			$sk_hint = ( strlen( $existing_sk ) > 12 )
+				? substr( $existing_sk, 0, 8 ) . '****' . substr( $existing_sk, -4 )
+				: '****';
+		}
+
 		$settings = [
 			'quick_setting'        => [
 				'title'       => __( 'Quick Settings', 'checkout-com-unified-payments-api' ),
@@ -190,11 +199,11 @@ class WC_Checkoutcom_Cards_Settings {
 				'title'       => __( 'Secret Key', 'checkout-com-unified-payments-api' ),
 				'type'        => 'password',
 				/* translators: 1: HTML anchor opening tag, 2: HTML anchor closing tag. */
-				'description' => sprintf( __( 'You can %1$s find your secret key %2$s in the Checkout.com Hub', 'checkout-com-unified-payments-api' ), '<a class="checkoutcom-key-docs" target="_blank" href="' . esc_url( $docs_link ) . '">', '</a>' ),
-				'placeholder' => 'sk_xxx',
-				'value'       => $existing_sk, // Load existing value
+				'description' => sprintf( __( 'You can %1$s find your secret key %2$s in the Checkout.com Hub. Leave blank to keep your saved key.', 'checkout-com-unified-payments-api' ), '<a class="checkoutcom-key-docs" target="_blank" href="' . esc_url( $docs_link ) . '">', '</a>' ),
+				'placeholder' => '' !== $sk_hint ? $sk_hint : 'sk_xxx',
+				'value'       => '', // SECURITY: never send the stored secret key to the browser.
 				'custom_attributes' => [
-					'autocomplete' => 'current-password',
+					'autocomplete' => 'new-password',
 				],
 			],
 			'ckocom_pk'           => [

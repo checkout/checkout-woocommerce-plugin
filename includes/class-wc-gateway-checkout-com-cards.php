@@ -433,6 +433,30 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 			|| isset( $_POST['cko_performance_logging'] );
 
 		if ( 'quick_settings' === $screen ) {
+			// SECURITY: the Secret Key field is rendered masked (empty value), so an empty submission
+			// means "keep the saved key". Restore the stored key into POST before save_fields() runs,
+			// otherwise the empty value would wipe it.
+			$existing_core_settings = function_exists( 'cko_get_raw_option' )
+				? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+				: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+			$stored_sk = is_array( $existing_core_settings ) && ! empty( $existing_core_settings['ckocom_sk'] )
+				? $existing_core_settings['ckocom_sk']
+				: '';
+			$posted_sk = '';
+			if ( isset( $_POST['woocommerce_wc_checkout_com_cards_settings']['ckocom_sk'] ) ) {
+				$posted_sk = sanitize_text_field( wp_unslash( $_POST['woocommerce_wc_checkout_com_cards_settings']['ckocom_sk'] ) );
+			} elseif ( isset( $_POST['ckocom_sk'] ) ) {
+				$posted_sk = sanitize_text_field( wp_unslash( $_POST['ckocom_sk'] ) );
+			}
+			if ( '' === trim( $posted_sk ) && '' !== $stored_sk ) {
+				if ( isset( $_POST['woocommerce_wc_checkout_com_cards_settings'] ) && is_array( $_POST['woocommerce_wc_checkout_com_cards_settings'] ) ) {
+					$_POST['woocommerce_wc_checkout_com_cards_settings']['ckocom_sk'] = $stored_sk;
+				}
+				if ( isset( $_POST['ckocom_sk'] ) ) {
+					$_POST['ckocom_sk'] = $stored_sk;
+				}
+			}
+
 			// CRITICAL FIX: Manually extract values from POST before save_fields()
 			// This ensures the values are saved even if save_fields() doesn't pick them up
 			$checkout_mode_from_post = null;

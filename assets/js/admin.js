@@ -445,45 +445,8 @@ jQuery( function ( $ ) {
 		},
 
 		toggleSecretKeyVisibility: function () {
-			// Find password field for Secret Key - try multiple selectors
-			const fieldSelectors = [
-				'#woocommerce_wc_checkout_com_cards_ckocom_sk',
-				'input[name="woocommerce_wc_checkout_com_cards_settings[ckocom_sk]"]',
-				'input[type="password"][id*="ckocom_sk"]',
-				'input[type="password"][name*="ckocom_sk"]',
-				'tr:has(label:contains("Secret Key")) input[type="password"]'
-			];
-			
-			let field = null;
-			for (let i = 0; i < fieldSelectors.length; i++) {
-				field = $(fieldSelectors[i]);
-				if (field.length && field.attr('type') === 'password') {
-					break;
-				}
-			}
-			
-			if (!field || !field.length) return;
-
-			// Check if button already exists in the same table cell
-			const parentCell = field.closest('td');
-			if (parentCell.find('.cko-toggle-password').length) return;
-
-			// Create the toggle button
-			const toggleBtn = $('<button type="button" class="button button-secondary cko-toggle-password" style="margin-left: 10px;">View</button>');
-			toggleBtn.on('click', function (e) {
-				e.preventDefault();
-				const currentType = field.attr('type');
-				if (currentType === 'password') {
-					field.attr('type', 'text');
-					toggleBtn.text('Hide');
-				} else {
-					field.attr('type', 'password');
-					toggleBtn.text('View');
-				}
-			});
-
-			// Append button after the input field
-			field.after(toggleBtn);
+			// Intentionally a no-op. The Secret Key is masked server-side and never rendered to the
+			// browser, so there is nothing to reveal — the old "View" button was removed for security.
 		},
 
 		expressButtonSizeSettings: function () {
