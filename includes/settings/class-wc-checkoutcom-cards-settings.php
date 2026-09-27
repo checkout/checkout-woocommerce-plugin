@@ -76,7 +76,7 @@ class WC_Checkoutcom_Cards_Settings {
 	public static function quick_settings() {
 		$core_settings = function_exists( 'cko_get_raw_option' )
 			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
-			: get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$nas_docs      = 'https://www.checkout.com/docs/four/resources/api-authentication/api-keys';
 		$abc_docs      = 'https://www.checkout.com/docs/the-hub/update-your-hub-settings#Manage_the_API_keys';
 		$docs_link     = $nas_docs; // Default to NAS docs since account type is NAS
@@ -316,7 +316,7 @@ class WC_Checkoutcom_Cards_Settings {
 	 * @return mixed
 	 */
 	public static function core_settings() {
-		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$nas_docs      = 'https://www.checkout.com/docs/four/resources/api-authentication/api-keys';
 		$abc_docs      = 'https://www.checkout.com/docs/the-hub/update-your-hub-settings#Manage_the_API_keys';
 		$docs_link     = $abc_docs;
@@ -325,7 +325,7 @@ class WC_Checkoutcom_Cards_Settings {
 			$docs_link = $nas_docs;
 		}
 
-		$checkout_mode           = $core_settings['ckocom_checkout_mode'];
+		$checkout_mode           = $core_settings['ckocom_checkout_mode'] ?? 'flow';
 		$should_disable_checkbox = false;
 				
 		if ( 'flow' === $checkout_mode ) {
@@ -858,7 +858,7 @@ class WC_Checkoutcom_Cards_Settings {
 	 * @return mixed|void
 	 */
 	public static function apple_settings() {
-		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$nas_docs      = 'https://www.checkout.com/docs/four/payments/payment-methods/apple-pay';
 		$abc_docs      = 'https://www.checkout.com/docs/payments/payment-methods/wallets/apple-pay';
 		$docs_link     = $abc_docs;
@@ -867,7 +867,7 @@ class WC_Checkoutcom_Cards_Settings {
 			$docs_link = $nas_docs;
 		}
 
-		$checkout_mode           = $core_settings['ckocom_checkout_mode'];
+		$checkout_mode           = $core_settings['ckocom_checkout_mode'] ?? 'flow';
 		$should_disable_checkbox = false;
 				
 		if ( 'flow' === $checkout_mode ) {
@@ -1322,9 +1322,9 @@ class WC_Checkoutcom_Cards_Settings {
 	 * @return mixed|void
 	 */
 	public static function paypal_settings() {
-		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 
-		$checkout_mode           = $core_settings['ckocom_checkout_mode'];
+		$checkout_mode           = $core_settings['ckocom_checkout_mode'] ?? 'flow';
 		$should_disable_checkbox = false;
 				
 		if ( 'flow' === $checkout_mode ) {
@@ -1452,9 +1452,9 @@ class WC_Checkoutcom_Cards_Settings {
 	 * @return mixed
 	 */
 	public static function apm_settings() {
-		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings' );
+		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 
-		$checkout_mode           = $core_settings['ckocom_checkout_mode'];
+		$checkout_mode           = $core_settings['ckocom_checkout_mode'] ?? 'flow';
 		$should_disable_checkbox = false;
 				
 		if ( 'flow' === $checkout_mode ) {
