@@ -5,12 +5,14 @@
  * Description: Extends WooCommerce by Adding the Checkout.com Gateway.
  * Author: Checkout.com
  * Author URI: https://www.checkout.com/
+ * Developer: Checkout.com
+ * Developer URI: https://www.checkout.com/
  * Version: 5.1.4.4
- * Requires at least: 5.0
- * Tested up to: 7.1
- * WC requires at least: 3.0
+ * Requires at least: 6.0
+ * Tested up to: 6.8
+ * WC requires at least: 8.0
  * WC tested up to: 11.0.1
- * Requires PHP: 7.3
+ * Requires PHP: 7.4
  * Requires Plugins: woocommerce
  * Text Domain: checkout-com-unified-payments-api
  * Domain Path: /languages
