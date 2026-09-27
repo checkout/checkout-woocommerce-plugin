@@ -10,7 +10,7 @@ defined( 'ABSPATH' ) || exit;
 use Checkout\CheckoutApiException;
 use Checkout\Webhooks\Previous\WebhookRequest;
 
-require_once 'class-wc-checkoutcom-workflows.php';
+require_once __DIR__ . '/class-wc-checkoutcom-workflows.php';
 
 /**
  * Class WC_Checkoutcom_Webhook

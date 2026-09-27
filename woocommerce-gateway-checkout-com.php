@@ -355,14 +355,14 @@ add_action( 'plugins_loaded', 'init_checkout_com_gateway_class', 0 );
 		load_plugin_textdomain( 'checkout-com-unified-payments-api', false, plugin_basename( __DIR__ ) . '/languages' );
 
 		// Core payment gateway classes
-		include_once 'includes/class-wc-checkout-com-webhook.php';
-		include_once 'includes/class-wc-checkout-com-webhook-queue.php';
+		include_once __DIR__ . '/includes/class-wc-checkout-com-webhook.php';
+		include_once __DIR__ . '/includes/class-wc-checkout-com-webhook-queue.php';
 		
 		// Admin pages
 		if ( is_admin() ) {
-			include_once 'includes/admin/class-wc-checkoutcom-webhook-queue-admin.php';
-			include_once 'includes/admin/class-wc-checkoutcom-diagnostics.php';
-			include_once 'includes/admin/class-wc-checkoutcom-order-columns.php';
+			include_once __DIR__ . '/includes/admin/class-wc-checkoutcom-webhook-queue-admin.php';
+			include_once __DIR__ . '/includes/admin/class-wc-checkoutcom-diagnostics.php';
+			include_once __DIR__ . '/includes/admin/class-wc-checkoutcom-order-columns.php';
 		}
 		
 		// Note: You can also access the webhook queue table directly using:
@@ -383,8 +383,8 @@ add_action( 'plugins_loaded', 'init_checkout_com_gateway_class', 0 );
 		// Hook for cleanup of old webhooks
 		add_action( 'cko_cleanup_old_webhooks', 'cko_cleanup_old_webhooks_handler' );
 		
-		include_once 'includes/class-wc-gateway-checkout-com-cards.php';
-		include_once 'includes/class-wc-gateway-checkout-com-apple-pay.php';
+		include_once __DIR__ . '/includes/class-wc-gateway-checkout-com-cards.php';
+		include_once __DIR__ . '/includes/class-wc-gateway-checkout-com-apple-pay.php';
 		
 		// Register Apple Pay CSR generation AJAX handler early
 		// Use a wrapper function to ensure it's always available
@@ -398,15 +398,15 @@ add_action( 'plugins_loaded', 'init_checkout_com_gateway_class', 0 );
 		add_action( 'wp_ajax_cko_test_apple_pay_certificate', 'cko_ajax_test_apple_pay_certificate' );
 	}
 	
-		include_once 'includes/class-wc-gateway-checkout-com-google-pay.php';
-		include_once 'includes/class-wc-gateway-checkout-com-paypal.php';
-		include_once 'includes/class-wc-gateway-checkout-com-alternative-payments.php';
+		include_once __DIR__ . '/includes/class-wc-gateway-checkout-com-google-pay.php';
+		include_once __DIR__ . '/includes/class-wc-gateway-checkout-com-paypal.php';
+		include_once __DIR__ . '/includes/class-wc-gateway-checkout-com-alternative-payments.php';
 		
 		// Flow integration
-		include_once 'flow-integration/class-wc-gateway-checkout-com-flow.php';
+		include_once __DIR__ . '/flow-integration/class-wc-gateway-checkout-com-flow.php';
 		
 		// Unified Express Checkout Element Handler
-		include_once 'includes/express/class-wc-checkoutcom-express-checkout-element.php';
+		include_once __DIR__ . '/includes/express/class-wc-checkoutcom-express-checkout-element.php';
 		
 		// Initialize unified express checkout element
 		if ( class_exists( 'WC_Checkoutcom_Express_Checkout_Element' ) ) {
@@ -1951,7 +1951,7 @@ add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_flow', '
  * @param WC_Order $renewal_order A WC_Order object created to record the renewal payment.
  */
 function cko_subscription_payment( $renewal_total, $renewal_order ) {
-	include_once 'includes/subscription/class-wc-checkoutcom-subscription.php';
+	include_once __DIR__ . '/includes/subscription/class-wc-checkoutcom-subscription.php';
 
 	WC_Checkoutcom_Subscription::renewal_payment( $renewal_total, $renewal_order );
 }
@@ -1966,7 +1966,7 @@ add_action( 'woocommerce_subscription_status_cancelled', 'cko_subscription_cance
  * @return void
  */
 function cko_subscription_cancelled( $subscription ) {
-	include_once 'includes/subscription/class-wc-checkoutcom-subscription.php';
+	include_once __DIR__ . '/includes/subscription/class-wc-checkoutcom-subscription.php';
 
 	// The static method on WC_Checkoutcom_Subscription is named subscription_cancelled()
 	// (no cko_ prefix). Calling cko_subscription_cancelled() here would fatal with

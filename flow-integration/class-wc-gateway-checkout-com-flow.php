@@ -6628,7 +6628,8 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		}
 
 		$computed_hmac = hash_hmac( 'sha256', $raw_event, $secret_key );
-		$signature     = ( $computed_hmac === $header_signature );
+		// Constant-time comparison to avoid a timing side-channel on the webhook signature.
+		$signature     = hash_equals( $computed_hmac, (string) $header_signature );
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Computed HMAC: ' . $computed_hmac );
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Expected HMAC: ' . ( $header_signature ?? 'NULL' ) );

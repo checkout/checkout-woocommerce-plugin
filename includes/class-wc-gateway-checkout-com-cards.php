@@ -17,12 +17,12 @@ require_once dirname( __DIR__ ) . '/lib/class-checkout-sdk.php';
 if ( is_readable( dirname( __DIR__ ) . '/vendor/autoload.php' ) ) {
 	require dirname( __DIR__ ) . '/vendor/autoload.php';
 }
-require_once 'settings/class-wc-checkoutcom-cards-settings.php';
-require_once 'settings/class-wc-checkoutcom-webhook.php';
-require_once 'settings/admin/class-wc-checkoutcom-admin.php';
-require_once 'api/class-wc-checkoutcom-api-request.php';
-require_once 'class-wc-checkout-com-webhook.php';
-require_once 'subscription/class-wc-checkoutcom-subscription.php';
+require_once __DIR__ . '/settings/class-wc-checkoutcom-cards-settings.php';
+require_once __DIR__ . '/settings/class-wc-checkoutcom-webhook.php';
+require_once __DIR__ . '/settings/admin/class-wc-checkoutcom-admin.php';
+require_once __DIR__ . '/api/class-wc-checkoutcom-api-request.php';
+require_once __DIR__ . '/class-wc-checkout-com-webhook.php';
+require_once __DIR__ . '/subscription/class-wc-checkoutcom-subscription.php';
 
 /**
  * Class WC_Gateway_Checkout_Com_Cards for Card payment method.

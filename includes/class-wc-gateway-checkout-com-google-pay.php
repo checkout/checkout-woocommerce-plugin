@@ -7,7 +7,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-require_once 'express/google-pay/class-google-pay-express.php';
+require_once __DIR__ . '/express/google-pay/class-google-pay-express.php';
 
 use Checkout\CheckoutApiException;
 use Checkout\Payments\PaymentType;

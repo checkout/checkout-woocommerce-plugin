@@ -34,8 +34,8 @@ use Checkout\Tokens\ApplePayTokenRequest;
 use Checkout\Tokens\GooglePayTokenData;
 use Checkout\Tokens\GooglePayTokenRequest;
 
-require_once 'class-wc-checkoutcom-utility.php';
-require 'class-wc-checkoutcom-apm-method.php';
+require_once __DIR__ . '/class-wc-checkoutcom-utility.php';
+require __DIR__ . '/class-wc-checkoutcom-apm-method.php';
 
 /**
  * Class WC_Checkoutcom_Api_Request handles the API requests.

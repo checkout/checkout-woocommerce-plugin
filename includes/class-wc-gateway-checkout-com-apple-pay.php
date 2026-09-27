@@ -7,8 +7,8 @@
 
 defined( 'ABSPATH' ) || exit;
 
-require_once 'settings/class-wc-checkoutcom-cards-settings.php';
-require_once 'express/apple-pay/class-apple-pay-express.php';
+require_once __DIR__ . '/settings/class-wc-checkoutcom-cards-settings.php';
+require_once __DIR__ . '/express/apple-pay/class-apple-pay-express.php';
 
 /**
  * Class WC_Gateway_Checkout_Com_Apple_Pay for Apple Pay method.
