@@ -922,19 +922,16 @@ function cko_check_incomplete_orders() {
 		return;
 	}
 	
-	// Get current screen
+	// Get current screen — allow the legacy order screens and the HPOS Orders screen.
 	$screen = get_current_screen();
-	if ( ! $screen || ( $screen->id !== 'shop_order' && $screen->id !== 'edit-shop_order' ) ) {
+	if ( ! $screen || ! in_array( $screen->id, array( 'shop_order', 'edit-shop_order', 'woocommerce_page_wc-orders' ), true ) ) {
 		return;
 	}
-	
-	// Get order ID from URL
-	$order_id = 0;
-	$posted_post_id = isset( $_GET['post'] ) ? absint( wp_unslash( $_GET['post'] ) ) : 0;
-	if ( $posted_post_id && get_post_type( $posted_post_id ) === 'shop_order' ) {
-		$order_id = $posted_post_id;
-	}
-	
+
+	// Order id comes from ?post= on the legacy edit screen or ?id= on the HPOS Orders screen.
+	// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only admin screen routing.
+	$order_id = isset( $_GET['id'] ) ? absint( wp_unslash( $_GET['id'] ) ) : ( isset( $_GET['post'] ) ? absint( wp_unslash( $_GET['post'] ) ) : 0 );
+
 	if ( ! $order_id ) {
 		return;
 	}
@@ -1047,10 +1044,10 @@ function cko_show_validation_notices() {
 	global $post;
 	$order_id = 0;
 	
-	$posted_post_id = isset( $_GET['post'] ) ? absint( wp_unslash( $_GET['post'] ) ) : 0;
-	if ( $posted_post_id && get_post_type( $posted_post_id ) === 'shop_order' ) {
-		$order_id = $posted_post_id;
-	} elseif ( $post && $post->post_type === 'shop_order' ) {
+	// Order id from ?post= (legacy edit screen) or ?id= (HPOS Orders screen); fall back to $post.
+	// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only admin screen routing.
+	$order_id = isset( $_GET['id'] ) ? absint( wp_unslash( $_GET['id'] ) ) : ( isset( $_GET['post'] ) ? absint( wp_unslash( $_GET['post'] ) ) : 0 );
+	if ( ! $order_id && $post && 'shop_order' === $post->post_type ) {
 		$order_id = $post->ID;
 	}
 	

@@ -6836,23 +6836,22 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Trying METHOD 2.5 (MULTI-TAB: Payment ID in _cko_payment_attempts)' );
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Looking for payment ID: ' . $webhook_payment_id . ' in payment attempts array' );
 			
-			// Search for orders with this payment ID tracked in the payment_attempts array
-			// We need to search serialized data, so we use LIKE with the payment ID
-			global $wpdb;
-			$meta_key = '_cko_payment_attempts';
-			$search_pattern = '%' . $wpdb->esc_like( $webhook_payment_id ) . '%';
-			
-			$order_ids = $wpdb->get_col(
-				$wpdb->prepare(
-					"SELECT DISTINCT pm.post_id FROM {$wpdb->postmeta} pm 
-					INNER JOIN {$wpdb->posts} p ON pm.post_id = p.ID 
-					WHERE pm.meta_key = %s 
-					AND pm.meta_value LIKE %s 
-					AND p.post_type IN ('shop_order', 'shop_order_placehold')
-					AND p.post_status IN ('wc-pending', 'wc-failed', 'wc-on-hold', 'wc-processing', 'wc-completed')
-					LIMIT 5",
-					$meta_key,
-					$search_pattern
+			// HPOS-safe lookup: query orders via the WooCommerce CRUD API so this works with both the
+			// legacy posts tables and High-Performance Order Storage (where order meta lives in
+			// wc_orders_meta, not postmeta — the old raw postmeta/posts JOIN never matched under HPOS).
+			// The serialized attempts array is matched with a LIKE; the loop below verifies the exact id.
+			$order_ids = wc_get_orders(
+				array(
+					'limit'      => 5,
+					'return'     => 'ids',
+					'status'     => array( 'pending', 'failed', 'on-hold', 'processing', 'completed' ),
+					'meta_query' => array(
+						array(
+							'key'     => '_cko_payment_attempts',
+							'value'   => $webhook_payment_id,
+							'compare' => 'LIKE',
+						),
+					),
 				)
 			);
 			
