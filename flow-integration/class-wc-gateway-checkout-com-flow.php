@@ -717,9 +717,46 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			return false;
 		}
 
+		// Not configured yet: never offer the method before both API keys are entered, so a
+		// customer can't pick a payment method that cannot work.
+		if ( function_exists( 'cko_has_api_keys' ) && ! cko_has_api_keys() ) {
+			return false;
+		}
+
 		// Gateway is available if enabled and checkout mode is 'flow'
 		// We bypass currency/country restrictions as Flow supports all currencies/countries
 		return true;
+	}
+
+	/**
+	 * Whether the Checkout.com account is connected (both API keys entered).
+	 * Drives the WooCommerce Payments list status ("Active" vs "Complete setup").
+	 *
+	 * @return bool
+	 */
+	public function is_account_connected() {
+		return function_exists( 'cko_has_api_keys' ) ? cko_has_api_keys() : true;
+	}
+
+	/**
+	 * Whether the gateway still needs setup (no API keys yet).
+	 *
+	 * @return bool
+	 */
+	public function needs_setup() {
+		return function_exists( 'cko_has_api_keys' ) ? ! cko_has_api_keys() : false;
+	}
+
+	/**
+	 * Whether the gateway is in test/sandbox mode (for the Payments-list "Test mode" badge).
+	 *
+	 * @return bool
+	 */
+	public function is_test_mode() {
+		$core_settings = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		return 'live' !== ( $core_settings['ckocom_environment'] ?? 'sandbox' );
 	}
 
 	/**

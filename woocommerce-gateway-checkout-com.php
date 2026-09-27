@@ -151,6 +151,26 @@ function cko_is_flow_mode() {
 }
 
 /**
+ * Whether both Checkout.com API keys (public + secret) are configured.
+ *
+ * Used to gate gateway availability and the Payments-list connection status so the plugin
+ * never advertises a payment method (or reports "Active") before the merchant has entered keys.
+ *
+ * @return bool
+ */
+function cko_has_api_keys() {
+	$core_settings = function_exists( 'cko_get_raw_option' )
+		? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+		: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+
+	if ( ! is_array( $core_settings ) ) {
+		return false;
+	}
+
+	return ! empty( $core_settings['ckocom_pk'] ) && ! empty( $core_settings['ckocom_sk'] );
+}
+
+/**
  * Whether the current checkout actually needs a payment method to be offered.
  *
  * Single source of truth used by every gateway-availability filter below so that
@@ -231,7 +251,7 @@ function cko_force_flow_gateway_available( $available_gateways ) {
 	$payment_method      = isset( $_POST['payment_method'] ) ? sanitize_text_field( wp_unslash( $_POST['payment_method'] ) ) : '';
 	$is_checkout_context = is_checkout() || is_wc_endpoint_url( 'order-pay' ) || ( defined( 'DOING_AJAX' ) && DOING_AJAX ) || ( 'wc_checkout_com_flow' === $payment_method );
 
-	if ( $is_checkout_context && cko_is_flow_mode() && cko_flow_checkout_requires_payment() ) {
+	if ( $is_checkout_context && cko_is_flow_mode() && cko_has_api_keys() && cko_flow_checkout_requires_payment() ) {
 		$all_gateways = WC()->payment_gateways()->payment_gateways();
 		if ( isset( $all_gateways['wc_checkout_com_flow'] ) ) {
 			$available_gateways['wc_checkout_com_flow'] = $all_gateways['wc_checkout_com_flow'];
@@ -249,7 +269,7 @@ add_filter( 'woocommerce_available_payment_gateways', 'cko_force_flow_gateway_av
  * @return array Filtered available payment gateways.
  */
 function cko_backup_force_flow_gateway_available( $available_gateways ) {
-	if ( cko_is_flow_mode() && cko_flow_checkout_requires_payment() && ! isset( $available_gateways['wc_checkout_com_flow'] ) ) {
+	if ( cko_is_flow_mode() && cko_has_api_keys() && cko_flow_checkout_requires_payment() && ! isset( $available_gateways['wc_checkout_com_flow'] ) ) {
 		$all_gateways = WC()->payment_gateways()->payment_gateways();
 		if ( isset( $all_gateways['wc_checkout_com_flow'] ) ) {
 			$available_gateways['wc_checkout_com_flow'] = $all_gateways['wc_checkout_com_flow'];
@@ -262,7 +282,7 @@ add_filter( 'woocommerce_available_payment_gateways', 'cko_backup_force_flow_gat
 // Re-add Flow at very high priority to counteract multilingual plugins (e.g. Polylang)
 // that strip gateways between priority 999 and 99999.
 add_filter( 'woocommerce_available_payment_gateways', function( $gateways ) {
-	if ( cko_is_flow_mode() && cko_flow_checkout_requires_payment() && ! isset( $gateways['wc_checkout_com_flow'] ) ) {
+	if ( cko_is_flow_mode() && cko_has_api_keys() && cko_flow_checkout_requires_payment() && ! isset( $gateways['wc_checkout_com_flow'] ) ) {
 		$all_gateways = WC()->payment_gateways()->payment_gateways();
 		if ( isset( $all_gateways['wc_checkout_com_flow'] ) ) {
 			$gateways['wc_checkout_com_flow'] = $all_gateways['wc_checkout_com_flow'];

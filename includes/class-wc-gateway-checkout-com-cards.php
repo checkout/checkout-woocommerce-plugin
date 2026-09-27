@@ -132,7 +132,42 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		if ( 'flow' === ( $core_settings['ckocom_checkout_mode'] ?? 'classic' ) ) {
 			return false;
 		}
+		// Not configured yet: don't offer card payments before both API keys are entered.
+		if ( function_exists( 'cko_has_api_keys' ) && ! cko_has_api_keys() ) {
+			return false;
+		}
 		return parent::is_available();
+	}
+
+	/**
+	 * Whether the Checkout.com account is connected (both API keys entered).
+	 * Drives the WooCommerce Payments list status ("Active" vs "Complete setup").
+	 *
+	 * @return bool
+	 */
+	public function is_account_connected() {
+		return function_exists( 'cko_has_api_keys' ) ? cko_has_api_keys() : true;
+	}
+
+	/**
+	 * Whether the gateway still needs setup (no API keys yet).
+	 *
+	 * @return bool
+	 */
+	public function needs_setup() {
+		return function_exists( 'cko_has_api_keys' ) ? ! cko_has_api_keys() : false;
+	}
+
+	/**
+	 * Whether the gateway is in test/sandbox mode (for the Payments-list "Test mode" badge).
+	 *
+	 * @return bool
+	 */
+	public function is_test_mode() {
+		$core_settings = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		return 'live' !== ( $core_settings['ckocom_environment'] ?? 'sandbox' );
 	}
 
 	/**
