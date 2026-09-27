@@ -53,8 +53,6 @@ if ( file_exists( $utility_path ) ) {
 	require_once $utility_path;
 }
 
-add_filter( 'woocommerce_checkout_registration_enabled', '__return_true' );
-
 /**
  * Read a WordPress option directly from the database, bypassing all filters.
  *
