@@ -9,9 +9,9 @@
  * Developer URI: https://www.checkout.com/
  * Version: 5.1.4.4
  * Requires at least: 6.0
- * Tested up to: 6.8
+ * Tested up to: 7.1
  * WC requires at least: 8.0
- * WC tested up to: 11.0.1
+ * WC tested up to: 11.2
  * Requires PHP: 7.4
  * Requires Plugins: woocommerce
  * Text Domain: checkout-com-unified-payments-api
