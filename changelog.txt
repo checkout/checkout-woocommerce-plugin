@@ -1,6 +1,6 @@
 *** Checkout.com Payment Gateway Changelog ***
 
-2026-09-27 - version 5.1.4.4
+2026-10-13 - version 5.1.4.5
 * Fix - Security: closed a payment/order-confusion issue in the Flow webhook path where a legitimately-signed capture for a low-value payment could advance a separate, unrelated (higher-value) order to a fulfilment status. Webhooks now require the resolved order to actually own the payment (by payment id, payment-session id, or a tracked attempt) before mutating it; the Checkout.com reference is set server-side from the order the amount is derived from; and a capture only advances the order when the captured amount and currency exactly match the order total (underpayments are held on-hold, with a cko_flow_allow_partial_capture_fulfilment filter to opt in).
 * Add - WooCommerce Blocks (block-based checkout) support for Flow: card payments (inline and 3DS), saved cards (display, save-on-consent, vaulting, pay-with-token), decline/error surfacing, name-&-email-only checkouts with store base-country fallback, and 3DS detail parameters.
 * Fix - Security: the public payment-status REST route now rejects any id that is not a well-formed Checkout.com payment id, closing a path-traversal that could proxy arbitrary Checkout.com API endpoints with the store's secret key.

@@ -2,7 +2,7 @@
 Contributors: checkoutintegration
 Tags: payments, credit card, payment gateway, apple pay, google pay
 Requires at least: 6.0
-Stable tag: 5.1.4.4
+Stable tag: 5.1.4.5
 Requires PHP: 7.4
 Tested up to: 7.1
 WC requires at least: 8.0
@@ -181,7 +181,7 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
-v5.1.4.4 27th September 2026
+v5.1.4.5 13th October 2026
 Security
 - Fixed a payment/order-confusion issue in the Flow webhook path where a legitimately-signed capture for a low-value payment could advance a separate, unrelated (higher-value) order to a fulfilment status. Webhooks now require the resolved order to actually own the payment before updating it, the Checkout.com reference is set server-side from the order the amount is taken from, and an order only advances when the captured amount and currency match exactly (underpayments are held on-hold).
 - The public payment-status endpoint now only accepts a valid Checkout.com payment id, closing a path-traversal that could query other Checkout.com API endpoints with the store's secret key.
