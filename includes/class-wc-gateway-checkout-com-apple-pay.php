@@ -831,7 +831,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 					$order_id = absint( $wp->query_vars['order-pay'] );
 
 					if ( ! $order_id && isset( $_GET['key'] ) ) {
-						$pay_order = wc_get_order( wc_get_order_id_by_order_key( sanitize_text_field( $_GET['key'] ) ) );
+						$pay_order = wc_get_order( wc_get_order_id_by_order_key( sanitize_text_field( wp_unslash( $_GET['key'] ) ) ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 					} else {
 						$pay_order = wc_get_order( $order_id );
 					}
@@ -1158,7 +1158,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 					break;
 
 				case 'express_apple_pay_order_session':
-					WC_Checkoutcom_Utility::cko_set_session( 'cko_apple_pay_order_id', isset( $_GET['apple_pay_order_id'] ) ? wc_clean( $_GET['apple_pay_order_id'] ) : '' );
+					WC_Checkoutcom_Utility::cko_set_session( 'cko_apple_pay_order_id', isset( $_GET['apple_pay_order_id'] ) ? wc_clean( wp_unslash( $_GET['apple_pay_order_id'] ) ) : '' );
 					$this->cko_express_apple_pay_order_session();
 					break;
 			}
@@ -3409,8 +3409,14 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		// Also ensure the site-root .htaccess allows .well-known through. Use WordPress's
 		// marker-managed writer (idempotent, keeps its own # BEGIN/# END block) instead of a
 		// raw file_put_contents on the site root .htaccess, which risked corrupting it.
+		global $wp_filesystem;
+		if ( empty( $wp_filesystem ) ) {
+			require_once ABSPATH . 'wp-admin/includes/file.php';
+			WP_Filesystem();
+		}
+
 		$main_htaccess = ABSPATH . '.htaccess';
-		if ( file_exists( $main_htaccess ) && is_writable( $main_htaccess ) ) {
+		if ( $wp_filesystem && $wp_filesystem->exists( $main_htaccess ) && $wp_filesystem->is_writable( $main_htaccess ) ) {
 			if ( ! function_exists( 'insert_with_markers' ) ) {
 				require_once ABSPATH . 'wp-admin/includes/misc.php';
 			}
