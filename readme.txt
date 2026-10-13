@@ -1,6 +1,6 @@
 === Checkout.com Payment Gateway ===
 Contributors: checkoutintegration
-Tags: checkout, payments, credit card, payment gateway, apple pay, google pay, payment request
+Tags: payments, credit card, payment gateway, apple pay, google pay
 Requires at least: 6.0
 Stable tag: 5.1.4.4
 Requires PHP: 7.4
@@ -10,7 +10,7 @@ WC tested up to: 11.2
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
-Checkout.com helps your business offer more payment methods and currencies to more customers. We provide best-in-class payment processing for credit card & alternative payment methods.
+Offer more payment methods and currencies with Checkout.com — best-in-class processing for cards and alternative payment methods.
 
 == Description ==
 
