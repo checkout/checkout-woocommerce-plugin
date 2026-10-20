@@ -465,7 +465,7 @@ class Logger implements LoggerInterface, ResettableInterface
      *
      * This still returns a string instead of a Level for BC, but new code should not rely on this method.
      *
-     * @throws \CheckoutComWC\Vendor\Psr\Log\InvalidArgumentException If level is not defined
+     * @throws \CheckoutComWC\Vendor\CheckoutComWC\Vendor\Psr\Log\InvalidArgumentException If level is not defined
      *
      * @phpstan-param  value-of<Level::VALUES>|Level $level
      * @phpstan-return value-of<Level::NAMES>
@@ -481,7 +481,7 @@ class Logger implements LoggerInterface, ResettableInterface
      * Converts PSR-3 levels to Monolog ones if necessary
      *
      * @param  int|string|Level|LogLevel::*      $level Level number (monolog) or name (PSR-3)
-     * @throws \CheckoutComWC\Vendor\Psr\Log\InvalidArgumentException If level is not defined
+     * @throws \CheckoutComWC\Vendor\CheckoutComWC\Vendor\Psr\Log\InvalidArgumentException If level is not defined
      *
      * @phpstan-param value-of<Level::VALUES>|value-of<Level::NAMES>|Level|LogLevel::* $level
      */

@@ -26,7 +26,7 @@ class SignalHandler
 
     /** @var array<int, callable|string|int> SIG_DFL, SIG_IGN or previous callable */
     private array $previousSignalHandler = [];
-    /** @var array<int, \CheckoutComWC\Vendor\Psr\Log\LogLevel::*> */
+    /** @var array<int, \CheckoutComWC\Vendor\CheckoutComWC\Vendor\Psr\Log\LogLevel::*> */
     private array $signalLevelMap = [];
     /** @var array<int, bool> */
     private array $signalRestartSyscalls = [];
