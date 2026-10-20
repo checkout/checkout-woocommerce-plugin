@@ -2,7 +2,7 @@
 Contributors: checkoutintegration
 Tags: payments, credit card, payment gateway, apple pay, google pay
 Requires at least: 6.0
-Stable tag: 5.1.4.5
+Stable tag: 5.2.0-beta
 Requires PHP: 8.1
 Tested up to: 7.1
 WC requires at least: 8.0
