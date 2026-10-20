@@ -146,12 +146,7 @@ class WC_Checkoutcom_Diagnostics {
 		}
 
 		$environment = isset( $core_settings['ckocom_environment'] ) ? $core_settings['ckocom_environment'] : 'sandbox';
-		$account_type = isset( $core_settings['ckocom_account_type'] ) ? $core_settings['ckocom_account_type'] : 'ABC';
 		$region = isset( $core_settings['ckocom_region'] ) ? $core_settings['ckocom_region'] : 'global';
-
-		if ( function_exists( 'cko_is_nas_account' ) && cko_is_nas_account() ) {
-			$account_type = 'NAS';
-		}
 
 		$base_url = ( 'sandbox' === $environment ) ? 'https://api.sandbox.checkout.com' : 'https://api.checkout.com';
 		if ( 'global' !== $region && ! empty( $region ) ) {
@@ -160,7 +155,7 @@ class WC_Checkoutcom_Diagnostics {
 
 		$api_url = $base_url . '/applepay/signing-requests';
 		$secret_key_clean = str_replace( 'Bearer ', '', trim( $secret_key_raw ) );
-		$auth_header = ( 'NAS' === $account_type ) ? 'Bearer ' . $secret_key_clean : $secret_key_clean;
+		$auth_header = 'Bearer ' . $secret_key_clean;
 
 		$request_body = array(
 			'protocol_version' => 'ec_v1',
@@ -177,21 +172,6 @@ class WC_Checkoutcom_Diagnostics {
 				'timeout' => 30,
 			)
 		);
-
-		// Retry with Bearer for ABC accounts on auth errors.
-		if ( ( is_wp_error( $response ) || 401 === wp_remote_retrieve_response_code( $response ) || 400 === wp_remote_retrieve_response_code( $response ) ) && 'ABC' === $account_type ) {
-			$response = wp_remote_post(
-				$api_url,
-				array(
-					'headers' => array(
-						'Authorization' => 'Bearer ' . $secret_key_clean,
-						'Content-Type'  => 'application/json',
-					),
-					'body'    => wp_json_encode( $request_body ),
-					'timeout' => 30,
-				)
-			);
-		}
 
 		if ( is_wp_error( $response ) ) {
 			return array(
