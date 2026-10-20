@@ -20,7 +20,7 @@ class WC_Checkoutcom_Utility {
 	 * @return bool
 	 */
 	public static function verify_signature( $event, $key, $cko_signature ) {
-		return hash_hmac( 'sha256', $event, $key ) === $cko_signature;
+		return hash_equals( hash_hmac( 'sha256', $event, $key ), (string) $cko_signature );
 	}
 
 	/**

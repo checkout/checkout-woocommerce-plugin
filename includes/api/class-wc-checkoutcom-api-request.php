@@ -34,8 +34,8 @@ use Checkout\Tokens\ApplePayTokenRequest;
 use Checkout\Tokens\GooglePayTokenData;
 use Checkout\Tokens\GooglePayTokenRequest;
 
-require_once 'class-wc-checkoutcom-utility.php';
-require 'class-wc-checkoutcom-apm-method.php';
+require_once __DIR__ . '/class-wc-checkoutcom-utility.php';
+require __DIR__ . '/class-wc-checkoutcom-apm-method.php';
 
 /**
  * Class WC_Checkoutcom_Api_Request handles the API requests.
@@ -1057,6 +1057,35 @@ class WC_Checkoutcom_Api_Request {
 	}
 
 	/**
+	 * Record a successful refund's action id on the order so the refund webhook can recognise it as
+	 * already booked and not create a duplicate WooCommerce refund (over-refund protection).
+	 *
+	 * @param WC_Order     $order    Order object.
+	 * @param object|array $response Checkout.com refund response.
+	 * @return void
+	 */
+	private static function record_refund_action_id( $order, $response ) {
+		if ( ! ( $order instanceof WC_Order ) ) {
+			return;
+		}
+		$action_id = '';
+		if ( is_array( $response ) ) {
+			$action_id = $response['action_id'] ?? '';
+		} elseif ( is_object( $response ) ) {
+			$action_id = $response->action_id ?? '';
+		}
+		if ( '' === (string) $action_id ) {
+			return;
+		}
+		$ids = (array) $order->get_meta( '_cko_refund_action_ids' );
+		if ( ! in_array( $action_id, $ids, true ) ) {
+			$ids[] = $action_id;
+			$order->update_meta_data( '_cko_refund_action_ids', $ids );
+			$order->save();
+		}
+	}
+
+	/**
 	 * Perform Refund.
 	 *
 	 * @param int      $order_id Order ID.
@@ -1152,6 +1181,7 @@ class WC_Checkoutcom_Api_Request {
 
 					return [ 'error' => $error_message ];
 				} else {
+					self::record_refund_action_id( $order, $response );
 					return $response;
 				}
 			}
@@ -1187,6 +1217,7 @@ class WC_Checkoutcom_Api_Request {
 
 				return [ 'error' => $error_message ];
 			} else {
+				self::record_refund_action_id( $order, $response );
 				return $response;
 			}
 		} catch ( CheckoutApiException $ex ) {

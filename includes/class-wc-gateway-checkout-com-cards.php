@@ -17,12 +17,12 @@ require_once dirname( __DIR__ ) . '/lib/class-checkout-sdk.php';
 if ( is_readable( dirname( __DIR__ ) . '/vendor/autoload.php' ) ) {
 	require dirname( __DIR__ ) . '/vendor/autoload.php';
 }
-require_once 'settings/class-wc-checkoutcom-cards-settings.php';
-require_once 'settings/class-wc-checkoutcom-webhook.php';
-require_once 'settings/admin/class-wc-checkoutcom-admin.php';
-require_once 'api/class-wc-checkoutcom-api-request.php';
-require_once 'class-wc-checkout-com-webhook.php';
-require_once 'subscription/class-wc-checkoutcom-subscription.php';
+require_once __DIR__ . '/settings/class-wc-checkoutcom-cards-settings.php';
+require_once __DIR__ . '/settings/class-wc-checkoutcom-webhook.php';
+require_once __DIR__ . '/settings/admin/class-wc-checkoutcom-admin.php';
+require_once __DIR__ . '/api/class-wc-checkoutcom-api-request.php';
+require_once __DIR__ . '/class-wc-checkout-com-webhook.php';
+require_once __DIR__ . '/subscription/class-wc-checkoutcom-subscription.php';
 
 /**
  * Class WC_Gateway_Checkout_Com_Cards for Card payment method.
@@ -132,7 +132,42 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		if ( 'flow' === ( $core_settings['ckocom_checkout_mode'] ?? 'classic' ) ) {
 			return false;
 		}
+		// Not configured yet: don't offer card payments before both API keys are entered.
+		if ( function_exists( 'cko_has_api_keys' ) && ! cko_has_api_keys() ) {
+			return false;
+		}
 		return parent::is_available();
+	}
+
+	/**
+	 * Whether the Checkout.com account is connected (both API keys entered).
+	 * Drives the WooCommerce Payments list status ("Active" vs "Complete setup").
+	 *
+	 * @return bool
+	 */
+	public function is_account_connected() {
+		return function_exists( 'cko_has_api_keys' ) ? cko_has_api_keys() : true;
+	}
+
+	/**
+	 * Whether the gateway still needs setup (no API keys yet).
+	 *
+	 * @return bool
+	 */
+	public function needs_setup() {
+		return function_exists( 'cko_has_api_keys' ) ? ! cko_has_api_keys() : false;
+	}
+
+	/**
+	 * Whether the gateway is in test/sandbox mode (for the Payments-list "Test mode" badge).
+	 *
+	 * @return bool
+	 */
+	public function is_test_mode() {
+		$core_settings = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		return 'live' !== ( $core_settings['ckocom_environment'] ?? 'sandbox' );
 	}
 
 	/**
@@ -398,6 +433,30 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 			|| isset( $_POST['cko_performance_logging'] );
 
 		if ( 'quick_settings' === $screen ) {
+			// SECURITY: the Secret Key field is rendered masked (empty value), so an empty submission
+			// means "keep the saved key". Restore the stored key into POST before save_fields() runs,
+			// otherwise the empty value would wipe it.
+			$existing_core_settings = function_exists( 'cko_get_raw_option' )
+				? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+				: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+			$stored_sk = is_array( $existing_core_settings ) && ! empty( $existing_core_settings['ckocom_sk'] )
+				? $existing_core_settings['ckocom_sk']
+				: '';
+			$posted_sk = '';
+			if ( isset( $_POST['woocommerce_wc_checkout_com_cards_settings']['ckocom_sk'] ) ) {
+				$posted_sk = sanitize_text_field( wp_unslash( $_POST['woocommerce_wc_checkout_com_cards_settings']['ckocom_sk'] ) );
+			} elseif ( isset( $_POST['ckocom_sk'] ) ) {
+				$posted_sk = sanitize_text_field( wp_unslash( $_POST['ckocom_sk'] ) );
+			}
+			if ( '' === trim( $posted_sk ) && '' !== $stored_sk ) {
+				if ( isset( $_POST['woocommerce_wc_checkout_com_cards_settings'] ) && is_array( $_POST['woocommerce_wc_checkout_com_cards_settings'] ) ) {
+					$_POST['woocommerce_wc_checkout_com_cards_settings']['ckocom_sk'] = $stored_sk;
+				}
+				if ( isset( $_POST['ckocom_sk'] ) ) {
+					$_POST['ckocom_sk'] = $stored_sk;
+				}
+			}
+
 			// CRITICAL FIX: Manually extract values from POST before save_fields()
 			// This ensures the values are saved even if save_fields() doesn't pick them up
 			$checkout_mode_from_post = null;

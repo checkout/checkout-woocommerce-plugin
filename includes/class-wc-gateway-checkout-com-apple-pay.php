@@ -7,8 +7,8 @@
 
 defined( 'ABSPATH' ) || exit;
 
-require_once 'settings/class-wc-checkoutcom-cards-settings.php';
-require_once 'express/apple-pay/class-apple-pay-express.php';
+require_once __DIR__ . '/settings/class-wc-checkoutcom-cards-settings.php';
+require_once __DIR__ . '/express/apple-pay/class-apple-pay-express.php';
 
 /**
  * Class WC_Gateway_Checkout_Com_Apple_Pay for Apple Pay method.
@@ -54,6 +54,10 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 
 		// CSR generation scripts (AJAX handler is registered in main plugin file)
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_csr_scripts' ] );
+
+		// Warn if the certificate directory is downloadable over HTTP (nginx/LiteSpeed ignore the
+		// .htaccess/web.config protection), so the private key isn't left publicly accessible.
+		add_action( 'admin_notices', [ $this, 'maybe_warn_cert_dir_web_exposed' ] );
 	}
 
 	/**
@@ -827,7 +831,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 					$order_id = absint( $wp->query_vars['order-pay'] );
 
 					if ( ! $order_id && isset( $_GET['key'] ) ) {
-						$pay_order = wc_get_order( wc_get_order_id_by_order_key( sanitize_text_field( $_GET['key'] ) ) );
+						$pay_order = wc_get_order( wc_get_order_id_by_order_key( sanitize_text_field( wp_unslash( $_GET['key'] ) ) ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 					} else {
 						$pay_order = wc_get_order( $order_id );
 					}
@@ -1154,7 +1158,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 					break;
 
 				case 'express_apple_pay_order_session':
-					WC_Checkoutcom_Utility::cko_set_session( 'cko_apple_pay_order_id', isset( $_GET['apple_pay_order_id'] ) ? wc_clean( $_GET['apple_pay_order_id'] ) : '' );
+					WC_Checkoutcom_Utility::cko_set_session( 'cko_apple_pay_order_id', isset( $_GET['apple_pay_order_id'] ) ? wc_clean( wp_unslash( $_GET['apple_pay_order_id'] ) ) : '' );
 					$this->cko_express_apple_pay_order_session();
 					break;
 			}
@@ -2908,18 +2912,104 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			wp_mkdir_p( $certificate_dir );
 		}
 
-		// Block direct web access to the private key / certificates.
-		$htaccess_file = $certificate_dir . '/.htaccess';
-		if ( ! file_exists( $htaccess_file ) ) {
-			file_put_contents( $htaccess_file, "Order deny,allow\nDeny from all\n" );
+		// Block direct web access to the private key / certificates. Cover Apache 2.4
+		// (Require all denied) as well as 2.2 (Order deny,allow) — the previous single-syntax rule
+		// was ignored by Apache 2.4. Overwrite any older, weaker .htaccess to upgrade existing installs.
+		$htaccess_file    = $certificate_dir . '/.htaccess';
+		$htaccess_content = "# Deny all web access to Checkout.com Apple Pay certificates and keys.\n"
+			. "<IfModule mod_authz_core.c>\n\tRequire all denied\n</IfModule>\n"
+			. "<IfModule !mod_authz_core.c>\n\tOrder deny,allow\n\tDeny from all\n</IfModule>\n";
+		if ( ! file_exists( $htaccess_file ) || md5_file( $htaccess_file ) !== md5( $htaccess_content ) ) {
+			file_put_contents( $htaccess_file, $htaccess_content );
 		}
-		// Prevent directory listing.
+
+		// IIS ignores .htaccess — deny via web.config too.
+		$webconfig_file = $certificate_dir . '/web.config';
+		if ( ! file_exists( $webconfig_file ) ) {
+			file_put_contents(
+				$webconfig_file,
+				"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<configuration>\n\t<system.webServer>\n\t\t<authorization>\n\t\t\t<deny users=\"*\" />\n\t\t</authorization>\n\t</system.webServer>\n</configuration>\n"
+			);
+		}
+
+		// Prevent directory listing / execution.
 		$index_file = $certificate_dir . '/index.php';
 		if ( ! file_exists( $index_file ) ) {
 			file_put_contents( $index_file, "<?php\n// Silence is golden.\n" );
 		}
 
+		// Canary: nginx and LiteSpeed ignore both .htaccess and web.config, so the key could still be
+		// downloadable. This harmless file lets cko_applepay_dir_web_exposed() detect that case over
+		// HTTP and warn the merchant (see the Apple Pay settings notice).
+		$canary_file = $certificate_dir . '/cko-access-check.txt';
+		if ( ! file_exists( $canary_file ) ) {
+			file_put_contents( $canary_file, 'checkout-com-apple-pay-access-check' );
+		}
+
 		return $certificate_dir;
+	}
+
+	/**
+	 * Whether the Apple Pay certificate directory is reachable over HTTP (the server ignores the
+	 * .htaccess/web.config denials — typically nginx or LiteSpeed — leaving the private key
+	 * downloadable). Result cached for 12h. Uses the harmless canary file, never the key itself.
+	 *
+	 * @return bool
+	 */
+	public function is_cert_dir_web_exposed() {
+		$cached = get_transient( 'cko_applepay_dir_web_exposed' );
+		if ( false !== $cached ) {
+			return 'yes' === $cached;
+		}
+
+		$upload_dir = wp_upload_dir();
+		$cert_dir   = $upload_dir['basedir'] . '/checkout-com-apple-pay';
+
+		// Nothing configured yet — nothing to warn about.
+		if ( empty( $upload_dir['baseurl'] ) || ! is_dir( $cert_dir ) ) {
+			set_transient( 'cko_applepay_dir_web_exposed', 'no', 12 * HOUR_IN_SECONDS );
+			return false;
+		}
+
+		// Ensure the protection files + canary exist (also upgrades older installs' weak .htaccess).
+		$this->get_protected_apple_pay_cert_dir( $upload_dir );
+
+		$canary_url = trailingslashit( $upload_dir['baseurl'] ) . 'checkout-com-apple-pay/cko-access-check.txt';
+		$response   = wp_remote_get( $canary_url, array( 'timeout' => 5, 'redirection' => 0 ) );
+		$exposed    = ! is_wp_error( $response )
+			&& 200 === (int) wp_remote_retrieve_response_code( $response )
+			&& false !== strpos( (string) wp_remote_retrieve_body( $response ), 'checkout-com-apple-pay-access-check' );
+
+		set_transient( 'cko_applepay_dir_web_exposed', $exposed ? 'yes' : 'no', 12 * HOUR_IN_SECONDS );
+		return $exposed;
+	}
+
+	/**
+	 * Show an admin warning on the Apple Pay settings screen when the certificate directory is
+	 * web-exposed, so the merchant can block it at the server or move the key out of the web root.
+	 *
+	 * @return void
+	 */
+	public function maybe_warn_cert_dir_web_exposed() {
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			return;
+		}
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		if ( ! $screen || 'woocommerce_page_wc-settings' !== $screen->id ) {
+			return;
+		}
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only screen routing check.
+		$section = isset( $_GET['section'] ) ? sanitize_text_field( wp_unslash( $_GET['section'] ) ) : '';
+		if ( 'wc_checkout_com_apple_pay' !== $section ) {
+			return;
+		}
+		if ( ! $this->is_cert_dir_web_exposed() ) {
+			return;
+		}
+		echo '<div class="notice notice-error"><p><strong>'
+			. esc_html__( 'Checkout.com Apple Pay:', 'checkout-com-unified-payments-api' ) . '</strong> '
+			. esc_html__( 'Your server is serving the Apple Pay certificate directory over HTTP, so the merchant-identity private key can be downloaded. This usually means nginx or LiteSpeed is ignoring the .htaccess protection. Block web access to /wp-content/uploads/checkout-com-apple-pay/ at the server level, or move the key outside the web root.', 'checkout-com-unified-payments-api' )
+			. '</p></div>';
 	}
 
 	/**
@@ -3319,8 +3409,14 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		// Also ensure the site-root .htaccess allows .well-known through. Use WordPress's
 		// marker-managed writer (idempotent, keeps its own # BEGIN/# END block) instead of a
 		// raw file_put_contents on the site root .htaccess, which risked corrupting it.
+		global $wp_filesystem;
+		if ( empty( $wp_filesystem ) ) {
+			require_once ABSPATH . 'wp-admin/includes/file.php';
+			WP_Filesystem();
+		}
+
 		$main_htaccess = ABSPATH . '.htaccess';
-		if ( file_exists( $main_htaccess ) && is_writable( $main_htaccess ) ) {
+		if ( $wp_filesystem && $wp_filesystem->exists( $main_htaccess ) && $wp_filesystem->is_writable( $main_htaccess ) ) {
 			if ( ! function_exists( 'insert_with_markers' ) ) {
 				require_once ABSPATH . 'wp-admin/includes/misc.php';
 			}

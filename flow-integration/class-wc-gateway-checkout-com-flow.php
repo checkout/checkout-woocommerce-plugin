@@ -717,9 +717,46 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			return false;
 		}
 
+		// Not configured yet: never offer the method before both API keys are entered, so a
+		// customer can't pick a payment method that cannot work.
+		if ( function_exists( 'cko_has_api_keys' ) && ! cko_has_api_keys() ) {
+			return false;
+		}
+
 		// Gateway is available if enabled and checkout mode is 'flow'
 		// We bypass currency/country restrictions as Flow supports all currencies/countries
 		return true;
+	}
+
+	/**
+	 * Whether the Checkout.com account is connected (both API keys entered).
+	 * Drives the WooCommerce Payments list status ("Active" vs "Complete setup").
+	 *
+	 * @return bool
+	 */
+	public function is_account_connected() {
+		return function_exists( 'cko_has_api_keys' ) ? cko_has_api_keys() : true;
+	}
+
+	/**
+	 * Whether the gateway still needs setup (no API keys yet).
+	 *
+	 * @return bool
+	 */
+	public function needs_setup() {
+		return function_exists( 'cko_has_api_keys' ) ? ! cko_has_api_keys() : false;
+	}
+
+	/**
+	 * Whether the gateway is in test/sandbox mode (for the Payments-list "Test mode" badge).
+	 *
+	 * @return bool
+	 */
+	public function is_test_mode() {
+		$core_settings = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		return 'live' !== ( $core_settings['ckocom_environment'] ?? 'sandbox' );
 	}
 
 	/**
@@ -6493,8 +6530,9 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		$checkout_mode = $core_settings['ckocom_checkout_mode'] ?? 'cards';
 		
 		if ( $webhook_debug_enabled ) {
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Core settings retrieved: ' . wp_json_encode( $core_settings ) );
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Checkout mode: ' . $checkout_mode );
+			// SECURITY: never serialise the whole settings array — it contains the secret key
+			// (ckocom_sk). Log only the non-sensitive fields needed for debugging.
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Core settings retrieved - environment: ' . ( $core_settings['ckocom_environment'] ?? 'n/a' ) . ', account type: ' . ( $core_settings['ckocom_account_type'] ?? 'n/a' ) . ', checkout mode: ' . $checkout_mode );
 		}
 		
 		if ( 'flow' !== $checkout_mode ) {
@@ -6590,7 +6628,8 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		}
 
 		$computed_hmac = hash_hmac( 'sha256', $raw_event, $secret_key );
-		$signature     = ( $computed_hmac === $header_signature );
+		// Constant-time comparison to avoid a timing side-channel on the webhook signature.
+		$signature     = hash_equals( $computed_hmac, (string) $header_signature );
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Computed HMAC: ' . $computed_hmac );
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Expected HMAC: ' . ( $header_signature ?? 'NULL' ) );
@@ -6798,23 +6837,22 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Trying METHOD 2.5 (MULTI-TAB: Payment ID in _cko_payment_attempts)' );
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK MATCHING: Looking for payment ID: ' . $webhook_payment_id . ' in payment attempts array' );
 			
-			// Search for orders with this payment ID tracked in the payment_attempts array
-			// We need to search serialized data, so we use LIKE with the payment ID
-			global $wpdb;
-			$meta_key = '_cko_payment_attempts';
-			$search_pattern = '%' . $wpdb->esc_like( $webhook_payment_id ) . '%';
-			
-			$order_ids = $wpdb->get_col(
-				$wpdb->prepare(
-					"SELECT DISTINCT pm.post_id FROM {$wpdb->postmeta} pm 
-					INNER JOIN {$wpdb->posts} p ON pm.post_id = p.ID 
-					WHERE pm.meta_key = %s 
-					AND pm.meta_value LIKE %s 
-					AND p.post_type IN ('shop_order', 'shop_order_placehold')
-					AND p.post_status IN ('wc-pending', 'wc-failed', 'wc-on-hold', 'wc-processing', 'wc-completed')
-					LIMIT 5",
-					$meta_key,
-					$search_pattern
+			// HPOS-safe lookup: query orders via the WooCommerce CRUD API so this works with both the
+			// legacy posts tables and High-Performance Order Storage (where order meta lives in
+			// wc_orders_meta, not postmeta — the old raw postmeta/posts JOIN never matched under HPOS).
+			// The serialized attempts array is matched with a LIKE; the loop below verifies the exact id.
+			$order_ids = wc_get_orders(
+				array(
+					'limit'      => 5,
+					'return'     => 'ids',
+					'status'     => array( 'pending', 'failed', 'on-hold', 'processing', 'completed' ),
+					'meta_query' => array(
+						array(
+							'key'     => '_cko_payment_attempts',
+							'value'   => $webhook_payment_id,
+							'compare' => 'LIKE',
+						),
+					),
 				)
 			);
 			
@@ -9267,6 +9305,33 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				'message' => __( 'Missing required parameters.', 'checkout-com-unified-payments-api' ),
 			) );
 			return;
+		}
+
+		// SECURITY: this endpoint is public (nopriv). It derives the amount from `order_id`, writes
+		// payment meta onto that order, and echoes the order key in the return URL. Verify the caller
+		// is entitled to act on the order before using it. Scoped to reject only the demonstrated
+		// abuse — an order that belongs to a registered customer who is NOT the current visitor and
+		// with no matching order key or checkout-session link — so guest checkouts, owner retries,
+		// and the order-less Blocks path (order_id = 0) are unaffected.
+		if ( $order_id > 0 ) {
+			$submit_order = wc_get_order( $order_id );
+			if ( $submit_order ) {
+				$owner_id     = (int) $submit_order->get_customer_id();
+				$current_uid  = get_current_user_id();
+				$session_oid  = (int) ( WC()->session ? WC()->session->get( 'order_awaiting_payment' ) : 0 );
+				$provided_key = isset( $_POST['order_key'] ) ? sanitize_text_field( wp_unslash( $_POST['order_key'] ) ) : '';
+				$key_ok       = '' !== $provided_key && hash_equals( (string) $submit_order->get_order_key(), $provided_key );
+				$owner_ok     = $owner_id > 0 && $owner_id === $current_uid;
+				$session_ok   = $order_id === $session_oid;
+
+				if ( $owner_id > 0 && ! $owner_ok && ! $key_ok && ! $session_ok ) {
+					WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] REJECTED: order ' . $order_id . ' belongs to another customer and the request carries no matching order key or session link.' );
+					wp_send_json_error( array(
+						'message' => __( 'Security check failed. Please refresh the page and try again.', 'checkout-com-unified-payments-api' ),
+					) );
+					return;
+				}
+			}
 		}
 
 		// Build the request body for Submit Payment Session API
