@@ -10,10 +10,10 @@ use CheckoutComWC\Vendor\GuzzleHttp\Handler\CurlShareHandleState;
 use CheckoutComWC\Vendor\GuzzleHttp\Handler\CurlVersion;
 use CheckoutComWC\Vendor\GuzzleHttp\Promise as P;
 use CheckoutComWC\Vendor\GuzzleHttp\Promise\PromiseInterface;
-use CheckoutComWC\Vendor\Psr\Http\Message\RequestInterface;
-use CheckoutComWC\Vendor\Psr\Http\Message\ResponseInterface;
-use CheckoutComWC\Vendor\Psr\Http\Message\StreamInterface;
-use CheckoutComWC\Vendor\Psr\Http\Message\UriInterface;
+use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\StreamInterface;
+use Psr\Http\Message\UriInterface;
 
 /**
  * @final

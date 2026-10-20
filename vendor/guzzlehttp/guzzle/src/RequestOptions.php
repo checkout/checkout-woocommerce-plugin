@@ -5,7 +5,7 @@ namespace CheckoutComWC\Vendor\GuzzleHttp;
 /**
  * This class contains a list of built-in Guzzle request options.
  *
- * @see https://github.com/guzzle/guzzle/blob/7.15/docs/request-options.md
+ * @see https://github.com/guzzle/guzzle/blob/7.16/docs/request-options.md
  */
 final class RequestOptions
 {
@@ -48,7 +48,7 @@ final class RequestOptions
     public const AUTH = 'auth';
 
     /**
-     * body: (resource|string|null|int|float|bool|\CheckoutComWC\Vendor\Psr\Http\Message\StreamInterface|(callable&object)|\Iterator|\Stringable)
+     * body: (resource|string|null|int|float|bool|\Psr\Http\Message\StreamInterface|(callable&object)|\Iterator|\Stringable)
      * Body to send in the request. Callable arrays are arrays, and arrays are
      * not valid body values in Guzzle.
      */
@@ -352,7 +352,7 @@ final class RequestOptions
     public const QUERY = 'query';
 
     /**
-     * sink: (resource|string|\CheckoutComWC\Vendor\Psr\Http\Message\StreamInterface) Where the data
+     * sink: (resource|string|\Psr\Http\Message\StreamInterface) Where the data
      * of the response is written to. Defaults to a PHP temp stream. Providing
      * a string will write data to a file by the given name.
      */

@@ -14,8 +14,8 @@ use CheckoutComWC\Vendor\GuzzleHttp\Psr7\Uri;
 use CheckoutComWC\Vendor\GuzzleHttp\TransferStats;
 use CheckoutComWC\Vendor\GuzzleHttp\TransportSharing;
 use CheckoutComWC\Vendor\GuzzleHttp\Utils;
-use CheckoutComWC\Vendor\Psr\Http\Message\RequestInterface;
-use CheckoutComWC\Vendor\Psr\Http\Message\UriInterface;
+use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\UriInterface;
 
 /**
  * Creates curl resources from a request

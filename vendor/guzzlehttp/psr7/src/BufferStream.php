@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace CheckoutComWC\Vendor\GuzzleHttp\Psr7;
 
-use CheckoutComWC\Vendor\Psr\Http\Message\StreamInterface;
+use Psr\Http\Message\StreamInterface;
 
 /**
  * Provides a buffer stream that can be written to to fill a buffer, and read

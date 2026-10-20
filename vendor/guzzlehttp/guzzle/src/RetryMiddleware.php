@@ -4,8 +4,8 @@ namespace CheckoutComWC\Vendor\GuzzleHttp;
 
 use CheckoutComWC\Vendor\GuzzleHttp\Promise as P;
 use CheckoutComWC\Vendor\GuzzleHttp\Promise\PromiseInterface;
-use CheckoutComWC\Vendor\Psr\Http\Message\RequestInterface;
-use CheckoutComWC\Vendor\Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
 
 /**
  * Middleware that retries requests based on the boolean result of

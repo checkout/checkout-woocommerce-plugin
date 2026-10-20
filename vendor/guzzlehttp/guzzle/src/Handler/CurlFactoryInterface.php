@@ -2,7 +2,7 @@
 
 namespace CheckoutComWC\Vendor\GuzzleHttp\Handler;
 
-use CheckoutComWC\Vendor\Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\RequestInterface;
 
 interface CurlFactoryInterface
 {

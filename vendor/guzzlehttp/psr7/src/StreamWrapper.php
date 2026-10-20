@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace CheckoutComWC\Vendor\GuzzleHttp\Psr7;
 
-use CheckoutComWC\Vendor\Psr\Http\Message\StreamInterface;
+use Psr\Http\Message\StreamInterface;
 
 /**
  * Converts Guzzle streams into PHP stream resources.
@@ -97,6 +97,11 @@ final class StreamWrapper
     public function stream_write(string $data): int
     {
         return $this->stream->write($data);
+    }
+
+    public function stream_flush(): bool
+    {
+        return true;
     }
 
     public function stream_tell(): int

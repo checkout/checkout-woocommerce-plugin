@@ -4,178 +4,345 @@ namespace Checkout\Payments;
 
 use Checkout\Payments\Previous\SenderInformation;
 
+/**
+ * Settings that control how the payment is processed.
+ *
+ * Shared across several request shapes. POST /payments resolves to PaymentRequestProcessing, while
+ * hosted payments, payment links and payment sessions resolve to the wider
+ * PaymentInterfacesProcessing. A property is therefore not necessarily read by every endpoint that
+ * accepts this object.
+ */
 class ProcessingSettings
 {
     /**
-     * @var string
-     */
-    public $order_id;
-
-    /**
-     * @var int
-     */
-    public $tax_amount;
-
-    /**
-     * @var int
-     */
-    public $discount_amount;
-
-    /**
-     * @var int
-     */
-    public $duty_amount;
-
-    /**
-     * @var int
-     */
-    public $shipping_amount;
-
-    /**
-     * @var int
-     */
-    public $shipping_tax_amount;
-
-    /**
+     * Indicates whether the payment is an Account Funding Transaction (AFT).
      * @var bool
      */
     public $aft;
 
     /**
-     * @var string value of PreferredSchema
+     * The discount amount applied to the payment, in minor currency units.
+     * @var float
      */
-    public $preferred_scheme;
+    public $discount_amount;
 
     /**
-     * @var string value of MerchantInitiatedReason
+     * The shipping amount for the payment, in minor currency units.
+     * @var float
      */
-    public $merchant_initiated_reason;
+    public $shipping_amount;
 
     /**
-     * @var int
+     * The tax amount for the payment, in minor currency units.
+     * @var float
      */
-    public $campaign_id;
+    public $tax_amount;
 
     /**
-     * @var string value of ProductType
-     */
-    public $product_type;
-
-    /**
-     * @var string
-     */
-    public $open_id;
-
-    /**
-     * @var int
-     */
-    public $original_order_amount;
-
-    /**
-     * @var string
-     */
-    public $receipt_id;
-
-    /**
-     * @var string value of TerminalType
-     */
-    public $terminal_type;
-
-    /**
-     * @var string value of OsType
-     */
-    public $os_type;
-
-    /**
+     * The invoice ID associated with the payment.
      * @var string
      */
     public $invoice_id;
 
     /**
+     * The brand name displayed to the customer.
      * @var string
      */
     public $brand_name;
 
     /**
+     * The locale for the payment session.
      * @var string
      */
     public $locale;
 
     /**
-     * @var string value of ShippingPreference
+     * Partner-specific customer risk data for enhanced fraud detection.
+     * @var PartnerCustomerRiskData
      */
-    public $shipping_preference;
+    public $partner_customer_risk_data;
 
     /**
-     * @var string value of UserAction
+     * Promo codes. They define which of the configured payment options within a payment
+     * category (pay_later, pay_over_time, and so on) are shown for this purchase.
+     * [Optional]
+     * @var string[]
      */
-    public $user_action;
+    public $custom_payment_method_ids;
 
     /**
-     * @var array
-     */
-    public $set_transaction_context;
-
-    /**
-     * @var array of AirlineData
+     * Contains information about the airline ticket and flights booked by the customer.
+     * [Optional]
+     * @var AirlineData[]
      */
     public $airline_data;
 
     /**
-     * @var string
+     * Contains information about the accommodation booked by the customer.
+     * [Optional]
+     * @var AccommodationData[]
      */
-    public $otp_value;
+    public $accommodation_data;
 
     /**
+     * The order ID associated with the payment.
+     * @var string
+     */
+    public $order_id;
+
+    /**
+     * The surcharge amount applied to the payment, in minor currency units.
+     * @var int
+     */
+    public $surcharge_amount;
+
+    /**
+     * The duty amount for the payment, in minor currency units.
+     * @var float
+     */
+    public $duty_amount;
+
+    /**
+     * The tax amount applied to shipping, in minor currency units.
+     * @var float
+     */
+    public $shipping_tax_amount;
+
+    /**
+     * The two-letter ISO country code where the purchase was made.
      * @var string values of Country
      */
     public $purchase_country;
 
     /**
-     * @var array of string
+     * The reason for a merchant-initiated payment.
+     * @var string value of MerchantInitiatedReason
      */
-    public $custom_payment_method_ids;
+    public $merchant_initiated_reason;
 
     /**
+     * The campaign ID associated with the payment.
+     * @var int
+     */
+    public $campaign_id;
+
+    /**
+     * The original order amount before any modifications, in minor currency units.
+     * @var float
+     */
+    public $original_order_amount;
+
+    /**
+     * The receipt ID for the payment.
+     * @var string
+     */
+    public $receipt_id;
+
+    /**
+     * The merchant callback URL for payment notifications.
      * @var string
      */
     public $merchant_callback_url;
 
     /**
+     * The line of business for the payment (e.g., Flights).
      * @var string
      */
     public $line_of_business;
 
     /**
+     * The preference for PAN type (fpan for Full PAN).
+     * @var string
+     */
+    public $pan_preference;
+
+    /**
+     * Whether to provision a network token for the payment.
+     * @var bool
+     */
+    public $provision_network_token;
+
+    /**
+     * The preferred card scheme for processing.
+     * @var string value of PreferredSchema
+     */
+    public $preferred_scheme;
+
+    /**
+     * The type of product being purchased.
+     * @var string value of ProductType
+     */
+    public $product_type;
+
+    /**
+     * The Open ID for the payment.
+     * @var string
+     */
+    public $open_id;
+
+    /**
+     * The type of terminal used for the payment.
+     * @var string value of TerminalType
+     */
+    public $terminal_type;
+
+    /**
+     * The operating system type of the device.
+     * @var string value of OsType
+     */
+    public $os_type;
+
+    /**
+     * The shipping preference for the payment.
+     *
+     * Declared on PaymentContextProcessing only,
+     * so it is read by POST /payment-contexts and not by POST /payments, hosted payments or payment links.
+     * @var string value of ShippingPreference
+     */
+    public $shipping_preference;
+
+    /**
+     * The user action required for the payment.
+     *
+     * Declared on PaymentContextProcessing only.
+     * Required by PayPal to have an appropriate payment flow.
+     * @var string value of UserAction
+     */
+    public $user_action;
+
+    /**
+     * Additional transaction context information.
+     *
+     * Not in the current specification, neither NAS nor Previous (ABC). Serializes as
+     * set_transaction_context, which no request processing schema defines, so the gateway
+     * discards it. Retained for backwards compatibility.
+     * @var array
+     */
+    public $set_transaction_context;
+
+    /**
+     * The OTP (One-Time Password) value for authentication.
+     *
+     * Declared on the payment contexts payment request and on the capture request only,
+     * not on PaymentRequestProcessing or PaymentInterfacesProcessing.
+     * @var string
+     */
+    public $otp_value;
+
+    /**
+     * The shipping delay in days.
+     *
+     * Not in the current specification, neither NAS nor Previous (ABC).
+     * The gateway discards it. Retained for backwards compatibility.
      * @var int
      */
     public $shipping_delay;
 
     /**
-     * @var array of ShippingInfo
+     * Additional shipping information for the payment.
+     *
+     * Not in the current specification, neither NAS nor Previous (ABC). The gateway discards
+     * it. Retained for backwards compatibility.
+     * @var ShippingInfo[]
      */
     public $shipping_info;
 
     /**
+     * DLocal-specific processing settings.
+     *
+     * Previous API (ABC) only.
+     * It is absent from the NAS processing schemas.
      * @var DLocalProcessingSettings
      */
     public $dlocal;
 
     /**
+     * Aggregator information for marketplace payments.
      * @var Aggregator
      */
     public $aggregator;
 
-
     /**
+     * Sender information for the payment.
+     *
+     * Previous API (ABC) only, and absent from every specification available to this workspace
+     * under both "senderInformation" and "sender_information", including the live API reference.
+     * No processing schema declares a sender property of any kind; the current API carries sender
+     * details in the top level "sender" object on the payment request. Deprecated in practice.
+     *
+     * The camelCase property name is long standing and is left exactly as it is. It has never
+     * been confirmed against a live ABC endpoint, so treat it as unverified rather than correct,
+     * and do not change it in either direction without such a confirmation.
      * @var SenderInformation
      */
     public $senderInformation;
 
     /**
+     * The purpose of the payment.
+     *
+     * Not declared on any processing schema in either specification.
+     * The name appears elsewhere in the spec on unrelated objects. The gateway discards it here.
      * @var string
      */
     public $purpose;
 
+    /**
+     * @var string
+     */
+    public $affiliate_id;
+
+    /**
+     * @var string
+     */
+    public $affiliate_url;
+
+    /**
+     * The transaction identifier to track a payment request.
+     * [Optional]
+     * @var string|null $reconciliation_id
+     */
+    public $reconciliation_id;
+
+    /**
+     * The foreign retailer amount applied to the transaction, in the minor currency unit.
+     * [Optional]
+     * min 0
+     * @var int|null $foreign_retailer_amount
+     */
+    public $foreign_retailer_amount;
+
+    /**
+     * Specifies which ACH service to use for the payment when source.type is "ach".
+     * [Optional]
+     * Enum: "same_day" "standard"
+     * @var string|null $service_type value of AchServiceType
+     */
+    public $service_type;
+
+    /**
+     * The customer's 6-digit Blik code. Required when source.type is blik and merchant_initiated is false.
+     * [Optional]
+     * Pattern: ^\d{6}$
+     * min 6 characters
+     * max 6 characters
+     * @var string|null $partner_code
+     */
+    public $partner_code;
+
+    /**
+     * Specifies whether to process the payment as a credit or debit transaction.
+     * Required for domestic payments in Brazil performed using a Brazilian card.
+     * [Optional]
+     * Enum: "credit" "debit"
+     * @var string|null $card_type value of CardType
+     */
+    public $card_type;
+
+    /**
+     * The scheme transaction link identifier.
+     * [Optional]
+     * @var string|null $scheme_transaction_link_id
+     */
+    public $scheme_transaction_link_id;
 
 }

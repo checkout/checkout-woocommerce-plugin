@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace CheckoutComWC\Vendor\GuzzleHttp\Psr7;
 
 use InvalidArgumentException;
-use CheckoutComWC\Vendor\Psr\Http\Message\ServerRequestInterface;
-use CheckoutComWC\Vendor\Psr\Http\Message\StreamInterface;
-use CheckoutComWC\Vendor\Psr\Http\Message\UploadedFileInterface;
-use CheckoutComWC\Vendor\Psr\Http\Message\UriInterface;
+use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Message\StreamInterface;
+use Psr\Http\Message\UploadedFileInterface;
+use Psr\Http\Message\UriInterface;
 
 /**
  * Server-side HTTP request
@@ -186,7 +186,7 @@ class ServerRequest extends Request implements ServerRequestInterface
      */
     private static function getAllHeaders(): array
     {
-        return self::normalizeHeaderValues(checkoutcomwc_vendor_getallheaders());
+        return self::normalizeHeaderValues(getallheaders());
     }
 
     /**

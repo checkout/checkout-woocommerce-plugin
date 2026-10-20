@@ -3,8 +3,8 @@
 namespace CheckoutComWC\Vendor\GuzzleHttp;
 
 use CheckoutComWC\Vendor\GuzzleHttp\Promise\PromiseInterface;
-use CheckoutComWC\Vendor\Psr\Http\Message\RequestInterface;
-use CheckoutComWC\Vendor\Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
 
 /**
  * Creates a composed Guzzle handler function by stacking middlewares on top of
@@ -284,6 +284,6 @@ class HandlerStack
         }
 
         /** @var object $fn */
-        return 'callable('.\spl_object_hash($fn).')';
+        return 'callable('.\spl_object_id($fn).')';
     }
 }

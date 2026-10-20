@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace CheckoutComWC\Vendor\GuzzleHttp\Psr7;
 
-use CheckoutComWC\Vendor\Psr\Http\Message\ResponseInterface;
-use CheckoutComWC\Vendor\Psr\Http\Message\StreamInterface;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\StreamInterface;
 
 /**
  * PSR-7 response implementation.

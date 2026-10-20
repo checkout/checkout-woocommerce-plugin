@@ -6,7 +6,7 @@ use CheckoutComWC\Vendor\GuzzleHttp\Promise as P;
 use CheckoutComWC\Vendor\GuzzleHttp\Promise\EachPromise;
 use CheckoutComWC\Vendor\GuzzleHttp\Promise\PromiseInterface;
 use CheckoutComWC\Vendor\GuzzleHttp\Promise\PromisorInterface;
-use CheckoutComWC\Vendor\Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\RequestInterface;
 
 /**
  * Sends an iterator of requests concurrently using a capped pool size.

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace CheckoutComWC\Vendor\GuzzleHttp\Psr7;
 
 use CheckoutComWC\Vendor\GuzzleHttp\Psr7\Exception\MalformedUriException;
-use CheckoutComWC\Vendor\Psr\Http\Message\UriInterface;
+use Psr\Http\Message\UriInterface;
 
 /**
  * PSR-7 URI implementation.
@@ -195,7 +195,7 @@ class Uri implements UriInterface, \JsonSerializable
      * Composes a URI reference string from its various components.
      *
      * Usually this method does not need to be called manually but instead is used indirectly via
-     * `CheckoutComWC\Vendor\Psr\Http\Message\UriInterface::__toString`.
+     * `Psr\Http\Message\UriInterface::__toString`.
      *
      * PSR-7 UriInterface treats an empty component the same as a missing component as
      * getQuery(), getFragment() etc. always return a string. This explains the slight
@@ -242,7 +242,7 @@ class Uri implements UriInterface, \JsonSerializable
     /**
      * Whether the URI has the default port of the current scheme.
      *
-     * `CheckoutComWC\Vendor\Psr\Http\Message\UriInterface::getPort` may return null or the standard port. This method can be used
+     * `Psr\Http\Message\UriInterface::getPort` may return null or the standard port. This method can be used
      * independently of the implementation.
      */
     public static function isDefaultPort(UriInterface $uri): bool

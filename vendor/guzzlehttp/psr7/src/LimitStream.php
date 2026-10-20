@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace CheckoutComWC\Vendor\GuzzleHttp\Psr7;
 
-use CheckoutComWC\Vendor\Psr\Http\Message\StreamInterface;
+use Psr\Http\Message\StreamInterface;
 
 /**
  * Decorator used to return only a subset of a stream.

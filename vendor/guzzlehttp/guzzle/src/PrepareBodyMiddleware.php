@@ -3,7 +3,7 @@
 namespace CheckoutComWC\Vendor\GuzzleHttp;
 
 use CheckoutComWC\Vendor\GuzzleHttp\Promise\PromiseInterface;
-use CheckoutComWC\Vendor\Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\RequestInterface;
 
 /**
  * Prepares requests that contain a body, adding the Content-Length,

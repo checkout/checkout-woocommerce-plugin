@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace CheckoutComWC\Vendor\GuzzleHttp\Psr7;
 
 use InvalidArgumentException;
-use CheckoutComWC\Vendor\Psr\Http\Message\RequestInterface;
-use CheckoutComWC\Vendor\Psr\Http\Message\StreamInterface;
-use CheckoutComWC\Vendor\Psr\Http\Message\UriInterface;
+use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\StreamInterface;
+use Psr\Http\Message\UriInterface;
 
 /**
  * PSR-7 request implementation.

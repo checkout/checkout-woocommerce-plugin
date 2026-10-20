@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace CheckoutComWC\Vendor\GuzzleHttp\Psr7;
 
-use CheckoutComWC\Vendor\Psr\Http\Message\StreamInterface;
+use Psr\Http\Message\StreamInterface;
 
 /**
  * Stream decorator that can cache previously read bytes from a sequentially
@@ -178,7 +178,7 @@ final class CachingStream implements StreamInterface
         // length.
         $overflow = (strlen($string) + $this->tell()) - $this->remoteStream->tell();
         if ($overflow > 0) {
-            $this->skipReadBytes += $overflow;
+            $this->skipReadBytes = max($this->skipReadBytes, $overflow);
         }
 
         return $this->stream->write($string);

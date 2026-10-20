@@ -4,7 +4,7 @@ namespace CheckoutComWC\Vendor\GuzzleHttp\Handler;
 
 use CheckoutComWC\Vendor\GuzzleHttp\Promise\PromiseInterface;
 use CheckoutComWC\Vendor\GuzzleHttp\TransportSharing;
-use CheckoutComWC\Vendor\Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\RequestInterface;
 
 /**
  * HTTP handler that uses cURL easy handles as a transport layer.

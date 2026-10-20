@@ -4,9 +4,9 @@ namespace CheckoutComWC\Vendor\GuzzleHttp\Exception;
 
 use CheckoutComWC\Vendor\GuzzleHttp\BodySummarizer;
 use CheckoutComWC\Vendor\GuzzleHttp\BodySummarizerInterface;
-use CheckoutComWC\Vendor\Psr\Http\Client\RequestExceptionInterface;
-use CheckoutComWC\Vendor\Psr\Http\Message\RequestInterface;
-use CheckoutComWC\Vendor\Psr\Http\Message\ResponseInterface;
+use Psr\Http\Client\RequestExceptionInterface;
+use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
 
 /**
  * HTTP Request exception

@@ -19,11 +19,11 @@ class TransfersClient extends Client
 
     /**
      * @param CreateTransferRequest $transferRequest
-     * @param string|null $idempotencyKey
+     * @param string $idempotencyKey
      * @return array
      * @throws CheckoutApiException
      */
-    public function initiateTransferOfFunds(CreateTransferRequest $transferRequest, $idempotencyKey = null)
+    public function initiateTransferOfFunds(CreateTransferRequest $transferRequest, $idempotencyKey): array
     {
         return $this->apiClient->post(
             self::TRANSFERS_PATH,
@@ -38,7 +38,7 @@ class TransfersClient extends Client
      * @return array
      * @throws CheckoutApiException
      */
-    public function retrieveATransfer($transferId)
+    public function retrieveATransfer($transferId): array
     {
         return $this->apiClient->get(
             $this->buildPath(self::TRANSFERS_PATH, $transferId),

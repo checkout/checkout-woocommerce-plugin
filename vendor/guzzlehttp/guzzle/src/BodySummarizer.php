@@ -2,7 +2,7 @@
 
 namespace CheckoutComWC\Vendor\GuzzleHttp;
 
-use CheckoutComWC\Vendor\Psr\Http\Message\MessageInterface;
+use Psr\Http\Message\MessageInterface;
 
 final class BodySummarizer implements BodySummarizerInterface
 {

@@ -7,9 +7,9 @@ use CheckoutComWC\Vendor\GuzzleHttp\HandlerStack;
 use CheckoutComWC\Vendor\GuzzleHttp\Promise as P;
 use CheckoutComWC\Vendor\GuzzleHttp\Promise\PromiseInterface;
 use CheckoutComWC\Vendor\GuzzleHttp\TransferStats;
-use CheckoutComWC\Vendor\Psr\Http\Message\RequestInterface;
-use CheckoutComWC\Vendor\Psr\Http\Message\ResponseInterface;
-use CheckoutComWC\Vendor\Psr\Http\Message\StreamInterface;
+use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\StreamInterface;
 
 /**
  * Handler that returns responses or throw exceptions from a queue.
@@ -83,7 +83,7 @@ class MockHandler implements \Countable
         }
 
         if (isset($options['delay']) && \is_numeric($options['delay'])) {
-            \usleep((int) $options['delay'] * 1000);
+            \usleep((int) ($options['delay'] * 1000));
         }
 
         $this->lastRequest = $request;

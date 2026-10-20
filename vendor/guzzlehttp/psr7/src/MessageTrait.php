@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace CheckoutComWC\Vendor\GuzzleHttp\Psr7;
 
-use CheckoutComWC\Vendor\Psr\Http\Message\MessageInterface;
-use CheckoutComWC\Vendor\Psr\Http\Message\StreamInterface;
+use Psr\Http\Message\MessageInterface;
+use Psr\Http\Message\StreamInterface;
 
 /**
  * Trait implementing functionality common to requests and responses.
