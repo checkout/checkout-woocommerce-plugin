@@ -28,13 +28,6 @@ class Checkout_SDK {
 	private $builder;
 
 	/**
-	 * Account type.
-	 *
-	 * @var bool
-	 */
-	private $nas_account_type;
-
-	/**
 	 * Constructor.
 	 *
 	 * @param bool $use_fallback Use Fallback account flag.
@@ -67,13 +60,9 @@ class Checkout_SDK {
 		$environment   = 'sandbox' === ( $core_settings['ckocom_environment'] ?? 'sandbox' ) ? Environment::sandbox() : Environment::production();
 		$subdomain     = ! isset( $core_settings['ckocom_region'] ) ? '--' : $core_settings['ckocom_region'];
 
-		$this->nas_account_type = cko_is_nas_account();
-
-		if ( $this->nas_account_type && false === $use_fallback ) {
-			$builder = CheckoutSdk::builder()->staticKeys();
-		} else {
-			$builder = CheckoutSdk::builder()->previous()->staticKeys();
-		}
+		// All Checkout.com accounts are NAS; the SDK's NAS static-keys builder is
+		// always used (the legacy ABC "previous" builder has been removed).
+		$builder = CheckoutSdk::builder()->staticKeys();
 
 		$builder->publicKey( $public_key );
 		$builder->secretKey( $secret_key );
@@ -120,12 +109,8 @@ class Checkout_SDK {
 		if ( ! class_exists( 'Checkout\CheckoutSdk' ) ) {
 			return null;
 		}
-		
-		if ( $this->nas_account_type ) {
-			return new Checkout\Payments\Request\PaymentRequest();
-		} else {
-			return new Checkout\Payments\Previous\PaymentRequest();
-		}
+
+		return new Checkout\Payments\Request\PaymentRequest();
 	}
 
 	/**
@@ -137,11 +122,7 @@ class Checkout_SDK {
 		if ( ! class_exists( 'Checkout\CheckoutSdk' ) ) {
 			return null;
 		}
-		
-		if ( $this->nas_account_type ) {
-			return new Checkout\Payments\CaptureRequest();
-		} else {
-			return new Checkout\Payments\Previous\CaptureRequest();
-		}
+
+		return new Checkout\Payments\CaptureRequest();
 	}
 }

@@ -1931,10 +1931,10 @@ function cko_gateway_icon( $icons, $id ) {
  * @return bool
  */
 function cko_is_nas_account() {
-
-	$core_settings = cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' );
-
-	return isset( $core_settings['ckocom_account_type'] ) && ( 'NAS' === $core_settings['ckocom_account_type'] );
+	// All Checkout.com accounts are NAS. The legacy ABC account type and its
+	// selector have been removed, so this is always true. Retained as a function
+	// so existing call sites keep working without a sweeping refactor.
+	return true;
 }
 
 add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_cards', 'cko_subscription_payment', 10, 2 );
