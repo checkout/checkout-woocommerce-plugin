@@ -9,13 +9,13 @@
     },
     "require": {
         "php": ">=8.1",
-        "checkout/checkout-sdk-php": "^6.7",
-        "wp-cli/wp-cli-bundle": "^2.6"
+        "checkout/checkout-sdk-php": "^6.7"
     },
     "require-dev": {
         "squizlabs/php_codesniffer": "^3.6",
         "automattic/vipwpcs": "^3",
-        "phpcompatibility/phpcompatibility-wp": "^2"
+        "phpcompatibility/phpcompatibility-wp": "^2",
+        "wp-cli/wp-cli-bundle": "^2.6"
     },
     "scripts": {
         "prefix-namespaces": [
