@@ -58,7 +58,20 @@ class Checkout_SDK {
 		}
 		
 		$environment   = 'sandbox' === ( $core_settings['ckocom_environment'] ?? 'sandbox' ) ? Environment::sandbox() : Environment::production();
-		$subdomain     = isset( $core_settings['ckocom_environment_subdomain'] ) ? trim( (string) $core_settings['ckocom_environment_subdomain'] ) : '';
+		// Derive the merchant-specific subdomain from the configured Client ID.
+		// Checkout.com's MSSD scheme uses the first 8 chars of the client_id (the part
+		// after the "cli_" prefix) as the API subdomain. We also accept a bare subdomain
+		// if that's what was entered. Falls back to the global domain when blank/invalid.
+		$client_id = isset( $core_settings['ckocom_client_id'] ) ? strtolower( trim( (string) $core_settings['ckocom_client_id'] ) ) : '';
+		$subdomain = '';
+		if ( '' !== $client_id ) {
+			$raw = ( 0 === strpos( $client_id, 'cli_' ) ) ? substr( $client_id, 4 ) : $client_id;
+			$candidate = substr( $raw, 0, 8 );
+			// SDK requires: optional "pl-" prefix then lowercase alphanumerics.
+			if ( preg_match( '/^(?:pl-)?[a-z0-9]+$/', $candidate ) ) {
+				$subdomain = $candidate;
+			}
+		}
 
 		// All Checkout.com accounts are NAS; the SDK's NAS static-keys builder is
 		// always used (the legacy ABC "previous" builder has been removed).

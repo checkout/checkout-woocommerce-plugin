@@ -130,7 +130,7 @@ class WC_Checkoutcom_Cards_Settings {
 		$existing_sk = isset( $core_settings['ckocom_sk'] ) ? $core_settings['ckocom_sk'] : '';
 		$existing_pk = isset( $core_settings['ckocom_pk'] ) ? $core_settings['ckocom_pk'] : '';
 		$existing_title = isset( $core_settings['title'] ) ? $core_settings['title'] : 'Pay by Card with Checkout.com';
-		$existing_subdomain = isset( $core_settings['ckocom_environment_subdomain'] ) ? $core_settings['ckocom_environment_subdomain'] : '';
+		$existing_client_id = isset( $core_settings['ckocom_client_id'] ) ? $core_settings['ckocom_client_id'] : '';
 		$existing_pc_id = isset( $core_settings['ckocom_processing_channel_id'] ) ? $core_settings['ckocom_processing_channel_id'] : '';
 
 		// SECURITY: never render the stored secret key into the form. Show a masked hint only; an
@@ -195,14 +195,14 @@ class WC_Checkoutcom_Cards_Settings {
 				'placeholder' => 'pk_xxx',
 				'value'       => $existing_pk, // Load existing value
 			],
-			'ckocom_environment_subdomain' => [
-				'id'          => 'ckocom_environment_subdomain',
-				'title'       => __( 'Environment Subdomain', 'checkout-com-unified-payments-api' ),
+			'ckocom_client_id' => [
+				'id'          => 'ckocom_client_id',
+				'title'       => __( 'Client ID', 'checkout-com-unified-payments-api' ),
 				'type'        => 'text',
-				'description' => __( 'Optional. Your merchant-specific subdomain (typically your client ID without the "cli_" prefix). Leave blank to use the global Checkout.com domain.', 'checkout-com-unified-payments-api' ),
+				'description' => __( 'Optional. Your Checkout.com Client ID (e.g. cli_xxxxxxxxxxxxxxxxxxxxxxxxxx) from the Hub. Used to route API calls to your merchant-specific subdomain. Leave blank to use the global Checkout.com domain.', 'checkout-com-unified-payments-api' ),
 				'desc_tip'    => true,
-				'placeholder' => 'your-subdomain',
-				'value'       => $existing_subdomain,
+				'placeholder' => 'cli_xxxxxxxxxxxxxxxxxxxxxxxxxx',
+				'value'       => $existing_client_id,
 			],
 			'ckocom_processing_channel_id' => [
 				'id'          => 'ckocom_processing_channel_id',
