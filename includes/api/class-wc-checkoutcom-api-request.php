@@ -375,6 +375,17 @@ class WC_Checkoutcom_Api_Request {
 		$payment->reference    = $order->get_order_number();
 		$payment->payment_type = PaymentType::$regular;
 
+		// Processing channel id: send it on the payment request when configured.
+		$cko_core_settings = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', [] );
+		$cko_pc_id = is_array( $cko_core_settings ) && ! empty( $cko_core_settings['ckocom_processing_channel_id'] )
+			? trim( (string) $cko_core_settings['ckocom_processing_channel_id'] )
+			: '';
+		if ( '' !== $cko_pc_id ) {
+			$payment->processing_channel_id = $cko_pc_id;
+		}
+
 		$payment->source = $method;
 
 

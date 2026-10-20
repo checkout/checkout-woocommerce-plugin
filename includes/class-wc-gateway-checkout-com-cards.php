@@ -535,6 +535,15 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 			$settings['flow_no_billing_address'] = ( isset( $_POST['woocommerce_wc_checkout_com_cards_settings']['flow_no_billing_address'] )
 				|| isset( $_POST['flow_no_billing_address'] ) ) ? 'yes' : 'no';
 
+			// Manually persist the optional Environment Subdomain and Processing Channel ID
+			// text fields (save_fields() is unreliable for this screen, as above).
+			if ( isset( $_POST['woocommerce_wc_checkout_com_cards_settings']['ckocom_environment_subdomain'] ) ) {
+				$settings['ckocom_environment_subdomain'] = sanitize_text_field( wp_unslash( $_POST['woocommerce_wc_checkout_com_cards_settings']['ckocom_environment_subdomain'] ) );
+			}
+			if ( isset( $_POST['woocommerce_wc_checkout_com_cards_settings']['ckocom_processing_channel_id'] ) ) {
+				$settings['ckocom_processing_channel_id'] = sanitize_text_field( wp_unslash( $_POST['woocommerce_wc_checkout_com_cards_settings']['ckocom_processing_channel_id'] ) );
+			}
+
 			$settings['ckocom_account_type'] = 'NAS';
 			update_option( 'woocommerce_wc_checkout_com_cards_settings', $settings );
 			// Force-write directly to wp_options so Polylang filter cannot block or redirect the save.

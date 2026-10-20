@@ -58,7 +58,7 @@ class Checkout_SDK {
 		}
 		
 		$environment   = 'sandbox' === ( $core_settings['ckocom_environment'] ?? 'sandbox' ) ? Environment::sandbox() : Environment::production();
-		$subdomain     = ! isset( $core_settings['ckocom_region'] ) ? '--' : $core_settings['ckocom_region'];
+		$subdomain     = isset( $core_settings['ckocom_environment_subdomain'] ) ? trim( (string) $core_settings['ckocom_environment_subdomain'] ) : '';
 
 		// All Checkout.com accounts are NAS; the SDK's NAS static-keys builder is
 		// always used (the legacy ABC "previous" builder has been removed).
@@ -68,12 +68,12 @@ class Checkout_SDK {
 		$builder->secretKey( $secret_key );
 		$builder->environment( $environment );
 
-		if ( '--' !== $subdomain && 'global' !== $subdomain ) {
+		if ( '' !== $subdomain ) {
+			// Merchant-specific subdomain configured: route to the merchant subdomain.
 			$builder->environmentSubdomain( $subdomain );
 		} else {
 			// SDK 6.x requires either a merchant-specific subdomain or an explicit
-			// opt-out. When no region subdomain is configured (global / "--"), keep
-			// the previous behaviour of using the global api.checkout.com domain.
+			// opt-out; with no subdomain configured, use the global api.checkout.com domain.
 			$builder->useLegacyDomain();
 		}
 
