@@ -778,6 +778,11 @@ function cko_get_selected_apms_class() {
 
 		// Get apm selected and add the class name in array.
 		foreach ( $apm_selected as $value ) {
+			// The legacy standalone SEPA APM has been removed (SEPA is offered via Flow).
+			// Skip any stale saved selection so we never register a missing gateway class.
+			if ( 'sepa' === strtolower( $value ) ) {
+				continue;
+			}
 			$selected_apms_class[] = 'WC_Gateway_Checkout_Com_Alternative_Payments' . '_' . $value;
 		}
 	}
@@ -1938,7 +1943,6 @@ function cko_is_nas_account() {
 }
 
 add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_cards', 'cko_subscription_payment', 10, 2 );
-add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_alternative_payments_sepa', 'cko_subscription_payment', 10, 2 );
 add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_google_pay', 'cko_subscription_payment', 10, 2 );
 add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_apple_pay', 'cko_subscription_payment', 10, 2 );
 add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_paypal', 'cko_subscription_payment', 10, 2 );

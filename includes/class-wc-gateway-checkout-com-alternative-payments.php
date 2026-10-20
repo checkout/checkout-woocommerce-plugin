@@ -12,7 +12,6 @@ include_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments
 include_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-alipay.php';
 include_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-qpay.php';
 include_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-boleto.php';
-include_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-sepa.php';
 include_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-knet.php';
 include_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-bancontact.php';
 include_once __DIR__ . '/apms/class-wc-gateway-checkout-com-alternative-payments-eps.php';
