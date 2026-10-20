@@ -78,8 +78,7 @@ class WC_Checkoutcom_Cards_Settings {
 			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
 			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$nas_docs      = 'https://www.checkout.com/docs/four/resources/api-authentication/api-keys';
-		$abc_docs      = 'https://www.checkout.com/docs/the-hub/update-your-hub-settings#Manage_the_API_keys';
-		$docs_link     = $nas_docs; // Default to NAS docs since account type is NAS
+		$docs_link     = $nas_docs;
 
 		$checkout_mode = isset( $core_settings['ckocom_checkout_mode'] ) ? $core_settings['ckocom_checkout_mode'] : 'flow';
 
@@ -128,11 +127,6 @@ class WC_Checkoutcom_Cards_Settings {
 		// Load existing values from saved settings
 		$existing_checkout_mode = isset( $core_settings['ckocom_checkout_mode'] ) ? $core_settings['ckocom_checkout_mode'] : 'flow';
 		$existing_environment = isset( $core_settings['ckocom_environment'] ) ? $core_settings['ckocom_environment'] : 'sandbox';
-		$existing_account_type = isset( $core_settings['ckocom_account_type'] ) ? $core_settings['ckocom_account_type'] : 'NAS';
-		// Ensure account type is NAS (cannot be changed)
-		if ( 'NAS' !== $existing_account_type ) {
-			$existing_account_type = 'NAS';
-		}
 		$existing_sk = isset( $core_settings['ckocom_sk'] ) ? $core_settings['ckocom_sk'] : '';
 		$existing_pk = isset( $core_settings['ckocom_pk'] ) ? $core_settings['ckocom_pk'] : '';
 		$existing_title = isset( $core_settings['title'] ) ? $core_settings['title'] : 'Pay by Card with Checkout.com';
@@ -177,22 +171,6 @@ class WC_Checkoutcom_Cards_Settings {
 				],
 				'default'     => 'sandbox',
 				'value'       => $existing_environment, // Load existing value
-			],
-			'ckocom_account_type' => [
-				'id'          => 'ckocom_account_type',
-				'title'       => __( 'Account Type', 'checkout-com-unified-payments-api' ),
-				'type'        => 'select',
-				'description' => __( 'Your account type is set to NAS by default and cannot be changed.', 'checkout-com-unified-payments-api' ),
-				'desc_tip'    => true,
-				'options'     => [
-					'NAS' => __( 'NAS', 'checkout-com-unified-payments-api' ),
-					'ABC' => __( 'ABC', 'checkout-com-unified-payments-api' ),
-				],
-				'default'     => 'NAS',
-				'value'       => 'NAS', // Always NAS, cannot be changed
-				'custom_attributes' => [
-					'disabled' => 'disabled',
-				],
 			],
 			'ckocom_sk'           => [
 				'id'          => 'ckocom_sk',
@@ -318,12 +296,7 @@ class WC_Checkoutcom_Cards_Settings {
 	public static function core_settings() {
 		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$nas_docs      = 'https://www.checkout.com/docs/four/resources/api-authentication/api-keys';
-		$abc_docs      = 'https://www.checkout.com/docs/the-hub/update-your-hub-settings#Manage_the_API_keys';
-		$docs_link     = $abc_docs;
-
-		if ( isset( $core_settings['ckocom_account_type'] ) && 'NAS' === $core_settings['ckocom_account_type'] ) {
-			$docs_link = $nas_docs;
-		}
+		$docs_link     = $nas_docs;
 
 		$checkout_mode           = $core_settings['ckocom_checkout_mode'] ?? 'flow';
 		$should_disable_checkbox = false;
@@ -391,17 +364,6 @@ class WC_Checkoutcom_Cards_Settings {
 				'description' => __( 'Title that will be displayed on the checkout page', 'checkout-com-unified-payments-api' ),
 				'desc_tip'    => true,
 				'default'     => 'Pay by Card with Checkout.com',
-			],
-			'ckocom_account_type' => [
-				'title'       => __( 'Account Type', 'checkout-com-unified-payments-api' ),
-				'type'        => 'select',
-				'description' => __( 'Contact support team to know your account type.', 'checkout-com-unified-payments-api' ),
-				'desc_tip'    => true,
-				'options'     => [
-					'ABC' => __( 'ABC', 'checkout-com-unified-payments-api' ),
-					'NAS' => __( 'NAS', 'checkout-com-unified-payments-api' ),
-				],
-				'default'     => 'ABC',
 			],
 			'ckocom_sk'           => [
 				'title'       => __( 'Secret Key', 'checkout-com-unified-payments-api' ),
@@ -860,12 +822,7 @@ class WC_Checkoutcom_Cards_Settings {
 	public static function apple_settings() {
 		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$nas_docs      = 'https://www.checkout.com/docs/four/payments/payment-methods/apple-pay';
-		$abc_docs      = 'https://www.checkout.com/docs/payments/payment-methods/wallets/apple-pay';
-		$docs_link     = $abc_docs;
-
-		if ( isset( $core_settings['ckocom_account_type'] ) && 'NAS' === $core_settings['ckocom_account_type'] ) {
-			$docs_link = $nas_docs;
-		}
+		$docs_link     = $nas_docs;
 
 		$checkout_mode           = $core_settings['ckocom_checkout_mode'] ?? 'flow';
 		$should_disable_checkbox = false;
