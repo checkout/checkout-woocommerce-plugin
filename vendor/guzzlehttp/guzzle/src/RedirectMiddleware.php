@@ -6,9 +6,9 @@ use CheckoutComWC\Vendor\GuzzleHttp\Exception\BadResponseException;
 use CheckoutComWC\Vendor\GuzzleHttp\Exception\RequestException;
 use CheckoutComWC\Vendor\GuzzleHttp\Exception\TooManyRedirectsException;
 use CheckoutComWC\Vendor\GuzzleHttp\Promise\PromiseInterface;
-use Psr\Http\Message\RequestInterface;
-use Psr\Http\Message\ResponseInterface;
-use Psr\Http\Message\UriInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\RequestInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\ResponseInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\UriInterface;
 
 /**
  * Request redirect middleware.

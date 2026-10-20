@@ -2,8 +2,8 @@
 
 namespace CheckoutComWC\Vendor\GuzzleHttp\Exception;
 
-use Psr\Http\Client\NetworkExceptionInterface;
-use Psr\Http\Message\RequestInterface;
+use CheckoutComWC\Vendor\Psr\Http\Client\NetworkExceptionInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\RequestInterface;
 
 /**
  * Exception thrown when a connection cannot be established.

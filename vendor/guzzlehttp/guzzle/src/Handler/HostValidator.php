@@ -3,7 +3,7 @@
 namespace CheckoutComWC\Vendor\GuzzleHttp\Handler;
 
 use CheckoutComWC\Vendor\GuzzleHttp\Exception\RequestException;
-use Psr\Http\Message\RequestInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\RequestInterface;
 
 /**
  * Rejects request hosts that a handler could resolve differently from the host

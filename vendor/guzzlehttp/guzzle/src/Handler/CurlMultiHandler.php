@@ -11,7 +11,7 @@ use CheckoutComWC\Vendor\GuzzleHttp\Promise\PromiseInterface;
 use CheckoutComWC\Vendor\GuzzleHttp\Psr7;
 use CheckoutComWC\Vendor\GuzzleHttp\TransportSharing;
 use CheckoutComWC\Vendor\GuzzleHttp\Utils;
-use Psr\Http\Message\RequestInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\RequestInterface;
 
 /**
  * Returns an asynchronous response using curl_multi_* functions.
@@ -183,7 +183,7 @@ class CurlMultiHandler
     {
         foreach ($options as $name => $_) {
             if (!isset(self::KNOWN_CONSTRUCTOR_OPTIONS[$name])) {
-                checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.14', \sprintf('The "%s" CurlMultiHandler constructor option is unknown; guzzlehttp/guzzle 8.0 will reject unknown constructor options.', (string) $name));
+                \trigger_deprecation('guzzlehttp/guzzle', '7.14', \sprintf('The "%s" CurlMultiHandler constructor option is unknown; guzzlehttp/guzzle 8.0 will reject unknown constructor options.', (string) $name));
             }
         }
 
@@ -225,17 +225,17 @@ class CurlMultiHandler
         if (isset($options['select_timeout'])) {
             $selectTimeout = $options['select_timeout'];
             if (!\is_int($selectTimeout) && !\is_float($selectTimeout) && (!\is_string($selectTimeout) || !\is_numeric($selectTimeout))) {
-                checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.14', 'Passing a non-numeric "select_timeout" CurlMultiHandler option is deprecated; guzzlehttp/guzzle 8.0 will reject it.');
+                \trigger_deprecation('guzzlehttp/guzzle', '7.14', 'Passing a non-numeric "select_timeout" CurlMultiHandler option is deprecated; guzzlehttp/guzzle 8.0 will reject it.');
             } else {
                 $seconds = (float) $selectTimeout;
                 if (!\is_finite($seconds) || $seconds < 0 || ($seconds > 0 && (int) ($seconds * 1000) === 0)) {
-                    checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.14', 'Passing a "select_timeout" CurlMultiHandler option that is not 0 or greater than or equal to 0.001 seconds is deprecated; guzzlehttp/guzzle 8.0 will reject it.');
+                    \trigger_deprecation('guzzlehttp/guzzle', '7.14', 'Passing a "select_timeout" CurlMultiHandler option that is not 0 or greater than or equal to 0.001 seconds is deprecated; guzzlehttp/guzzle 8.0 will reject it.');
                 }
             }
 
             $this->selectTimeout = $selectTimeout;
         } elseif ($selectTimeout = Utils::getenv('GUZZLE_CURL_SELECT_TIMEOUT')) {
-            checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.2', 'The GUZZLE_CURL_SELECT_TIMEOUT environment variable is deprecated; use the "select_timeout" option instead.');
+            \trigger_deprecation('guzzlehttp/guzzle', '7.2', 'The GUZZLE_CURL_SELECT_TIMEOUT environment variable is deprecated; use the "select_timeout" option instead.');
             $this->selectTimeout = (int) $selectTimeout;
         } else {
             $this->selectTimeout = 1;
@@ -594,7 +594,7 @@ class CurlMultiHandler
         $sinceOverrides = self::conflictingCurlMultiOptionSinceOverrides();
         foreach ($options as $option => $_) {
             if (\array_key_exists($option, $conflictingOptions)) {
-                checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', $sinceOverrides[$option] ?? '7.14', \sprintf('Passing %s in the cURL multi handler "options" is deprecated; guzzlehttp/guzzle 8.0 will reject this option. Use %s instead.', self::formatCurlMultiOption($option), $conflictingOptions[$option]));
+                \trigger_deprecation('guzzlehttp/guzzle', $sinceOverrides[$option] ?? '7.14', \sprintf('Passing %s in the cURL multi handler "options" is deprecated; guzzlehttp/guzzle 8.0 will reject this option. Use %s instead.', self::formatCurlMultiOption($option), $conflictingOptions[$option]));
             }
         }
     }
@@ -1275,7 +1275,7 @@ class CurlMultiHandler
     private function cancel($id, ?object $waitToken = null): bool
     {
         if (!is_int($id)) {
-            checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.4', 'Not passing an int to %s::%s() is deprecated and will cause an error in 8.0.', __CLASS__, __FUNCTION__);
+            \trigger_deprecation('guzzlehttp/guzzle', '7.4', 'Not passing an int to %s::%s() is deprecated and will cause an error in 8.0.', __CLASS__, __FUNCTION__);
         }
 
         // Cannot cancel if it has been processed or replaced by a request

@@ -4,7 +4,7 @@ namespace CheckoutComWC\Vendor\GuzzleHttp\Handler;
 
 use CheckoutComWC\Vendor\GuzzleHttp\Promise\PromiseInterface;
 use CheckoutComWC\Vendor\GuzzleHttp\RequestOptions;
-use Psr\Http\Message\RequestInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\RequestInterface;
 
 /**
  * Provides basic proxies for handlers.

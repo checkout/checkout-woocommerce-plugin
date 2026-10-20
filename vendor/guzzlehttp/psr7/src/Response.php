@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace CheckoutComWC\Vendor\GuzzleHttp\Psr7;
 
-use Psr\Http\Message\ResponseInterface;
-use Psr\Http\Message\StreamInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\ResponseInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\StreamInterface;
 
 /**
  * PSR-7 response implementation.
@@ -133,7 +133,7 @@ class Response implements ResponseInterface
     public function withStatus($code, $reasonPhrase = ''): ResponseInterface
     {
         if (!\is_int($code) && \filter_var($code, \FILTER_VALIDATE_INT) !== false) {
-            checkoutcomwc_vendor_trigger_deprecation(
+            \trigger_deprecation(
                 'guzzlehttp/psr7',
                 '2.11',
                 'Passing %s to ResponseInterface::withStatus() is deprecated; guzzlehttp/psr7 3.0 requires int for $code.',
@@ -142,7 +142,7 @@ class Response implements ResponseInterface
         }
 
         if (!\is_string($reasonPhrase)) {
-            checkoutcomwc_vendor_trigger_deprecation(
+            \trigger_deprecation(
                 'guzzlehttp/psr7',
                 '2.11',
                 'Passing %s to ResponseInterface::withStatus() is deprecated; guzzlehttp/psr7 3.0 requires string for $reasonPhrase.',

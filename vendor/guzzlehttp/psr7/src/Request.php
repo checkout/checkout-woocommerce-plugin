@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace CheckoutComWC\Vendor\GuzzleHttp\Psr7;
 
 use InvalidArgumentException;
-use Psr\Http\Message\RequestInterface;
-use Psr\Http\Message\StreamInterface;
-use Psr\Http\Message\UriInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\RequestInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\StreamInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\UriInterface;
 
 /**
  * PSR-7 request implementation.
@@ -121,7 +121,7 @@ class Request implements RequestInterface
     public function withUri(UriInterface $uri, $preserveHost = false): RequestInterface
     {
         if (!\is_bool($preserveHost)) {
-            checkoutcomwc_vendor_trigger_deprecation(
+            \trigger_deprecation(
                 'guzzlehttp/psr7',
                 '2.11',
                 'Passing %s to RequestInterface::withUri() is deprecated; guzzlehttp/psr7 3.0 requires bool for $preserveHost.',
@@ -185,7 +185,7 @@ class Request implements RequestInterface
     private static function warnOnMethodCasingChange(string $method): void
     {
         if ($method !== Utils::asciiToUpper($method)) {
-            checkoutcomwc_vendor_trigger_deprecation(
+            \trigger_deprecation(
                 'guzzlehttp/psr7',
                 '2.11',
                 'Passing a non-uppercase HTTP method is deprecated; guzzlehttp/psr7 3.0 preserves method casing and will no longer uppercase it. Normalize the method before constructing or modifying requests if uppercase is required.'

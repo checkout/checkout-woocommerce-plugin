@@ -6,7 +6,7 @@ use CheckoutComWC\Vendor\GuzzleHttp\Promise as P;
 use CheckoutComWC\Vendor\GuzzleHttp\Promise\EachPromise;
 use CheckoutComWC\Vendor\GuzzleHttp\Promise\PromiseInterface;
 use CheckoutComWC\Vendor\GuzzleHttp\Promise\PromisorInterface;
-use Psr\Http\Message\RequestInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\RequestInterface;
 
 /**
  * Sends an iterator of requests concurrently using a capped pool size.
@@ -52,7 +52,7 @@ class Pool implements PromisorInterface
         }
 
         if (!\is_iterable($requests)) {
-            checkoutcomwc_vendor_trigger_deprecation(
+            \trigger_deprecation(
                 'guzzlehttp/guzzle',
                 '7.11',
                 'Passing a non-iterable request collection to %s::__construct() or %s::batch() is deprecated; guzzlehttp/guzzle 8.0 will require an iterable.',

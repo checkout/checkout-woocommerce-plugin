@@ -4,7 +4,7 @@ namespace CheckoutComWC\Vendor\GuzzleHttp\Handler;
 
 use CheckoutComWC\Vendor\GuzzleHttp\Promise\PromiseInterface;
 use CheckoutComWC\Vendor\GuzzleHttp\TransportSharing;
-use Psr\Http\Message\RequestInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\RequestInterface;
 
 /**
  * HTTP handler that uses cURL easy handles as a transport layer.
@@ -44,7 +44,7 @@ class CurlHandler
     {
         foreach ($options as $name => $_) {
             if (!isset(self::KNOWN_CONSTRUCTOR_OPTIONS[$name])) {
-                checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.14', \sprintf('The "%s" CurlHandler constructor option is unknown; guzzlehttp/guzzle 8.0 will reject unknown constructor options.', (string) $name));
+                \trigger_deprecation('guzzlehttp/guzzle', '7.14', \sprintf('The "%s" CurlHandler constructor option is unknown; guzzlehttp/guzzle 8.0 will reject unknown constructor options.', (string) $name));
             }
         }
 

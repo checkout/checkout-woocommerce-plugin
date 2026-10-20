@@ -4,8 +4,8 @@ namespace CheckoutComWC\Vendor\GuzzleHttp;
 
 use CheckoutComWC\Vendor\GuzzleHttp\Promise as P;
 use CheckoutComWC\Vendor\GuzzleHttp\Promise\PromiseInterface;
-use Psr\Http\Message\RequestInterface;
-use Psr\Http\Message\ResponseInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\RequestInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\ResponseInterface;
 
 /**
  * Middleware that retries requests based on the boolean result of
@@ -58,7 +58,7 @@ class RetryMiddleware
      */
     public static function exponentialDelay(int $retries): int
     {
-        checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.11', '%s::%s() is deprecated and will be removed in 8.0.', __CLASS__, __FUNCTION__);
+        \trigger_deprecation('guzzlehttp/guzzle', '7.11', '%s::%s() is deprecated and will be removed in 8.0.', __CLASS__, __FUNCTION__);
 
         return (int) 2 ** ($retries - 1) * 1000;
     }

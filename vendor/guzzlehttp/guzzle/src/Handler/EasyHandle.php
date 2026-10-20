@@ -4,9 +4,9 @@ namespace CheckoutComWC\Vendor\GuzzleHttp\Handler;
 
 use CheckoutComWC\Vendor\GuzzleHttp\Psr7\Response;
 use CheckoutComWC\Vendor\GuzzleHttp\Utils;
-use Psr\Http\Message\RequestInterface;
-use Psr\Http\Message\ResponseInterface;
-use Psr\Http\Message\StreamInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\RequestInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\ResponseInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\StreamInterface;
 
 /**
  * Represents a cURL easy handle and the data it populates.

@@ -7,9 +7,9 @@ use CheckoutComWC\Vendor\GuzzleHttp\HandlerStack;
 use CheckoutComWC\Vendor\GuzzleHttp\Promise as P;
 use CheckoutComWC\Vendor\GuzzleHttp\Promise\PromiseInterface;
 use CheckoutComWC\Vendor\GuzzleHttp\TransferStats;
-use Psr\Http\Message\RequestInterface;
-use Psr\Http\Message\ResponseInterface;
-use Psr\Http\Message\StreamInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\RequestInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\ResponseInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\StreamInterface;
 
 /**
  * Handler that returns responses or throw exceptions from a queue.

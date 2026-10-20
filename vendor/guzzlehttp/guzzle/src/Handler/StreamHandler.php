@@ -13,10 +13,10 @@ use CheckoutComWC\Vendor\GuzzleHttp\Psr7;
 use CheckoutComWC\Vendor\GuzzleHttp\TransferStats;
 use CheckoutComWC\Vendor\GuzzleHttp\TransportSharing;
 use CheckoutComWC\Vendor\GuzzleHttp\Utils;
-use Psr\Http\Message\RequestInterface;
-use Psr\Http\Message\ResponseInterface;
-use Psr\Http\Message\StreamInterface;
-use Psr\Http\Message\UriInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\RequestInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\ResponseInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\StreamInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\UriInterface;
 
 /**
  * HTTP handler that uses PHP's HTTP stream wrapper.
@@ -81,7 +81,7 @@ class StreamHandler
     {
         foreach ($options as $name => $_) {
             if (!isset(self::KNOWN_CONSTRUCTOR_OPTIONS[$name])) {
-                checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.14', \sprintf('The "%s" StreamHandler constructor option is unknown; guzzlehttp/guzzle 8.0 will reject unknown constructor options.', (string) $name));
+                \trigger_deprecation('guzzlehttp/guzzle', '7.14', \sprintf('The "%s" StreamHandler constructor option is unknown; guzzlehttp/guzzle 8.0 will reject unknown constructor options.', (string) $name));
             }
         }
 
@@ -143,7 +143,7 @@ class StreamHandler
         $protocolVersion = $request->getProtocolVersion();
 
         if ('' === $protocolVersion) {
-            checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.11', 'Sending a request with an empty protocol version is deprecated; guzzlehttp/guzzle 8.0 will reject empty protocol versions.');
+            \trigger_deprecation('guzzlehttp/guzzle', '7.11', 'Sending a request with an empty protocol version is deprecated; guzzlehttp/guzzle 8.0 will reject empty protocol versions.');
 
             $protocolVersion = '1.1';
             $request = Psr7\Utils::modifyRequest($request, ['version' => $protocolVersion]);
@@ -703,11 +703,11 @@ class StreamHandler
             && $options['curl'] !== []
             && !self::isCurlOptionGeneratedByAuth($options)
         ) {
-            checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.11', 'Passing the "curl" request option to the stream handler is deprecated; guzzlehttp/guzzle 8.0 will reject this option because the stream handler ignores cURL options.');
+            \trigger_deprecation('guzzlehttp/guzzle', '7.11', 'Passing the "curl" request option to the stream handler is deprecated; guzzlehttp/guzzle 8.0 will reject this option because the stream handler ignores cURL options.');
         }
 
         if (\array_key_exists('expect', $options) && $options['expect'] !== false && $request->hasHeader('Expect')) {
-            checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.11', 'Passing the "expect" request option to the stream handler is deprecated when it adds an Expect header; guzzlehttp/guzzle 8.0 will reject this option because the stream handler does not support Expect: 100-Continue.');
+            \trigger_deprecation('guzzlehttp/guzzle', '7.11', 'Passing the "expect" request option to the stream handler is deprecated when it adds an Expect header; guzzlehttp/guzzle 8.0 will reject this option because the stream handler does not support Expect: 100-Continue.');
         }
     }
 
@@ -725,7 +725,7 @@ class StreamHandler
                     continue;
                 }
 
-                checkoutcomwc_vendor_trigger_deprecation(
+                \trigger_deprecation(
                     'guzzlehttp/guzzle',
                     '7.12',
                     \sprintf(
@@ -746,7 +746,7 @@ class StreamHandler
             return;
         }
 
-        checkoutcomwc_vendor_trigger_deprecation(
+        \trigger_deprecation(
             'guzzlehttp/guzzle',
             '7.12',
             \sprintf(

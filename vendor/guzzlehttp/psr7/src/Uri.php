@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace CheckoutComWC\Vendor\GuzzleHttp\Psr7;
 
 use CheckoutComWC\Vendor\GuzzleHttp\Psr7\Exception\MalformedUriException;
-use Psr\Http\Message\UriInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\UriInterface;
 
 /**
  * PSR-7 URI implementation.
@@ -195,7 +195,7 @@ class Uri implements UriInterface, \JsonSerializable
      * Composes a URI reference string from its various components.
      *
      * Usually this method does not need to be called manually but instead is used indirectly via
-     * `Psr\Http\Message\UriInterface::__toString`.
+     * `CheckoutComWC\Vendor\Psr\Http\Message\UriInterface::__toString`.
      *
      * PSR-7 UriInterface treats an empty component the same as a missing component as
      * getQuery(), getFragment() etc. always return a string. This explains the slight
@@ -242,7 +242,7 @@ class Uri implements UriInterface, \JsonSerializable
     /**
      * Whether the URI has the default port of the current scheme.
      *
-     * `Psr\Http\Message\UriInterface::getPort` may return null or the standard port. This method can be used
+     * `CheckoutComWC\Vendor\Psr\Http\Message\UriInterface::getPort` may return null or the standard port. This method can be used
      * independently of the implementation.
      */
     public static function isDefaultPort(UriInterface $uri): bool
@@ -406,7 +406,7 @@ class Uri implements UriInterface, \JsonSerializable
     private static function stringifyQueryValue($value): string
     {
         if (!is_string($value)) {
-            checkoutcomwc_vendor_trigger_deprecation(
+            \trigger_deprecation(
                 'guzzlehttp/psr7',
                 '2.12',
                 'Passing %s to Uri::withQueryValues() is deprecated; cast it to a string. guzzlehttp/psr7 3.0 will only accept string or null query values.',
@@ -580,7 +580,7 @@ class Uri implements UriInterface, \JsonSerializable
     public function withPort($port): UriInterface
     {
         if ($port !== null && !\is_int($port)) {
-            checkoutcomwc_vendor_trigger_deprecation(
+            \trigger_deprecation(
                 'guzzlehttp/psr7',
                 '2.11',
                 'Passing %s to UriInterface::withPort() is deprecated; guzzlehttp/psr7 3.0 requires int|null.',
@@ -699,7 +699,7 @@ class Uri implements UriInterface, \JsonSerializable
         $scheme = Utils::asciiToLower($scheme);
 
         if ($scheme !== '' && !preg_match('/^[a-z][a-z0-9.+-]*$/D', $scheme)) {
-            checkoutcomwc_vendor_trigger_deprecation(
+            \trigger_deprecation(
                 'guzzlehttp/psr7',
                 '2.11',
                 'Passing "%s" as a URI scheme is deprecated; guzzlehttp/psr7 3.0 requires URI schemes to match RFC 3986 syntax and begin with a letter.',

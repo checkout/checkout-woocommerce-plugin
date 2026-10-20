@@ -4,9 +4,9 @@ namespace CheckoutComWC\Vendor\GuzzleHttp\Exception;
 
 use CheckoutComWC\Vendor\GuzzleHttp\BodySummarizer;
 use CheckoutComWC\Vendor\GuzzleHttp\BodySummarizerInterface;
-use Psr\Http\Client\RequestExceptionInterface;
-use Psr\Http\Message\RequestInterface;
-use Psr\Http\Message\ResponseInterface;
+use CheckoutComWC\Vendor\Psr\Http\Client\RequestExceptionInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\RequestInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\ResponseInterface;
 
 /**
  * HTTP Request exception
@@ -50,7 +50,7 @@ class RequestException extends TransferException implements RequestExceptionInte
      */
     public static function wrapException(RequestInterface $request, \Throwable $e): RequestException
     {
-        checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.11', '%s::wrapException() is deprecated and will be removed in 8.0. Create a %s directly instead.', self::class, self::class);
+        \trigger_deprecation('guzzlehttp/guzzle', '7.11', '%s::wrapException() is deprecated and will be removed in 8.0. Create a %s directly instead.', self::class, self::class);
 
         return $e instanceof RequestException ? $e : new RequestException($e->getMessage(), $request, null, $e);
     }

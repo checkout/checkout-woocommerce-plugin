@@ -37,7 +37,14 @@
             "classmap_prefix": "CheckoutComWC_Vendor_",
             "packages": [
                 "monolog/monolog",
-                "checkout/checkout-sdk-php"
+                "checkout/checkout-sdk-php",
+                "guzzlehttp/guzzle",
+                "guzzlehttp/promises",
+                "guzzlehttp/psr7",
+                "psr/http-client",
+                "psr/http-factory",
+                "psr/http-message",
+                "psr/log"
             ],
             "exclude_from_prefix": {
                 "packages": [

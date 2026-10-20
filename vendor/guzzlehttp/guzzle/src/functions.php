@@ -15,7 +15,7 @@ namespace CheckoutComWC\Vendor\GuzzleHttp;
  */
 function describe_type($input): string
 {
-    checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.1', '%s() is deprecated and will be removed in 8.0. Use get_debug_type() instead.', __FUNCTION__);
+    \trigger_deprecation('guzzlehttp/guzzle', '7.1', '%s() is deprecated and will be removed in 8.0. Use get_debug_type() instead.', __FUNCTION__);
 
     switch (\gettype($input)) {
         case 'object':
@@ -43,7 +43,7 @@ function describe_type($input): string
  */
 function headers_from_lines(iterable $lines): array
 {
-    checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.1', '%s() is deprecated and will be removed in 8.0. Use Utils::headersFromLines() instead.', __FUNCTION__);
+    \trigger_deprecation('guzzlehttp/guzzle', '7.1', '%s() is deprecated and will be removed in 8.0. Use Utils::headersFromLines() instead.', __FUNCTION__);
 
     return Utils::headersFromLines($lines);
 }
@@ -59,7 +59,7 @@ function headers_from_lines(iterable $lines): array
  */
 function debug_resource($value = null)
 {
-    checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.1', '%s() is deprecated and will be removed in 8.0. Use Utils::debugResource() instead.', __FUNCTION__);
+    \trigger_deprecation('guzzlehttp/guzzle', '7.1', '%s() is deprecated and will be removed in 8.0. Use Utils::debugResource() instead.', __FUNCTION__);
 
     return Utils::debugResource($value);
 }
@@ -69,7 +69,7 @@ function debug_resource($value = null)
  *
  * The returned handler is not wrapped by any default middlewares.
  *
- * @return callable(\Psr\Http\Message\RequestInterface, array): Promise\PromiseInterface Returns the best handler for the given system.
+ * @return callable(\CheckoutComWC\Vendor\Psr\Http\Message\RequestInterface, array): Promise\PromiseInterface Returns the best handler for the given system.
  *
  * @throws \RuntimeException if no viable Handler is available.
  *
@@ -77,7 +77,7 @@ function debug_resource($value = null)
  */
 function choose_handler(): callable
 {
-    checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.1', '%s() is deprecated and will be removed in 8.0. Use Utils::chooseHandler() instead.', __FUNCTION__);
+    \trigger_deprecation('guzzlehttp/guzzle', '7.1', '%s() is deprecated and will be removed in 8.0. Use Utils::chooseHandler() instead.', __FUNCTION__);
 
     return Utils::chooseHandler();
 }
@@ -89,7 +89,7 @@ function choose_handler(): callable
  */
 function default_user_agent(): string
 {
-    checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.1', '%s() is deprecated and will be removed in 8.0. Use Utils::defaultUserAgent() instead.', __FUNCTION__);
+    \trigger_deprecation('guzzlehttp/guzzle', '7.1', '%s() is deprecated and will be removed in 8.0. Use Utils::defaultUserAgent() instead.', __FUNCTION__);
 
     return Utils::defaultUserAgent();
 }
@@ -111,7 +111,7 @@ function default_user_agent(): string
  */
 function default_ca_bundle(): string
 {
-    checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.1', '%s() is deprecated and will be removed in 8.0. This function is not needed in PHP 5.6+.', __FUNCTION__);
+    \trigger_deprecation('guzzlehttp/guzzle', '7.1', '%s() is deprecated and will be removed in 8.0. This function is not needed in PHP 5.6+.', __FUNCTION__);
 
     static $cached = null;
     static $cafiles = [
@@ -175,7 +175,7 @@ EOT
  */
 function normalize_header_keys(array $headers): array
 {
-    checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.1', '%s() is deprecated and will be removed in 8.0. Use Utils::normalizeHeaderKeys() instead.', __FUNCTION__);
+    \trigger_deprecation('guzzlehttp/guzzle', '7.1', '%s() is deprecated and will be removed in 8.0. Use Utils::normalizeHeaderKeys() instead.', __FUNCTION__);
 
     return Utils::normalizeHeaderKeys($headers);
 }
@@ -203,7 +203,7 @@ function normalize_header_keys(array $headers): array
  */
 function is_host_in_noproxy(string $host, array $noProxyArray): bool
 {
-    checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.1', '%s() is deprecated and will be removed in 8.0. Use Utils::isHostInNoProxy() instead.', __FUNCTION__);
+    \trigger_deprecation('guzzlehttp/guzzle', '7.1', '%s() is deprecated and will be removed in 8.0. Use Utils::isHostInNoProxy() instead.', __FUNCTION__);
 
     return Utils::isHostInNoProxy($host, $noProxyArray);
 }
@@ -226,7 +226,7 @@ function is_host_in_noproxy(string $host, array $noProxyArray): bool
  */
 function json_decode(string $json, bool $assoc = false, int $depth = 512, int $options = 0)
 {
-    checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.1', '%s() is deprecated and will be removed in 8.0. Use PHP\'s json_decode() instead.', __FUNCTION__);
+    \trigger_deprecation('guzzlehttp/guzzle', '7.1', '%s() is deprecated and will be removed in 8.0. Use PHP\'s json_decode() instead.', __FUNCTION__);
 
     if ($depth < 1) {
         throw new Exception\InvalidArgumentException('json_decode error: Maximum stack depth exceeded');
@@ -255,7 +255,7 @@ function json_decode(string $json, bool $assoc = false, int $depth = 512, int $o
  */
 function json_encode($value, int $options = 0, int $depth = 512): string
 {
-    checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.1', '%s() is deprecated and will be removed in 8.0. Use PHP\'s json_encode() instead.', __FUNCTION__);
+    \trigger_deprecation('guzzlehttp/guzzle', '7.1', '%s() is deprecated and will be removed in 8.0. Use PHP\'s json_encode() instead.', __FUNCTION__);
 
     /** @var positive-int $depth */
     $json = \json_encode($value, $options, $depth);

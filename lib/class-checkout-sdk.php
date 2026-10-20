@@ -81,6 +81,11 @@ class Checkout_SDK {
 
 		if ( '--' !== $subdomain && 'global' !== $subdomain ) {
 			$builder->environmentSubdomain( $subdomain );
+		} else {
+			// SDK 6.x requires either a merchant-specific subdomain or an explicit
+			// opt-out. When no region subdomain is configured (global / "--"), keep
+			// the previous behaviour of using the global api.checkout.com domain.
+			$builder->useLegacyDomain();
 		}
 
 		if ( $use_fallback ) {

@@ -17,7 +17,7 @@ final class Is
      */
     public static function pending(PromiseInterface $promise): bool
     {
-        checkoutcomwc_vendor_trigger_deprecation(
+        \trigger_deprecation(
             'guzzlehttp/promises',
             '2.6',
             '%s() is deprecated and will be removed in 4.0. Use %s::isPending() instead.',
@@ -36,7 +36,7 @@ final class Is
      */
     public static function settled(PromiseInterface $promise): bool
     {
-        checkoutcomwc_vendor_trigger_deprecation(
+        \trigger_deprecation(
             'guzzlehttp/promises',
             '2.6',
             '%s() is deprecated and will be removed in 4.0. Use %s::isSettled() instead.',
@@ -55,7 +55,7 @@ final class Is
      */
     public static function fulfilled(PromiseInterface $promise): bool
     {
-        checkoutcomwc_vendor_trigger_deprecation(
+        \trigger_deprecation(
             'guzzlehttp/promises',
             '2.6',
             '%s() is deprecated and will be removed in 4.0. Use %s::isFulfilled() instead.',
@@ -74,7 +74,7 @@ final class Is
      */
     public static function rejected(PromiseInterface $promise): bool
     {
-        checkoutcomwc_vendor_trigger_deprecation(
+        \trigger_deprecation(
             'guzzlehttp/promises',
             '2.6',
             '%s() is deprecated and will be removed in 4.0. Use %s::isRejected() instead.',

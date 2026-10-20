@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace CheckoutComWC\Vendor\GuzzleHttp\Psr7;
 
-use Psr\Http\Message\RequestInterface;
-use Psr\Http\Message\StreamInterface;
-use Psr\Http\Message\UriInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\RequestInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\StreamInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\UriInterface;
 
 final class Utils
 {
@@ -442,7 +442,7 @@ final class Utils
      */
     private static function warnOnInvalidModifyRequestChange(string $key, string $expected, $value): void
     {
-        checkoutcomwc_vendor_trigger_deprecation(
+        \trigger_deprecation(
             'guzzlehttp/psr7',
             '2.11',
             'Passing %s to Utils::modifyRequest() change "%s" is deprecated; guzzlehttp/psr7 3.0 requires %s.',
@@ -499,7 +499,7 @@ final class Utils
      * - size: Size of the stream.
      *
      * This method accepts the following `$resource` types:
-     * - `Psr\Http\Message\StreamInterface`: Returns the value as-is.
+     * - `CheckoutComWC\Vendor\Psr\Http\Message\StreamInterface`: Returns the value as-is.
      * - `string`: Creates a stream object that uses the given string as the contents.
      * - `resource`: Creates a stream object that wraps the given PHP stream resource.
      * - `Iterator`: If the provided value implements `Iterator`, then a read-only
@@ -533,7 +533,7 @@ final class Utils
     {
         if (is_scalar($resource)) {
             if (!is_string($resource)) {
-                checkoutcomwc_vendor_trigger_deprecation(
+                \trigger_deprecation(
                     'guzzlehttp/psr7',
                     '2.12',
                     'Passing %s to Utils::streamFor() is deprecated; cast it to a string. guzzlehttp/psr7 3.0 will only accept string, resource, StreamInterface, Stringable, Iterator, callable, or null.',

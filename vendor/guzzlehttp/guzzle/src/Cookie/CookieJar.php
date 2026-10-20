@@ -3,8 +3,8 @@
 namespace CheckoutComWC\Vendor\GuzzleHttp\Cookie;
 
 use CheckoutComWC\Vendor\GuzzleHttp\Psr7;
-use Psr\Http\Message\RequestInterface;
-use Psr\Http\Message\ResponseInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\RequestInterface;
+use CheckoutComWC\Vendor\Psr\Http\Message\ResponseInterface;
 
 /**
  * Cookie jar that stores cookies as an array
