@@ -537,11 +537,17 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 
 			// Manually persist the optional Client ID and Processing Channel ID
 			// text fields (save_fields() is unreliable for this screen, as above).
+			// The fields can arrive either nested under the option group or as a
+			// direct POST key, so check both (same as the keys/mode fields above).
 			if ( isset( $_POST['woocommerce_wc_checkout_com_cards_settings']['ckocom_client_id'] ) ) {
 				$settings['ckocom_client_id'] = sanitize_text_field( wp_unslash( $_POST['woocommerce_wc_checkout_com_cards_settings']['ckocom_client_id'] ) );
+			} elseif ( isset( $_POST['ckocom_client_id'] ) ) {
+				$settings['ckocom_client_id'] = sanitize_text_field( wp_unslash( $_POST['ckocom_client_id'] ) );
 			}
 			if ( isset( $_POST['woocommerce_wc_checkout_com_cards_settings']['ckocom_processing_channel_id'] ) ) {
 				$settings['ckocom_processing_channel_id'] = sanitize_text_field( wp_unslash( $_POST['woocommerce_wc_checkout_com_cards_settings']['ckocom_processing_channel_id'] ) );
+			} elseif ( isset( $_POST['ckocom_processing_channel_id'] ) ) {
+				$settings['ckocom_processing_channel_id'] = sanitize_text_field( wp_unslash( $_POST['ckocom_processing_channel_id'] ) );
 			}
 
 			$settings['ckocom_account_type'] = 'NAS';
