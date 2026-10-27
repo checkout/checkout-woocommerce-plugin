@@ -72,6 +72,10 @@ class WC_Checkoutcom_Api_Request {
 	public static function create_payment( WC_Order $order, $arg, $subscription = null, $retry_idempotency_key = false ) {
 		// Get payment request parameter.
 		$request_param = WC_Checkoutcom_Api_Request::get_request_param( $order, $arg, $subscription );
+		if ( is_array( $request_param ) && isset( $request_param['error'] ) ) {
+			$error = $request_param['error'];
+			return array( 'error' => is_array( $error ) ? ( $error['message'] ?? __( 'Payment could not be processed.', 'checkout-com-unified-payments-api' ) ) : $error );
+		}
 
 		$gateway_debug = 'yes' === WC_Admin_Settings::get_option( 'cko_gateway_responses', 'no' );
 
@@ -237,8 +241,11 @@ class WC_Checkoutcom_Api_Request {
 
 			if ( self::is_using_saved_payment_method() ) {
 				// Saved card used.
-				// Load token id ($arg).
-				$token = WC_Payment_Tokens::get( $arg );
+				// Load token id ($arg) — only if it belongs to this customer/order.
+				$token = WC_Checkoutcom_Utility::get_owned_payment_token( $arg, $order );
+				if ( ! $token ) {
+					return array( 'error' => __( 'Saved payment method not found. Please try using a new payment method.', 'checkout-com-unified-payments-api' ) );
+				}
 
 				$card_scheme = $token->get_meta( 'preferred_scheme' );
 
@@ -281,8 +288,8 @@ class WC_Checkoutcom_Api_Request {
 
 			if ( self::is_using_saved_payment_method() ) {
 				// Saved card used with Flow.
-				// Load token id ($arg).
-				$token = WC_Payment_Tokens::get( $arg );
+				// Load token id ($arg) — only if it belongs to this customer/order.
+				$token = WC_Checkoutcom_Utility::get_owned_payment_token( $arg, $order );
 
 				// Enhanced error handling for old saved cards
 				if ( ! $token ) {
@@ -557,9 +564,9 @@ class WC_Checkoutcom_Api_Request {
 				if ( $is_save_card ) {
 					// check if souce_id is a mada card.
 					// load token by id ($arg).
-					$token = WC_Payment_Tokens::get( $arg );
+					$token = WC_Checkoutcom_Utility::get_owned_payment_token( $arg, $order );
 					// check if source_id is mada.
-					$is_mada = $token->get_meta( 'is_mada' );
+					$is_mada = $token ? $token->get_meta( 'is_mada' ) : false;
 
 					if ( $is_mada ) {
 						$method->cvv = $post_data['wc_checkout_com_cards-card-cvv'];
