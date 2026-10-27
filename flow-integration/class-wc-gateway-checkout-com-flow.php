@@ -7793,11 +7793,26 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			WC_Checkoutcom_Utility::logger( '[PAYMENT SESSION] Currency missing from request — defaulted to store currency: ' . $payment_session_request['currency'] );
 		}
 
-		// Determine API URL based on environment
-		$api_url = 'https://api.checkout.com/payment-sessions';
-		if ( isset( $core_settings['ckocom_environment'] ) && 'sandbox' === $core_settings['ckocom_environment'] ) {
-			$api_url = 'https://api.sandbox.checkout.com/payment-sessions';
+		// Processing channel id: include it on the session when configured. Accounts with
+		// multiple processing channels require it (otherwise Checkout.com returns
+		// processing_channel_id_required on the payment-session create).
+		$cko_pc_id = isset( $core_settings['ckocom_processing_channel_id'] ) ? trim( (string) $core_settings['ckocom_processing_channel_id'] ) : '';
+		if ( '' !== $cko_pc_id ) {
+			$payment_session_request['processing_channel_id'] = $cko_pc_id;
 		}
+
+		// Determine API host based on environment, then prepend the merchant-specific
+		// subdomain derived from the configured Client ID (blank => global domain).
+		$api_host = ( isset( $core_settings['ckocom_environment'] ) && 'sandbox' === $core_settings['ckocom_environment'] )
+			? 'api.sandbox.checkout.com'
+			: 'api.checkout.com';
+		$cko_subdomain = function_exists( 'cko_mssd_subdomain_from_client_id' )
+			? cko_mssd_subdomain_from_client_id( $core_settings['ckocom_client_id'] ?? '' )
+			: '';
+		if ( '' !== $cko_subdomain ) {
+			$api_host = $cko_subdomain . '.' . $api_host;
+		}
+		$api_url = 'https://' . $api_host . '/payment-sessions';
 
 		// Prepare the API request
 		$request_args = array(
