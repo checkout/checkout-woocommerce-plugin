@@ -1640,6 +1640,25 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			return;
 		}
 
+		// 3DS required: send the customer to the challenge; the order is NOT authorised yet.
+		if ( ! empty( $result['3d'] ) ) {
+			/* translators: %s: 3DS redirect URL. */
+			$order->add_order_note( sprintf( esc_html__( 'Checkout.com 3d Redirect waiting. URL : %s', 'checkout-com-unified-payments-api' ), $result['3d'] ) );
+
+			return [
+				'result'   => 'success',
+				'redirect' => $result['3d'],
+			];
+		}
+
+		// SECURITY: only a final, approved Authorized/Captured payment may authorise the order.
+		if ( ! WC_Checkoutcom_Utility::is_authorised_payment_response( $result ) ) {
+			WC_Checkoutcom_Utility::logger( 'Apple Pay: payment not authorised for order ' . $order_id . ' (status: ' . ( $result['status'] ?? 'unknown' ) . ').' );
+			WC_Checkoutcom_Utility::wc_add_notice_self( __( 'There was an issue completing the payment.', 'checkout-com-unified-payments-api' ), 'error' );
+
+			return;
+		}
+
 		if ( class_exists( 'WC_Subscriptions_Order' ) ) {
 			// Save source id for subscription.
 			WC_Checkoutcom_Subscription::save_source_id( $order_id, $order, $result['source']['id'] );
@@ -1656,7 +1675,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		$message = sprintf( esc_html__( 'Checkout.com Payment Authorised - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
 
 		// check if payment was flagged.
-		if ( $result['risk']['flagged'] ) {
+		if ( ! empty( $result['risk']['flagged'] ) ) {
 			// Get cko auth status configured in admin.
 			$status = WC_Admin_Settings::get_option( 'ckocom_order_flagged', 'flagged' );
 
