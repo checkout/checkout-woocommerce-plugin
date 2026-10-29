@@ -2597,6 +2597,14 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			}
 		}
 
+		// A cancelled or refunded order is closed and can no longer be paid. (Must run before the
+		// pre-creation branch below, which resets the status to pending.)
+		if ( $order->has_status( array( 'cancelled', 'refunded' ) ) && ! ( function_exists( 'wcs_is_subscription' ) && wcs_is_subscription( $order ) ) ) {
+			WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Refused: order ' . $order->get_id() . ' is ' . $order->get_status() . ' and can no longer be paid.' );
+			WC_Checkoutcom_Utility::wc_add_notice_self( __( 'This order can no longer be paid. Please place a new order.', 'checkout-com-unified-payments-api' ), 'error' );
+			return;
+		}
+
 		// Order pre-creation mode: allow WooCommerce to create the order/subscription
 		// without attempting to process payment yet (Flow will submit payment afterward).
 		if ( isset( $_POST['cko_flow_precreate_order'] ) && '1' === sanitize_text_field( wp_unslash( $_POST['cko_flow_precreate_order'] ) ) ) {
@@ -5132,6 +5140,19 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			}
 		}
 		
+		// A cancelled or refunded order is closed: never apply a returning payment to it. Record the
+		// payment id so the merchant can void/refund it if the customer was charged.
+		if ( $order && $order->has_status( array( 'cancelled', 'refunded' ) ) ) {
+			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Refused: order ' . $order->get_id() . ' is ' . $order->get_status() . ' - payment ' . $payment_id . ' not applied.' );
+			if ( WC_Checkoutcom_Utility::is_valid_payment_id( $payment_id ) ) {
+				/* translators: %s: Checkout.com payment ID. */
+				$order->add_order_note( sprintf( __( 'Checkout.com payment %s returned for a closed order and was not applied. If the customer was charged, void or refund it in the Checkout.com dashboard.', 'checkout-com-unified-payments-api' ), $payment_id ) );
+			}
+			WC_Checkoutcom_Utility::wc_add_notice_self( __( 'This order can no longer be paid. Please place a new order.', 'checkout-com-unified-payments-api' ), 'error' );
+			wp_safe_redirect( wc_get_checkout_url() );
+			exit;
+		}
+
 		// Check if payment is approved
 		try {
 			// CRITICAL FIX: Refresh order from database to get latest status
