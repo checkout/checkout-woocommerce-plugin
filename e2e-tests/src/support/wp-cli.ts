@@ -6,11 +6,22 @@ const WP_ENV = path.join(REPO_ROOT, 'e2e-tests/node_modules/.bin/wp-env');
 
 /** Run a WP-CLI command inside the wp-env "cli" container and return its stdout. */
 export function wp(...args: string[]): string {
-	return execFileSync(WP_ENV, ['run', 'cli', 'wp', ...args], {
-		cwd: REPO_ROOT,
-		encoding: 'utf8',
-		stdio: ['ignore', 'pipe', 'pipe'],
-	}).trim();
+	try {
+		return execFileSync(WP_ENV, ['run', 'cli', 'wp', ...args], {
+			cwd: REPO_ROOT,
+			encoding: 'utf8',
+			stdio: ['ignore', 'pipe', 'pipe'],
+		}).trim();
+	} catch (e) {
+		const err = e as { stderr?: string; stdout?: string };
+		// Surface WP-CLI's own error (PHP fatal, unknown command, ...) instead of just "Command failed".
+		const detail = `${err.stdout ?? ''}\n${err.stderr ?? ''}`
+			.split('\n')
+			.filter((l) => /error|fatal|warning|exception/i.test(l) && !/^\s*ℹ/.test(l))
+			.slice(0, 5)
+			.join('\n');
+		throw new Error(`wp ${args[0]} failed:\n${detail || (e as Error).message}`);
+	}
 }
 
 /** Run PHP inside WordPress and parse the JSON it echoes. */

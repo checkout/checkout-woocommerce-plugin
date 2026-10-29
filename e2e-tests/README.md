@@ -39,6 +39,54 @@ plugin from this repository. Ports 8890/8891 avoid clashing with other local wp-
 | `src/support/assertions.ts` | `expectOrderPaidByCheckoutCom()` — the three-place check. |
 | `tests/checkout/` | Runs once per project: `classic` and `blocks`. |
 
+## Test catalogue
+
+| Project | Spec | Covers |
+|---|---|---|
+| classic, blocks | `checkout/card-payment` | Guest and logged-in card payment (3DS challenge completed) — `@smoke` |
+| classic, blocks | `checkout/card-failures` | Declined card · failed 3DS (3 wrong passwords) · invalid number / expired / short CVV rejected before payment · retry after decline ends with one paid order |
+| classic, blocks | `checkout/saved-cards` | Card saved only when ticked · pay with saved card · My Account add card (approved / fails verification) |
+| server | `server/webhooks` | Signed webhooks: capture, duplicate delivery, under-capture, out-of-order approved, full/partial refund, void, decline · unsigned/forged rejected · event for another order's payment ignored |
+| server | `server/security` | Regression tests for the payment-verification fixes: return URL without/with wrong key, unknown/reused/under-amount/other-currency/other-order payments, stored ids don't skip verification, fail closed without SDK, wallet result gate |
+| server | `server/refunds` | Admin full and partial refund to Checkout.com |
+| server | `server/live-webhooks` | Real Checkout.com webhooks complete an order (`@webhook-live`, opt-in) |
+
+Server tests build paid orders without a browser (`src/support/orders.ts`): a pending order,
+a real sandbox payment for its exact amount, then the shopper's return URL — so the plugin's
+own verification authorises it.
+
+### Known bugs (tests marked `test.fail`)
+
+These tests describe the correct behaviour and are expected to fail until the bug is fixed;
+Playwright reports them green while they fail and red the moment they start passing — then
+remove the `test.fail()` line.
+
+| Test | Bug |
+|---|---|
+| refunds › a refund created in code refunds the requested amount | `refund_payment()` reads `$_POST['refund_amount']`, not the `$amount` WooCommerce passes. |
+| webhooks › late payment_approved does not reopen a cancelled order | `authorize_payment` only guards processing/completed. Also seen live: a real `payment_approved` arriving after a void reopened the order. |
+
+`security › a saved card can only be used by the customer who owns it` is `test.fixme`: its
+WP-CLI call could not run in the session that wrote it. Run it from a normal terminal and
+remove the `fixme`.
+
+### Sandbox test data
+
+Verified against the sandbox: `4242 4242 4242 4242` approves (and is 3DS-challenged because
+the plugin forces 3DS; password `Checkout1!`), `4544 2491 6767 3670` declines (20051).
+This sandbox does **not** simulate declines by amount.
+
+## Live webhooks (tunnel)
+
+The store is on `localhost`, so Checkout.com cannot deliver webhooks to it. To test real
+delivery: expose it (`cloudflared tunnel --url http://localhost:8890`), register
+`<tunnel-url>/?wc-api=wc_checkoutcom_webhook` as a Checkout.com workflow (the plugin's
+`WC_Checkoutcom_Workflows::create( $url )` does this with the plugin's events and signing key),
+then run with `E2E_LIVE_WEBHOOKS=1`. While live delivery is on, real events race the signed
+webhook tests; the one test that this breaks (`payment_voided`) is skipped. **Delete the
+workflow when done** — and prefer a sandbox account dedicated to testing: a shared account
+sends every integration's events to your tunnel.
+
 ## Rules for writing tests
 
 - **Assert in three places.** A thank-you page proves nothing on its own. Every payment test

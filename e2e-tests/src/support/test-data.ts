@@ -19,6 +19,18 @@ export interface Address {
  * challenge it; the checkout page objects complete the challenge automatically. */
 export const APPROVED_CARD: Card = { number: '4242424242424242', expiry: '12/30', cvv: '100', name: 'E2E Tester' };
 
+/** Declined by the sandbox (20051 Insufficient Funds). Verified against this sandbox. */
+export const DECLINED_CARD: Card = { ...APPROVED_CARD, number: '4544249167673670' };
+
+/** Fails the Luhn check - Flow must reject it before any payment is attempted. */
+export const INVALID_NUMBER_CARD: Card = { ...APPROVED_CARD, number: '4242424242424241' };
+
+/** Expiry in the past - Flow must reject it before any payment is attempted. */
+export const EXPIRED_CARD: Card = { ...APPROVED_CARD, expiry: '01/20' };
+
+/** CVV too short - Flow must reject it before any payment is attempted. */
+export const SHORT_CVV_CARD: Card = { ...APPROVED_CARD, cvv: '1' };
+
 export const PRODUCTS = {
 	virtual: { sku: 'e2e-virtual', price: '12.34' },
 	physical: { sku: 'e2e-physical', price: '20.00' },

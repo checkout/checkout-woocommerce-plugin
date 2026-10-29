@@ -17,6 +17,7 @@ type TestFixtures = {
 	checkout: CheckoutPage;
 	addToCart: (product: keyof typeof PRODUCTS) => Promise<void>;
 	loginAsCustomer: () => Promise<void>;
+	loginAsAdmin: () => Promise<void>;
 };
 
 export const test = base.extend<TestFixtures, WorkerFixtures>({
@@ -54,6 +55,21 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
 			await page.fill('#password', env.customer.password);
 			await page.locator('button[name="login"]').click();
 			await expect(page.locator('.woocommerce-MyAccount-navigation')).toBeVisible();
+		});
+	},
+
+	loginAsAdmin: async ({ page }, use) => {
+		await use(async () => {
+			await page.goto('/wp-login.php', { waitUntil: 'load' });
+			// wp-login.php runs wp_attempt_focus() ~200ms after load, which CLEARS #user_login and
+			// focuses it. Wait for that to happen before typing, then verify each field.
+			await expect(page.locator('#user_login')).toBeFocused({ timeout: 5_000 }).catch(() => undefined);
+			for (const [selector, value] of [['#user_login', 'admin'], ['#user_pass', 'password']] as const) {
+				await page.locator(selector).fill(value);
+				await expect(page.locator(selector)).toHaveValue(value);
+			}
+			await page.locator('#wp-submit').click();
+			await expect(page.locator('#wpadminbar')).toBeVisible();
 		});
 	},
 });

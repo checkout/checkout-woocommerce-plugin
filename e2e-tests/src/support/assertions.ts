@@ -1,6 +1,7 @@
-import { expect } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 import { getCkoPayment } from './checkout-com';
 import { getOrder, type StoreOrder } from './store';
+import { wpEvalJson } from './wp-cli';
 import { toMinorUnits } from './test-data';
 
 const AUTHORISED_STATUSES = ['on-hold', 'processing', 'completed'];
@@ -31,4 +32,27 @@ export async function expectOrderPaidByCheckoutCom(orderId: number): Promise<Sto
 	}
 
 	return order;
+}
+
+/** Orders created after `sinceOrderId` that ended up in an authorised status (must be none on failure paths). */
+export function authorisedOrdersSince(sinceOrderId: number): Array<{ id: number; status: string }> {
+	return wpEvalJson<Array<{ id: number; status: string }>>(`
+		$out = array();
+		foreach ( wc_get_orders( array( 'limit' => 20, 'orderby' => 'ID', 'order' => 'DESC' ) ) as $o ) {
+			if ( $o->get_id() > ${Number(sinceOrderId)} && in_array( $o->get_status(), array( 'on-hold', 'processing', 'completed' ), true ) ) {
+				$out[] = array( 'id' => $o->get_id(), 'status' => $o->get_status() );
+			}
+		}
+		return $out;
+	`);
+}
+
+/**
+ * Failure path: the shopper is told the payment failed, never reaches the thank-you page,
+ * and no order created since `sinceOrderId` is authorised.
+ */
+export async function expectPaymentRejected(page: Page, sinceOrderId: number, message: RegExp): Promise<void> {
+	await expect(page.getByText(message).first(), 'shopper sees why the payment failed').toBeVisible({ timeout: 60_000 });
+	expect(page.url(), 'never reaches the thank-you page').not.toMatch(/order-received/);
+	expect(authorisedOrdersSince(sinceOrderId), 'no order was authorised').toEqual([]);
 }
