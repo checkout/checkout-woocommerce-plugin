@@ -173,7 +173,6 @@ test.describe('Webhooks: security', () => {
 	});
 
 	test('late payment_approved does not reopen a cancelled (voided) order', async ({ request }) => {
-		test.fail(true, 'Open: authorize_payment only guards processing/completed, so cancelled orders are reopened');
 		const { order, payment } = await createPaidOrder(request);
 		await sendWebhook(request, webhookEvent('payment_voided', payment));
 		expect(getOrder(order.id).status).toBe('cancelled');
