@@ -203,33 +203,30 @@ Fixes
 - Refunds created through the WooCommerce REST API or by other plugins now refund the requested amount.
 - Fixed an error when Checkout.com sends a notification for an order that does not exist in this store.
 - Improved performance: the plugin no longer re-saves its settings on every page load.
+- Refund notifications are de-duplicated, so a refund is never booked twice.
+- The plugin no longer offers a payment method (or shows "Active") before API keys are entered, and no longer forces account creation at checkout.
+- Manual/offline orders (bank transfer, cash on delivery) can be saved without a billing email again.
+- High-Performance Order Storage (HPOS): order lookups use the WooCommerce order API so they work with HPOS enabled.
+- The secret key is masked in the settings screen; leave it blank to keep the saved key.
 
 New
 - Client ID setting: requests are sent to your account's own Checkout.com address (merchant-specific subdomain).
 - Optional Processing Channel ID setting, now also used for Flow payments.
 - Mastercard Transaction Link Identifier (TLID) support for recurring payments.
 
-v5.1.4.5 13th October 2026
+Maintenance
+- Declared block checkout compatibility and updated the minimum PHP/WordPress/WooCommerce versions.
+- Removed the unused WP-CLI bundle from the distributed package.
+
+v5.1.4.4 14th September 2026
 Security
 - Fixed a payment/order-confusion issue in the Flow webhook path where a legitimately-signed capture for a low-value payment could advance a separate, unrelated (higher-value) order to a fulfilment status. Webhooks now require the resolved order to actually own the payment before updating it, the Checkout.com reference is set server-side from the order the amount is taken from, and an order only advances when the captured amount and currency match exactly (underpayments are held on-hold).
-- The public payment-status endpoint now only accepts a valid Checkout.com payment id, closing a path-traversal that could query other Checkout.com API endpoints with the store's secret key.
-- The secret key is no longer written to the webhook debug log, and is no longer rendered into the settings page (it is masked; leave it blank to keep the saved key).
-- Webhook register/check admin actions now require the WooCommerce management permission.
-- The Flow submit endpoint now verifies the shopper is entitled to the order it is given.
-- Apple Pay: certificate-directory protection now covers Apache 2.4 and IIS, with a warning when the server (e.g. nginx) leaves the key web-accessible.
-- Refund webhooks are de-duplicated so a refund is never booked twice.
 
 WooCommerce Blocks
 - Added support for the block-based ("Blocks") checkout with Flow: card payments (inline and 3DS), saved cards, decline/error messages, name-&-email-only checkouts, and 3DS options.
 
-Compatibility & setup
-- The plugin no longer offers a payment method (or shows "Active") before API keys are entered, and no longer forces account creation at checkout.
-- Manual/offline orders (bank transfer, cash on delivery) can be saved without a billing email again.
-- High-Performance Order Storage (HPOS): order lookups now use the WooCommerce order API so they work with HPOS enabled.
-- Declared block checkout compatibility and updated the minimum PHP/WordPress/WooCommerce versions.
-
 Maintenance
-- Removed development files and the unused WP-CLI bundle from the distributed package.
+- Removed development files from the distributed package.
 
 v5.1.4.3 3rd September 2026
 Flow declined-payment fixes

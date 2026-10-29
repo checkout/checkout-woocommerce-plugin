@@ -14,24 +14,20 @@
 * Fix - Webhook handlers no longer fatal when the event's id differs from the resolved order's id.
 * Fix - Performance: flow_enabled() only writes gateway settings when an enabled flag changes (previously two writes and an alloptions flush per gateway load). cko_update_raw_option() can now be overridden.
 * Fix - Client ID / Processing Channel ID values now persist when saved from the quick-settings fields.
-* Dev - wp-cli bundle moved to require-dev; production autoloader regenerated.
-
-2026-10-13 - version 5.1.4.5
-* Fix - Security: closed a payment/order-confusion issue in the Flow webhook path where a legitimately-signed capture for a low-value payment could advance a separate, unrelated (higher-value) order to a fulfilment status. Webhooks now require the resolved order to actually own the payment (by payment id, payment-session id, or a tracked attempt) before mutating it; the Checkout.com reference is set server-side from the order the amount is derived from; and a capture only advances the order when the captured amount and currency exactly match the order total (underpayments are held on-hold, with a cko_flow_allow_partial_capture_fulfilment filter to opt in).
-* Add - WooCommerce Blocks (block-based checkout) support for Flow: card payments (inline and 3DS), saved cards (display, save-on-consent, vaulting, pay-with-token), decline/error surfacing, name-&-email-only checkouts with store base-country fallback, and 3DS detail parameters.
-* Fix - Security: the public payment-status REST route now rejects any id that is not a well-formed Checkout.com payment id, closing a path-traversal that could proxy arbitrary Checkout.com API endpoints with the store's secret key.
-* Fix - Security: the webhook debug log no longer serialises the settings array (which contained the secret key).
-* Fix - Security: the webhook register/check admin AJAX actions now require the manage_woocommerce capability in addition to a nonce.
-* Fix - Security: the Flow payment-session submit endpoint verifies the caller is entitled to the order before using it, so it can no longer be pointed at another customer's order.
-* Fix - Security: the Secret Key is no longer rendered into the settings page — it is masked, and left blank to keep the saved key.
-* Fix - Security: Apple Pay certificate-directory protection now covers Apache 2.4 and IIS, and warns the merchant when the server (e.g. nginx/LiteSpeed) leaves the directory web-accessible.
 * Fix - Refunds: refund webhooks are de-duplicated (per refund action id), so a repeated delivery or an admin-initiated refund is not booked twice and the order is not over-refunded.
 * Fix - The plugin no longer offers a payment method, or reports "Active", before the API keys are configured.
 * Fix - The plugin no longer forces account creation at checkout; the store's Accounts & Privacy setting is respected.
 * Fix - Admin can save manual orders that lack a billing email/address (e.g. bank transfer or cash on delivery) again.
 * Fix - HPOS: multi-tab order lookups and admin order-id reads use the WooCommerce CRUD API so they work under High-Performance Order Storage.
 * Fix - Declared cart_checkout_blocks compatibility and set realistic minimum PHP/WordPress/WooCommerce versions in the plugin header.
-* Fix - Packaging: development files (.husky, package.json) and the unused WP-CLI bundle are no longer included in the distributed plugin zip.
+* Fix - Packaging: the unused WP-CLI bundle is no longer included in the distributed plugin zip.
+* Tweak - The Secret Key is masked in the settings screen; leave it blank to keep the saved key.
+* Dev - wp-cli bundle moved to require-dev; production autoloader regenerated.
+
+2026-09-14 - version 5.1.4.4
+* Fix - Security: closed a payment/order-confusion issue in the Flow webhook path where a legitimately-signed capture for a low-value payment could advance a separate, unrelated (higher-value) order to a fulfilment status. Webhooks now require the resolved order to actually own the payment (by payment id, payment-session id, or a tracked attempt) before mutating it; the Checkout.com reference is set server-side from the order the amount is derived from; and a capture only advances the order when the captured amount and currency exactly match the order total (underpayments are held on-hold, with a cko_flow_allow_partial_capture_fulfilment filter to opt in).
+* Add - WooCommerce Blocks (block-based checkout) support for Flow: card payments (inline and 3DS), saved cards (display, save-on-consent, vaulting, pay-with-token), decline/error surfacing, name-&-email-only checkouts with store base-country fallback, and 3DS detail parameters.
+* Fix - Packaging: development files (.husky, package.json) are no longer included in the distributed plugin zip.
 
 2026-08-26 - version 5.1.4.3
 * Fix - Flow declined-payment retry lockout: declined payments no longer write their payment id to the order's primary _cko_payment_id meta (stored under _cko_declined_payment_id instead), which previously poisoned the Flow duplicate-prevention guard.
