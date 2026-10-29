@@ -349,15 +349,7 @@ class WC_Checkout_Com_Webhook {
 		// refunded at Checkout.com, or failed by our amount/currency security check). Webhooks can
 		// arrive out of order - e.g. payment_approved delivered after payment_voided.
 		if ( self::is_closed_order( $order ) ) {
-			$order->add_order_note(
-				sprintf(
-					/* translators: 1: payment ID, 2: order status. */
-					__( 'Checkout.com authorization webhook ignored - Payment ID: %1$s. The order is already closed (%2$s), so it was not reopened.', 'checkout-com-unified-payments-api' ),
-					$payment_id,
-					$order->get_status()
-				)
-			);
-			return true;
+			return self::ignore_for_closed_order( $order, 'authorization', $payment_id );
 		}
 
 		// CRITICAL: Never downgrade completed or processing orders - check FIRST before any other logic
@@ -566,6 +558,10 @@ class WC_Checkout_Com_Webhook {
 			return true; // Acknowledge webhook but do not change status.
 		}
 
+		if ( self::is_closed_order( $order ) ) {
+			return self::ignore_for_closed_order( $order, 'card verified', (string) $webhook_data->id );
+		}
+
 		$payment_id = $webhook_data->id;
 		/* translators: 1: Checkout.com payment ID, 2: Checkout.com action ID. */
 		$order->add_order_note( sprintf( __( 'Checkout.com Card verified webhook received - Payment ID: %1$s, Action ID: %2$s', 'checkout-com-unified-payments-api' ), $payment_id, $action_id ) );
@@ -687,6 +683,12 @@ class WC_Checkout_Com_Webhook {
 				isset( $webhook_data->id ) ? $webhook_data->id : 'N/A'
 			) );
 			return false;
+		}
+
+		// A capture must never reopen a closed order (e.g. a scheduled auto-capture arriving after
+		// the merchant cancelled the order). Acknowledge it and leave the order as it is.
+		if ( self::is_closed_order( $order ) ) {
+			return self::ignore_for_closed_order( $order, 'capture', isset( $webhook_data->id ) ? (string) $webhook_data->id : '' );
 		}
 
 		// Check if payment is already captured.
@@ -1776,7 +1778,7 @@ class WC_Checkout_Com_Webhook {
 		
 		// If order is already in a successful state, don't downgrade to failed
 		// This can happen if a successful payment was processed and a stale decline webhook arrives
-		if ( in_array( $current_status, array( 'completed', 'processing', 'on-hold' ), true ) ) {
+		if ( in_array( $current_status, array( 'completed', 'processing', 'on-hold' ), true ) || self::is_closed_order( $order ) ) {
 			// translators: %s: current order status.
 			$order->add_order_note( sprintf( __( 'Decline webhook received but order is already %s. This may be a stale webhook for a previous failed attempt. Status unchanged.', 'checkout-com-unified-payments-api' ), $current_status ) );
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: decline_payment - Order already ' . $current_status . ', skipping status change to failed. Order ID: ' . $order_id );
@@ -1859,10 +1861,33 @@ class WC_Checkout_Com_Webhook {
 	 * @return bool
 	 */
 	private static function is_closed_order( $order ) {
+		// Note: a partial refund (cko_payment_refunded) does not close an order - it stays open
+		// (processing) and must still accept its own events. A full refund sets status refunded.
 		return $order->has_status( array( 'cancelled', 'refunded' ) )
 			|| (bool) $order->get_meta( 'cko_payment_voided' )
-			|| (bool) $order->get_meta( 'cko_payment_refunded' )
 			|| '' !== (string) $order->get_meta( '_cko_security_check_failed' );
+	}
+
+	/**
+	 * Acknowledge an event for a closed order without changing it, leaving a note.
+	 *
+	 * @param WC_Order $order      Closed order.
+	 * @param string   $event      Human-readable event name (e.g. "capture").
+	 * @param string   $payment_id Checkout.com payment id.
+	 *
+	 * @return bool Always true (webhook acknowledged, so Checkout.com does not retry).
+	 */
+	private static function ignore_for_closed_order( $order, $event, $payment_id ) {
+		$order->add_order_note(
+			sprintf(
+				/* translators: 1: webhook event, 2: payment ID, 3: order status. */
+				__( 'Checkout.com %1$s webhook ignored - Payment ID: %2$s. The order is already closed (%3$s), so its status was not changed.', 'checkout-com-unified-payments-api' ),
+				$event,
+				$payment_id,
+				$order->get_status()
+			)
+		);
+		return true;
 	}
 
 	/**
