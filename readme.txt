@@ -2,7 +2,7 @@
 Contributors: checkoutintegration
 Tags: payments, credit card, payment gateway, apple pay, google pay
 Requires at least: 6.0
-Stable tag: 5.1.4.5
+Stable tag: 5.2.0
 Requires PHP: 8.1
 Tested up to: 7.1
 WC requires at least: 8.0
@@ -181,6 +181,27 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v5.2.0 29th October 2026
+Important - please read before updating
+- Requires PHP 8.1 or newer (the bundled Checkout.com PHP SDK is now version 6).
+- All Checkout.com accounts now use the current platform: the "Account Type" setting and the legacy (ABC) integration have been removed.
+- The old standalone SEPA payment method has been removed. SEPA Direct Debit is offered through Flow.
+- If you ran version 5.1.4 with database error logging enabled, your Checkout.com secret key may have been written to your server's PHP error log. Please rotate your secret key in the Checkout.com dashboard and remove or restrict access to old logs. (The cause was fixed in 5.1.4.1.)
+
+Security
+- Important security hardening of payment verification, payment notifications (webhooks) and checkout endpoints. Updating is strongly recommended.
+
+Fixes
+- Saved-card payments that did not need 3D Secure now keep their payment reference, so the order moves to Processing when the payment is captured and can be refunded from the order screen.
+- Refunds created through the WooCommerce REST API or by other plugins now refund the requested amount.
+- Fixed an error when Checkout.com sends a notification for an order that does not exist in this store.
+- Improved performance: the plugin no longer re-saves its settings on every page load.
+
+New
+- Client ID setting: requests are sent to your account's own Checkout.com address (merchant-specific subdomain).
+- Optional Processing Channel ID setting, now also used for Flow payments.
+- Mastercard Transaction Link Identifier (TLID) support for recurring payments.
+
 v5.1.4.5 13th October 2026
 Security
 - Fixed a payment/order-confusion issue in the Flow webhook path where a legitimately-signed capture for a low-value payment could advance a separate, unrelated (higher-value) order to a fulfilment status. Webhooks now require the resolved order to actually own the payment before updating it, the Checkout.com reference is set server-side from the order the amount is taken from, and an order only advances when the captured amount and currency match exactly (underpayments are held on-hold).

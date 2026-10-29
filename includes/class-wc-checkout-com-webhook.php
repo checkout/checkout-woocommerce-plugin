@@ -1914,10 +1914,8 @@ class WC_Checkout_Com_Webhook {
 		}
 
 		// Fall back to the order NUMBER the plugin stored at payment time (_cko_order_reference),
-		// for stores whose order numbers differ from ids (Sequential Order Numbers). This must be an
-		// exact match: the previous wc_get_orders( [ 'order_number' => ... ] ) used an argument
-		// WooCommerce ignores, so it returned the NEWEST order for any unknown id - attaching other
-		// payments' events (e.g. another store on the same Checkout.com account) to that order.
+		// for stores whose order numbers differ from ids (Sequential Order Numbers). Exact match
+		// only: an unknown id must resolve to no order.
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: get_wc_order - Order not found via wc_get_order, trying exact order-number lookup' );
 		}

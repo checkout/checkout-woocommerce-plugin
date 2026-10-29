@@ -3171,9 +3171,8 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			}
 			$this->set_order_addresses_consistently( $order, $payment_details );
 			
-			// Record the declined payment id for tracking — but only when the payment really belongs
-			// to this order, and never as the transaction id: a transaction id on an unpaid order used
-			// to make later requests skip payment verification entirely.
+			// Record the declined payment id for tracking only when the payment belongs to this
+			// order, and never as the transaction id (a transaction id means "paid").
 			if ( $is_bound_decline ) {
 				$order->update_meta_data( '_cko_payment_id', $flow_payment_id );
 			
@@ -4453,9 +4452,8 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		if ( 'failed' === $cko_status ) {
 			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ❌ Checkout.com returned status=failed - Payment was declined' );
 			
-			// SECURITY: this URL is public. Only touch the order when the caller proves ownership with
-			// the order key, and only while it is still unpaid. Never store the client-supplied payment
-			// id: it is unverified, and a stored id used to let later requests skip verification.
+			// SECURITY: public URL. Only touch the order with a valid order key and while it is still
+			// unpaid, and never store the unverified payment id from the URL.
 			$order = null;
 			if ( ! empty( $order_id ) && '' !== $order_key ) {
 				$candidate = wc_get_order( $order_id );
@@ -5301,9 +5299,8 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		$order_status = $order->get_status();
 		$payment_already_processed = in_array( $order_status, array( 'processing', 'completed', 'on-hold' ), true );
 		
-		// NOTE: stored payment/transaction ids are deliberately NOT treated as "already processed":
-		// they can be written before a payment is verified, and skipping validation because of
-		// them made this check dead on the normal flow. Only a paid status skips it.
+		// Only a paid status counts as "already processed". Stored payment/transaction ids do not:
+		// they can exist before a payment is verified.
 		
 		if ( $is_debug ) {
 			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] [SECURITY] Payment already processed check - status: ' . $order_status . ', result: ' . ( $payment_already_processed ? 'YES (skip validation)' : 'NO (run validation)' ) );
@@ -6709,8 +6706,8 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 		$secret_key_raw = $core_settings['ckocom_sk'] ?? '';
 		$secret_key     = cko_is_nas_account() ? 'Bearer ' . $secret_key_raw : $secret_key_raw;
-		// Without a secret key the signing key would be the known string "Bearer ", so any
-		// signature could be forged. Refuse webhooks until a key is configured.
+		// A webhook signature cannot be verified without a secret key: refuse webhooks until one
+		// is configured.
 		if ( '' === trim( (string) $secret_key_raw ) ) {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK: rejected - no secret key configured, signature cannot be verified.' );
 			$this->send_response( 401, 'Unauthorized: webhook signing key not configured' );

@@ -1393,7 +1393,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		$raw_event     = file_get_contents( 'php://input' );
 
 		$secret_key_raw = $core_settings['ckocom_sk'] ?? '';
-		// Without a secret key the signing key would be the known string "Bearer " - refuse.
+		// A webhook signature cannot be verified without a secret key - refuse.
 		if ( '' === trim( (string) $secret_key_raw ) ) {
 			return http_response_code( 401 );
 		}
