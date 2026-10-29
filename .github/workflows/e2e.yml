@@ -1,0 +1,82 @@
+name: E2E (Playwright)
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      grep:
+        description: 'Only run tests matching this tag/title (empty = smoke)'
+        required: false
+        default: '@smoke'
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: Checkout smoke (classic + Blocks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CKO_PUBLIC_KEY: ${{ secrets.E2E_CKO_PUBLIC_KEY }}
+      CKO_SECRET_KEY: ${{ secrets.E2E_CKO_SECRET_KEY }}
+      CKO_CLIENT_ID: ${{ secrets.E2E_CKO_CLIENT_ID }}
+      CKO_PROCESSING_CHANNEL_ID: ${{ secrets.E2E_CKO_PROCESSING_CHANNEL_ID }}
+      BASE_URL: http://localhost:8890
+    steps:
+      # Secrets are not available to PRs from forks (this repo is public) - skip cleanly.
+      - name: Check sandbox credentials
+        id: creds
+        run: |
+          if [ -z "$CKO_SECRET_KEY" ] || [ -z "$CKO_PUBLIC_KEY" ]; then
+            echo "::notice::E2E skipped: Checkout.com sandbox secrets are not available to this run."
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.creds.outputs.available == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.creds.outputs.available == 'true'
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            e2e-tests/package-lock.json
+
+      - name: Build Blocks assets (build/ is not committed)
+        if: steps.creds.outputs.available == 'true'
+        run: npm ci && npm run build
+
+      - name: Install E2E dependencies
+        if: steps.creds.outputs.available == 'true'
+        working-directory: e2e-tests
+        run: npm ci && npx playwright install --with-deps chromium
+
+      - name: Start pinned test store (wp-env)
+        if: steps.creds.outputs.available == 'true'
+        working-directory: e2e-tests
+        run: npm run env:start
+
+      - name: Seed store
+        if: steps.creds.outputs.available == 'true'
+        run: bin/e2e/seed.sh
+
+      - name: Run Playwright
+        if: steps.creds.outputs.available == 'true'
+        working-directory: e2e-tests
+        run: npx playwright test --grep "${{ github.event.inputs.grep || '@smoke' }}"
+
+      - name: Upload report and traces
+        if: always() && steps.creds.outputs.available == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            e2e-tests/playwright-report
+            e2e-tests/test-results
+          retention-days: 14
