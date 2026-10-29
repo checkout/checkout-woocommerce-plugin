@@ -154,6 +154,10 @@ class WC_Checkout_Com_Webhook {
 			}
 			return false;
 		}
+
+		// Use the resolved order's real id from here on: the event's id may be an order
+		// number (or not this store's at all), and reloading by it returned false (fatal).
+		$order_id = $order->get_id();
 		
 		// Safety: never apply order-status changes to a WC_Subscription. A subscription card-change
 		// verification ($0 auth) must not flip the subscription's status — that is managed by WCS,
@@ -512,6 +516,10 @@ class WC_Checkout_Com_Webhook {
 			}
 			return false;
 		}
+
+		// Use the resolved order's real id from here on: the event's id may be an order
+		// number (or not this store's at all), and reloading by it returned false (fatal).
+		$order_id = $order->get_id();
 		
 		// Safety: never apply order-status changes to a WC_Subscription. A subscription card-change
 		// verification ($0 auth) must not flip the subscription's status — that is managed by WCS,
@@ -1452,6 +1460,10 @@ class WC_Checkout_Com_Webhook {
 				}
 				return false;
 			}
+
+			// Use the resolved order's real id from here on: the event's id may be an order
+			// number (or not this store's at all), and reloading by it returned false (fatal).
+			$order_id = $order->get_id();
 			
 			if ( $webhook_debug_enabled ) {
 				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order loaded successfully - Order ID: ' . $order->get_id() . ', Status: ' . $order->get_status() );
@@ -1600,6 +1612,10 @@ class WC_Checkout_Com_Webhook {
 			}
 			return false;
 		}
+
+		// Use the resolved order's real id from here on: the event's id may be an order
+		// number (or not this store's at all), and reloading by it returned false (fatal).
+		$order_id = $order->get_id();
 		
 		// Safety: never apply order-status changes to a WC_Subscription. A subscription card-change
 		// verification ($0 auth) must not flip the subscription's status — that is managed by WCS,
@@ -1816,7 +1832,7 @@ class WC_Checkout_Com_Webhook {
 	}
 
 	/**
-	 * Load order from order id or Query order by order number.
+	 * Load order by id, or by the exact order number stored at payment time.
 	 *
 	 * @param int $order_id Order id.
 	 *
@@ -1838,24 +1854,30 @@ class WC_Checkout_Com_Webhook {
 			return $order;
 		}
 
-		// Query order by order number to check if order exist.
+		// Fall back to the order NUMBER the plugin stored at payment time (_cko_order_reference),
+		// for stores whose order numbers differ from ids (Sequential Order Numbers). This must be an
+		// exact match: the previous wc_get_orders( [ 'order_number' => ... ] ) used an argument
+		// WooCommerce ignores, so it returned the NEWEST order for any unknown id - attaching other
+		// payments' events (e.g. another store on the same Checkout.com account) to that order.
 		if ( $webhook_debug_enabled ) {
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: get_wc_order - Order not found via wc_get_order, trying order_number lookup' );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: get_wc_order - Order not found via wc_get_order, trying exact order-number lookup' );
 		}
-		$orders = wc_get_orders(
-			[
-				'order_number' => $order_id,
-			]
-		);
+		$orders = ( '' !== (string) $order_id ) ? wc_get_orders(
+			array(
+				'limit'      => 2,
+				'meta_key'   => '_cko_order_reference', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key
+				'meta_value' => (string) $order_id, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value
+			)
+		) : array();
 
-		if ( ! empty( $orders ) && isset( $orders[0] ) ) {
+		if ( 1 === count( $orders ) ) {
 			$order = $orders[0];
 			if ( $webhook_debug_enabled ) {
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: get_wc_order - Order found via order_number lookup - ID: ' . $order->get_id() . ', Status: ' . $order->get_status() );
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: get_wc_order - Order found via order-number lookup - ID: ' . $order->get_id() . ', Status: ' . $order->get_status() );
 			}
 			return $order;
 		}
-		
+
 		// Always log errors
 		WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: get_wc_order - ERROR - Order not found by ID or order_number: ' . $order_id );
 		return false;

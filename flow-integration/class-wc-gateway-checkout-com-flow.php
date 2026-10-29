@@ -3598,6 +3598,12 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			if ( 'pending' === $order_status || 'failed' === $order_status ) {
 				$order->update_meta_data( 'cko_payment_authorized', true );
 			}
+
+			// Persist the payment id / transaction id now. The status update at the end of
+			// process_payment() reloads the order from the database first, which discarded these
+			// unsaved changes - saved-card orders were left without _cko_payment_id, so webhooks
+			// could not match them (stuck on-hold) and admin refunds failed.
+			$order->save();
 		}
 	else {
 		// CRITICAL: Check for saved card token even if is_using_saved_payment_method() returned false
