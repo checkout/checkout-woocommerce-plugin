@@ -15,7 +15,7 @@ function apiHost(clientId: string): string {
 }
 
 export const env = {
-	baseUrl: process.env.BASE_URL || 'http://localhost:8890',
+	baseUrl: process.env.BASE_URL || 'http://localhost:8892',
 	customer: { username: 'e2e_customer', password: process.env.E2E_CUSTOMER_PASSWORD || 'password' },
 	get ckoSecretKey(): string {
 		return required('CKO_SECRET_KEY');

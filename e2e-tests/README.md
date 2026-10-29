@@ -14,7 +14,7 @@ npm ci
 npx playwright install chromium
 cp .env.example .env          # add your Checkout.com SANDBOX keys
 
-npm run env:start             # WordPress + WooCommerce on http://localhost:8890
+npm run env:start             # WordPress + WooCommerce on http://localhost:8892
 npm run env:seed              # store settings, products, customer, gateway config (re-runnable)
 npm test                      # all projects (classic + blocks)
 npm run test:smoke            # @smoke only
@@ -85,7 +85,7 @@ This sandbox does **not** simulate declines by amount.
 ## Live webhooks (tunnel)
 
 The store is on `localhost`, so Checkout.com cannot deliver webhooks to it. To test real
-delivery: expose it (`cloudflared tunnel --url http://localhost:8890`), register
+delivery: expose it (`cloudflared tunnel --url http://localhost:8892`), register
 `<tunnel-url>/?wc-api=wc_checkoutcom_webhook` as a Checkout.com workflow (the plugin's
 `WC_Checkoutcom_Workflows::create( $url )` does this with the plugin's events and signing key),
 then run with `E2E_LIVE_WEBHOOKS=1`. While live delivery is on, real events race the signed
