@@ -49,6 +49,8 @@ plugin from this repository. Ports 8890/8891 avoid clashing with other local wp-
 | server | `server/webhooks` | Signed webhooks: capture, duplicate delivery, under-capture, out-of-order approved, full/partial refund, void, decline · unsigned/forged rejected · event for another order's payment ignored |
 | server | `server/security` | Regression tests for the payment-verification fixes: return URL without/with wrong key, unknown/reused/under-amount/other-currency/other-order payments, stored ids don't skip verification, fail closed without SDK, wallet result gate |
 | server | `server/refunds` | Admin full and partial refund to Checkout.com |
+| server | `server/closed-orders` | Cancelled/refunded orders are not changed by their own capture, approval, decline or card-verified webhooks, or by a returning payment · partial refunds keep the order open · a failed order can still be completed by its own genuine payment (agreed policy) |
+| server | `server/settings-sync` | Loading the gateway does not rewrite settings unless the enabled flags change |
 | server | `server/live-webhooks` | Real Checkout.com webhooks complete an order (`@webhook-live`, opt-in) |
 
 Server tests build paid orders without a browser (`src/support/orders.ts`): a pending order,
@@ -66,6 +68,13 @@ programmatic refund amount) are fixed on `fix/payment-verification`.
 `security › a saved card can only be used by the customer who owns it` is `test.fixme`: its
 WP-CLI call could not run in the session that wrote it. Run it from a normal terminal and
 remove the `fixme`.
+
+### Scope: Flow mode only
+
+The suite runs the plugin in **Flow** mode, which is what merchants use. Classic (Frames) mode is
+not covered and not hardened: there, webhooks go straight to the handlers without the Flow
+dispatcher's payment-ownership check, and void/refund/cancel/decline/card_verified only compare
+payment ids when the order already has one.
 
 ### Sandbox test data
 
