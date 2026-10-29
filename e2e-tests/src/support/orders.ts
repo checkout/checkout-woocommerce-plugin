@@ -32,11 +32,12 @@ export function createPendingOrder(sku: string = PRODUCTS.virtual.sku, customerI
 }
 
 /** The plugin's public 3DS/redirect return URL - what Checkout.com sends the shopper back to. */
-export function flowReturnUrl(params: { orderId?: number; key?: string; paymentId?: string; status?: string }): string {
+export function flowReturnUrl(params: { orderId?: number; key?: string; paymentId?: string; sessionId?: string; status?: string }): string {
 	const q = new URLSearchParams({ 'wc-api': 'wc_checkoutcom_flow_process' });
 	if (params.orderId !== undefined) q.set('order_id', String(params.orderId));
 	if (params.key !== undefined) q.set('key', params.key);
 	if (params.paymentId !== undefined) q.set('cko-payment-id', params.paymentId);
+	if (params.sessionId !== undefined) q.set('cko-payment-session-id', params.sessionId);
 	if (params.status !== undefined) q.set('status', params.status);
 	return `/?${q.toString()}`;
 }
