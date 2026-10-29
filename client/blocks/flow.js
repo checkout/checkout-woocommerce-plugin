@@ -140,6 +140,7 @@ const CheckoutComFlowContent = ( props ) => {
 		paymentRef.current = { id: '', type: 'card' };
 		if ( containerRef.current ) {
 			containerRef.current.innerHTML = '';
+			containerRef.current.setAttribute( 'data-cko-flow-ready', '0' );
 		}
 	};
 
@@ -234,6 +235,12 @@ const CheckoutComFlowContent = ( props ) => {
 					publicKey: settings.public_key,
 					environment: settings.environment === 'PRODUCTION' ? 'production' : 'sandbox',
 					paymentSession: session.data,
+					// Readiness signal for automated UI tests and support debugging (nothing reads it).
+					onReady: () => {
+						if ( containerRef.current ) {
+							containerRef.current.setAttribute( 'data-cko-flow-ready', '1' );
+						}
+					},
 					// The SDK calls handleSubmit when the payment is submitted (we drive submit() from the
 					// Place Order button). This bridges to the server's cko_flow_submit_payment_session,
 					// which re-derives the amount from the cart/order, sets capture_on and enables 3DS,
@@ -310,6 +317,7 @@ const CheckoutComFlowContent = ( props ) => {
 				// "Place Order" button drives submission via flowComponent.submit() in onPaymentSetup.
 				flowComponentRef.current = checkout.create( 'flow', { showPayButton: false } );
 				if ( containerRef.current ) {
+					containerRef.current.setAttribute( 'data-cko-flow-ready', '0' );
 					flowComponentRef.current.mount( containerRef.current );
 				}
 			} catch ( e ) {

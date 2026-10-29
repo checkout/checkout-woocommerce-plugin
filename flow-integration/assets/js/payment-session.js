@@ -1158,6 +1158,12 @@ var ckoFlow = {
 		const onReady = () => {
 				try {
 					ckoLogger.debug('onReady callback fired! 🔥🔥🔥');
+					// Readiness signal for automated UI tests and support debugging. Nothing in the
+					// plugin reads it; it only reports that the SDK finished rendering the component.
+					const readyContainer = document.getElementById('flow-container');
+					if (readyContainer) {
+						readyContainer.setAttribute('data-cko-flow-ready', '1');
+					}
 					hideLoadingOverlay();
 					
 					// Performance tracking: Mark when Flow is ready
@@ -2569,6 +2575,8 @@ var ckoFlow = {
 				attempt: attempt
 			});
 
+			// Not ready until this component's onReady fires (reset on every re-mount).
+			flowContainer.setAttribute('data-cko-flow-ready', '0');
 			flowComponent.mount(flowContainer);
 			
 			const mountEnd = performance.now();
