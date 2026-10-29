@@ -1294,7 +1294,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		$order  = wc_get_order( $order_id );
 		WC_Checkoutcom_Utility::logger( "REFUND DEBUG: Order loaded. Payment method: " . $order->get_payment_method() );
 		
-		$result = (array) WC_Checkoutcom_Api_Request::refund_payment( $order_id, $order );
+		$result = (array) WC_Checkoutcom_Api_Request::refund_payment( $order_id, $order, $amount );
 		WC_Checkoutcom_Utility::logger( 'REFUND DEBUG: API refund result. Has error: ' . ( isset( $result['error'] ) && ! empty( $result['error'] ) ? 'yes' : 'no' ) . ', action_id: ' . ( isset( $result['action_id'] ) ? $result['action_id'] : 'N/A' ) );
 
 		// check if result has error and return error message.

@@ -1172,12 +1172,13 @@ class WC_Checkoutcom_Api_Request {
 	/**
 	 * Perform Refund.
 	 *
-	 * @param int      $order_id Order ID.
-	 * @param WC_Order $order Order object.
+	 * @param int        $order_id Order ID.
+	 * @param WC_Order   $order    Order object.
+	 * @param float|null $amount   Amount to refund, as passed to process_refund() by WooCommerce.
 	 *
 	 * @return array|mixed
 	 */
-	public static function refund_payment( $order_id, $order ) {
+	public static function refund_payment( $order_id, $order, $amount = null ) {
 		$core_settings      = function_exists( 'cko_get_raw_option' )
 			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
 			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
@@ -1195,7 +1196,16 @@ class WC_Checkoutcom_Api_Request {
 		// check for decimal separator.
 		$order_amount        = str_replace( ',', '.', $order->get_total() );
 		$order_amount_cents  = WC_Checkoutcom_Utility::value_to_decimal( $order_amount, $order->get_currency() );
-		$refund_amount       = str_replace( ',', '.', sanitize_text_field( $_POST['refund_amount'] ) );
+		// Use the amount WooCommerce passes to process_refund(). Reading only $_POST['refund_amount']
+		// (the admin order screen field) sent a wrong/zero amount for refunds created through the
+		// REST API or code. Fall back to the form field, then to a full refund, for old callers.
+		if ( null !== $amount && '' !== (string) $amount ) {
+			$refund_amount = str_replace( ',', '.', (string) $amount );
+		} elseif ( isset( $_POST['refund_amount'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing -- WooCommerce verifies the refund nonce.
+			$refund_amount = str_replace( ',', '.', sanitize_text_field( wp_unslash( $_POST['refund_amount'] ) ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+		} else {
+			$refund_amount = $order_amount;
+		}
 		$refund_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $refund_amount, $order->get_currency() );
 
 		// Check if refund amount is less than order amount.
