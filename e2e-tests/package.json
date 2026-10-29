@@ -1,46 +1,27 @@
 {
-  "name": "woocommerce-e2e-tests",
-  "version": "1.0.0",
-  "description": "Production-ready E2E automation framework for WooCommerce stores",
-  "main": "index.js",
+  "name": "checkout-com-woocommerce-e2e",
+  "private": true,
+  "description": "Playwright UI/E2E tests for the Checkout.com WooCommerce plugin, run against a pinned wp-env store.",
   "scripts": {
+    "env:start": "cd .. && ./e2e-tests/node_modules/.bin/wp-env start",
+    "env:stop": "cd .. && ./e2e-tests/node_modules/.bin/wp-env stop",
+    "env:destroy": "cd .. && ./e2e-tests/node_modules/.bin/wp-env destroy",
+    "env:seed": "node -r dotenv/config -e \"require('child_process').execSync('../bin/e2e/seed.sh', { stdio: 'inherit', env: process.env })\"",
     "test": "playwright test",
-    "test:storefront": "playwright test --project=storefront",
-    "test:admin": "playwright test --project=admin",
-    "test:e2e": "playwright test --project=e2e",
+    "test:smoke": "playwright test --grep @smoke",
     "test:headed": "playwright test --headed",
-    "test:debug": "playwright test --debug",
     "test:ui": "playwright test --ui",
     "report": "playwright show-report",
-    "lint": "eslint src tests --ext .ts",
-    "lint:fix": "eslint src tests --ext .ts --fix",
-    "typecheck": "tsc --noEmit",
-    "codegen": "playwright codegen",
-    "trace": "playwright show-trace"
+    "typecheck": "tsc --noEmit"
   },
-  "keywords": [
-    "woocommerce",
-    "e2e",
-    "playwright",
-    "automation",
-    "testing"
-  ],
-  "author": "",
-  "license": "ISC",
   "devDependencies": {
-    "@playwright/test": "^1.41.0",
-    "@types/node": "^20.11.0",
-    "@typescript-eslint/eslint-plugin": "^6.19.0",
-    "@typescript-eslint/parser": "^6.19.0",
-    "dotenv": "^16.3.1",
-    "eslint": "^8.56.0",
-    "eslint-config-prettier": "^9.1.0",
-    "eslint-plugin-playwright": "^0.22.0",
-    "prettier": "^3.2.4",
-    "typescript": "^5.3.3",
-    "zod": "^3.22.4"
+    "@playwright/test": "^1.56.0",
+    "@types/node": "^22.10.0",
+    "@wordpress/env": "^12.0.0",
+    "dotenv": "^16.4.7",
+    "typescript": "^5.7.2"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20"
   }
 }
