@@ -34,7 +34,7 @@ FLOW features include:
 
 = Alternative Payments =
 
-Users can place orders with alternative and local payment options: Alipay (China & Hong Kong), Alma, Bancontact, Benefit, Dana, EPS, GCash, Ideal, Kakaopay, Klarna, KNet, MBWay, Multibanco, P24 (Przelewy24), QPay, SEPA (WooCommerce subscription compatible), STCPay, Tabby, Tamara, TNG, TrueMoney.
+Users can place orders with alternative and local payment options: Alipay (China & Hong Kong), Alma, Bancontact, Benefit, Dana, EPS, GCash, Ideal, Kakaopay, Klarna, KNet, MBWay, Multibanco, P24 (Przelewy24), QPay, STCPay, Tabby, Tamara, TNG, TrueMoney.
 
 = Digital Wallets =
 * **Google Pay** - Fast, secure checkout with one tap
@@ -48,7 +48,7 @@ Users can place orders with PayPal, Google Pay, and Apple Pay Express checkout o
 = Additional Features =
 
 * **MOTO Payments** - Process Mail Order/Telephone Order payments
-* **Recurring Payments** - Full support for subscriptions with SEPA Direct Debit compatibility
+* **Recurring Payments** - Full support for WooCommerce Subscriptions
 * **Saved Cards** - With FLOW integration, saved cards enable instant checkout for faster payments
 * **WooCommerce Invoicing** - Send invoice emails to customers for payment
 
@@ -159,9 +159,6 @@ To learn more about our pricing, visit https://www.checkout.com/pricing
 
 **Currencies**  - [150+ transaction currencies](https://docs.checkout.com/resources/codes/currency-codes) are supported in the integration
 
-= Does SEPA support recurring payments like for subscription? =
-Yes
-
 = How do I contact the Payment Provider’s Support? =
 support@checkout.com
 
@@ -192,7 +189,6 @@ v5.2.0 29th October 2026
 Important - please read before updating
 - Requires PHP 8.1 or newer (the bundled Checkout.com PHP SDK is now version 6).
 - All Checkout.com accounts now use the current platform: the "Account Type" setting and the legacy (ABC) integration have been removed.
-- The old standalone SEPA payment method has been removed. SEPA Direct Debit is offered through Flow.
 - If you ran version 5.1.4 with database error logging enabled, your Checkout.com secret key may have been written to your server's PHP error log. Please rotate your secret key in the Checkout.com dashboard and remove or restrict access to old logs. (The cause was fixed in 5.1.4.1.)
 
 Security
