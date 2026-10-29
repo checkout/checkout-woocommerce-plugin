@@ -345,6 +345,21 @@ class WC_Checkout_Com_Webhook {
 			}
 		}
 
+		// A late authorization must never reopen a closed order (cancelled/refunded, voided or
+		// refunded at Checkout.com, or failed by our amount/currency security check). Webhooks can
+		// arrive out of order - e.g. payment_approved delivered after payment_voided.
+		if ( self::is_closed_order( $order ) ) {
+			$order->add_order_note(
+				sprintf(
+					/* translators: 1: payment ID, 2: order status. */
+					__( 'Checkout.com authorization webhook ignored - Payment ID: %1$s. The order is already closed (%2$s), so it was not reopened.', 'checkout-com-unified-payments-api' ),
+					$payment_id,
+					$order->get_status()
+				)
+			);
+			return true;
+		}
+
 		// CRITICAL: Never downgrade completed or processing orders - check FIRST before any other logic
 		if ( in_array( $current_status, array( 'processing', 'completed' ), true ) ) {
 			if ( $webhook_debug_enabled ) {
@@ -428,6 +443,10 @@ class WC_Checkout_Com_Webhook {
 		// CRITICAL: Final guard before update_status - order may have been updated by capture webhook
 		// during Flow payment title processing (save/reload above). Never downgrade completed/processing.
 		$order = wc_get_order( $order_id );
+		if ( $order && self::is_closed_order( $order ) ) {
+			// Closed while this handler was running (e.g. a concurrent void) - do not reopen it.
+			return true;
+		}
 		if ( $order && in_array( $order->get_status(), array( 'processing', 'completed' ), true ) ) {
 			if ( $webhook_debug_enabled ) {
 				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: authorize_payment - Final guard: Order now in advanced state (' . $order->get_status() . '), skipping status update to prevent downgrade' );
@@ -1829,6 +1848,21 @@ class WC_Checkout_Com_Webhook {
 		WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Payment flagged for review — order ' . $order_id . ' routed to "' . $status . '" status.' );
 
 		return true;
+	}
+
+	/**
+	 * Whether an order is closed for payment purposes and must not be moved back to an
+	 * authorised/paid status by a (late, out-of-order) webhook.
+	 *
+	 * @param WC_Order $order Order.
+	 *
+	 * @return bool
+	 */
+	private static function is_closed_order( $order ) {
+		return $order->has_status( array( 'cancelled', 'refunded' ) )
+			|| (bool) $order->get_meta( 'cko_payment_voided' )
+			|| (bool) $order->get_meta( 'cko_payment_refunded' )
+			|| '' !== (string) $order->get_meta( '_cko_security_check_failed' );
 	}
 
 	/**
