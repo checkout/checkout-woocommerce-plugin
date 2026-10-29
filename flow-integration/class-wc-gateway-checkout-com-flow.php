@@ -4603,20 +4603,22 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					
 					// First query: Look up by payment_session_id (primary lookup)
 					if ( ! empty( $payment_session_id ) ) {
+						// meta_key/meta_value, not meta_query: WooCommerce ignores meta_query on the
+						// legacy (posts) order storage and would return unrelated recent orders.
 						$orders = wc_get_orders( array(
-							'meta_query' => array(
-								array(
-									'key'   => '_cko_payment_session_id',
-									'value' => $payment_session_id,
-								),
-							),
-							'limit'   => 5,
-							'orderby' => 'date',
-							'order'   => 'DESC',
+							'meta_key'   => '_cko_payment_session_id', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key
+							'meta_value' => $payment_session_id, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value
+							'limit'      => 5,
+							'orderby'    => 'date',
+							'order'      => 'DESC',
 						) );
 						
 						if ( ! empty( $orders ) ) {
 							foreach ( $orders as $potential_order ) {
+								// The order must really carry this payment session id.
+								if ( (string) $potential_order->get_meta( '_cko_payment_session_id' ) !== (string) $payment_session_id ) {
+									continue;
+								}
 								$order_status = $potential_order->get_status();
 								if ( in_array( $order_status, array( 'pending', 'failed' ), true ) ) {
 									$found_order = $potential_order;
@@ -4637,19 +4639,19 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 						}
 						
 						$orders = wc_get_orders( array(
-							'meta_query' => array(
-								array(
-									'key'   => '_cko_payment_id',
-									'value' => $payment_id,
-								),
-							),
-							'limit'   => 5,
-							'orderby' => 'date',
-							'order'   => 'DESC',
+							'meta_key'   => '_cko_payment_id', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key
+							'meta_value' => $payment_id, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value
+							'limit'      => 5,
+							'orderby'    => 'date',
+							'order'      => 'DESC',
 						) );
 						
 						if ( ! empty( $orders ) ) {
 							foreach ( $orders as $potential_order ) {
+								// The order must really carry this payment id.
+								if ( (string) $potential_order->get_meta( '_cko_payment_id' ) !== (string) $payment_id ) {
+									continue;
+								}
 								$order_status = $potential_order->get_status();
 								$existing_transaction_id = $potential_order->get_transaction_id();
 								
@@ -6811,49 +6813,34 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Payment ID: ' . $data->data->id );
 			}
 			
-			// First try to match orders that need updating (pending, failed, on-hold, processing)
-			// CRITICAL: Use 'compare' => '=' explicitly and ensure both meta keys exist
-			$orders = wc_get_orders( array(
-				'meta_query' => array(
-					'relation' => 'AND',
-					array(
-						'key'     => '_cko_payment_session_id',
-						'value'   => $data->data->metadata->cko_payment_session_id,
-						'compare' => '=',
-					),
-					array(
-						'key'     => '_cko_flow_payment_id',
-						'value'   => $data->data->id,
-						'compare' => '=',
-					),
-				),
-				'status'     => array( 'pending', 'failed', 'on-hold', 'processing' ), // ✅ Only match orders that need updating
-				'limit'      => 1,
-				'return'     => 'objects',
-			) );
+			// First try to match orders that need updating (pending, failed, on-hold, processing).
+			// Match the session id with meta_key/meta_value (meta_query is ignored on the legacy posts
+			// order storage), then require the Flow payment id to match as well.
+			$cko_match_session_and_payment = function ( $statuses ) use ( $data ) {
+				$args = array(
+					'meta_key'   => '_cko_payment_session_id', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key
+					'meta_value' => $data->data->metadata->cko_payment_session_id, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value
+					'limit'      => 10,
+					'return'     => 'objects',
+				);
+				if ( $statuses ) {
+					$args['status'] = $statuses;
+				}
+				foreach ( wc_get_orders( $args ) as $candidate ) {
+					if ( (string) $candidate->get_meta( '_cko_flow_payment_id' ) === (string) $data->data->id ) {
+						return array( $candidate );
+					}
+				}
+				return array();
+			};
+			$orders = $cko_match_session_and_payment( array( 'pending', 'failed', 'on-hold', 'processing' ) );
 			
 			// If not found in active orders, try all orders (fallback for edge cases)
 			if ( empty( $orders ) ) {
 				if ( $webhook_debug_enabled ) {
 					WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Order not found in active statuses, trying all orders...' );
 				}
-				$orders = wc_get_orders( array(
-					'meta_query' => array(
-						'relation' => 'AND',
-						array(
-							'key'     => '_cko_payment_session_id',
-							'value'   => $data->data->metadata->cko_payment_session_id,
-							'compare' => '=',
-						),
-						array(
-							'key'     => '_cko_flow_payment_id',
-							'value'   => $data->data->id,
-							'compare' => '=',
-						),
-					),
-					'limit'      => 1,
-					'return'     => 'objects',
-				) );
+				$orders = $cko_match_session_and_payment( array() );
 			}
 			
 			if ( ! empty( $orders ) ) {
@@ -6940,13 +6927,10 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					'limit'      => 5,
 					'return'     => 'ids',
 					'status'     => array( 'pending', 'failed', 'on-hold', 'processing', 'completed' ),
-					'meta_query' => array(
-						array(
-							'key'     => '_cko_payment_attempts',
-							'value'   => $webhook_payment_id,
-							'compare' => 'LIKE',
-						),
-					),
+					// meta_key/meta_value/meta_compare: meta_query is ignored on the posts storage.
+					'meta_key'     => '_cko_payment_attempts', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key
+					'meta_value'   => $webhook_payment_id, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value
+					'meta_compare' => 'LIKE',
 				)
 			);
 			
