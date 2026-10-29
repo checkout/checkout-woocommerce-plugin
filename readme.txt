@@ -172,11 +172,18 @@ support@checkout.com
 2. Search for "Checkout.com Payment Gateway"
 3. Click on Install Now
 4. Click on Activate
-5. Click on Settings to configure the module
-6. Configure the webhook url in your checkout hub account.
+5. Click on Settings to configure the module (requires PHP 8.1 or newer)
 
-**Webhook URL:**
-http://example.com/?wc-api=wc_checkoutcom_webhook
+**Configuration (WooCommerce > Settings > Payments > Checkout.com)**
+* **Checkout Mode** - Flow (recommended).
+* **Environment** - Sandbox for testing, Live for real payments.
+* **Secret Key** and **Public Key** - from the Checkout.com Hub. The secret key is masked after saving; leave it blank to keep the saved key.
+* **Client ID** (optional, recommended) - your Client ID from the Hub (for example `cli_xxxxxxxxxxxxxxxxxxxxxxxxxx`). API calls are then sent to your account's own Checkout.com address (merchant-specific subdomain). Leave blank to use the global address.
+* **Processing Channel ID** (optional) - your processing channel ID (`pc_xxx`). Required if your Checkout.com account has more than one processing channel, or if payments fail with "processing_channel_id_required".
+* **Webhook** - under Webhook Status, click **Register Webhook**. The plugin registers this URL with Checkout.com for you:
+  `https://example.com/?wc-api=wc_checkoutcom_webhook`
+
+All Checkout.com accounts use the current platform; there is no Account Type setting.
 
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
@@ -625,5 +632,8 @@ v4.0.0 3 Sep 2019
 · Checkout.com Woocommerce module for the Unified Payments API
 
 == Upgrade Notice ==
+= 5.2.0 =
+Important security update - updating is strongly recommended. Requires PHP 8.1 or newer. The Account Type setting has been removed (all accounts use the current Checkout.com platform). New optional Client ID and Processing Channel ID settings.
+
 = 4.1.16 =
 4.1.16 - Bug Fix - Removed saved card checkbox for guest users
