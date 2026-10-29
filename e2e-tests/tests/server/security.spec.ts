@@ -1,5 +1,6 @@
 import { test, expect } from '../../src/fixtures';
-import { createCkoPayment } from '../../src/support/checkout-com';
+import { createCkoPayment, signWebhook, webhookEvent } from '../../src/support/checkout-com';
+import { sendWebhook } from '../../src/support/webhooks';
 import { createPaidOrder, createPendingOrder, hitReturnUrl } from '../../src/support/orders';
 import { customerIdByLogin, getOrder, overrideCoreSetting, patchOrder } from '../../src/support/store';
 import { wp, wpEvalJson } from '../../src/support/wp-cli';
@@ -103,6 +104,39 @@ test.describe('Security: payment verification', () => {
 	test('a genuine payment for the right order and amount is still accepted', async ({ request }) => {
 		const { stored } = await createPaidOrder(request);
 		expect(AUTHORISED).toContain(stored.status);
+	});
+});
+
+test.describe('Security: endpoints', () => {
+	test('payment-status returns only the status fields to a checkout visitor', async ({ page, request, addToCart }) => {
+		const { payment } = await createPaidOrder(request);
+		await addToCart('virtual');
+		await page.goto('/checkout/');
+		const nonce = await page.evaluate(() => (window as unknown as { cko_flow_vars?: { payment_session_nonce?: string } }).cko_flow_vars?.payment_session_nonce ?? '');
+		expect(nonce, 'checkout page exposes the visitor nonce').not.toBe('');
+
+		const res = await page.request.get(`/wp-json/ckoplugin/v1/payment-status?paymentId=${payment.id}&nonce=${nonce}`);
+		expect(res.status()).toBe(200);
+		const body = (await res.json()) as Record<string, unknown>;
+
+		expect(Object.keys(body).sort(), 'only status fields').toEqual(['approved', 'response_code', 'response_summary', 'status']);
+		expect(body.status).toBe('Authorized');
+		expect(JSON.stringify(body), 'no customer or card data').not.toMatch(/@example\.com|4242|source|billing|customer/i);
+	});
+
+	test('webhooks are rejected while no secret key is configured', async ({ request }) => {
+		const { order, payment } = await createPaidOrder(request);
+		const event = webhookEvent('payment_captured', payment);
+		const restore = overrideCoreSetting('ckocom_sk', '');
+		let code = 0;
+		try {
+			code = await sendWebhook(request, event, signWebhook(JSON.stringify(event), ''));
+		} finally {
+			restore();
+		}
+
+		expect(code).toBe(401);
+		expect(getOrder(order.id).status).toBe('on-hold');
 	});
 });
 
