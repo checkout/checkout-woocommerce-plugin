@@ -6709,6 +6709,13 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 		$secret_key_raw = $core_settings['ckocom_sk'] ?? '';
 		$secret_key     = cko_is_nas_account() ? 'Bearer ' . $secret_key_raw : $secret_key_raw;
+		// Without a secret key the signing key would be the known string "Bearer ", so any
+		// signature could be forged. Refuse webhooks until a key is configured.
+		if ( '' === trim( (string) $secret_key_raw ) ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK: rejected - no secret key configured, signature cannot be verified.' );
+			$this->send_response( 401, 'Unauthorized: webhook signing key not configured' );
+			return;
+		}
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Secret key (masked): ' . substr($secret_key, 0, 14) . '...' );
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK DEBUG: Is NAS account: ' . (cko_is_nas_account() ? 'YES' : 'NO') );
