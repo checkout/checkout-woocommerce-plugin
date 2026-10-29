@@ -2311,7 +2311,7 @@ add_action(
 			'/payment-status',
 			array(
 				'methods'             => 'GET',
-				'callback'            => 'cko_get_payment_status',
+				'callback'            => 'cko_get_payment_status_public',
 				'permission_callback' => 'cko_payment_status_permission_check',
 			)
 		);
@@ -2337,6 +2337,41 @@ function cko_payment_status_permission_check( $request ) {
 	}
 	
 	return true;
+}
+
+/**
+ * Public REST callback for /ckoplugin/v1/payment-status.
+ *
+ * The route is reachable by any visitor holding the checkout nonce, so it returns only what
+ * the browser needs (the decline reason shown on a failed return) - never the full payment
+ * (customer name, email, addresses, card details). Internal callers use
+ * cko_get_payment_status() directly and still get the full payment.
+ *
+ * @param WP_REST_Request $request Request.
+ *
+ * @return WP_REST_Response
+ */
+function cko_get_payment_status_public( $request ) {
+	$response = cko_get_payment_status( $request );
+	if ( ! $response instanceof WP_REST_Response ) {
+		return new WP_REST_Response( array( 'error' => 'Payment status unavailable' ), 500 );
+	}
+
+	$data   = $response->get_data();
+	$status = $response->get_status();
+	if ( $status >= 400 || ! is_array( $data ) || isset( $data['error'] ) ) {
+		return new WP_REST_Response( array( 'error' => 'Payment status unavailable' ), $status >= 400 ? $status : 500 );
+	}
+
+	return new WP_REST_Response(
+		array(
+			'status'           => isset( $data['status'] ) ? (string) $data['status'] : '',
+			'approved'         => ! empty( $data['approved'] ),
+			'response_code'    => isset( $data['response_code'] ) ? (string) $data['response_code'] : '',
+			'response_summary' => isset( $data['response_summary'] ) ? (string) $data['response_summary'] : '',
+		),
+		200
+	);
 }
 
 /**
