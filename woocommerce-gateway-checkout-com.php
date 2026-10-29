@@ -96,29 +96,31 @@ function cko_get_raw_option( $option_name, $default = array() ) {
  * @param mixed  $value       Value to save.
  * @return bool True on success.
  */
-function cko_update_raw_option( $option_name, $value ) {
-	global $wpdb;
-	$serialized = maybe_serialize( $value );
+if ( ! function_exists( 'cko_update_raw_option' ) ) {
+	function cko_update_raw_option( $option_name, $value ) {
+		global $wpdb;
+		$serialized = maybe_serialize( $value );
 
-	// Single atomic upsert. A previous UPDATE-then-INSERT pattern was unsafe: $wpdb->update()
-	// returns 0 BOTH when no row matched AND when a row matched but the value was unchanged. The
-	// latter (identical value, common on the settings-sync path) wrongly triggered a fallback
-	// INSERT against an existing option_name and failed on the unique key, throwing DB errors on
-	// nearly every run. INSERT ... ON DUPLICATE KEY UPDATE avoids the false insert and is race-safe.
-	// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- $wpdb->options is a trusted table name; values are prepared.
-	$wpdb->query(
-		$wpdb->prepare(
-			"INSERT INTO {$wpdb->options} ( option_name, option_value, autoload ) VALUES ( %s, %s, 'yes' )
-			ON DUPLICATE KEY UPDATE option_value = VALUES( option_value )",
-			$option_name,
-			$serialized
-		)
-	);
+		// Single atomic upsert. A previous UPDATE-then-INSERT pattern was unsafe: $wpdb->update()
+		// returns 0 BOTH when no row matched AND when a row matched but the value was unchanged. The
+		// latter (identical value, common on the settings-sync path) wrongly triggered a fallback
+		// INSERT against an existing option_name and failed on the unique key, throwing DB errors on
+		// nearly every run. INSERT ... ON DUPLICATE KEY UPDATE avoids the false insert and is race-safe.
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- $wpdb->options is a trusted table name; values are prepared.
+		$wpdb->query(
+			$wpdb->prepare(
+				"INSERT INTO {$wpdb->options} ( option_name, option_value, autoload ) VALUES ( %s, %s, 'yes' )
+				ON DUPLICATE KEY UPDATE option_value = VALUES( option_value )",
+				$option_name,
+				$serialized
+			)
+		);
 
-	// Keep WordPress object cache in sync so same-request get_option() calls see the new value.
-	wp_cache_set( $option_name, $value, 'options' );
-	wp_cache_delete( 'alloptions', 'options' );
-	return true;
+		// Keep WordPress object cache in sync so same-request get_option() calls see the new value.
+		wp_cache_set( $option_name, $value, 'options' );
+		wp_cache_delete( 'alloptions', 'options' );
+		return true;
+	}
 }
 
 /**

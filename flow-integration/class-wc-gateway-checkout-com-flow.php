@@ -6520,41 +6520,51 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		$applepay_settings = get_option( 'woocommerce_wc_checkout_com_apple_pay_settings', array() );
 		$paypal_settings   = get_option( 'woocommerce_wc_checkout_com_paypal_settings', array() );
 	
-		if ( 'flow' === $checkout_mode ) {
-			$flow_settings['enabled']     = 'yes';
-			$checkout_setting['enabled']  = 'no';
-			$apm_settings['enabled']      = 'no';
-			$gpay_settings['enabled']     = 'no';
-			$applepay_settings['enabled'] = 'no';
-			$paypal_settings['enabled']   = 'no';
-		} else {
-			$flow_settings['enabled']    = 'no';
-			$checkout_setting['enabled'] = 'yes';
+		// Desired enabled flag per gateway: Flow mode enables only Flow; classic mode enables
+		// Cards and disables Flow (the other gateways keep their own setting in classic mode).
+		$desired = ( 'flow' === $checkout_mode )
+			? array( 'flow' => 'yes', 'cards' => 'no', 'apm' => 'no', 'gpay' => 'no', 'applepay' => 'no', 'paypal' => 'no' )
+			: array( 'flow' => 'no', 'cards' => 'yes' );
+
+		$option_names = array(
+			'flow'     => 'woocommerce_wc_checkout_com_flow_settings',
+			'cards'    => 'woocommerce_wc_checkout_com_cards_settings',
+			'apm'      => 'woocommerce_wc_checkout_com_alternative_payments_settings',
+			'gpay'     => 'woocommerce_wc_checkout_com_google_pay_settings',
+			'applepay' => 'woocommerce_wc_checkout_com_apple_pay_settings',
+			'paypal'   => 'woocommerce_wc_checkout_com_paypal_settings',
+		);
+		$current = array(
+			'flow'     => is_array( $flow_settings ) ? $flow_settings : array(),
+			'cards'    => is_array( $checkout_setting ) ? $checkout_setting : array(),
+			'apm'      => is_array( $apm_settings ) ? $apm_settings : array(),
+			'gpay'     => is_array( $gpay_settings ) ? $gpay_settings : array(),
+			'applepay' => is_array( $applepay_settings ) ? $applepay_settings : array(),
+			'paypal'   => is_array( $paypal_settings ) ? $paypal_settings : array(),
+		);
+
+		// This runs in the gateway constructor (most storefront requests), so only write when a
+		// flag actually differs from what is stored. Writing unconditionally cost two DB writes
+		// and an alloptions cache flush on every request.
+		$changed = array();
+		foreach ( $desired as $key => $enabled ) {
+			if ( ( $current[ $key ]['enabled'] ?? '' ) === $enabled ) {
+				continue;
+			}
+			$current[ $key ]['enabled'] = $enabled;
+			$changed[]                  = $key;
+
+			update_option( $option_names[ $key ], $current[ $key ] );
+			// Flow and Cards are read raw (cko_get_raw_option) to bypass Polylang's option
+			// filtering, so write those raw as well.
+			if ( in_array( $key, array( 'flow', 'cards' ), true ) && function_exists( 'cko_update_raw_option' ) ) {
+				cko_update_raw_option( $option_names[ $key ], $current[ $key ] );
+			}
 		}
-	
-		update_option( 'woocommerce_wc_checkout_com_flow_settings', $flow_settings );
-		update_option( 'woocommerce_wc_checkout_com_cards_settings', $checkout_setting );
-		update_option( 'woocommerce_wc_checkout_com_alternative_payments_settings', $apm_settings );
-		update_option( 'woocommerce_wc_checkout_com_google_pay_settings', $gpay_settings );
-		update_option( 'woocommerce_wc_checkout_com_apple_pay_settings', $applepay_settings );
-		update_option( 'woocommerce_wc_checkout_com_paypal_settings', $paypal_settings );
-		if ( function_exists( 'cko_update_raw_option' ) ) {
-			cko_update_raw_option( 'woocommerce_wc_checkout_com_flow_settings', $flow_settings );
-			cko_update_raw_option( 'woocommerce_wc_checkout_com_cards_settings', $checkout_setting );
-		}
-		
-		// Log for debugging (only in debug mode to reduce log spam)
-		$is_debug = defined( 'WP_DEBUG' ) && WP_DEBUG;
-		if ( $is_debug ) {
-			WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] ========== FLOW ENABLED CHECK ==========' );
-			WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] Checkout mode: ' . $checkout_mode );
-			WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] Flow gateway enabled: ' . ( isset( $flow_settings['enabled'] ) ? $flow_settings['enabled'] : 'not set' ) );
-			WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] Cards gateway enabled: ' . ( isset( $checkout_setting['enabled'] ) ? $checkout_setting['enabled'] : 'not set' ) );
-			WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] APM gateway enabled: ' . ( isset( $apm_settings['enabled'] ) ? $apm_settings['enabled'] : 'not set' ) );
-			WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] Google Pay enabled: ' . ( isset( $gpay_settings['enabled'] ) ? $gpay_settings['enabled'] : 'not set' ) );
-			WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] Apple Pay enabled: ' . ( isset( $applepay_settings['enabled'] ) ? $applepay_settings['enabled'] : 'not set' ) );
-			WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] PayPal enabled: ' . ( isset( $paypal_settings['enabled'] ) ? $paypal_settings['enabled'] : 'not set' ) );
-			WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] ========================================' );
+
+		// Log only when something was actually changed (this used to log on every request).
+		if ( $changed && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			WC_Checkoutcom_Utility::logger( '[FLOW ENABLED] Checkout mode: ' . $checkout_mode . ' - updated enabled flag for: ' . implode( ', ', $changed ) );
 		}
 	}
 
