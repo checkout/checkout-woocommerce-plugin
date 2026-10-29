@@ -35,4 +35,23 @@ export class ThreeDSChallenge {
 		await expect(submit).toBeEnabled();
 		await submit.click();
 	}
+
+	/**
+	 * Fail authentication: the simulator allows 3 attempts, so keep entering a wrong
+	 * password until the challenge closes.
+	 */
+	async fail(maxAttempts = 3): Promise<void> {
+		for (let attempt = 0; attempt < maxAttempts; attempt++) {
+			const frame = await this.find();
+			if (!frame) {
+				return;
+			}
+			await frame.locator('input[type="password"]').first().fill('wrong-password');
+			await frame.getByRole('button', { name: /continue|submit/i }).first().click();
+			await this.page.waitForTimeout(2500);
+		}
+		if (await this.find()) {
+			throw new Error(`3DS challenge still open after ${maxAttempts} wrong passwords`);
+		}
+	}
 }

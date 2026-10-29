@@ -35,6 +35,12 @@ export default defineConfig<Options>({
 			use: { ...devices['Desktop Chrome'], checkoutLayout: 'classic' },
 		},
 		{
+			// Webhooks, security regressions and admin flows - layout-independent.
+			name: 'server',
+			testDir: './tests/server',
+			use: { ...devices['Desktop Chrome'], checkoutLayout: 'classic' },
+		},
+		{
 			name: 'blocks',
 			testDir: './tests/checkout',
 			use: { ...devices['Desktop Chrome'], checkoutLayout: 'blocks' },

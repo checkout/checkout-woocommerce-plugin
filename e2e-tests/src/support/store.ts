@@ -47,3 +47,62 @@ export function getOrder(orderId: number): StoreOrder {
 export function customerIdByLogin(login: string): number {
 	return wpEvalJson<number>(`$u = get_user_by( 'login', ${JSON.stringify(login)} ); return $u ? $u->ID : 0;`);
 }
+
+/** Id of the newest order in the store (0 when there are none). */
+export function latestOrderId(): number {
+	return wpEvalJson<number>(`$ids = wc_get_orders( array( 'limit' => 1, 'orderby' => 'ID', 'order' => 'DESC', 'return' => 'ids' ) ); return $ids ? (int) $ids[0] : 0;`);
+}
+
+export interface SavedToken {
+	id: number;
+	gateway: string;
+	last4: string;
+}
+
+export function customerTokens(login: string): SavedToken[] {
+	return wpEvalJson<SavedToken[]>(`
+		$u = get_user_by( 'login', ${JSON.stringify(login)} );
+		if ( ! $u ) { return array(); }
+		return array_values( array_map( function ( $t ) {
+			return array( 'id' => $t->get_id(), 'gateway' => $t->get_gateway_id(), 'last4' => method_exists( $t, 'get_last4' ) ? $t->get_last4() : '' );
+		}, WC_Payment_Tokens::get_customer_tokens( $u->ID ) ) );
+	`);
+}
+
+export function deleteCustomerTokens(login: string): void {
+	wpEvalJson<number>(`
+		$u = get_user_by( 'login', ${JSON.stringify(login)} );
+		if ( $u ) { foreach ( WC_Payment_Tokens::get_customer_tokens( $u->ID ) as $t ) { WC_Payment_Tokens::delete( $t->get_id() ); } }
+		return 1;
+	`);
+}
+
+/** Write order meta / status directly (used to recreate attacker preconditions). */
+export function patchOrder(orderId: number, patch: { status?: string; meta?: Record<string, string>; transactionId?: string }): void {
+	wpEvalJson<number>(`
+		$o = wc_get_order( ${Number(orderId)} );
+		$p = json_decode( ${JSON.stringify(JSON.stringify(patch))}, true );
+		foreach ( (array) ( $p['meta'] ?? array() ) as $k => $v ) { $o->update_meta_data( $k, $v ); }
+		if ( isset( $p['transactionId'] ) ) { $o->set_transaction_id( $p['transactionId'] ); }
+		if ( isset( $p['status'] ) ) { $o->set_status( $p['status'] ); }
+		$o->save();
+		return 1;
+	`);
+}
+
+/** WooCommerce refunds recorded on an order (amounts as decimal strings). */
+export function orderRefunds(orderId: number): string[] {
+	return wpEvalJson<string[]>(`return array_map( function ( $r ) { return (string) $r->get_amount(); }, wc_get_order( ${Number(orderId)} )->get_refunds() );`);
+}
+
+/**
+ * Temporarily change one key of the Checkout.com core settings; returns a restore function.
+ * Always call the restore in a finally block.
+ */
+export function overrideCoreSetting(key: string, value: string): () => void {
+	const previous = wpEvalJson<string>(`$s = get_option( 'woocommerce_wc_checkout_com_cards_settings' ); return (string) ( $s[${JSON.stringify(key)}] ?? '' );`);
+	const write = (v: string) =>
+		wpEvalJson<number>(`$s = get_option( 'woocommerce_wc_checkout_com_cards_settings' ); $s[${JSON.stringify(key)}] = ${JSON.stringify(v)}; update_option( 'woocommerce_wc_checkout_com_cards_settings', $s ); return 1;`);
+	write(value);
+	return () => write(previous);
+}

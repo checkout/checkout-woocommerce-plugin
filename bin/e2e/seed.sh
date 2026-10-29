@@ -86,6 +86,9 @@ process.stdout.write(JSON.stringify(s));
 wp option update woocommerce_wc_checkout_com_cards_settings "$CARDS_JSON" --format=json
 wp option update woocommerce_wc_checkout_com_flow_settings '{"enabled":"yes","flow_enabled_payment_methods":["card"]}' --format=json
 wp option update ckocom_order_authorised on-hold
+# Saved cards on (CVV not re-asked) so save-card / pay-with-saved-card flows are testable.
+wp option update ckocom_card_saved 1
+wp option update ckocom_card_require_cvv 0
 
 echo "==> Default to the block checkout layout"
 "$SCRIPT_DIR/checkout-layout.sh" blocks

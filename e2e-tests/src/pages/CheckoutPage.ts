@@ -12,6 +12,26 @@ export interface CheckoutPage {
 	fillBilling(address: Address, options?: { includeEmail?: boolean }): Promise<void>;
 	selectFlow(): Promise<void>;
 	placeOrder(): Promise<number>;
+	/** Click Place Order without expecting success (failure-path tests). */
+	clickPlaceOrder(): Promise<void>;
+	/** Tick "save card" (shown once card details are entered). */
+	tickSaveCard(): Promise<void>;
+	/** Pay with an already-saved card instead of entering a new one. */
+	selectSavedCard(tokenId: number): Promise<void>;
+}
+
+/** True when the shopper picked a saved card (no card details typed into Flow). */
+async function usingSavedCard(page: Page): Promise<boolean> {
+	return page.evaluate(() =>
+		Array.from(document.querySelectorAll<HTMLInputElement>('input[type="radio"]:checked')).some(
+			(r) => /payment-token|saved-tokens/.test(r.name) && r.value !== 'new' && r.value !== '',
+		),
+	);
+}
+
+/** Click whichever Place Order button the current page has (checkout, order-pay, Blocks). */
+export async function clickAnyPlaceOrder(page: Page): Promise<void> {
+	await page.locator('#place_order, .wc-block-components-checkout-place-order-button').first().click();
 }
 
 export function checkoutPageFor(layout: CheckoutLayout, page: Page): CheckoutPage {
@@ -23,7 +43,7 @@ export function checkoutPageFor(layout: CheckoutLayout, page: Page): CheckoutPag
  * sandbox raises a 3DS challenge first, complete it (the plugin forces 3DS on, so
  * challenges are part of the normal flow).
  */
-async function waitForOrderReceived(page: Page): Promise<number> {
+export async function waitForOrderReceived(page: Page): Promise<number> {
 	const challenge = new ThreeDSChallenge(page);
 	const deadline = Date.now() + 90_000;
 	let challengeCompleted = false;
@@ -114,9 +134,29 @@ export class ClassicCheckoutPage implements CheckoutPage {
 	}
 
 	async placeOrder(): Promise<number> {
-		await this.flow.expectCardStillEntered();
+		if (!(await usingSavedCard(this.page))) {
+			await this.flow.expectCardStillEntered();
+		}
 		await this.page.locator('#place_order').click();
 		return waitForOrderReceived(this.page);
+	}
+
+	async clickPlaceOrder(): Promise<void> {
+		await this.page.locator('#place_order').click();
+	}
+
+	async tickSaveCard(): Promise<void> {
+		const box = this.page.locator('#wc-wc_checkout_com_flow-new-payment-method');
+		await expect(box, 'save-card checkbox not shown').toBeVisible();
+		await box.check();
+	}
+
+	async selectSavedCard(tokenId: number): Promise<void> {
+		const radio = this.page.locator(`input[name="wc-wc_checkout_com_flow-payment-token"][value="${tokenId}"]`);
+		await expect(radio, `saved card ${tokenId} not offered`).toHaveCount(1);
+		// The radio is visually hidden behind its label - click the label like a shopper.
+		await this.page.locator(`label[for="wc-wc_checkout_com_flow-payment-token-${tokenId}"]`).click();
+		await expect(radio).toBeChecked();
 	}
 }
 
@@ -164,8 +204,26 @@ export class BlocksCheckoutPage implements CheckoutPage {
 	}
 
 	async placeOrder(): Promise<number> {
-		await this.flow.expectCardStillEntered();
+		if (!(await usingSavedCard(this.page))) {
+			await this.flow.expectCardStillEntered();
+		}
 		await this.page.locator('.wc-block-components-checkout-place-order-button').click();
 		return waitForOrderReceived(this.page);
+	}
+
+	async clickPlaceOrder(): Promise<void> {
+		await this.page.locator('.wc-block-components-checkout-place-order-button').click();
+	}
+
+	async tickSaveCard(): Promise<void> {
+		const box = this.page.getByLabel(/save (payment information|card)/i).first();
+		await expect(box, 'save-card checkbox not shown').toBeVisible();
+		await box.check();
+	}
+
+	async selectSavedCard(tokenId: number): Promise<void> {
+		const radio = this.page.locator(`input[type="radio"][value="${tokenId}"]`);
+		await expect(radio, `saved card ${tokenId} not offered`).toHaveCount(1);
+		await radio.check({ force: true });
 	}
 }

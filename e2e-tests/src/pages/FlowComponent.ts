@@ -36,6 +36,24 @@ export class FlowComponent {
 		await this.type('card-cvv', card.cvv);
 	}
 
+	/** Type card details without asserting they stick - for invalid-input tests. */
+	async fillCardUnchecked(card: Card): Promise<void> {
+		await this.waitUntilReady();
+		if ((await this.page.locator('iframe[name^="cardholder-name__"]').count()) > 0) {
+			await this.type('cardholder-name', card.name);
+		}
+		for (const [testId, value] of [
+			['card-number', card.number],
+			['card-expiry-date', card.expiry.replace('/', '')],
+			['card-cvv', card.cvv],
+		] as const) {
+			const input = this.field(testId).getByTestId(testId);
+			await expect(input, `Flow field "${testId}" not rendered`).toBeVisible();
+			// pressSequentially focuses the field itself; a click would wait for Flow's iframe to stop resizing.
+			await input.pressSequentially(value, { delay: 25 });
+		}
+	}
+
 	/**
 	 * Fails if the component was rebuilt after the card was typed (a rebuilt component has
 	 * empty fields and a new payment session) - catches the update_checkout race.
@@ -48,7 +66,7 @@ export class FlowComponent {
 	private async type(testId: string, value: string): Promise<void> {
 		const input = this.field(testId).getByTestId(testId);
 		await expect(input, `Flow field "${testId}" not rendered`).toBeVisible();
-		await input.click();
+		// pressSequentially focuses the field itself; a click would wait for Flow's iframe to stop resizing.
 		await input.pressSequentially(value, { delay: 25 });
 		await expect(input, `Flow field "${testId}" is empty after typing`).not.toHaveValue('');
 	}
