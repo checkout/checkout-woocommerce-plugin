@@ -57,14 +57,11 @@ own verification authorises it.
 
 ### Known bugs (tests marked `test.fail`)
 
-These tests describe the correct behaviour and are expected to fail until the bug is fixed;
-Playwright reports them green while they fail and red the moment they start passing — then
-remove the `test.fail()` line.
-
-| Test | Bug |
-|---|---|
-| refunds › a refund created in code refunds the requested amount | `refund_payment()` reads `$_POST['refund_amount']`, not the `$amount` WooCommerce passes. |
-| webhooks › late payment_approved does not reopen a cancelled order | `authorize_payment` only guards processing/completed. Also seen live: a real `payment_approved` arriving after a void reopened the order. |
+A test that describes correct behaviour for a known, not-yet-fixed bug is marked `test.fail()`.
+Playwright reports it green while it fails and red the moment it starts passing - then remove
+the `test.fail()` line. There are currently **none**: the bugs found while building the suite
+(saved-card payment id, webhook order lookup, late approval reopening cancelled orders,
+programmatic refund amount) are fixed on `fix/payment-verification`.
 
 `security › a saved card can only be used by the customer who owns it` is `test.fixme`: its
 WP-CLI call could not run in the session that wrote it. Run it from a normal terminal and

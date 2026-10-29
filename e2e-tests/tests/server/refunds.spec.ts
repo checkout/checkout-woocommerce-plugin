@@ -38,9 +38,7 @@ test.describe('Refunds from WooCommerce admin', () => {
 	});
 
 	test('a refund created in code (REST/programmatic) refunds the requested amount', async ({ request }) => {
-		// KNOWN BUG: refund_payment() reads $_POST['refund_amount'] instead of the $amount
-		// WooCommerce passes, so refunds started outside the admin screen send the wrong amount.
-		test.fail(true, 'Programmatic refunds ignore the requested amount (reads $_POST["refund_amount"])');
+		// Regression: refund_payment() used to read only $_POST['refund_amount'] (admin screen).
 		const { order, payment } = await createPaidOrder(request, { capture: true });
 		await waitForCkoStatus(payment.id, ['Captured']);
 
@@ -50,6 +48,7 @@ test.describe('Refunds from WooCommerce admin', () => {
 		`);
 		expect(result.ok, result.error).toBe(true);
 		await waitForCkoStatus(payment.id, ['Partially Refunded'], 30_000);
+		expect(orderRefunds(order.id).map(Number), 'WooCommerce recorded the requested amount').toEqual([3]);
 	});
 });
 
