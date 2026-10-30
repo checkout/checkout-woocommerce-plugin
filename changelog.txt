@@ -1,12 +1,19 @@
 *** Checkout.com Payment Gateway Changelog ***
 
-2026-10-29 - version 5.1.5
-* Fix - Security: important hardening of payment verification, webhook handling and checkout endpoints. Updating is strongly recommended. (Security release for stores that cannot yet run 5.2.0 / PHP 8.1.)
+2026-10-29 - version 5.2.0
+* Update - checkout-sdk-php upgraded from 3.2.8 to 6.7.0; requires PHP 8.1+. Guzzle/PSR packages are namespace-scoped with the SDK.
+* Update - All accounts are NAS: removed the Account Type setting and the ABC ("previous") SDK path and dead ABC code.
+* Remove - Removed the deprecated standalone SEPA gateway and its checkout templates (SEPA is offered through Flow).
+* Add - Client ID setting; the merchant-specific API subdomain (MSSD) is derived from it. Blank/invalid keeps the global domain.
+* Add - Optional Processing Channel ID setting, sent on SDK requests and on Flow payment sessions.
+* Add - Mastercard Transaction Link Identifier (TLID): captured from the first payment and sent on merchant-initiated recurring payments.
+* Add - Flow sets data-cko-flow-ready on #flow-container when the component is ready (used by automated UI tests).
+* Fix - Security: important hardening of payment verification, webhook handling and checkout endpoints. Updating is strongly recommended.
 * Fix - Saved-card Flow payments without a 3DS challenge lost _cko_payment_id/transaction id (order reloaded before save): orders stayed on-hold and admin refunds failed.
 * Fix - Refunds use the amount passed to process_refund() (REST/programmatic refunds previously read only the admin form field).
-* Fix - Order lookups no longer use meta_query (ignored on WooCommerce's legacy posts storage), so the 3DS return always resolves the shopper's own order.
 * Fix - Webhook handlers no longer fatal when the event's id differs from the resolved order's id.
-* Fix - Performance: flow_enabled() only writes gateway settings when an enabled flag changes. cko_update_raw_option() can now be overridden.
+* Fix - Performance: flow_enabled() only writes gateway settings when an enabled flag changes (previously two writes and an alloptions flush per gateway load). cko_update_raw_option() can now be overridden.
+* Fix - Client ID / Processing Channel ID values now persist when saved from the quick-settings fields.
 * Fix - Refunds: refund webhooks are de-duplicated (per refund action id), so a repeated delivery or an admin-initiated refund is not booked twice and the order is not over-refunded.
 * Fix - The plugin no longer offers a payment method, or reports "Active", before the API keys are configured.
 * Fix - The plugin no longer forces account creation at checkout; the store's Accounts & Privacy setting is respected.
@@ -15,7 +22,7 @@
 * Fix - Declared cart_checkout_blocks compatibility and set realistic minimum PHP/WordPress/WooCommerce versions in the plugin header.
 * Fix - Packaging: the unused WP-CLI bundle is no longer included in the distributed plugin zip.
 * Tweak - The Secret Key is masked in the settings screen; leave it blank to keep the saved key.
-* Dev - wp-cli bundle moved to require-dev; Guzzle/PSR packages namespace-scoped with the SDK; production autoloader regenerated.
+* Dev - wp-cli bundle moved to require-dev; production autoloader regenerated.
 
 2026-09-14 - version 5.1.4.4
 * Fix - Security: closed a payment/order-confusion issue in the Flow webhook path where a legitimately-signed capture for a low-value payment could advance a separate, unrelated (higher-value) order to a fulfilment status. Webhooks now require the resolved order to actually own the payment (by payment id, payment-session id, or a tracked attempt) before mutating it; the Checkout.com reference is set server-side from the order the amount is derived from; and a capture only advances the order when the captured amount and currency exactly match the order total (underpayments are held on-hold, with a cko_flow_allow_partial_capture_fulfilment filter to opt in).

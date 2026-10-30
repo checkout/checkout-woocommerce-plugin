@@ -406,7 +406,7 @@ class Uri implements UriInterface, \JsonSerializable
     private static function stringifyQueryValue($value): string
     {
         if (!is_string($value)) {
-            checkoutcomwc_vendor_trigger_deprecation(
+            \trigger_deprecation(
                 'guzzlehttp/psr7',
                 '2.12',
                 'Passing %s to Uri::withQueryValues() is deprecated; cast it to a string. guzzlehttp/psr7 3.0 will only accept string or null query values.',
@@ -580,7 +580,7 @@ class Uri implements UriInterface, \JsonSerializable
     public function withPort($port): UriInterface
     {
         if ($port !== null && !\is_int($port)) {
-            checkoutcomwc_vendor_trigger_deprecation(
+            \trigger_deprecation(
                 'guzzlehttp/psr7',
                 '2.11',
                 'Passing %s to UriInterface::withPort() is deprecated; guzzlehttp/psr7 3.0 requires int|null.',
@@ -699,7 +699,7 @@ class Uri implements UriInterface, \JsonSerializable
         $scheme = Utils::asciiToLower($scheme);
 
         if ($scheme !== '' && !preg_match('/^[a-z][a-z0-9.+-]*$/D', $scheme)) {
-            checkoutcomwc_vendor_trigger_deprecation(
+            \trigger_deprecation(
                 'guzzlehttp/psr7',
                 '2.11',
                 'Passing "%s" as a URI scheme is deprecated; guzzlehttp/psr7 3.0 requires URI schemes to match RFC 3986 syntax and begin with a letter.',

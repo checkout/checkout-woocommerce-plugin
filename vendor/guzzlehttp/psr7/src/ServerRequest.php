@@ -186,7 +186,7 @@ class ServerRequest extends Request implements ServerRequestInterface
      */
     private static function getAllHeaders(): array
     {
-        return self::normalizeHeaderValues(checkoutcomwc_vendor_getallheaders());
+        return self::normalizeHeaderValues(getallheaders());
     }
 
     /**
@@ -327,7 +327,7 @@ class ServerRequest extends Request implements ServerRequestInterface
         }
 
         if ($invalidUploadedFileFound) {
-            checkoutcomwc_vendor_trigger_deprecation(
+            \trigger_deprecation(
                 'guzzlehttp/psr7',
                 '2.11',
                 'Passing %s inside ServerRequestInterface::withUploadedFiles() is deprecated; guzzlehttp/psr7 3.0 requires an UploadedFileInterface[] tree.',
@@ -378,7 +378,7 @@ class ServerRequest extends Request implements ServerRequestInterface
     public function withParsedBody($data): ServerRequestInterface
     {
         if ($data !== null && !\is_array($data) && !\is_object($data)) {
-            checkoutcomwc_vendor_trigger_deprecation(
+            \trigger_deprecation(
                 'guzzlehttp/psr7',
                 '2.11',
                 'Passing %s to ServerRequestInterface::withParsedBody() is deprecated; guzzlehttp/psr7 3.0 requires array|object|null.',
@@ -403,7 +403,7 @@ class ServerRequest extends Request implements ServerRequestInterface
     public function getAttribute($attribute, $default = null)
     {
         if (!\is_string($attribute)) {
-            checkoutcomwc_vendor_trigger_deprecation(
+            \trigger_deprecation(
                 'guzzlehttp/psr7',
                 '2.11',
                 'Passing %s to ServerRequestInterface::getAttribute() is deprecated; guzzlehttp/psr7 3.0 requires string for $attribute.',
@@ -421,7 +421,7 @@ class ServerRequest extends Request implements ServerRequestInterface
     public function withAttribute($attribute, $value): ServerRequestInterface
     {
         if (!\is_string($attribute)) {
-            checkoutcomwc_vendor_trigger_deprecation(
+            \trigger_deprecation(
                 'guzzlehttp/psr7',
                 '2.11',
                 'Passing %s to ServerRequestInterface::withAttribute() is deprecated; guzzlehttp/psr7 3.0 requires string for $attribute.',
@@ -438,7 +438,7 @@ class ServerRequest extends Request implements ServerRequestInterface
     public function withoutAttribute($attribute): ServerRequestInterface
     {
         if (!\is_string($attribute)) {
-            checkoutcomwc_vendor_trigger_deprecation(
+            \trigger_deprecation(
                 'guzzlehttp/psr7',
                 '2.11',
                 'Passing %s to ServerRequestInterface::withoutAttribute() is deprecated; guzzlehttp/psr7 3.0 requires string for $attribute.',

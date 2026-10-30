@@ -35,7 +35,7 @@ trait MessageTrait
     public function withProtocolVersion($version): MessageInterface
     {
         if (!\is_string($version)) {
-            checkoutcomwc_vendor_trigger_deprecation(
+            \trigger_deprecation(
                 'guzzlehttp/psr7',
                 '2.11',
                 'Passing %s to MessageInterface::withProtocolVersion() is deprecated; guzzlehttp/psr7 3.0 requires string.',
@@ -92,7 +92,7 @@ trait MessageTrait
         $values = \is_array($value) ? $value : [$value];
         foreach ($values as $item) {
             if (!\is_string($item) && (\is_scalar($item) || $item === null)) {
-                checkoutcomwc_vendor_trigger_deprecation(
+                \trigger_deprecation(
                     'guzzlehttp/psr7',
                     '2.11',
                     'Passing %s to MessageInterface::withHeader() is deprecated; guzzlehttp/psr7 3.0 requires string|string[].',
@@ -124,7 +124,7 @@ trait MessageTrait
         $values = \is_array($value) ? $value : [$value];
         foreach ($values as $item) {
             if (!\is_string($item) && (\is_scalar($item) || $item === null)) {
-                checkoutcomwc_vendor_trigger_deprecation(
+                \trigger_deprecation(
                     'guzzlehttp/psr7',
                     '2.11',
                     'Passing %s to MessageInterface::withAddedHeader() is deprecated; guzzlehttp/psr7 3.0 requires string|string[].',
@@ -206,7 +206,7 @@ trait MessageTrait
             $values = \is_array($value) ? $value : [$value];
             foreach ($values as $item) {
                 if (!\is_string($item) && (\is_scalar($item) || $item === null)) {
-                    checkoutcomwc_vendor_trigger_deprecation(
+                    \trigger_deprecation(
                         'guzzlehttp/psr7',
                         '2.11',
                         'Passing %s to %s::__construct() is deprecated; guzzlehttp/psr7 3.0 requires string|string[].',
@@ -237,7 +237,7 @@ trait MessageTrait
     private function normalizeHeaderValue($value): array
     {
         if (is_array($value) && $value === []) {
-            checkoutcomwc_vendor_trigger_deprecation(
+            \trigger_deprecation(
                 'guzzlehttp/psr7',
                 '2.11',
                 'Passing an empty array as a header value is deprecated; guzzlehttp/psr7 3.0 rejects empty header value arrays.'

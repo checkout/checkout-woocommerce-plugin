@@ -7,12 +7,12 @@
  * Author URI: https://www.checkout.com/
  * Developer: Checkout.com
  * Developer URI: https://www.checkout.com/
- * Version: 5.1.5
+ * Version: 5.2.0
  * Requires at least: 6.0
  * Tested up to: 7.1
  * WC requires at least: 8.0
  * WC tested up to: 11.2
- * Requires PHP: 7.4
+ * Requires PHP: 8.1
  * Requires Plugins: woocommerce
  * Text Domain: checkout-com-unified-payments-api
  * Domain Path: /languages
@@ -340,7 +340,7 @@ add_action( 'woocommerce_new_order', 'cko_update_order_id_in_session', 5 );
  * Constants.
  */
 // NOSONAR (S1313): "5.1.3.7" is the plugin version (WordPress semver-style), not a hardcoded IP address.
-define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '5.1.5' ); // NOSONAR
+define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '5.2.0' ); // NOSONAR
 define( 'WC_CHECKOUTCOM_PLUGIN_URL', untrailingslashit( plugins_url( basename( plugin_dir_path( __FILE__ ) ), basename( __FILE__ ) ) ) );
 define( 'WC_CHECKOUTCOM_PLUGIN_PATH', untrailingslashit( plugin_dir_path( __FILE__ ) ) );
 
@@ -780,6 +780,11 @@ function cko_get_selected_apms_class() {
 
 		// Get apm selected and add the class name in array.
 		foreach ( $apm_selected as $value ) {
+			// The legacy standalone SEPA APM has been removed (SEPA is offered via Flow).
+			// Skip any stale saved selection so we never register a missing gateway class.
+			if ( 'sepa' === strtolower( $value ) ) {
+				continue;
+			}
 			$selected_apms_class[] = 'WC_Gateway_Checkout_Com_Alternative_Payments' . '_' . $value;
 		}
 	}
@@ -1928,19 +1933,41 @@ function cko_gateway_icon( $icons, $id ) {
 }
 
 /**
+ * Derive the Checkout.com merchant-specific subdomain (MSSD) from a Client ID.
+ *
+ * Accepts a full Client ID (cli_xxxxxxxx...) or a bare subdomain, normalises case
+ * and whitespace, and returns the first 8 chars after the "cli_" prefix. Returns an
+ * empty string when blank or when the result is not a valid subdomain (so callers
+ * can fall back to the global domain instead of breaking).
+ *
+ * @param string $client_id The configured Client ID (or subdomain).
+ *
+ * @return string The subdomain, or '' when none/invalid.
+ */
+function cko_mssd_subdomain_from_client_id( $client_id ) {
+	$client_id = strtolower( trim( (string) $client_id ) );
+	if ( '' === $client_id ) {
+		return '';
+	}
+	$raw       = ( 0 === strpos( $client_id, 'cli_' ) ) ? substr( $client_id, 4 ) : $client_id;
+	$candidate = substr( $raw, 0, 8 );
+
+	return preg_match( '/^(?:pl-)?[a-z0-9]+$/', $candidate ) ? $candidate : '';
+}
+
+/**
  * Check if account is NAS.
  *
  * @return bool
  */
 function cko_is_nas_account() {
-
-	$core_settings = cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' );
-
-	return isset( $core_settings['ckocom_account_type'] ) && ( 'NAS' === $core_settings['ckocom_account_type'] );
+	// All Checkout.com accounts are NAS. The legacy ABC account type and its
+	// selector have been removed, so this is always true. Retained as a function
+	// so existing call sites keep working without a sweeping refactor.
+	return true;
 }
 
 add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_cards', 'cko_subscription_payment', 10, 2 );
-add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_alternative_payments_sepa', 'cko_subscription_payment', 10, 2 );
 add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_google_pay', 'cko_subscription_payment', 10, 2 );
 add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_apple_pay', 'cko_subscription_payment', 10, 2 );
 add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_paypal', 'cko_subscription_payment', 10, 2 );

@@ -50,11 +50,6 @@ class StreamHandler
     ];
 
     /**
-     * @var array
-     */
-    private $lastHeaders = [];
-
-    /**
      * @var string
      */
     private $transportSharingMode;
@@ -86,7 +81,7 @@ class StreamHandler
     {
         foreach ($options as $name => $_) {
             if (!isset(self::KNOWN_CONSTRUCTOR_OPTIONS[$name])) {
-                checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.14', \sprintf('The "%s" StreamHandler constructor option is unknown; guzzlehttp/guzzle 8.0 will reject unknown constructor options.', (string) $name));
+                \trigger_deprecation('guzzlehttp/guzzle', '7.14', \sprintf('The "%s" StreamHandler constructor option is unknown; guzzlehttp/guzzle 8.0 will reject unknown constructor options.', (string) $name));
             }
         }
 
@@ -148,7 +143,7 @@ class StreamHandler
         $protocolVersion = $request->getProtocolVersion();
 
         if ('' === $protocolVersion) {
-            checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.11', 'Sending a request with an empty protocol version is deprecated; guzzlehttp/guzzle 8.0 will reject empty protocol versions.');
+            \trigger_deprecation('guzzlehttp/guzzle', '7.11', 'Sending a request with an empty protocol version is deprecated; guzzlehttp/guzzle 8.0 will reject empty protocol versions.');
 
             $protocolVersion = '1.1';
             $request = Psr7\Utils::modifyRequest($request, ['version' => $protocolVersion]);
@@ -179,10 +174,14 @@ class StreamHandler
                 $request = $request->withHeader('Content-Length', '0');
             }
 
+            $stream = $this->createStream($request, $options);
+            $headers = \stream_get_meta_data($stream)['wrapper_data'];
+
             return $this->createResponse(
                 $request,
                 $options,
-                $this->createStream($request, $options),
+                $stream,
+                \is_array($headers) ? $headers : [],
                 $startTime
             );
         } catch (\InvalidArgumentException $e) {
@@ -226,11 +225,8 @@ class StreamHandler
     /**
      * @param resource $stream
      */
-    private function createResponse(RequestInterface $request, array $options, $stream, ?float $startTime): PromiseInterface
+    private function createResponse(RequestInterface $request, array $options, $stream, array $hdrs, ?float $startTime): PromiseInterface
     {
-        $hdrs = $this->lastHeaders;
-        $this->lastHeaders = [];
-
         try {
             [$ver, $status, $reason, $headers] = HeaderProcessor::parseHeaders($hdrs);
         } catch (\Throwable $e) {
@@ -502,13 +498,6 @@ class StreamHandler
             function () use ($uri, $contextResource, $context, $options, $request) {
                 $resource = @\fopen((string) $uri, 'r', false, $contextResource);
 
-                // See https://wiki.php.net/rfc/deprecations_php_8_5#deprecate_the_http_response_header_predefined_variable
-                if (function_exists('http_get_last_response_headers')) {
-                    $http_response_header = \http_get_last_response_headers();
-                }
-
-                $this->lastHeaders = $http_response_header ?? [];
-
                 if (false === $resource) {
                     throw new ConnectException(sprintf('Connection refused for URI %s', Psr7\Utils::redactUserInfo($uri)), $request, null, $context);
                 }
@@ -530,6 +519,18 @@ class StreamHandler
         $uri = $request->getUri();
 
         $host = $uri->getHost();
+
+        // Fold a numeric IPv4 spelling to the dotted quad libcurl connects
+        // to, rather than leaving it to the platform resolver: macOS reads
+        // the zero-padded 0177 as decimal 177 where glibc, musl and FreeBSD
+        // read octal 127. The Host header is serialized from the request and
+        // stays as written; the TLS peer name follows the same fold.
+        $canonicalHost = self::canonicalConnectionHost($host);
+        if ($canonicalHost !== $host) {
+            $uri = $uri->withHost($canonicalHost);
+            $host = $canonicalHost;
+        }
+
         $hostForIpCheck = $host !== '' && $host[0] === '[' && \substr($host, -1) === ']'
             ? \substr($host, 1, -1)
             : $host;
@@ -553,6 +554,97 @@ class StreamHandler
         }
 
         return $uri;
+    }
+
+    /**
+     * Returns a numeric IPv4 spelling folded to the dotted quad libcurl's
+     * ipv4_normalize() produces, and every other host unchanged.
+     */
+    private static function canonicalConnectionHost(string $host): string
+    {
+        $binary = self::numericIpv4ToBinary($host);
+        if ($binary === null) {
+            return $host;
+        }
+
+        return (string) \inet_ntop($binary);
+    }
+
+    /**
+     * Returns the four-byte binary form of a host that a transport reads as a
+     * numeric IPv4 address, or null when it reads it as a name.
+     *
+     * The shape test is HostValidator::isNumericIpv4Host(); this method adds
+     * the range checks that predicate omits: every part but the last must fit
+     * one octet, and the last must fit the octets the earlier parts left. A
+     * trailing root dot is not swallowed, unlike libcurl 8.21.0 and later,
+     * because assertRequestHost() rejects that spelling first.
+     */
+    private static function numericIpv4ToBinary(string $host): ?string
+    {
+        if (!HostValidator::isNumericIpv4Host($host)) {
+            return null;
+        }
+
+        $values = [];
+        foreach (\explode('.', $host) as $part) {
+            $values[] = self::numericIpv4PartValue($part);
+        }
+
+        // Every accepted value is a whole number no larger than 0xFFFFFFFF,
+        // which a float holds exactly, so the arithmetic below is correct on a
+        // 32-bit build too, where the widest part overflows an integer.
+        $address = (float) \array_pop($values);
+
+        $packed = '';
+        foreach ($values as $value) {
+            if ($value > 255.0) {
+                return null;
+            }
+
+            $packed .= \chr((int) $value);
+        }
+
+        $width = 4 - \count($values);
+        if ($address >= 256.0 ** $width) {
+            return null;
+        }
+
+        for ($shift = $width - 1; $shift >= 0; --$shift) {
+            $packed .= \chr((int) \fmod(\floor($address / 256.0 ** $shift), 256.0));
+        }
+
+        return $packed;
+    }
+
+    /**
+     * Returns the value of one accepted part as a float, so a part filling
+     * all four octets such as 2130706433 stays exact on every integer width.
+     */
+    private static function numericIpv4PartValue(string $part): float
+    {
+        if ($part[0] === '0' && isset($part[1]) && ($part[1] === 'x' || $part[1] === 'X')) {
+            return self::digitsValue((string) \substr($part, 2), 16);
+        }
+
+        if ($part[0] === '0') {
+            return self::digitsValue($part, 8);
+        }
+
+        return (float) $part;
+    }
+
+    private static function digitsValue(string $digits, int $base): float
+    {
+        $value = 0.0;
+        foreach (\str_split($digits) as $digit) {
+            $value = $value * $base + \hexdec($digit);
+            if ($value > 0xFFFFFFFF) {
+                break;
+            }
+        }
+
+        return $value;
     }
 
     private function getDefaultContext(RequestInterface $request): array
@@ -584,7 +676,7 @@ class StreamHandler
                 'follow_location' => 0,
             ],
             'ssl' => [
-                'peer_name' => $request->getUri()->getHost(),
+                'peer_name' => self::canonicalConnectionHost($request->getUri()->getHost()),
             ],
         ];
 
@@ -611,11 +703,11 @@ class StreamHandler
             && $options['curl'] !== []
             && !self::isCurlOptionGeneratedByAuth($options)
         ) {
-            checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.11', 'Passing the "curl" request option to the stream handler is deprecated; guzzlehttp/guzzle 8.0 will reject this option because the stream handler ignores cURL options.');
+            \trigger_deprecation('guzzlehttp/guzzle', '7.11', 'Passing the "curl" request option to the stream handler is deprecated; guzzlehttp/guzzle 8.0 will reject this option because the stream handler ignores cURL options.');
         }
 
         if (\array_key_exists('expect', $options) && $options['expect'] !== false && $request->hasHeader('Expect')) {
-            checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.11', 'Passing the "expect" request option to the stream handler is deprecated when it adds an Expect header; guzzlehttp/guzzle 8.0 will reject this option because the stream handler does not support Expect: 100-Continue.');
+            \trigger_deprecation('guzzlehttp/guzzle', '7.11', 'Passing the "expect" request option to the stream handler is deprecated when it adds an Expect header; guzzlehttp/guzzle 8.0 will reject this option because the stream handler does not support Expect: 100-Continue.');
         }
     }
 
@@ -633,7 +725,7 @@ class StreamHandler
                     continue;
                 }
 
-                checkoutcomwc_vendor_trigger_deprecation(
+                \trigger_deprecation(
                     'guzzlehttp/guzzle',
                     '7.12',
                     \sprintf(
@@ -654,7 +746,7 @@ class StreamHandler
             return;
         }
 
-        checkoutcomwc_vendor_trigger_deprecation(
+        \trigger_deprecation(
             'guzzlehttp/guzzle',
             '7.12',
             \sprintf(

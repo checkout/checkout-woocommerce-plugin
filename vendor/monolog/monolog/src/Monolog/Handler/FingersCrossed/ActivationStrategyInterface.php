@@ -11,19 +11,17 @@
 
 namespace CheckoutComWC\Vendor\Monolog\Handler\FingersCrossed;
 
+use CheckoutComWC\Vendor\Monolog\LogRecord;
+
 /**
  * Interface for activation strategies for the FingersCrossedHandler.
  *
  * @author Johannes M. Schmitt <schmittjoh@gmail.com>
- *
- * @phpstan-import-type Record from \CheckoutComWC\Vendor\Monolog\Logger
  */
 interface ActivationStrategyInterface
 {
     /**
      * Returns whether the given record activates the handler.
-     *
-     * @phpstan-param Record $record
      */
-    public function isHandlerActivated(array $record): bool;
+    public function isHandlerActivated(LogRecord $record): bool;
 }

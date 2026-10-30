@@ -183,7 +183,7 @@ class CurlMultiHandler
     {
         foreach ($options as $name => $_) {
             if (!isset(self::KNOWN_CONSTRUCTOR_OPTIONS[$name])) {
-                checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.14', \sprintf('The "%s" CurlMultiHandler constructor option is unknown; guzzlehttp/guzzle 8.0 will reject unknown constructor options.', (string) $name));
+                \trigger_deprecation('guzzlehttp/guzzle', '7.14', \sprintf('The "%s" CurlMultiHandler constructor option is unknown; guzzlehttp/guzzle 8.0 will reject unknown constructor options.', (string) $name));
             }
         }
 
@@ -225,17 +225,17 @@ class CurlMultiHandler
         if (isset($options['select_timeout'])) {
             $selectTimeout = $options['select_timeout'];
             if (!\is_int($selectTimeout) && !\is_float($selectTimeout) && (!\is_string($selectTimeout) || !\is_numeric($selectTimeout))) {
-                checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.14', 'Passing a non-numeric "select_timeout" CurlMultiHandler option is deprecated; guzzlehttp/guzzle 8.0 will reject it.');
+                \trigger_deprecation('guzzlehttp/guzzle', '7.14', 'Passing a non-numeric "select_timeout" CurlMultiHandler option is deprecated; guzzlehttp/guzzle 8.0 will reject it.');
             } else {
                 $seconds = (float) $selectTimeout;
                 if (!\is_finite($seconds) || $seconds < 0 || ($seconds > 0 && (int) ($seconds * 1000) === 0)) {
-                    checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.14', 'Passing a "select_timeout" CurlMultiHandler option that is not 0 or greater than or equal to 0.001 seconds is deprecated; guzzlehttp/guzzle 8.0 will reject it.');
+                    \trigger_deprecation('guzzlehttp/guzzle', '7.14', 'Passing a "select_timeout" CurlMultiHandler option that is not 0 or greater than or equal to 0.001 seconds is deprecated; guzzlehttp/guzzle 8.0 will reject it.');
                 }
             }
 
             $this->selectTimeout = $selectTimeout;
         } elseif ($selectTimeout = Utils::getenv('GUZZLE_CURL_SELECT_TIMEOUT')) {
-            checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.2', 'The GUZZLE_CURL_SELECT_TIMEOUT environment variable is deprecated; use the "select_timeout" option instead.');
+            \trigger_deprecation('guzzlehttp/guzzle', '7.2', 'The GUZZLE_CURL_SELECT_TIMEOUT environment variable is deprecated; use the "select_timeout" option instead.');
             $this->selectTimeout = (int) $selectTimeout;
         } else {
             $this->selectTimeout = 1;
@@ -378,18 +378,38 @@ class CurlMultiHandler
 
         $waitToken = new \stdClass();
 
+        $promise = null;
         $promise = new Promise(
-            function () use ($id, $waitToken): void {
-                if ($this->multiExecDepth > 0) {
-                    // Waiting cannot drive native cURL while a callback has
-                    // the multi handle busy; fail the wait promptly instead
-                    // of self-deadlocking.
-                    $this->failNestedWait($id, $waitToken);
+            function () use ($id, $waitToken, $easy, &$promise): void {
+                // Waiting cannot drive native cURL while a callback has the
+                // multi handle busy; fail the wait promptly instead of
+                // self-deadlocking.
+                $idReused = $this->multiExecDepth > 0
+                    ? $this->failNestedWait($id, $waitToken)
+                    : $this->executeUntil($id, $waitToken);
 
+                // Settling can be queued, and guzzlehttp/promises drains the
+                // queue before deciding a wait function achieved nothing.
+                P\Utils::queue()->run();
+
+                // Never null: assigned below before any wait can invoke this.
+                /** @var Promise $promise */
+                if (!P\State::isPending($promise)) {
                     return;
                 }
 
-                $this->executeUntil($id, $waitToken);
+                // Neither path guarantees the transfer settled, and returning
+                // while pending makes guzzlehttp/promises reject with a bare
+                // string naming nothing.
+                $stalled = $idReused
+                    ? 'its native cURL handle ID was reused by another request'
+                    : 'its entry was removed without settling';
+
+                $message = \sprintf('Waiting on cURL multi handler transfer %d cannot make progress (%s).', $id, $stalled);
+
+                // The entry is gone or belongs to another request, so
+                // attribute from this easy handle.
+                $promise->reject(new RequestException($message, $easy->request, $easy->response));
             },
             function () use ($id, $waitToken) {
                 return $this->cancel($id, $waitToken);
@@ -574,7 +594,7 @@ class CurlMultiHandler
         $sinceOverrides = self::conflictingCurlMultiOptionSinceOverrides();
         foreach ($options as $option => $_) {
             if (\array_key_exists($option, $conflictingOptions)) {
-                checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', $sinceOverrides[$option] ?? '7.14', \sprintf('Passing %s in the cURL multi handler "options" is deprecated; guzzlehttp/guzzle 8.0 will reject this option. Use %s instead.', self::formatCurlMultiOption($option), $conflictingOptions[$option]));
+                \trigger_deprecation('guzzlehttp/guzzle', $sinceOverrides[$option] ?? '7.14', \sprintf('Passing %s in the cURL multi handler "options" is deprecated; guzzlehttp/guzzle 8.0 will reject this option. Use %s instead.', self::formatCurlMultiOption($option), $conflictingOptions[$option]));
             }
         }
     }
@@ -924,7 +944,7 @@ class CurlMultiHandler
                         // The promise has already escaped, so reject it
                         // rather than throw.
                         $rejection = $this->discardPendingRequest($id, $entry, $e);
-                        if (P\Is::pending($entry['deferred'])) {
+                        if (P\State::isPending($entry['deferred'])) {
                             $entry['deferred']->reject($rejection);
                         }
                     }
@@ -1086,8 +1106,11 @@ class CurlMultiHandler
      * The native cURL handle ID can be reused by a request created from a
      * completion callback, so the wait token guards against waiting on an
      * unrelated transfer that inherited the ID.
+     *
+     * @return bool Whether another request had reused the native cURL handle
+     *              ID by the time the loop stopped
      */
-    private function executeUntil(int $id, object $waitToken): void
+    private function executeUntil(int $id, object $waitToken): bool
     {
         $queue = P\Utils::queue();
 
@@ -1100,9 +1123,15 @@ class CurlMultiHandler
             $this->tickFor($id, $waitToken);
         }
 
+        // Sample before the drain below, which can add or remove an entry
+        // under this ID and so rewrite the answer.
+        $idReused = isset($this->handles[$id]);
+
         if (!$queue->isEmpty()) {
             $queue->run();
         }
+
+        return $idReused;
     }
 
     /**
@@ -1124,6 +1153,17 @@ class CurlMultiHandler
         $easy = $entry['easy'];
         $id = (int) $easy->handle;
         $entry['attached'] = false;
+
+        $displaced = $this->handles[$id] ?? null;
+        if ($displaced !== null) {
+            // Never silently discard a tracked entry; settle it first.
+            unset($this->handles[$id], $this->delays[$id], $this->deferredAdds[$id]);
+            if (P\State::isPending($displaced['deferred'])) {
+                $message = \sprintf('cURL multi handler transfer %d was displaced by another request that reused its native cURL handle ID.', $id);
+                $displaced['deferred']->reject(new RequestException($message, $displaced['easy']->request, $displaced['easy']->response));
+            }
+        }
+
         $this->handles[$id] = $entry;
 
         if (!empty($easy->options['delay'])) {
@@ -1161,11 +1201,15 @@ class CurlMultiHandler
     /**
      * Fails a synchronous wait attempted from inside a cURL callback, where
      * native execution cannot progress until the callback returns.
+     *
+     * @return bool Whether another request had reused the native cURL handle
+     *              ID, which only matters when no transfer was left to fail
      */
-    private function failNestedWait(int $id, object $token): void
+    private function failNestedWait(int $id, object $token): bool
     {
         if (!$this->hasRequest($id, $token)) {
-            return;
+            // Nothing left to fail, so report which way the entry went.
+            return isset($this->handles[$id]);
         }
 
         $entry = $this->handles[$id];
@@ -1180,6 +1224,8 @@ class CurlMultiHandler
         }
 
         $entry['deferred']->reject($failure);
+
+        return false;
     }
 
     /**
@@ -1210,7 +1256,7 @@ class CurlMultiHandler
                 // throw. User code may have settled it directly; a settled
                 // promise must not abort the rest of the snapshot.
                 $rejection = $this->discardPendingRequest($id, $entry, $e);
-                if (P\Is::pending($entry['deferred'])) {
+                if (P\State::isPending($entry['deferred'])) {
                     $entry['deferred']->reject($rejection);
                 }
             }
@@ -1229,7 +1275,7 @@ class CurlMultiHandler
     private function cancel($id, ?object $waitToken = null): bool
     {
         if (!is_int($id)) {
-            checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.4', 'Not passing an int to %s::%s() is deprecated and will cause an error in 8.0.', __CLASS__, __FUNCTION__);
+            \trigger_deprecation('guzzlehttp/guzzle', '7.4', 'Not passing an int to %s::%s() is deprecated and will cause an error in 8.0.', __CLASS__, __FUNCTION__);
         }
 
         // Cannot cancel if it has been processed or replaced by a request
@@ -1349,14 +1395,14 @@ class CurlMultiHandler
                 try {
                     $result = CurlFactory::finish($this, $entry['easy'], $this->factory);
                 } catch (\Throwable $e) {
-                    if (P\Is::pending($entry['deferred'])) {
+                    if (P\State::isPending($entry['deferred'])) {
                         $entry['deferred']->reject($e);
                     }
 
                     continue;
                 }
 
-                if (P\Is::pending($entry['deferred'])) {
+                if (P\State::isPending($entry['deferred'])) {
                     $entry['deferred']->resolve($result);
                 }
             }

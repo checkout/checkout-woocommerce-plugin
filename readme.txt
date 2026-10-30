@@ -2,8 +2,8 @@
 Contributors: checkoutintegration
 Tags: payments, credit card, payment gateway, apple pay, google pay
 Requires at least: 6.0
-Stable tag: 5.1.5
-Requires PHP: 7.4
+Stable tag: 5.2.0
+Requires PHP: 8.1
 Tested up to: 7.1
 WC requires at least: 8.0
 WC tested up to: 11.2
@@ -34,7 +34,7 @@ FLOW features include:
 
 = Alternative Payments =
 
-Users can place orders with alternative and local payment options: Alipay (China & Hong Kong), Alma, Bancontact, Benefit, Dana, EPS, GCash, Ideal, Kakaopay, Klarna, KNet, MBWay, Multibanco, P24 (Przelewy24), QPay, SEPA (WooCommerce subscription compatible), STCPay, Tabby, Tamara, TNG, TrueMoney.
+Users can place orders with alternative and local payment options: Alipay (China & Hong Kong), Alma, Bancontact, Benefit, Dana, EPS, GCash, Ideal, Kakaopay, Klarna, KNet, MBWay, Multibanco, P24 (Przelewy24), QPay, STCPay, Tabby, Tamara, TNG, TrueMoney.
 
 = Digital Wallets =
 * **Google Pay** - Fast, secure checkout with one tap
@@ -48,7 +48,7 @@ Users can place orders with PayPal, Google Pay, and Apple Pay Express checkout o
 = Additional Features =
 
 * **MOTO Payments** - Process Mail Order/Telephone Order payments
-* **Recurring Payments** - Full support for subscriptions with SEPA Direct Debit compatibility
+* **Recurring Payments** - Full support for WooCommerce Subscriptions
 * **Saved Cards** - With FLOW integration, saved cards enable instant checkout for faster payments
 * **WooCommerce Invoicing** - Send invoice emails to customers for payment
 
@@ -159,9 +159,6 @@ To learn more about our pricing, visit https://www.checkout.com/pricing
 
 **Currencies**  - [150+ transaction currencies](https://docs.checkout.com/resources/codes/currency-codes) are supported in the integration
 
-= Does SEPA support recurring payments like for subscription? =
-Yes
-
 = How do I contact the Payment Provider’s Support? =
 support@checkout.com
 
@@ -172,18 +169,26 @@ support@checkout.com
 2. Search for "Checkout.com Payment Gateway"
 3. Click on Install Now
 4. Click on Activate
-5. Click on Settings to configure the module
-6. Configure the webhook url in your checkout hub account.
+5. Click on Settings to configure the module (requires PHP 8.1 or newer)
 
-**Webhook URL:**
-http://example.com/?wc-api=wc_checkoutcom_webhook
+**Configuration (WooCommerce > Settings > Payments > Checkout.com)**
+* **Checkout Mode** - Flow (recommended).
+* **Environment** - Sandbox for testing, Live for real payments.
+* **Secret Key** and **Public Key** - from the Checkout.com Hub. The secret key is masked after saving; leave it blank to keep the saved key.
+* **Client ID** (optional, recommended) - your Client ID from the Hub (for example `cli_xxxxxxxxxxxxxxxxxxxxxxxxxx`). API calls are then sent to your account's own Checkout.com address (merchant-specific subdomain). Leave blank to use the global address.
+* **Processing Channel ID** (optional) - your processing channel ID (`pc_xxx`). Required if your Checkout.com account has more than one processing channel, or if payments fail with "processing_channel_id_required".
+* **Webhook** - under Webhook Status, click **Register Webhook**. The plugin registers this URL with Checkout.com for you:
+  `https://example.com/?wc-api=wc_checkoutcom_webhook`
+
+All Checkout.com accounts use the current platform; there is no Account Type setting.
 
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
-v5.1.5 29th October 2026
-Important
-- This is a security release for stores that cannot yet run version 5.2.0 (which requires PHP 8.1). Updating is strongly recommended.
+v5.2.0 29th October 2026
+Important - please read before updating
+- Requires PHP 8.1 or newer (the bundled Checkout.com PHP SDK is now version 6).
+- All Checkout.com accounts now use the current platform: the "Account Type" setting and the legacy (ABC) integration have been removed.
 - If you ran version 5.1.4 with database error logging enabled, your Checkout.com secret key may have been written to your server's PHP error log. Please rotate your secret key in the Checkout.com dashboard and remove or restrict access to old logs. (The cause was fixed in 5.1.4.1.)
 
 Security
@@ -192,7 +197,6 @@ Security
 Fixes
 - Saved-card payments that did not need 3D Secure now keep their payment reference, so the order moves to Processing when the payment is captured and can be refunded from the order screen.
 - Refunds created through the WooCommerce REST API or by other plugins now refund the requested amount.
-- Stores using WooCommerce's older (non-HPOS) order storage: a returning payment is always applied to the shopper's own order.
 - Fixed an error when Checkout.com sends a notification for an order that does not exist in this store.
 - Improved performance: the plugin no longer re-saves its settings on every page load.
 - Refund notifications are de-duplicated, so a refund is never booked twice.
@@ -201,8 +205,13 @@ Fixes
 - High-Performance Order Storage (HPOS): order lookups use the WooCommerce order API so they work with HPOS enabled.
 - The secret key is masked in the settings screen; leave it blank to keep the saved key.
 
+New
+- Client ID setting: requests are sent to your account's own Checkout.com address (merchant-specific subdomain).
+- Optional Processing Channel ID setting, now also used for Flow payments.
+- Mastercard Transaction Link Identifier (TLID) support for recurring payments.
+
 Maintenance
-- Requires PHP 7.4+, WordPress 6.0+ and WooCommerce 8.0+. Declared block checkout compatibility.
+- Declared block checkout compatibility and updated the minimum PHP/WordPress/WooCommerce versions.
 - Removed the unused WP-CLI bundle from the distributed package.
 
 v5.1.4.4 14th September 2026
@@ -616,8 +625,8 @@ v4.0.0 3 Sep 2019
 · Checkout.com Woocommerce module for the Unified Payments API
 
 == Upgrade Notice ==
-= 5.1.5 =
-Important security update - updating is strongly recommended. For stores that cannot yet run 5.2.0 (PHP 8.1).
+= 5.2.0 =
+Important security update - updating is strongly recommended. Requires PHP 8.1 or newer. The Account Type setting has been removed (all accounts use the current Checkout.com platform). New optional Client ID and Processing Channel ID settings.
 
 = 4.1.16 =
 4.1.16 - Bug Fix - Removed saved card checkbox for guest users

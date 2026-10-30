@@ -535,6 +535,21 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 			$settings['flow_no_billing_address'] = ( isset( $_POST['woocommerce_wc_checkout_com_cards_settings']['flow_no_billing_address'] )
 				|| isset( $_POST['flow_no_billing_address'] ) ) ? 'yes' : 'no';
 
+			// Manually persist the optional Client ID and Processing Channel ID
+			// text fields (save_fields() is unreliable for this screen, as above).
+			// The fields can arrive either nested under the option group or as a
+			// direct POST key, so check both (same as the keys/mode fields above).
+			if ( isset( $_POST['woocommerce_wc_checkout_com_cards_settings']['ckocom_client_id'] ) ) {
+				$settings['ckocom_client_id'] = sanitize_text_field( wp_unslash( $_POST['woocommerce_wc_checkout_com_cards_settings']['ckocom_client_id'] ) );
+			} elseif ( isset( $_POST['ckocom_client_id'] ) ) {
+				$settings['ckocom_client_id'] = sanitize_text_field( wp_unslash( $_POST['ckocom_client_id'] ) );
+			}
+			if ( isset( $_POST['woocommerce_wc_checkout_com_cards_settings']['ckocom_processing_channel_id'] ) ) {
+				$settings['ckocom_processing_channel_id'] = sanitize_text_field( wp_unslash( $_POST['woocommerce_wc_checkout_com_cards_settings']['ckocom_processing_channel_id'] ) );
+			} elseif ( isset( $_POST['ckocom_processing_channel_id'] ) ) {
+				$settings['ckocom_processing_channel_id'] = sanitize_text_field( wp_unslash( $_POST['ckocom_processing_channel_id'] ) );
+			}
+
 			$settings['ckocom_account_type'] = 'NAS';
 			update_option( 'woocommerce_wc_checkout_com_cards_settings', $settings );
 			// Force-write directly to wp_options so Polylang filter cannot block or redirect the save.
@@ -1378,7 +1393,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		$raw_event     = file_get_contents( 'php://input' );
 
 		$secret_key_raw = $core_settings['ckocom_sk'] ?? '';
-		// Without a secret key the signing key would be the known string "Bearer " - refuse.
+		// A webhook signature cannot be verified without a secret key - refuse.
 		if ( '' === trim( (string) $secret_key_raw ) ) {
 			return http_response_code( 401 );
 		}

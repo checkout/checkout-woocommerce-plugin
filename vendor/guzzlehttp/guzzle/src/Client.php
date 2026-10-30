@@ -133,7 +133,7 @@ class Client implements ClientInterface, \CheckoutComWC\Vendor\Psr\Http\Client\C
      */
     public function __call($method, $args)
     {
-        checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.1', '%s::%s() is deprecated and will be removed in 8.0.', __CLASS__, __FUNCTION__);
+        \trigger_deprecation('guzzlehttp/guzzle', '7.1', '%s::%s() is deprecated and will be removed in 8.0.', __CLASS__, __FUNCTION__);
 
         if (\count($args) < 1) {
             throw new InvalidArgumentException('Magic request methods require a URI and optional options array');
@@ -213,7 +213,7 @@ class Client implements ClientInterface, \CheckoutComWC\Vendor\Psr\Http\Client\C
     {
         $normalizedMethod = Psr7\Utils::asciiToUpper($method);
         if ($method !== $normalizedMethod) {
-            checkoutcomwc_vendor_trigger_deprecation(
+            \trigger_deprecation(
                 'guzzlehttp/guzzle',
                 '7.11',
                 'Passing a non-uppercase HTTP method to Client::requestAsync() is deprecated; guzzlehttp/guzzle 8.0 will preserve HTTP method casing. Pass an uppercase method explicitly if uppercase is required.'
@@ -260,7 +260,7 @@ class Client implements ClientInterface, \CheckoutComWC\Vendor\Psr\Http\Client\C
     {
         $normalizedMethod = Psr7\Utils::asciiToUpper($method);
         if ($method !== $normalizedMethod) {
-            checkoutcomwc_vendor_trigger_deprecation(
+            \trigger_deprecation(
                 'guzzlehttp/guzzle',
                 '7.11',
                 'Passing a non-uppercase HTTP method to Client::request() is deprecated; guzzlehttp/guzzle 8.0 will preserve HTTP method casing. Pass an uppercase method explicitly if uppercase is required.'
@@ -604,7 +604,7 @@ class Client implements ClientInterface, \CheckoutComWC\Vendor\Psr\Http\Client\C
             return;
         }
 
-        checkoutcomwc_vendor_trigger_deprecation(
+        \trigger_deprecation(
             'guzzlehttp/guzzle',
             '7.12',
             'Passing the "handler" request option is deprecated; guzzlehttp/guzzle 8.0 will ignore request-level handlers. Configure the handler when creating the Client, or use a separate Client instance for requests that need a different handler.'
@@ -1070,7 +1070,7 @@ class Client implements ClientInterface, \CheckoutComWC\Vendor\Psr\Http\Client\C
      */
     private static function warnInvalidRequestOptionType(string $option, string $expected, $value, string $since = '7.11'): void
     {
-        checkoutcomwc_vendor_trigger_deprecation(
+        \trigger_deprecation(
             'guzzlehttp/guzzle',
             $since,
             'Passing %s to request option "%s" is deprecated; guzzlehttp/guzzle 8.0 requires %s.',
@@ -1095,11 +1095,11 @@ class Client implements ClientInterface, \CheckoutComWC\Vendor\Psr\Http\Client\C
         $protocolVersion = $request->getProtocolVersion();
 
         if ('' === $protocolVersion) {
-            checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.11', 'Sending a request with an empty protocol version is deprecated; guzzlehttp/guzzle 8.0 will reject empty protocol versions.');
+            \trigger_deprecation('guzzlehttp/guzzle', '7.11', 'Sending a request with an empty protocol version is deprecated; guzzlehttp/guzzle 8.0 will reject empty protocol versions.');
 
             $request = Psr7\Utils::modifyRequest($request, ['version' => '1.1']);
         } elseif (!self::isProtocolVersionValid($protocolVersion)) {
-            checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.11', 'Sending a request with a malformed protocol version is deprecated; guzzlehttp/guzzle 8.0 will reject malformed protocol versions.');
+            \trigger_deprecation('guzzlehttp/guzzle', '7.11', 'Sending a request with a malformed protocol version is deprecated; guzzlehttp/guzzle 8.0 will reject malformed protocol versions.');
         }
 
         /** @var HandlerStack $handler */
@@ -1198,7 +1198,7 @@ class Client implements ClientInterface, \CheckoutComWC\Vendor\Psr\Http\Client\C
                     $options['curl'][\CURLOPT_USERPWD] = "$value[0]:$value[1]";
                     break;
                 case 'ntlm':
-                    checkoutcomwc_vendor_trigger_deprecation(
+                    \trigger_deprecation(
                         'guzzlehttp/guzzle',
                         '7.12',
                         'Passing "ntlm" as the built-in auth type is deprecated; guzzlehttp/guzzle 8.0 will no longer apply NTLM through the "auth" request option. NTLM is also deprecated by curl/libcurl and may be unavailable in current or future libcurl builds. Avoid NTLM; if you must use it temporarily, configure cURL HTTP authentication options directly with a libcurl build that still supports NTLM.'
@@ -1320,7 +1320,7 @@ class Client implements ClientInterface, \CheckoutComWC\Vendor\Psr\Http\Client\C
         }
 
         if (\is_scalar($body)) {
-            checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.12', 'Passing a non-string scalar to the "body" request option is deprecated; guzzlehttp/guzzle 8.0 will reject non-string scalar bodies.');
+            \trigger_deprecation('guzzlehttp/guzzle', '7.12', 'Passing a non-string scalar to the "body" request option is deprecated; guzzlehttp/guzzle 8.0 will reject non-string scalar bodies.');
 
             return Psr7\Utils::streamFor(self::stringifyScalar($body));
         }
@@ -1363,7 +1363,7 @@ class Client implements ClientInterface, \CheckoutComWC\Vendor\Psr\Http\Client\C
             if (\is_array($value)) {
                 $values[$key] = self::normalizeNonFiniteFloats($value, $option);
             } elseif (\is_float($value) && !\is_finite($value)) {
-                checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.12', 'Passing a non-finite float in the "%s" request option is deprecated; guzzlehttp/guzzle 8.0 will reject non-finite floats.', $option);
+                \trigger_deprecation('guzzlehttp/guzzle', '7.12', 'Passing a non-finite float in the "%s" request option is deprecated; guzzlehttp/guzzle 8.0 will reject non-finite floats.', $option);
 
                 $values[$key] = \is_nan($value) ? 'NAN' : ($value > 0 ? 'INF' : '-INF');
             }
@@ -1378,7 +1378,7 @@ class Client implements ClientInterface, \CheckoutComWC\Vendor\Psr\Http\Client\C
     private static function normalizeProtocolVersion($version): string
     {
         if ('' === $version) {
-            checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.11', 'Passing an empty "version" request option is deprecated; guzzlehttp/guzzle 8.0 will reject empty protocol versions.');
+            \trigger_deprecation('guzzlehttp/guzzle', '7.11', 'Passing an empty "version" request option is deprecated; guzzlehttp/guzzle 8.0 will reject empty protocol versions.');
 
             return '1.1';
         }

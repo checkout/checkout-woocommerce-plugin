@@ -8,7 +8,7 @@ $baseDir = dirname($vendorDir);
 return array(
     'Checkout\\' => array($vendorDir . '/checkout/checkout-sdk-php/lib/Checkout'),
     'CheckoutComWC\\Vendor\\Symfony\\Polyfill\\Php80\\' => array($vendorDir . '/symfony/polyfill-php80'),
-    'CheckoutComWC\\Vendor\\Psr\\Log\\' => array($vendorDir . '/psr/log/Psr/Log'),
+    'CheckoutComWC\\Vendor\\Psr\\Log\\' => array($vendorDir . '/psr/log/src'),
     'CheckoutComWC\\Vendor\\Psr\\Http\\Message\\' => array($vendorDir . '/psr/http-factory/src', $vendorDir . '/psr/http-message/src'),
     'CheckoutComWC\\Vendor\\Psr\\Http\\Client\\' => array($vendorDir . '/psr/http-client/src'),
     'CheckoutComWC\\Vendor\\Monolog\\' => array($vendorDir . '/monolog/monolog/src/Monolog'),

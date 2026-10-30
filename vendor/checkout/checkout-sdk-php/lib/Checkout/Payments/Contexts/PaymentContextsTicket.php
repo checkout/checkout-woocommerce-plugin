@@ -2,6 +2,11 @@
 
 namespace Checkout\Payments\Contexts;
 
+use Checkout\Common\DateOnly;
+
+/**
+ * Contains information about the airline ticket.
+ */
 class PaymentContextsTicket
 {
     /**
@@ -10,8 +15,10 @@ class PaymentContextsTicket
     public $number;
 
     /**
+     * Format: yyyy-MM-dd
      * @var DateTime
      */
+    #[DateOnly]
     public $issue_date;
 
     /**

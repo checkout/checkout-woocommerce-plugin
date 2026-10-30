@@ -20,7 +20,7 @@ if (!function_exists('checkoutcomwc_vendor_trigger_deprecation')) {
      *
      * @author Nicolas Grekas <p@tchwork.com>
      */
-    function checkoutcomwc_vendor_trigger_deprecation(string $package, string $version, string $message, ...$args): void
+    function checkoutcomwc_vendor_trigger_deprecation(string $package, string $version, string $message, mixed ...$args): void
     {
         @trigger_error(($package || $version ? "Since $package $version: " : '').($args ? vsprintf($message, $args) : $message), \E_USER_DEPRECATED);
     }
