@@ -7,7 +7,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-require_once 'express/google-pay/class-google-pay-express.php';
+require_once __DIR__ . '/express/google-pay/class-google-pay-express.php';
 
 use Checkout\CheckoutApiException;
 use Checkout\Payments\PaymentType;
@@ -1091,6 +1091,14 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 			return;
 		}
 
+		// SECURITY: only a final, approved Authorized/Captured payment may authorise the order
+		// (e.g. '3d_redirection_error' carries no 'error' key and used to fall through).
+		if ( ! WC_Checkoutcom_Utility::is_authorised_payment_response( $result ) ) {
+			WC_Checkoutcom_Utility::logger( 'Google Pay: payment not authorised for order ' . $order_id . ' (status: ' . ( $result['status'] ?? 'unknown' ) . ').' );
+			WC_Checkoutcom_Utility::wc_add_notice_self( __( 'There was an issue completing the payment.', 'checkout-com-unified-payments-api' ), 'error' );
+			return;
+		}
+
 		if ( class_exists( 'WC_Subscriptions_Order' ) ) {
 			// Save source id for subscription.
 			WC_Checkoutcom_Subscription::save_source_id( $order_id, $order, $result['source']['id'] );
@@ -1107,7 +1115,7 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 		$message = sprintf( esc_html__( 'Checkout.com Payment Authorised - Action ID : %s', 'checkout-com-unified-payments-api' ), $result['action_id'] );
 
 		// check if payment was flagged.
-		if ( $result['risk']['flagged'] ) {
+		if ( ! empty( $result['risk']['flagged'] ) ) {
 			// Get cko auth status configured in admin.
 			$status = WC_Admin_Settings::get_option( 'ckocom_order_flagged', 'flagged' );
 
@@ -1143,7 +1151,7 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 	 */
 	public function process_refund( $order_id, $amount = null, $reason = '' ) {
 		$order  = wc_get_order( $order_id );
-		$result = (array) WC_Checkoutcom_Api_Request::refund_payment( $order_id, $order );
+		$result = (array) WC_Checkoutcom_Api_Request::refund_payment( $order_id, $order, $amount );
 
 		// check if result has error and return error message.
 		if ( ! empty( $result['error'] ) ) {

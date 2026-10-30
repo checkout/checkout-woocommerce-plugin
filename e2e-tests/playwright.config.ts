@@ -1,81 +1,49 @@
 import { defineConfig, devices } from '@playwright/test';
-import { loadEnvConfig } from './src/config/env-loader';
-import path from 'path';
+import type { Options } from './src/fixtures';
+import { env } from './src/env';
 
-const env = loadEnvConfig();
-
-export default defineConfig({
-  testDir: './tests',
-  fullyParallel: false,
-  forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : 1,
-  reporter: [
-    ['list'],
-    ['html', { outputFolder: 'playwright-report', open: 'never' }],
-    ['json', { outputFile: 'test-results/results.json' }],
-  ],
-
-  timeout: 60000,
-  expect: {
-    timeout: 10000,
-  },
-
-  use: {
-    baseURL: env.BASE_URL,
-    trace: 'on-first-retry',
-    screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
-    actionTimeout: 15000,
-    navigationTimeout: 30000,
-    locale: 'en-US',
-    timezoneId: 'America/New_York',
-  },
-
-  outputDir: 'test-results/',
-
-  projects: [
-    {
-      name: 'storefront',
-      testDir: './tests/storefront',
-      use: {
-        ...devices['Desktop Chrome'],
-        storageState: undefined,
-      },
-    },
-    {
-      name: 'admin',
-      testDir: './tests/admin',
-      use: {
-        ...devices['Desktop Chrome'],
-        storageState: path.join(__dirname, '.auth/admin.json'),
-      },
-      dependencies: ['admin-setup'],
-    },
-    {
-      name: 'admin-setup',
-      testMatch: /admin\.setup\.ts/,
-      use: {
-        ...devices['Desktop Chrome'],
-      },
-    },
-    {
-      name: 'e2e',
-      testDir: './tests/e2e',
-      use: {
-        ...devices['Desktop Chrome'],
-      },
-      dependencies: ['admin-setup'],
-    },
-    {
-      name: 'mobile-storefront',
-      testDir: './tests/storefront',
-      use: {
-        ...devices['iPhone 14'],
-      },
-    },
-  ],
-
-  globalSetup: path.join(__dirname, 'src/config/global-setup.ts'),
-  globalTeardown: path.join(__dirname, 'src/config/global-teardown.ts'),
+/**
+ * One project per checkout layout. The store has a single checkout page; a worker-scoped
+ * fixture switches it to the project's layout when the worker starts (see src/fixtures.ts).
+ * workers: 1 - payment tests share one store and change order state, so they run serially,
+ * and a worker only ever serves one project, so the layout is always right for it.
+ */
+export default defineConfig<Options>({
+	testDir: './tests',
+	fullyParallel: false,
+	workers: 1,
+	forbidOnly: !!process.env.CI,
+	retries: process.env.CI ? 1 : 0,
+	timeout: 120_000,
+	expect: { timeout: 15_000 },
+	reporter: process.env.CI
+		? [['list'], ['html', { open: 'never' }], ['github']]
+		: [['list'], ['html', { open: 'never' }]],
+	use: {
+		baseURL: env.baseUrl,
+		trace: 'retain-on-failure',
+		screenshot: 'only-on-failure',
+		video: 'retain-on-failure',
+		actionTimeout: 20_000,
+		navigationTimeout: 45_000,
+		locale: 'en-US',
+	},
+	projects: [
+		{
+			name: 'classic',
+			testDir: './tests/checkout',
+			use: { ...devices['Desktop Chrome'], checkoutLayout: 'classic' },
+		},
+		{
+			// Webhooks, security regressions and admin flows - layout-independent.
+			name: 'server',
+			testDir: './tests/server',
+			use: { ...devices['Desktop Chrome'], checkoutLayout: 'classic' },
+		},
+		{
+			name: 'blocks',
+			testDir: './tests/checkout',
+			use: { ...devices['Desktop Chrome'], checkoutLayout: 'blocks' },
+		},
+	],
 });

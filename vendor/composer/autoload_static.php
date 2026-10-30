@@ -4,7 +4,7 @@
 
 namespace Composer\Autoload;
 
-class ComposerStaticInit4333676b444fa68516a1ad39d83ef0cb
+class ComposerStaticInitd13737ac8cbd24811663f6d198549889
 {
     public static $files = array (
         '6e3fae29631ef280660b3cdad06f25a8' => __DIR__ . '/..' . '/symfony/deprecation-contracts/function.php',
@@ -14,7 +14,7 @@ class ComposerStaticInit4333676b444fa68516a1ad39d83ef0cb
     );
 
     public static $prefixLengthsPsr4 = array (
-        'C' => 
+        'C' =>
         array (
             'Checkout\\' => 9,
             'CheckoutComWC\\Vendor\\Symfony\\Polyfill\\Php80\\' => 44,
@@ -29,40 +29,40 @@ class ComposerStaticInit4333676b444fa68516a1ad39d83ef0cb
     );
 
     public static $prefixDirsPsr4 = array (
-        'Checkout\\' => 
+        'Checkout\\' =>
         array (
             0 => __DIR__ . '/..' . '/checkout/checkout-sdk-php/lib/Checkout',
         ),
-        'CheckoutComWC\\Vendor\\Symfony\\Polyfill\\Php80\\' => 
+        'CheckoutComWC\\Vendor\\Symfony\\Polyfill\\Php80\\' =>
         array (
             0 => __DIR__ . '/..' . '/symfony/polyfill-php80',
         ),
-        'CheckoutComWC\\Vendor\\Psr\\Log\\' => 
+        'CheckoutComWC\\Vendor\\Psr\\Log\\' =>
         array (
             0 => __DIR__ . '/..' . '/psr/log/Psr/Log',
         ),
-        'CheckoutComWC\\Vendor\\Psr\\Http\\Message\\' => 
+        'CheckoutComWC\\Vendor\\Psr\\Http\\Message\\' =>
         array (
             0 => __DIR__ . '/..' . '/psr/http-factory/src',
             1 => __DIR__ . '/..' . '/psr/http-message/src',
         ),
-        'CheckoutComWC\\Vendor\\Psr\\Http\\Client\\' => 
+        'CheckoutComWC\\Vendor\\Psr\\Http\\Client\\' =>
         array (
             0 => __DIR__ . '/..' . '/psr/http-client/src',
         ),
-        'CheckoutComWC\\Vendor\\Monolog\\' => 
+        'CheckoutComWC\\Vendor\\Monolog\\' =>
         array (
             0 => __DIR__ . '/..' . '/monolog/monolog/src/Monolog',
         ),
-        'CheckoutComWC\\Vendor\\GuzzleHttp\\Psr7\\' => 
+        'CheckoutComWC\\Vendor\\GuzzleHttp\\Psr7\\' =>
         array (
             0 => __DIR__ . '/..' . '/guzzlehttp/psr7/src',
         ),
-        'CheckoutComWC\\Vendor\\GuzzleHttp\\Promise\\' => 
+        'CheckoutComWC\\Vendor\\GuzzleHttp\\Promise\\' =>
         array (
             0 => __DIR__ . '/..' . '/guzzlehttp/promises/src',
         ),
-        'CheckoutComWC\\Vendor\\GuzzleHttp\\' => 
+        'CheckoutComWC\\Vendor\\GuzzleHttp\\' =>
         array (
             0 => __DIR__ . '/..' . '/guzzlehttp/guzzle/src',
         ),
@@ -80,9 +80,9 @@ class ComposerStaticInit4333676b444fa68516a1ad39d83ef0cb
     public static function getInitializer(ClassLoader $loader)
     {
         return \Closure::bind(function () use ($loader) {
-            $loader->prefixLengthsPsr4 = ComposerStaticInit4333676b444fa68516a1ad39d83ef0cb::$prefixLengthsPsr4;
-            $loader->prefixDirsPsr4 = ComposerStaticInit4333676b444fa68516a1ad39d83ef0cb::$prefixDirsPsr4;
-            $loader->classMap = ComposerStaticInit4333676b444fa68516a1ad39d83ef0cb::$classMap;
+            $loader->prefixLengthsPsr4 = ComposerStaticInitd13737ac8cbd24811663f6d198549889::$prefixLengthsPsr4;
+            $loader->prefixDirsPsr4 = ComposerStaticInitd13737ac8cbd24811663f6d198549889::$prefixDirsPsr4;
+            $loader->classMap = ComposerStaticInitd13737ac8cbd24811663f6d198549889::$classMap;
 
         }, null, ClassLoader::class);
     }

@@ -7,7 +7,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-require_once 'express/paypal/class-paypal-express.php';
+require_once __DIR__ . '/express/paypal/class-paypal-express.php';
 
 use Checkout\CheckoutApiException;
 use Checkout\Payments\PaymentType;
@@ -914,10 +914,11 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$checkout_mode    = $checkout_setting['ckocom_checkout_mode'] ?? 'classic';
 
-		if ( $checkout_mode === 'classic' ) {
-			if ( ! $paypal_enabled ) {
-					return;
-			}
+		// Never load the classic PayPal SDK when the PayPal gateway is disabled — in either mode.
+		// Previously this early-return only ran in Classic mode, so in Flow mode the paypal.com SDK
+		// loaded on every cart/checkout page even with PayPal switched off.
+		if ( ! $paypal_enabled ) {
+			return;
 		}
 
 		if ( ! empty( WC_Checkoutcom_Utility::cko_get_session( 'cko_pc_id' ) ) ) {
@@ -1014,7 +1015,7 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 	 */
 	public function process_refund( $order_id, $amount = null, $reason = '' ) {
 		$order  = wc_get_order( $order_id );
-		$result = (array) WC_Checkoutcom_Api_Request::refund_payment( $order_id, $order );
+		$result = (array) WC_Checkoutcom_Api_Request::refund_payment( $order_id, $order, $amount );
 
 		// check if result has error and return error message.
 		if ( ! empty( $result['error'] ) ) {

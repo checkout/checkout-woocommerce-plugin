@@ -20,7 +20,181 @@ class WC_Checkoutcom_Utility {
 	 * @return bool
 	 */
 	public static function verify_signature( $event, $key, $cko_signature ) {
-		return hash_hmac( 'sha256', $event, $key ) === $cko_signature;
+		return hash_equals( hash_hmac( 'sha256', $event, $key ), (string) $cko_signature );
+	}
+
+	/**
+	 * Check a value looks like a Checkout.com payment id (pay_xxx).
+	 *
+	 * @param string $payment_id Payment id.
+	 *
+	 * @return bool
+	 */
+	public static function is_valid_payment_id( $payment_id ) {
+		return is_string( $payment_id ) && 1 === preg_match( '/^pay_[a-z0-9]{20,40}$/i', $payment_id );
+	}
+
+	/**
+	 * Whether a create-payment result (WC_Checkoutcom_Api_Request::create_payment) is a final,
+	 * authorised payment that may move an order to the authorised status.
+	 *
+	 * A pending 3DS step ('3d' / '3d_redirection_error'), an error, a missing id, a missing or
+	 * false `approved` flag, or any status other than Authorized/Captured is NOT authorised.
+	 *
+	 * @param array $result Result array.
+	 *
+	 * @return bool
+	 */
+	public static function is_authorised_payment_response( $result ) {
+		if ( ! is_array( $result ) || ! empty( $result['error'] ) || ! empty( $result['3d'] ) || ! empty( $result['3d_redirection_error'] ) ) {
+			return false;
+		}
+
+		return ! empty( $result['id'] )
+			&& true === ( $result['approved'] ?? null )
+			&& in_array( (string) ( $result['status'] ?? '' ), array( 'Authorized', 'Captured' ), true );
+	}
+
+	/**
+	 * Load a saved-card token only if it belongs to the current customer and to this order.
+	 *
+	 * WooCommerce does not check token ownership itself; token ids are sequential, so a token
+	 * id taken from the request must be checked before it is charged.
+	 *
+	 * @param int|string $token_id Token id from the request.
+	 * @param WC_Order   $order    Order being paid.
+	 *
+	 * @return WC_Payment_Token|null
+	 */
+	public static function get_owned_payment_token( $token_id, $order ) {
+		$token_id = absint( $token_id );
+		if ( ! $token_id || ! $order instanceof WC_Order ) {
+			return null;
+		}
+
+		$token = WC_Payment_Tokens::get( $token_id );
+		if ( ! $token ) {
+			return null;
+		}
+
+		$owner_id = (int) $token->get_user_id();
+		if ( $owner_id <= 0 || $owner_id !== get_current_user_id() || $owner_id !== (int) $order->get_customer_id() ) {
+			self::logger( 'SECURITY: Rejected saved card token ' . $token_id . ' - not owned by the current customer / order ' . $order->get_id() . '.' );
+			return null;
+		}
+
+		if ( ! in_array( $token->get_gateway_id(), array( 'wc_checkout_com_cards', 'wc_checkout_com_flow' ), true ) ) {
+			self::logger( 'SECURITY: Rejected saved card token ' . $token_id . ' - belongs to gateway ' . $token->get_gateway_id() . '.' );
+			return null;
+		}
+
+		return $token;
+	}
+
+	/**
+	 * Verify that a Checkout.com payment genuinely pays for the given order.
+	 *
+	 * This is the single gate every code path must pass before moving an order to a
+	 * paid/authorised status. It fails closed: if the payment cannot be fetched from
+	 * Checkout.com (SDK not initialised, network error, 404) it is NOT treated as approved.
+	 *
+	 * Checks, in order:
+	 *  - the id is a well-formed pay_ id;
+	 *  - the payment exists (fetched server-side with the secret key, never from the client);
+	 *  - it is bound to this order: a numeric reference or metadata.order_id must point at
+	 *    this order, and the payment id must not already belong to a different order;
+	 *  - currency and amount match the order (1 minor unit tolerance for rounding);
+	 *  - approved === true and status is Authorized/Captured ("Card Verified" only for a
+	 *    zero-total order, e.g. a free-trial subscription).
+	 *
+	 * @param WC_Order   $order           Order being paid.
+	 * @param string     $payment_id      Checkout.com payment id.
+	 * @param array|null $payment_details Optional already-fetched details; on return holds
+	 *                                    the details that were verified (or null).
+	 *
+	 * @return true|WP_Error
+	 */
+	public static function verify_payment_for_order( $order, $payment_id, &$payment_details = null ) {
+		if ( ! $order instanceof WC_Order ) {
+			return new WP_Error( 'cko_no_order', 'No order to verify the payment against.' );
+		}
+
+		if ( ! self::is_valid_payment_id( $payment_id ) ) {
+			return new WP_Error( 'cko_invalid_payment_id', 'Invalid payment id.' );
+		}
+
+		// Only trust details fetched for exactly this id; otherwise fetch them ourselves.
+		if ( empty( $payment_details ) || ! is_array( $payment_details ) || ( $payment_details['id'] ?? '' ) !== $payment_id ) {
+			$payment_details = null;
+			try {
+				$checkout = new Checkout_SDK();
+				$builder  = $checkout->get_builder();
+				if ( ! $builder ) {
+					return new WP_Error( 'cko_sdk_unavailable', 'Checkout.com SDK is not initialised; payment cannot be verified.' );
+				}
+				$payment_details = $builder->getPaymentsClient()->getPaymentDetails( $payment_id );
+			} catch ( Exception $e ) {
+				$payment_details = null;
+				return new WP_Error( 'cko_payment_lookup_failed', 'Payment could not be retrieved from Checkout.com: ' . $e->getMessage() );
+			}
+		}
+
+		if ( empty( $payment_details ) || ! is_array( $payment_details ) || ( $payment_details['id'] ?? '' ) !== $payment_id ) {
+			return new WP_Error( 'cko_payment_lookup_failed', 'Payment details missing or for a different payment.' );
+		}
+
+		$order_id     = (string) $order->get_id();
+		$order_number = (string) $order->get_order_number();
+
+		// Binding: a reference / metadata order id that names an order must name THIS order.
+		$reference = isset( $payment_details['reference'] ) ? (string) $payment_details['reference'] : '';
+		if ( '' !== $reference && $reference !== $order_id && $reference !== $order_number ) {
+			if ( ctype_digit( $reference ) || 0 === strpos( $reference, 'cko-card-change-' ) || 0 === strpos( $reference, 'cko-add-payment-method' ) ) {
+				return new WP_Error( 'cko_payment_wrong_order', 'Payment reference ' . $reference . ' does not belong to order ' . $order_id . '.' );
+			}
+		}
+		if ( isset( $payment_details['metadata']['order_id'] ) && '' !== (string) $payment_details['metadata']['order_id'] && (string) $payment_details['metadata']['order_id'] !== $order_id ) {
+			return new WP_Error( 'cko_payment_wrong_order', 'Payment metadata order_id does not belong to order ' . $order_id . '.' );
+		}
+
+		// Replay: the same payment must not be applied to two orders.
+		$other_orders = wc_get_orders(
+			array(
+				'limit'      => 1,
+				'return'     => 'ids',
+				'exclude'    => array( $order->get_id() ),
+				'meta_key'   => '_cko_payment_id', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key
+				'meta_value' => $payment_id, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value
+			)
+		);
+		if ( ! empty( $other_orders ) ) {
+			return new WP_Error( 'cko_payment_reused', 'Payment is already attached to order ' . $other_orders[0] . '.' );
+		}
+
+		// Currency and amount must match what the order actually costs.
+		$order_currency   = strtoupper( (string) $order->get_currency() );
+		$payment_currency = strtoupper( (string) ( $payment_details['currency'] ?? '' ) );
+		if ( '' === $payment_currency || $payment_currency !== $order_currency ) {
+			return new WP_Error( 'cko_currency_mismatch', 'Payment currency ' . $payment_currency . ' does not match order currency ' . $order_currency . '.' );
+		}
+
+		$order_amount   = (int) round( (float) self::value_to_decimal( (float) $order->get_total(), $order_currency ) );
+		$payment_amount = isset( $payment_details['amount'] ) ? (int) $payment_details['amount'] : -1;
+		if ( $payment_amount < 0 || abs( $payment_amount - $order_amount ) > 1 ) {
+			return new WP_Error( 'cko_amount_mismatch', 'Payment amount ' . $payment_amount . ' does not match order total ' . $order_amount . ' (' . $order_currency . ' minor units).' );
+		}
+
+		// Approval: explicit approved flag plus a status that means money is secured.
+		$status          = (string) ( $payment_details['status'] ?? '' );
+		$allowed_status  = array( 'Authorized', 'Captured', 'Partially Captured' );
+		if ( 0 === $order_amount ) {
+			$allowed_status[] = 'Card Verified';
+		}
+		if ( true !== ( $payment_details['approved'] ?? null ) || ! in_array( $status, $allowed_status, true ) ) {
+			return new WP_Error( 'cko_payment_not_approved', 'Payment is not approved (status: ' . ( '' !== $status ? $status : 'unknown' ) . ').' );
+		}
+
+		return true;
 	}
 
 	/**

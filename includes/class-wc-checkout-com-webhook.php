@@ -154,6 +154,10 @@ class WC_Checkout_Com_Webhook {
 			}
 			return false;
 		}
+
+		// Use the resolved order's real id from here on: the event's id may be an order
+		// number (or not this store's at all), and reloading by it returned false (fatal).
+		$order_id = $order->get_id();
 		
 		// Safety: never apply order-status changes to a WC_Subscription. A subscription card-change
 		// verification ($0 auth) must not flip the subscription's status — that is managed by WCS,
@@ -341,6 +345,13 @@ class WC_Checkout_Com_Webhook {
 			}
 		}
 
+		// A late authorization must never reopen a closed order (cancelled/refunded, voided or
+		// refunded at Checkout.com, or failed by our amount/currency security check). Webhooks can
+		// arrive out of order - e.g. payment_approved delivered after payment_voided.
+		if ( self::is_closed_order( $order ) ) {
+			return self::ignore_for_closed_order( $order, 'authorization', $payment_id );
+		}
+
 		// CRITICAL: Never downgrade completed or processing orders - check FIRST before any other logic
 		if ( in_array( $current_status, array( 'processing', 'completed' ), true ) ) {
 			if ( $webhook_debug_enabled ) {
@@ -424,6 +435,10 @@ class WC_Checkout_Com_Webhook {
 		// CRITICAL: Final guard before update_status - order may have been updated by capture webhook
 		// during Flow payment title processing (save/reload above). Never downgrade completed/processing.
 		$order = wc_get_order( $order_id );
+		if ( $order && self::is_closed_order( $order ) ) {
+			// Closed while this handler was running (e.g. a concurrent void) - do not reopen it.
+			return true;
+		}
 		if ( $order && in_array( $order->get_status(), array( 'processing', 'completed' ), true ) ) {
 			if ( $webhook_debug_enabled ) {
 				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: authorize_payment - Final guard: Order now in advanced state (' . $order->get_status() . '), skipping status update to prevent downgrade' );
@@ -512,6 +527,10 @@ class WC_Checkout_Com_Webhook {
 			}
 			return false;
 		}
+
+		// Use the resolved order's real id from here on: the event's id may be an order
+		// number (or not this store's at all), and reloading by it returned false (fatal).
+		$order_id = $order->get_id();
 		
 		// Safety: never apply order-status changes to a WC_Subscription. A subscription card-change
 		// verification ($0 auth) must not flip the subscription's status — that is managed by WCS,
@@ -537,6 +556,10 @@ class WC_Checkout_Com_Webhook {
 			) );
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: card_verified - Order has security check failure (' . $security_check_failed . '), rejecting webhook to preserve Failed status. Payment ID: ' . $payment_id );
 			return true; // Acknowledge webhook but do not change status.
+		}
+
+		if ( self::is_closed_order( $order ) ) {
+			return self::ignore_for_closed_order( $order, 'card verified', (string) $webhook_data->id );
 		}
 
 		$payment_id = $webhook_data->id;
@@ -660,6 +683,12 @@ class WC_Checkout_Com_Webhook {
 				isset( $webhook_data->id ) ? $webhook_data->id : 'N/A'
 			) );
 			return false;
+		}
+
+		// A capture must never reopen a closed order (e.g. a scheduled auto-capture arriving after
+		// the merchant cancelled the order). Acknowledge it and leave the order as it is.
+		if ( self::is_closed_order( $order ) ) {
+			return self::ignore_for_closed_order( $order, 'capture', isset( $webhook_data->id ) ? (string) $webhook_data->id : '' );
 		}
 
 		// Check if payment is already captured.
@@ -1302,7 +1331,15 @@ class WC_Checkout_Com_Webhook {
 		$refund_amount_formatted = wc_price( WC_Checkoutcom_Utility::decimal_to_value( $amount, $order->get_currency() ), array( 'currency' => $order->get_currency() ) );
 		$message          = sprintf( 'Webhook received from checkout.com. Payment refunded - Payment ID: %s, Action ID: %s, Amount: %s', $payment_id, $action_id, $refund_amount_formatted );
 
-		if ( $get_transaction_id === $action_id ) {
+		// Dedupe by refund action id. Each processed refund action is recorded on the order (here
+		// and by the admin-initiated process_refund via the API helper). Without this, a repeated
+		// webhook delivery, or the webhook for a refund already booked from the admin screen, creates
+		// a second WooCommerce refund and over-refunds the order.
+		$processed_refund_ids = (array) $order->get_meta( '_cko_refund_action_ids' );
+		if ( ( '' !== (string) $action_id && in_array( $action_id, $processed_refund_ids, true ) ) || $get_transaction_id === $action_id ) {
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: refund action ' . $action_id . ' already booked - skipping to avoid duplicate refund.' );
+			}
 			return true;
 		}
 
@@ -1350,6 +1387,12 @@ class WC_Checkout_Com_Webhook {
 					'line_items' => [],
 				]
 			);
+		}
+
+		// Record this refund action so a later duplicate delivery is skipped by the dedupe above.
+		if ( isset( $refund ) && ! is_wp_error( $refund ) && '' !== (string) $action_id ) {
+			$processed_refund_ids[] = $action_id;
+			$order->update_meta_data( '_cko_refund_action_ids', $processed_refund_ids );
 		}
 
 		// add notes for the order and update status.
@@ -1438,6 +1481,10 @@ class WC_Checkout_Com_Webhook {
 				}
 				return false;
 			}
+
+			// Use the resolved order's real id from here on: the event's id may be an order
+			// number (or not this store's at all), and reloading by it returned false (fatal).
+			$order_id = $order->get_id();
 			
 			if ( $webhook_debug_enabled ) {
 				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order loaded successfully - Order ID: ' . $order->get_id() . ', Status: ' . $order->get_status() );
@@ -1586,6 +1633,10 @@ class WC_Checkout_Com_Webhook {
 			}
 			return false;
 		}
+
+		// Use the resolved order's real id from here on: the event's id may be an order
+		// number (or not this store's at all), and reloading by it returned false (fatal).
+		$order_id = $order->get_id();
 		
 		// Safety: never apply order-status changes to a WC_Subscription. A subscription card-change
 		// verification ($0 auth) must not flip the subscription's status — that is managed by WCS,
@@ -1727,7 +1778,7 @@ class WC_Checkout_Com_Webhook {
 		
 		// If order is already in a successful state, don't downgrade to failed
 		// This can happen if a successful payment was processed and a stale decline webhook arrives
-		if ( in_array( $current_status, array( 'completed', 'processing', 'on-hold' ), true ) ) {
+		if ( in_array( $current_status, array( 'completed', 'processing', 'on-hold' ), true ) || self::is_closed_order( $order ) ) {
 			// translators: %s: current order status.
 			$order->add_order_note( sprintf( __( 'Decline webhook received but order is already %s. This may be a stale webhook for a previous failed attempt. Status unchanged.', 'checkout-com-unified-payments-api' ), $current_status ) );
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: decline_payment - Order already ' . $current_status . ', skipping status change to failed. Order ID: ' . $order_id );
@@ -1802,7 +1853,45 @@ class WC_Checkout_Com_Webhook {
 	}
 
 	/**
-	 * Load order from order id or Query order by order number.
+	 * Whether an order is closed for payment purposes and must not be moved back to an
+	 * authorised/paid status by a (late, out-of-order) webhook.
+	 *
+	 * @param WC_Order $order Order.
+	 *
+	 * @return bool
+	 */
+	private static function is_closed_order( $order ) {
+		// Note: a partial refund (cko_payment_refunded) does not close an order - it stays open
+		// (processing) and must still accept its own events. A full refund sets status refunded.
+		return $order->has_status( array( 'cancelled', 'refunded' ) )
+			|| (bool) $order->get_meta( 'cko_payment_voided' )
+			|| '' !== (string) $order->get_meta( '_cko_security_check_failed' );
+	}
+
+	/**
+	 * Acknowledge an event for a closed order without changing it, leaving a note.
+	 *
+	 * @param WC_Order $order      Closed order.
+	 * @param string   $event      Human-readable event name (e.g. "capture").
+	 * @param string   $payment_id Checkout.com payment id.
+	 *
+	 * @return bool Always true (webhook acknowledged, so Checkout.com does not retry).
+	 */
+	private static function ignore_for_closed_order( $order, $event, $payment_id ) {
+		$order->add_order_note(
+			sprintf(
+				/* translators: 1: webhook event, 2: payment ID, 3: order status. */
+				__( 'Checkout.com %1$s webhook ignored - Payment ID: %2$s. The order is already closed (%3$s), so its status was not changed.', 'checkout-com-unified-payments-api' ),
+				$event,
+				$payment_id,
+				$order->get_status()
+			)
+		);
+		return true;
+	}
+
+	/**
+	 * Load order by id, or by the exact order number stored at payment time.
 	 *
 	 * @param int $order_id Order id.
 	 *
@@ -1824,24 +1913,30 @@ class WC_Checkout_Com_Webhook {
 			return $order;
 		}
 
-		// Query order by order number to check if order exist.
+		// Fall back to the order NUMBER the plugin stored at payment time (_cko_order_reference),
+		// for stores whose order numbers differ from ids (Sequential Order Numbers). This must be an
+		// exact match: the previous wc_get_orders( [ 'order_number' => ... ] ) used an argument
+		// WooCommerce ignores, so it returned the NEWEST order for any unknown id - attaching other
+		// payments' events (e.g. another store on the same Checkout.com account) to that order.
 		if ( $webhook_debug_enabled ) {
-			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: get_wc_order - Order not found via wc_get_order, trying order_number lookup' );
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: get_wc_order - Order not found via wc_get_order, trying exact order-number lookup' );
 		}
-		$orders = wc_get_orders(
-			[
-				'order_number' => $order_id,
-			]
-		);
+		$orders = ( '' !== (string) $order_id ) ? wc_get_orders(
+			array(
+				'limit'      => 2,
+				'meta_key'   => '_cko_order_reference', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key
+				'meta_value' => (string) $order_id, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value
+			)
+		) : array();
 
-		if ( ! empty( $orders ) && isset( $orders[0] ) ) {
+		if ( 1 === count( $orders ) ) {
 			$order = $orders[0];
 			if ( $webhook_debug_enabled ) {
-				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: get_wc_order - Order found via order_number lookup - ID: ' . $order->get_id() . ', Status: ' . $order->get_status() );
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: get_wc_order - Order found via order-number lookup - ID: ' . $order->get_id() . ', Status: ' . $order->get_status() );
 			}
 			return $order;
 		}
-		
+
 		// Always log errors
 		WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: get_wc_order - ERROR - Order not found by ID or order_number: ' . $order_id );
 		return false;

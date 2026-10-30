@@ -9,13 +9,13 @@
     },
     "require": {
         "php": ">=7.3",
-        "checkout/checkout-sdk-php": "3.2.*",
-        "wp-cli/wp-cli-bundle": "^2.6"
+        "checkout/checkout-sdk-php": "3.2.*"
     },
     "require-dev": {
         "squizlabs/php_codesniffer": "^3.6",
         "automattic/vipwpcs": "^3",
-        "phpcompatibility/phpcompatibility-wp": "^2"
+        "phpcompatibility/phpcompatibility-wp": "^2",
+        "wp-cli/wp-cli-bundle": "^2.6"
     },
     "scripts": {
         "prefix-namespaces": [
@@ -37,7 +37,14 @@
             "classmap_prefix": "CheckoutComWC_Vendor_",
             "packages": [
                 "monolog/monolog",
-                "checkout/checkout-sdk-php"
+                "checkout/checkout-sdk-php",
+                "guzzlehttp/guzzle",
+                "guzzlehttp/promises",
+                "guzzlehttp/psr7",
+                "psr/http-client",
+                "psr/http-factory",
+                "psr/http-message",
+                "psr/log"
             ],
             "exclude_from_prefix": {
                 "packages": [

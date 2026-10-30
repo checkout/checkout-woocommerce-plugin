@@ -1,16 +1,16 @@
 === Checkout.com Payment Gateway ===
 Contributors: checkoutintegration
-Tags: checkout, payments, credit card, payment gateway, apple pay, google pay, payment request
-Requires at least: 5.0
-Stable tag: 5.1.4.4
-Requires PHP: 7.3
+Tags: payments, credit card, payment gateway, apple pay, google pay
+Requires at least: 6.0
+Stable tag: 5.1.5
+Requires PHP: 7.4
 Tested up to: 7.1
-WC requires at least: 3.0
-WC tested up to: 11.0.1
+WC requires at least: 8.0
+WC tested up to: 11.2
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
-Checkout.com helps your business offer more payment methods and currencies to more customers. We provide best-in-class payment processing for credit card & alternative payment methods.
+Offer more payment methods and currencies with Checkout.com — best-in-class processing for cards and alternative payment methods.
 
 == Description ==
 
@@ -181,6 +181,30 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v5.1.5 29th October 2026
+Important
+- This is a security release for stores that cannot yet run version 5.2.0 (which requires PHP 8.1). Updating is strongly recommended.
+- If you ran version 5.1.4 with database error logging enabled, your Checkout.com secret key may have been written to your server's PHP error log. Please rotate your secret key in the Checkout.com dashboard and remove or restrict access to old logs. (The cause was fixed in 5.1.4.1.)
+
+Security
+- Important security hardening of payment verification, payment notifications (webhooks) and checkout endpoints. Updating is strongly recommended.
+
+Fixes
+- Saved-card payments that did not need 3D Secure now keep their payment reference, so the order moves to Processing when the payment is captured and can be refunded from the order screen.
+- Refunds created through the WooCommerce REST API or by other plugins now refund the requested amount.
+- Stores using WooCommerce's older (non-HPOS) order storage: a returning payment is always applied to the shopper's own order.
+- Fixed an error when Checkout.com sends a notification for an order that does not exist in this store.
+- Improved performance: the plugin no longer re-saves its settings on every page load.
+- Refund notifications are de-duplicated, so a refund is never booked twice.
+- The plugin no longer offers a payment method (or shows "Active") before API keys are entered, and no longer forces account creation at checkout.
+- Manual/offline orders (bank transfer, cash on delivery) can be saved without a billing email again.
+- High-Performance Order Storage (HPOS): order lookups use the WooCommerce order API so they work with HPOS enabled.
+- The secret key is masked in the settings screen; leave it blank to keep the saved key.
+
+Maintenance
+- Requires PHP 7.4+, WordPress 6.0+ and WooCommerce 8.0+. Declared block checkout compatibility.
+- Removed the unused WP-CLI bundle from the distributed package.
+
 v5.1.4.4 14th September 2026
 Security
 - Fixed a payment/order-confusion issue in the Flow webhook path where a legitimately-signed capture for a low-value payment could advance a separate, unrelated (higher-value) order to a fulfilment status. Webhooks now require the resolved order to actually own the payment before updating it, the Checkout.com reference is set server-side from the order the amount is taken from, and an order only advances when the captured amount and currency match exactly (underpayments are held on-hold).
@@ -592,5 +616,8 @@ v4.0.0 3 Sep 2019
 · Checkout.com Woocommerce module for the Unified Payments API
 
 == Upgrade Notice ==
+= 5.1.5 =
+Important security update - updating is strongly recommended. For stores that cannot yet run 5.2.0 (PHP 8.1).
+
 = 4.1.16 =
 4.1.16 - Bug Fix - Removed saved card checkbox for guest users

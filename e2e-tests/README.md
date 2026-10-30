@@ -1,441 +1,115 @@
-# WooCommerce E2E Test Automation Framework
+# Checkout.com WooCommerce — E2E tests
 
-A production-ready end-to-end test automation framework for WooCommerce stores using Playwright and TypeScript.
+Playwright tests that drive real checkouts against a **pinned, disposable WooCommerce store**
+(wp-env) and the **Checkout.com sandbox**.
 
-## Features
-
-- **Page Object Model (POM)** - Clean, maintainable test architecture
-- **Multi-Project Support** - Separate storefront, admin, and e2e test suites
-- **Robust Selectors** - Accessible, stable selectors (role, label, text-based)
-- **No Flaky Sleeps** - Condition-based waits for reliable tests
-- **CI-Ready** - GitHub Actions workflow included
-- **Rich Reporting** - HTML reports, screenshots, videos, and traces
-- **API Verification** - Optional WooCommerce REST API layer
-- **Environment Validation** - Zod-powered config with clear errors
-
-## Project Structure
-
-```
-e2e-tests/
-├── src/
-│   ├── pages/                    # Page Object Models
-│   │   ├── storefront/           # Customer-facing pages
-│   │   │   ├── HomePage.ts
-│   │   │   ├── ProductPage.ts
-│   │   │   ├── CartPage.ts
-│   │   │   ├── CheckoutPage.ts
-│   │   │   ├── OrderReceivedPage.ts
-│   │   │   └── MyAccountPage.ts
-│   │   └── admin/                # WP-Admin pages
-│   │       ├── AdminLoginPage.ts
-│   │       ├── AdminOrdersPage.ts
-│   │       └── AdminOrderDetailsPage.ts
-│   ├── fixtures/                 # Test fixtures and setup
-│   ├── utils/                    # Utilities (selectors, waits, money, logging)
-│   ├── config/                   # Environment configuration
-│   ├── test-data/                # Products, customers, coupons, etc.
-│   ├── assertions/               # Shared assertion helpers
-│   └── api/                      # WooCommerce REST API client
-├── tests/
-│   ├── storefront/               # Customer flow tests
-│   ├── admin/                    # Admin verification tests
-│   └── e2e/                      # Combined end-to-end flows
-├── playwright.config.ts
-├── package.json
-└── .env.example
-```
-
-## Quick Start
-
-### Prerequisites
-
-- Node.js 18+
-- npm or yarn
-- Access to a WooCommerce test store
-
-### Installation
+## Quick start
 
 ```bash
-# Navigate to the e2e-tests directory
+# from the repo root: build the Blocks assets the plugin loads (build/ is not committed)
+npm ci && npm run build
+
 cd e2e-tests
+npm ci
+npx playwright install chromium
+cp .env.example .env          # add your Checkout.com SANDBOX keys
 
-# Install dependencies
-npm install
-
-# Install Playwright browsers
-npx playwright install
+npm run env:start             # WordPress + WooCommerce on http://localhost:8892
+npm run env:seed              # store settings, products, customer, gateway config (re-runnable)
+npm test                      # all projects (classic + blocks)
+npm run test:smoke            # @smoke only
+npm run report                # open the HTML report
 ```
 
-### Environment Setup
-
-1. Copy the example environment file:
-
-```bash
-cp .env.example .env
-```
-
-2. Configure your `.env` file:
-
-```env
-# Required: Store URLs
-BASE_URL=https://your-test-store.com
-ADMIN_URL=https://your-test-store.com/wp-admin
-
-# Required: Admin credentials
-ADMIN_USER=admin
-ADMIN_PASS=your-password
-
-# Optional: Customer credentials (for logged-in tests)
-CUSTOMER_USER=customer@example.com
-CUSTOMER_PASS=customer-password
-
-# Optional: WooCommerce REST API (for API verification)
-WC_CONSUMER_KEY=ck_xxxx
-WC_CONSUMER_SECRET=cs_xxxx
-
-# Optional: Payment test flags
-PAYMENT_TEST_MODE=true
-PAYMENT_3DS_REQUIRED=false
-PAYMENT_FORCE_FAILURE=false
-```
-
-### Running Tests
-
-```bash
-# Run all tests
-npm test
-
-# Run specific test suites
-npm run test:storefront     # Customer flow tests only
-npm run test:admin          # Admin verification tests only
-npm run test:e2e            # Combined end-to-end tests
-
-# Run in headed mode (see browser)
-npm run test:headed
-
-# Run in debug mode
-npm run test:debug
-
-# Open Playwright UI
-npm run test:ui
-```
-
-### Viewing Reports
-
-```bash
-# Open the HTML report
-npm run report
-
-# View a trace file
-npm run trace -- ./test-results/some-trace.zip
-```
-
-## Test Suites
-
-### Storefront Tests (`tests/storefront/`)
-
-Customer-facing purchase flows:
-
-- **Guest Checkout** - Complete purchase without account
-- **Logged-In Checkout** - Purchase with saved address
-- **Coupon/Discount** - Apply and verify coupons
-- **Payment Failure** - Handle declined cards, 3DS
-
-### Admin Tests (`tests/admin/`)
-
-WooCommerce admin verification:
-
-- Order list navigation and search
-- Order details verification
-- Status updates
-- Order notes
-
-### E2E Tests (`tests/e2e/`)
-
-Complete flows with admin verification:
-
-- Purchase on storefront → verify in admin
-- Multi-item orders
-- Coupon discounts
-- Payment method verification
-
-## Configuration
-
-### Test Products
-
-Configure test products in `src/test-data/products.ts`:
-
-```typescript
-export const testProducts = {
-  simple: {
-    name: 'Simple Product',
-    slug: 'simple-product',
-    sku: 'SIMPLE-001',
-    price: 25.00,
-    type: 'simple',
-    inStock: true,
-  },
-  // Add more products...
-};
-```
-
-### Test Coupons
-
-Configure coupons in `src/test-data/coupons.ts`:
-
-```typescript
-export const testCoupons = {
-  percent10: {
-    code: 'PERCENT10',
-    type: 'percent',
-    amount: 10,
-    description: '10% off entire order',
-  },
-  // Add more coupons...
-};
-```
-
-### Payment Methods
-
-Configure payment methods in `src/test-data/payment-methods.ts`:
-
-```typescript
-export const paymentMethods = {
-  cod: {
-    id: 'cod',
-    title: 'Cash on delivery',
-    requiresCard: false,
-  },
-  stripe: {
-    id: 'stripe',
-    title: 'Credit Card (Stripe)',
-    requiresCard: true,
-    testCards: [/* test card details */],
-  },
-};
-```
-
-## Writing New Tests
-
-### Using Fixtures
-
-```typescript
-import { test, expect } from '../../src/fixtures';
-
-test('my new test', async ({
-  productPage,
-  cartPage,
-  checkoutPage,
-  billingAddress,
-  logger,
-}) => {
-  logger.step('Add product to cart');
-  await productPage.goToProduct('my-product');
-  await productPage.addToCart();
-  
-  // Continue with test...
-});
-```
-
-### Using Page Objects Directly
-
-```typescript
-import { test } from '@playwright/test';
-import { ProductPage, CartPage } from '../../src/pages';
-
-test('custom test', async ({ page }) => {
-  const productPage = new ProductPage(page);
-  const cartPage = new CartPage(page);
-  
-  await productPage.goToProduct('my-product');
-  await productPage.addToCart();
-  await cartPage.goto();
-  // ...
-});
-```
-
-## Selector Best Practices
-
-### Preferred (Stable)
-
-```typescript
-// Role-based (most accessible)
-this.getByRole('button', { name: 'Add to Cart' });
-
-// Label-based
-this.getByLabel('Email address');
-
-// Text-based
-this.getByText('Order received');
-
-// Test ID
-this.getByTestId('checkout-form');
-```
-
-### Avoid (Brittle)
-
-```typescript
-// Avoid: Deep CSS selectors
-this.locator('.main > div.content > .product-list > .item:nth-child(2)');
-
-// Avoid: Dynamic class names
-this.locator('.btn-xyz123');
-
-// Avoid: Positional selectors
-this.locator('input').nth(5);
-```
-
-### WooCommerce-Specific
-
-Use the selectors defined in `src/utils/selectors.ts`:
-
-```typescript
-import { WooSelectors } from '../utils/selectors';
-
-// Use predefined WooCommerce selectors
-this.locator(WooSelectors.ADD_TO_CART_BUTTON);
-this.locator(WooSelectors.CHECKOUT_FORM);
-```
-
-## Debugging
-
-### Trace Viewer
-
-On test failure, traces are automatically captured. View them:
-
-```bash
-npx playwright show-trace test-results/path-to-trace.zip
-```
-
-### Debug Mode
-
-```bash
-# Run with Playwright Inspector
-npm run test:debug
-
-# Run with headed browser and slow motion
-SLOW_MO=500 npm run test:headed
-```
-
-### Screenshots
-
-Take screenshots in tests:
-
-```typescript
-await page.screenshot({ path: 'debug.png' });
-await productPage.screenshot('product-page');
-```
-
-## CI/CD Integration
-
-### GitHub Actions
-
-The included workflow (`.github/workflows/e2e-tests.yml`) runs:
-
-1. **Lint & Type Check** - Validates code quality
-2. **Storefront Tests** - Customer flow tests
-3. **Admin Tests** - Admin verification tests
-4. **E2E Tests** - Full integration tests
-
-### Required Secrets
-
-Configure these secrets in your GitHub repository:
-
-| Secret | Description |
-|--------|-------------|
-| `STORE_BASE_URL` | WooCommerce store URL |
-| `STORE_ADMIN_URL` | WordPress admin URL |
-| `ADMIN_USER` | Admin username |
-| `ADMIN_PASS` | Admin password |
-| `CUSTOMER_USER` | (Optional) Customer email |
-| `CUSTOMER_PASS` | (Optional) Customer password |
-| `WC_CONSUMER_KEY` | (Optional) REST API key |
-| `WC_CONSUMER_SECRET` | (Optional) REST API secret |
-
-### Manual Trigger
-
-Run tests manually via GitHub Actions:
-
-1. Go to Actions → E2E Tests
-2. Click "Run workflow"
-3. Select test project and options
-
-## WooCommerce REST API Verification
-
-Enable API verification for a third layer of order validation:
-
-1. Generate API keys: WooCommerce → Settings → Advanced → REST API
-2. Add to `.env`:
-   ```env
-   WC_CONSUMER_KEY=ck_xxxx
-   WC_CONSUMER_SECRET=cs_xxxx
-   ```
-
-3. Use in tests:
-   ```typescript
-   import { getWcApi } from '../api';
-   
-   const api = getWcApi();
-   if (api.isAvailable()) {
-     const order = await api.getOrder(orderNumber);
-     const verification = await api.verifyOrderTotals(orderNumber, {
-       total: 99.99,
-       subtotal: 89.99,
-       shipping: 10.00,
-     });
-   }
-   ```
-
-## Visual Testing (Applitools)
-
-To enable Applitools visual testing:
-
-1. Install the SDK:
-   ```bash
-   npm install @applitools/eyes-playwright
-   ```
-
-2. Configure your API key:
-   ```env
-   APPLITOOLS_API_KEY=your-api-key
-   ```
-
-3. Add visual checks to tests:
-   ```typescript
-   import { Eyes, Target } from '@applitools/eyes-playwright';
-   
-   const eyes = new Eyes();
-   await eyes.open(page, 'WooCommerce', 'Checkout Page');
-   await eyes.check('Checkout', Target.window().fully());
-   await eyes.close();
-   ```
-
-## Troubleshooting
-
-### Common Issues
-
-**Tests timeout on checkout**
-- Increase `timeout` in playwright.config.ts
-- Check for slow network or payment gateway
-
-**Selectors not finding elements**
-- Verify WooCommerce theme compatibility
-- Add custom selectors to `WooSelectors` in `src/utils/selectors.ts`
-
-**Authentication failures**
-- Verify credentials in `.env`
-- Check for 2FA or security plugins blocking login
-
-**Cart not persisting**
-- Clear browser storage between tests: `await context.clearCookies()`
-- Check WooCommerce session settings
-
-### Getting Help
-
-1. Check the Playwright docs: https://playwright.dev/docs
-2. WooCommerce REST API docs: https://woocommerce.github.io/woocommerce-rest-api-docs/
-3. Review test output and traces for detailed error information
-
-## License
-
-ISC
+Stop with `npm run env:stop`; wipe the store with `npm run env:destroy`, then start and seed again.
+
+## What is pinned
+
+`/.wp-env.json` pins WordPress 7.1.4, WooCommerce 11.1.0 and PHP 8.3, and mounts the
+plugin from this repository. Ports 8890/8891 avoid clashing with other local wp-env sites.
+
+## How the suite is organised
+
+| Path | Purpose |
+|---|---|
+| `bin/e2e/seed.sh` | Idempotent store setup from env vars (keys never committed). |
+| `bin/e2e/checkout-layout.sh` | Switches the checkout page between the classic shortcode and the Checkout block. |
+| `src/fixtures.ts` | Switches the layout once per worker; `checkout`, `addToCart`, `loginAsCustomer` fixtures. |
+| `src/pages/` | `FlowComponent` (Flow iframes), `ThreeDSChallenge` (sandbox simulator), classic/Blocks `CheckoutPage`. |
+| `src/support/assertions.ts` | `expectOrderPaidByCheckoutCom()` — the three-place check. |
+| `tests/checkout/` | Runs once per project: `classic` and `blocks`. |
+
+## Test catalogue
+
+| Project | Spec | Covers |
+|---|---|---|
+| classic, blocks | `checkout/card-payment` | Guest and logged-in card payment (3DS challenge completed) — `@smoke` |
+| classic, blocks | `checkout/card-failures` | Declined card · failed 3DS (3 wrong passwords) · invalid number / expired / short CVV rejected before payment · retry after decline ends with one paid order |
+| classic, blocks | `checkout/saved-cards` | Card saved only when ticked · pay with saved card · My Account add card (approved / fails verification) |
+| server | `server/webhooks` | Signed webhooks: capture, duplicate delivery, under-capture, out-of-order approved, full/partial refund, void, decline · unsigned/forged rejected · event for another order's payment ignored |
+| server | `server/security` | Regression tests for the payment-verification fixes: return URL without/with wrong key, unknown/reused/under-amount/other-currency/other-order payments, stored ids don't skip verification, fail closed without SDK, wallet result gate |
+| server | `server/refunds` | Admin full and partial refund to Checkout.com |
+| server | `server/closed-orders` | Cancelled/refunded orders are not changed by their own capture, approval, decline or card-verified webhooks, or by a returning payment · partial refunds keep the order open · a failed order can still be completed by its own genuine payment (agreed policy) |
+| server | `server/settings-sync` | Loading the gateway does not rewrite settings unless the enabled flags change |
+| server | `server/live-webhooks` | Real Checkout.com webhooks complete an order (`@webhook-live`, opt-in) |
+
+Server tests build paid orders without a browser (`src/support/orders.ts`): a pending order,
+a real sandbox payment for its exact amount, then the shopper's return URL — so the plugin's
+own verification authorises it.
+
+### Known bugs (tests marked `test.fail`)
+
+A test that describes correct behaviour for a known, not-yet-fixed bug is marked `test.fail()`.
+Playwright reports it green while it fails and red the moment it starts passing - then remove
+the `test.fail()` line. There are currently **none**: the bugs found while building the suite
+(saved-card payment id, webhook order lookup, late approval reopening cancelled orders,
+programmatic refund amount) are fixed on `fix/payment-verification`.
+
+`security › a saved card can only be used by the customer who owns it` is `test.fixme`: its
+WP-CLI call could not run in the session that wrote it. Run it from a normal terminal and
+remove the `fixme`.
+
+### Scope: Flow mode only
+
+The suite runs the plugin in **Flow** mode, which is what merchants use. Classic (Frames) mode is
+not covered and not hardened: there, webhooks go straight to the handlers without the Flow
+dispatcher's payment-ownership check, and void/refund/cancel/decline/card_verified only compare
+payment ids when the order already has one.
+
+### Sandbox test data
+
+Verified against the sandbox: `4242 4242 4242 4242` approves (and is 3DS-challenged because
+the plugin forces 3DS; password `Checkout1!`), `4544 2491 6767 3670` declines (20051).
+This sandbox does **not** simulate declines by amount.
+
+## Live webhooks (tunnel)
+
+The store is on `localhost`, so Checkout.com cannot deliver webhooks to it. To test real
+delivery: expose it (`cloudflared tunnel --url http://localhost:8892`), register
+`<tunnel-url>/?wc-api=wc_checkoutcom_webhook` as a Checkout.com workflow (the plugin's
+`WC_Checkoutcom_Workflows::create( $url )` does this with the plugin's events and signing key),
+then run with `E2E_LIVE_WEBHOOKS=1`. While live delivery is on, real events race the signed
+webhook tests; the one test that this breaks (`payment_voided`) is skipped. **Delete the
+workflow when done** — and prefer a sandbox account dedicated to testing: a shared account
+sends every integration's events to your tunnel.
+
+## Rules for writing tests
+
+- **Assert in three places.** A thank-you page proves nothing on its own. Every payment test
+  must also check the WooCommerce order and the Checkout.com payment (amount, currency,
+  status) — use `expectOrderPaidByCheckoutCom()`.
+- **Wait on signals, not time.** Flow is ready when `#flow-container` has
+  `data-cko-flow-ready="1"` (set by the plugin from the SDK's `onReady`). Classic checkout is
+  settled when no AJAX/overlay has been seen for 1.5s. No fixed `waitForTimeout` for readiness.
+- **Fail loudly.** A missing iframe/field is a failure, never a logged warning.
+- **Own your data.** Each test creates its own order with a unique email; tests run serially
+  (`workers: 1`) because they share one store.
+- **3DS is part of the normal flow.** The plugin forces 3DS on; the page objects complete the
+  sandbox challenge (password `Checkout1!`) automatically.
+
+## CI
+
+`.github/workflows/e2e.yml` runs `@smoke` on every PR (Chromium, classic + Blocks) and uploads
+the report and traces. It needs these repository secrets (use a **dedicated** sandbox account):
+`E2E_CKO_PUBLIC_KEY`, `E2E_CKO_SECRET_KEY`, and optionally `E2E_CKO_CLIENT_ID`,
+`E2E_CKO_PROCESSING_CHANNEL_ID`. Without them (e.g. PRs from forks) the job skips with a notice.

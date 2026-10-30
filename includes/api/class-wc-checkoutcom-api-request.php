@@ -34,8 +34,8 @@ use Checkout\Tokens\ApplePayTokenRequest;
 use Checkout\Tokens\GooglePayTokenData;
 use Checkout\Tokens\GooglePayTokenRequest;
 
-require_once 'class-wc-checkoutcom-utility.php';
-require 'class-wc-checkoutcom-apm-method.php';
+require_once __DIR__ . '/class-wc-checkoutcom-utility.php';
+require __DIR__ . '/class-wc-checkoutcom-apm-method.php';
 
 /**
  * Class WC_Checkoutcom_Api_Request handles the API requests.
@@ -72,6 +72,10 @@ class WC_Checkoutcom_Api_Request {
 	public static function create_payment( WC_Order $order, $arg, $subscription = null, $retry_idempotency_key = false ) {
 		// Get payment request parameter.
 		$request_param = WC_Checkoutcom_Api_Request::get_request_param( $order, $arg, $subscription );
+		if ( is_array( $request_param ) && isset( $request_param['error'] ) ) {
+			$error = $request_param['error'];
+			return array( 'error' => is_array( $error ) ? ( $error['message'] ?? __( 'Payment could not be processed.', 'checkout-com-unified-payments-api' ) ) : $error );
+		}
 
 		$gateway_debug = 'yes' === WC_Admin_Settings::get_option( 'cko_gateway_responses', 'no' );
 
@@ -237,8 +241,11 @@ class WC_Checkoutcom_Api_Request {
 
 			if ( self::is_using_saved_payment_method() ) {
 				// Saved card used.
-				// Load token id ($arg).
-				$token = WC_Payment_Tokens::get( $arg );
+				// Load token id ($arg) — only if it belongs to this customer/order.
+				$token = WC_Checkoutcom_Utility::get_owned_payment_token( $arg, $order );
+				if ( ! $token ) {
+					return array( 'error' => __( 'Saved payment method not found. Please try using a new payment method.', 'checkout-com-unified-payments-api' ) );
+				}
 
 				$card_scheme = $token->get_meta( 'preferred_scheme' );
 
@@ -281,8 +288,8 @@ class WC_Checkoutcom_Api_Request {
 
 			if ( self::is_using_saved_payment_method() ) {
 				// Saved card used with Flow.
-				// Load token id ($arg).
-				$token = WC_Payment_Tokens::get( $arg );
+				// Load token id ($arg) — only if it belongs to this customer/order.
+				$token = WC_Checkoutcom_Utility::get_owned_payment_token( $arg, $order );
 
 				// Enhanced error handling for old saved cards
 				if ( ! $token ) {
@@ -557,9 +564,9 @@ class WC_Checkoutcom_Api_Request {
 				if ( $is_save_card ) {
 					// check if souce_id is a mada card.
 					// load token by id ($arg).
-					$token = WC_Payment_Tokens::get( $arg );
+					$token = WC_Checkoutcom_Utility::get_owned_payment_token( $arg, $order );
 					// check if source_id is mada.
-					$is_mada = $token->get_meta( 'is_mada' );
+					$is_mada = $token ? $token->get_meta( 'is_mada' ) : false;
 
 					if ( $is_mada ) {
 						$method->cvv = $post_data['wc_checkout_com_cards-card-cvv'];
@@ -1057,14 +1064,44 @@ class WC_Checkoutcom_Api_Request {
 	}
 
 	/**
+	 * Record a successful refund's action id on the order so the refund webhook can recognise it as
+	 * already booked and not create a duplicate WooCommerce refund (over-refund protection).
+	 *
+	 * @param WC_Order     $order    Order object.
+	 * @param object|array $response Checkout.com refund response.
+	 * @return void
+	 */
+	private static function record_refund_action_id( $order, $response ) {
+		if ( ! ( $order instanceof WC_Order ) ) {
+			return;
+		}
+		$action_id = '';
+		if ( is_array( $response ) ) {
+			$action_id = $response['action_id'] ?? '';
+		} elseif ( is_object( $response ) ) {
+			$action_id = $response->action_id ?? '';
+		}
+		if ( '' === (string) $action_id ) {
+			return;
+		}
+		$ids = (array) $order->get_meta( '_cko_refund_action_ids' );
+		if ( ! in_array( $action_id, $ids, true ) ) {
+			$ids[] = $action_id;
+			$order->update_meta_data( '_cko_refund_action_ids', $ids );
+			$order->save();
+		}
+	}
+
+	/**
 	 * Perform Refund.
 	 *
-	 * @param int      $order_id Order ID.
-	 * @param WC_Order $order Order object.
+	 * @param int        $order_id Order ID.
+	 * @param WC_Order   $order    Order object.
+	 * @param float|null $amount   Amount to refund, as passed to process_refund() by WooCommerce.
 	 *
 	 * @return array|mixed
 	 */
-	public static function refund_payment( $order_id, $order ) {
+	public static function refund_payment( $order_id, $order, $amount = null ) {
 		$core_settings      = function_exists( 'cko_get_raw_option' )
 			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
 			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
@@ -1082,7 +1119,16 @@ class WC_Checkoutcom_Api_Request {
 		// check for decimal separator.
 		$order_amount        = str_replace( ',', '.', $order->get_total() );
 		$order_amount_cents  = WC_Checkoutcom_Utility::value_to_decimal( $order_amount, $order->get_currency() );
-		$refund_amount       = str_replace( ',', '.', sanitize_text_field( $_POST['refund_amount'] ) );
+		// Use the amount WooCommerce passes to process_refund(). Reading only $_POST['refund_amount']
+		// (the admin order screen field) sent a wrong/zero amount for refunds created through the
+		// REST API or code. Fall back to the form field, then to a full refund, for old callers.
+		if ( null !== $amount && '' !== (string) $amount ) {
+			$refund_amount = str_replace( ',', '.', (string) $amount );
+		} elseif ( isset( $_POST['refund_amount'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing -- WooCommerce verifies the refund nonce.
+			$refund_amount = str_replace( ',', '.', sanitize_text_field( wp_unslash( $_POST['refund_amount'] ) ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+		} else {
+			$refund_amount = $order_amount;
+		}
 		$refund_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $refund_amount, $order->get_currency() );
 
 		// Check if refund amount is less than order amount.
@@ -1152,6 +1198,7 @@ class WC_Checkoutcom_Api_Request {
 
 					return [ 'error' => $error_message ];
 				} else {
+					self::record_refund_action_id( $order, $response );
 					return $response;
 				}
 			}
@@ -1187,6 +1234,7 @@ class WC_Checkoutcom_Api_Request {
 
 				return [ 'error' => $error_message ];
 			} else {
+				self::record_refund_action_id( $order, $response );
 				return $response;
 			}
 		} catch ( CheckoutApiException $ex ) {

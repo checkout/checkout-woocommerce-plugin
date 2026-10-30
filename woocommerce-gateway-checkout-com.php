@@ -5,12 +5,14 @@
  * Description: Extends WooCommerce by Adding the Checkout.com Gateway.
  * Author: Checkout.com
  * Author URI: https://www.checkout.com/
- * Version: 5.1.4.4
- * Requires at least: 5.0
+ * Developer: Checkout.com
+ * Developer URI: https://www.checkout.com/
+ * Version: 5.1.5
+ * Requires at least: 6.0
  * Tested up to: 7.1
- * WC requires at least: 3.0
- * WC tested up to: 11.0.1
- * Requires PHP: 7.3
+ * WC requires at least: 8.0
+ * WC tested up to: 11.2
+ * Requires PHP: 7.4
  * Requires Plugins: woocommerce
  * Text Domain: checkout-com-unified-payments-api
  * Domain Path: /languages
@@ -53,8 +55,6 @@ if ( file_exists( $utility_path ) ) {
 	require_once $utility_path;
 }
 
-add_filter( 'woocommerce_checkout_registration_enabled', '__return_true' );
-
 /**
  * Read a WordPress option directly from the database, bypassing all filters.
  *
@@ -96,29 +96,31 @@ function cko_get_raw_option( $option_name, $default = array() ) {
  * @param mixed  $value       Value to save.
  * @return bool True on success.
  */
-function cko_update_raw_option( $option_name, $value ) {
-	global $wpdb;
-	$serialized = maybe_serialize( $value );
+if ( ! function_exists( 'cko_update_raw_option' ) ) {
+	function cko_update_raw_option( $option_name, $value ) {
+		global $wpdb;
+		$serialized = maybe_serialize( $value );
 
-	// Single atomic upsert. A previous UPDATE-then-INSERT pattern was unsafe: $wpdb->update()
-	// returns 0 BOTH when no row matched AND when a row matched but the value was unchanged. The
-	// latter (identical value, common on the settings-sync path) wrongly triggered a fallback
-	// INSERT against an existing option_name and failed on the unique key, throwing DB errors on
-	// nearly every run. INSERT ... ON DUPLICATE KEY UPDATE avoids the false insert and is race-safe.
-	// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- $wpdb->options is a trusted table name; values are prepared.
-	$wpdb->query(
-		$wpdb->prepare(
-			"INSERT INTO {$wpdb->options} ( option_name, option_value, autoload ) VALUES ( %s, %s, 'yes' )
-			ON DUPLICATE KEY UPDATE option_value = VALUES( option_value )",
-			$option_name,
-			$serialized
-		)
-	);
+		// Single atomic upsert. A previous UPDATE-then-INSERT pattern was unsafe: $wpdb->update()
+		// returns 0 BOTH when no row matched AND when a row matched but the value was unchanged. The
+		// latter (identical value, common on the settings-sync path) wrongly triggered a fallback
+		// INSERT against an existing option_name and failed on the unique key, throwing DB errors on
+		// nearly every run. INSERT ... ON DUPLICATE KEY UPDATE avoids the false insert and is race-safe.
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- $wpdb->options is a trusted table name; values are prepared.
+		$wpdb->query(
+			$wpdb->prepare(
+				"INSERT INTO {$wpdb->options} ( option_name, option_value, autoload ) VALUES ( %s, %s, 'yes' )
+				ON DUPLICATE KEY UPDATE option_value = VALUES( option_value )",
+				$option_name,
+				$serialized
+			)
+		);
 
-	// Keep WordPress object cache in sync so same-request get_option() calls see the new value.
-	wp_cache_set( $option_name, $value, 'options' );
-	wp_cache_delete( 'alloptions', 'options' );
-	return true;
+		// Keep WordPress object cache in sync so same-request get_option() calls see the new value.
+		wp_cache_set( $option_name, $value, 'options' );
+		wp_cache_delete( 'alloptions', 'options' );
+		return true;
+	}
 }
 
 /**
@@ -148,6 +150,26 @@ function cko_is_flow_mode() {
 	$flow_enabled     = isset( $flow_settings['enabled'] ) && 'yes' === $flow_settings['enabled'];
 
 	return 'flow' === $checkout_mode && $flow_enabled;
+}
+
+/**
+ * Whether both Checkout.com API keys (public + secret) are configured.
+ *
+ * Used to gate gateway availability and the Payments-list connection status so the plugin
+ * never advertises a payment method (or reports "Active") before the merchant has entered keys.
+ *
+ * @return bool
+ */
+function cko_has_api_keys() {
+	$core_settings = function_exists( 'cko_get_raw_option' )
+		? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+		: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+
+	if ( ! is_array( $core_settings ) ) {
+		return false;
+	}
+
+	return ! empty( $core_settings['ckocom_pk'] ) && ! empty( $core_settings['ckocom_sk'] );
 }
 
 /**
@@ -231,7 +253,7 @@ function cko_force_flow_gateway_available( $available_gateways ) {
 	$payment_method      = isset( $_POST['payment_method'] ) ? sanitize_text_field( wp_unslash( $_POST['payment_method'] ) ) : '';
 	$is_checkout_context = is_checkout() || is_wc_endpoint_url( 'order-pay' ) || ( defined( 'DOING_AJAX' ) && DOING_AJAX ) || ( 'wc_checkout_com_flow' === $payment_method );
 
-	if ( $is_checkout_context && cko_is_flow_mode() && cko_flow_checkout_requires_payment() ) {
+	if ( $is_checkout_context && cko_is_flow_mode() && cko_has_api_keys() && cko_flow_checkout_requires_payment() ) {
 		$all_gateways = WC()->payment_gateways()->payment_gateways();
 		if ( isset( $all_gateways['wc_checkout_com_flow'] ) ) {
 			$available_gateways['wc_checkout_com_flow'] = $all_gateways['wc_checkout_com_flow'];
@@ -249,7 +271,7 @@ add_filter( 'woocommerce_available_payment_gateways', 'cko_force_flow_gateway_av
  * @return array Filtered available payment gateways.
  */
 function cko_backup_force_flow_gateway_available( $available_gateways ) {
-	if ( cko_is_flow_mode() && cko_flow_checkout_requires_payment() && ! isset( $available_gateways['wc_checkout_com_flow'] ) ) {
+	if ( cko_is_flow_mode() && cko_has_api_keys() && cko_flow_checkout_requires_payment() && ! isset( $available_gateways['wc_checkout_com_flow'] ) ) {
 		$all_gateways = WC()->payment_gateways()->payment_gateways();
 		if ( isset( $all_gateways['wc_checkout_com_flow'] ) ) {
 			$available_gateways['wc_checkout_com_flow'] = $all_gateways['wc_checkout_com_flow'];
@@ -262,7 +284,7 @@ add_filter( 'woocommerce_available_payment_gateways', 'cko_backup_force_flow_gat
 // Re-add Flow at very high priority to counteract multilingual plugins (e.g. Polylang)
 // that strip gateways between priority 999 and 99999.
 add_filter( 'woocommerce_available_payment_gateways', function( $gateways ) {
-	if ( cko_is_flow_mode() && cko_flow_checkout_requires_payment() && ! isset( $gateways['wc_checkout_com_flow'] ) ) {
+	if ( cko_is_flow_mode() && cko_has_api_keys() && cko_flow_checkout_requires_payment() && ! isset( $gateways['wc_checkout_com_flow'] ) ) {
 		$all_gateways = WC()->payment_gateways()->payment_gateways();
 		if ( isset( $all_gateways['wc_checkout_com_flow'] ) ) {
 			$gateways['wc_checkout_com_flow'] = $all_gateways['wc_checkout_com_flow'];
@@ -318,7 +340,7 @@ add_action( 'woocommerce_new_order', 'cko_update_order_id_in_session', 5 );
  * Constants.
  */
 // NOSONAR (S1313): "5.1.3.7" is the plugin version (WordPress semver-style), not a hardcoded IP address.
-define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '5.1.4.4' ); // NOSONAR
+define( 'WC_CHECKOUTCOM_PLUGIN_VERSION', '5.1.5' ); // NOSONAR
 define( 'WC_CHECKOUTCOM_PLUGIN_URL', untrailingslashit( plugins_url( basename( plugin_dir_path( __FILE__ ) ), basename( __FILE__ ) ) ) );
 define( 'WC_CHECKOUTCOM_PLUGIN_PATH', untrailingslashit( plugin_dir_path( __FILE__ ) ) );
 
@@ -335,14 +357,14 @@ add_action( 'plugins_loaded', 'init_checkout_com_gateway_class', 0 );
 		load_plugin_textdomain( 'checkout-com-unified-payments-api', false, plugin_basename( __DIR__ ) . '/languages' );
 
 		// Core payment gateway classes
-		include_once 'includes/class-wc-checkout-com-webhook.php';
-		include_once 'includes/class-wc-checkout-com-webhook-queue.php';
+		include_once __DIR__ . '/includes/class-wc-checkout-com-webhook.php';
+		include_once __DIR__ . '/includes/class-wc-checkout-com-webhook-queue.php';
 		
 		// Admin pages
 		if ( is_admin() ) {
-			include_once 'includes/admin/class-wc-checkoutcom-webhook-queue-admin.php';
-			include_once 'includes/admin/class-wc-checkoutcom-diagnostics.php';
-			include_once 'includes/admin/class-wc-checkoutcom-order-columns.php';
+			include_once __DIR__ . '/includes/admin/class-wc-checkoutcom-webhook-queue-admin.php';
+			include_once __DIR__ . '/includes/admin/class-wc-checkoutcom-diagnostics.php';
+			include_once __DIR__ . '/includes/admin/class-wc-checkoutcom-order-columns.php';
 		}
 		
 		// Note: You can also access the webhook queue table directly using:
@@ -363,8 +385,8 @@ add_action( 'plugins_loaded', 'init_checkout_com_gateway_class', 0 );
 		// Hook for cleanup of old webhooks
 		add_action( 'cko_cleanup_old_webhooks', 'cko_cleanup_old_webhooks_handler' );
 		
-		include_once 'includes/class-wc-gateway-checkout-com-cards.php';
-		include_once 'includes/class-wc-gateway-checkout-com-apple-pay.php';
+		include_once __DIR__ . '/includes/class-wc-gateway-checkout-com-cards.php';
+		include_once __DIR__ . '/includes/class-wc-gateway-checkout-com-apple-pay.php';
 		
 		// Register Apple Pay CSR generation AJAX handler early
 		// Use a wrapper function to ensure it's always available
@@ -378,15 +400,15 @@ add_action( 'plugins_loaded', 'init_checkout_com_gateway_class', 0 );
 		add_action( 'wp_ajax_cko_test_apple_pay_certificate', 'cko_ajax_test_apple_pay_certificate' );
 	}
 	
-		include_once 'includes/class-wc-gateway-checkout-com-google-pay.php';
-		include_once 'includes/class-wc-gateway-checkout-com-paypal.php';
-		include_once 'includes/class-wc-gateway-checkout-com-alternative-payments.php';
+		include_once __DIR__ . '/includes/class-wc-gateway-checkout-com-google-pay.php';
+		include_once __DIR__ . '/includes/class-wc-gateway-checkout-com-paypal.php';
+		include_once __DIR__ . '/includes/class-wc-gateway-checkout-com-alternative-payments.php';
 		
 		// Flow integration
-		include_once 'flow-integration/class-wc-gateway-checkout-com-flow.php';
+		include_once __DIR__ . '/flow-integration/class-wc-gateway-checkout-com-flow.php';
 		
 		// Unified Express Checkout Element Handler
-		include_once 'includes/express/class-wc-checkoutcom-express-checkout-element.php';
+		include_once __DIR__ . '/includes/express/class-wc-checkoutcom-express-checkout-element.php';
 		
 		// Initialize unified express checkout element
 		if ( class_exists( 'WC_Checkoutcom_Express_Checkout_Element' ) ) {
@@ -492,6 +514,9 @@ add_action(
 	function () {
 		if ( class_exists( '\Automattic\WooCommerce\Utilities\FeaturesUtil' ) ) {
 			\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility( 'custom_order_tables', __FILE__, true );
+			// Block-based (Cart & Checkout) blocks: the Flow payment method is registered for the
+			// WooCommerce Checkout block (includes/blocks/), so declare compatibility.
+			\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility( 'cart_checkout_blocks', __FILE__, true );
 		}
 	}
 );
@@ -849,7 +874,6 @@ function cko_check_if_empty() {
 // Hook into order creation and updates
 add_action( 'woocommerce_new_order', 'cko_validate_manual_order_creation' );
 add_action( 'woocommerce_update_order', 'cko_validate_manual_order_creation' );
-add_action( 'save_post', 'cko_validate_manual_order_on_save' );
 add_action( 'admin_init', 'cko_check_incomplete_orders' );
 
 /**
@@ -894,82 +918,6 @@ function cko_validate_manual_order_creation( $order_id ) {
 }
 
 /**
- * Validate order when saved via admin (different hook)
- *
- * @param int $post_id Post ID.
- */
-function cko_validate_manual_order_on_save( $post_id ) {
-	// Only process shop_order posts
-	if ( get_post_type( $post_id ) !== 'shop_order' ) {
-		return;
-	}
-	
-	$order = wc_get_order( $post_id );
-	
-	// Only validate admin-created orders (manual orders)
-	if ( ! $order || ! $order->is_created_via( 'admin' ) ) {
-		return;
-	}
-	
-	// Log for debugging
-	WC_Checkoutcom_Utility::logger( 'Validating manual order on save. Order ID: ' . $post_id );
-	
-	$validation_errors = array();
-	
-	// Check if billing email is missing or invalid
-	$billing_email = $order->get_billing_email();
-	if ( empty( $billing_email ) || ! is_email( $billing_email ) ) {
-		$validation_errors[] = __( 'Billing email is required for Flow payments to work properly.', 'checkout-com-unified-payments-api' );
-		WC_Checkoutcom_Utility::logger( 'Manual order saved without valid billing email. Order ID: ' . $post_id );
-	}
-	
-	// Check if billing address is missing
-	$billing_address_1 = $order->get_billing_address_1();
-	$billing_city = $order->get_billing_city();
-	$billing_country = $order->get_billing_country();
-	
-	if ( empty( $billing_address_1 ) || empty( $billing_city ) || empty( $billing_country ) ) {
-		$validation_errors[] = __( 'Complete billing address is required for Flow payments to work properly.', 'checkout-com-unified-payments-api' );
-		WC_Checkoutcom_Utility::logger( 'Manual order saved without complete billing address. Order ID: ' . $post_id );
-	}
-	
-	// If there are validation errors, prevent saving and show error
-	if ( ! empty( $validation_errors ) ) {
-		// Log the blocking
-		WC_Checkoutcom_Utility::logger( 'BLOCKING order creation due to validation errors: ' . implode( ', ', $validation_errors ) );
-		
-		// Show error message and stop execution
-		$error_message = '<h2>' . esc_html__( 'Order Creation Blocked', 'checkout-com-unified-payments-api' ) . '</h2>';
-		$error_message .= '<p><strong>' . esc_html__( 'Checkout.com Flow:', 'checkout-com-unified-payments-api' ) . '</strong> ' . esc_html__( 'Cannot create order with missing required information.', 'checkout-com-unified-payments-api' ) . '</p>';
-		$error_message .= '<ul>';
-		foreach ( $validation_errors as $error ) {
-			$error_message .= '<li>' . esc_html( $error ) . '</li>';
-		}
-		$error_message .= '</ul>';
-		$error_message .= '<p><strong>' . esc_html__( 'Please:', 'checkout-com-unified-payments-api' ) . '</strong></p>';
-		$error_message .= '<ol>';
-		$error_message .= '<li>' . esc_html__( 'Go back to the order form', 'checkout-com-unified-payments-api' ) . '</li>';
-		$error_message .= '<li>' . esc_html__( 'Add the missing billing email and address', 'checkout-com-unified-payments-api' ) . '</li>';
-		$error_message .= '<li>' . esc_html__( 'Try creating the order again', 'checkout-com-unified-payments-api' ) . '</li>';
-		$error_message .= '</ol>';
-		$error_message .= '<p><a href="javascript:history.back()">' . esc_html__( 'Go Back', 'checkout-com-unified-payments-api' ) . '</a></p>';
-		
-		// Define allowed HTML for wp_kses
-		$allowed_html = array(
-			'h2'     => array(),
-			'p'      => array(),
-			'strong' => array(),
-			'ul'     => array(),
-			'ol'     => array(),
-			'li'     => array(),
-			'a'      => array( 'href' => array() ),
-		);
-		
-		wp_die( wp_kses( $error_message, $allowed_html ), esc_html__( 'Order Creation Blocked', 'checkout-com-unified-payments-api' ), array( 'response' => 400 ) );
-	}
-}
-
-/**
  * Check for incomplete orders and show persistent warnings
  */
 function cko_check_incomplete_orders() {
@@ -978,19 +926,16 @@ function cko_check_incomplete_orders() {
 		return;
 	}
 	
-	// Get current screen
+	// Get current screen — allow the legacy order screens and the HPOS Orders screen.
 	$screen = get_current_screen();
-	if ( ! $screen || ( $screen->id !== 'shop_order' && $screen->id !== 'edit-shop_order' ) ) {
+	if ( ! $screen || ! in_array( $screen->id, array( 'shop_order', 'edit-shop_order', 'woocommerce_page_wc-orders' ), true ) ) {
 		return;
 	}
-	
-	// Get order ID from URL
-	$order_id = 0;
-	$posted_post_id = isset( $_GET['post'] ) ? absint( wp_unslash( $_GET['post'] ) ) : 0;
-	if ( $posted_post_id && get_post_type( $posted_post_id ) === 'shop_order' ) {
-		$order_id = $posted_post_id;
-	}
-	
+
+	// Order id comes from ?post= on the legacy edit screen or ?id= on the HPOS Orders screen.
+	// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only admin screen routing.
+	$order_id = isset( $_GET['id'] ) ? absint( wp_unslash( $_GET['id'] ) ) : ( isset( $_GET['post'] ) ? absint( wp_unslash( $_GET['post'] ) ) : 0 );
+
 	if ( ! $order_id ) {
 		return;
 	}
@@ -1103,10 +1048,10 @@ function cko_show_validation_notices() {
 	global $post;
 	$order_id = 0;
 	
-	$posted_post_id = isset( $_GET['post'] ) ? absint( wp_unslash( $_GET['post'] ) ) : 0;
-	if ( $posted_post_id && get_post_type( $posted_post_id ) === 'shop_order' ) {
-		$order_id = $posted_post_id;
-	} elseif ( $post && $post->post_type === 'shop_order' ) {
+	// Order id from ?post= (legacy edit screen) or ?id= (HPOS Orders screen); fall back to $post.
+	// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only admin screen routing.
+	$order_id = isset( $_GET['id'] ) ? absint( wp_unslash( $_GET['id'] ) ) : ( isset( $_GET['post'] ) ? absint( wp_unslash( $_GET['post'] ) ) : 0 );
+	if ( ! $order_id && $post && 'shop_order' === $post->post_type ) {
 		$order_id = $post->ID;
 	}
 	
@@ -2008,7 +1953,7 @@ add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_flow', '
  * @param WC_Order $renewal_order A WC_Order object created to record the renewal payment.
  */
 function cko_subscription_payment( $renewal_total, $renewal_order ) {
-	include_once 'includes/subscription/class-wc-checkoutcom-subscription.php';
+	include_once __DIR__ . '/includes/subscription/class-wc-checkoutcom-subscription.php';
 
 	WC_Checkoutcom_Subscription::renewal_payment( $renewal_total, $renewal_order );
 }
@@ -2023,7 +1968,7 @@ add_action( 'woocommerce_subscription_status_cancelled', 'cko_subscription_cance
  * @return void
  */
 function cko_subscription_cancelled( $subscription ) {
-	include_once 'includes/subscription/class-wc-checkoutcom-subscription.php';
+	include_once __DIR__ . '/includes/subscription/class-wc-checkoutcom-subscription.php';
 
 	// The static method on WC_Checkoutcom_Subscription is named subscription_cancelled()
 	// (no cko_ prefix). Calling cko_subscription_cancelled() here would fatal with
@@ -2366,7 +2311,7 @@ add_action(
 			'/payment-status',
 			array(
 				'methods'             => 'GET',
-				'callback'            => 'cko_get_payment_status',
+				'callback'            => 'cko_get_payment_status_public',
 				'permission_callback' => 'cko_payment_status_permission_check',
 			)
 		);
@@ -2395,6 +2340,41 @@ function cko_payment_status_permission_check( $request ) {
 }
 
 /**
+ * Public REST callback for /ckoplugin/v1/payment-status.
+ *
+ * The route is reachable by any visitor holding the checkout nonce, so it returns only what
+ * the browser needs (the decline reason shown on a failed return) - never the full payment
+ * (customer name, email, addresses, card details). Internal callers use
+ * cko_get_payment_status() directly and still get the full payment.
+ *
+ * @param WP_REST_Request $request Request.
+ *
+ * @return WP_REST_Response
+ */
+function cko_get_payment_status_public( $request ) {
+	$response = cko_get_payment_status( $request );
+	if ( ! $response instanceof WP_REST_Response ) {
+		return new WP_REST_Response( array( 'error' => 'Payment status unavailable' ), 500 );
+	}
+
+	$data   = $response->get_data();
+	$status = $response->get_status();
+	if ( $status >= 400 || ! is_array( $data ) || isset( $data['error'] ) ) {
+		return new WP_REST_Response( array( 'error' => 'Payment status unavailable' ), $status >= 400 ? $status : 500 );
+	}
+
+	return new WP_REST_Response(
+		array(
+			'status'           => isset( $data['status'] ) ? (string) $data['status'] : '',
+			'approved'         => ! empty( $data['approved'] ),
+			'response_code'    => isset( $data['response_code'] ) ? (string) $data['response_code'] : '',
+			'response_summary' => isset( $data['response_summary'] ) ? (string) $data['response_summary'] : '',
+		),
+		200
+	);
+}
+
+/**
  * Callback function to get payment status from Checkout.com API.
  *
  * @param WP_REST_Request $request The REST API request object.
@@ -2416,6 +2396,14 @@ function cko_get_payment_status( $request ) {
 
 	if ( empty( $payment_id ) ) {
 		return new WP_REST_Response( array( 'error' => 'Missing paymentId' ), 400 );
+	}
+
+	// SECURITY: only accept a well-formed Checkout.com payment id. Without this, a caller could pass
+	// path segments (e.g. "pay_x/../customers/cus_victim") that get appended to the API URL and
+	// proxied with the store's secret key, turning this into an authenticated read of arbitrary
+	// Checkout.com endpoints. The strict pattern also blocks slashes, dots and traversal.
+	if ( ! preg_match( '/^pay_[A-Za-z0-9]{10,64}$/', $payment_id ) ) {
+		return new WP_REST_Response( array( 'error' => 'Invalid paymentId' ), 400 );
 	}
 
 	// Use correct API URL based on environment
