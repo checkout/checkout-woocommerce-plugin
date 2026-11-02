@@ -879,11 +879,12 @@ function cko_check_if_empty() {
 // Hook into order creation and updates
 add_action( 'woocommerce_new_order', 'cko_validate_manual_order_creation' );
 add_action( 'woocommerce_update_order', 'cko_validate_manual_order_creation' );
-add_action( 'admin_init', 'cko_check_incomplete_orders' );
+// current_screen, not admin_init: get_current_screen() is still null during admin_init.
+add_action( 'current_screen', 'cko_check_incomplete_orders' );
 
 /**
- * Validate manual order creation to ensure billing address and email are set.
- * This prevents issues when using Flow payment on order-pay page.
+ * Log manual orders created without a billing email or address (needed for Flow on the
+ * order-pay page). The admin warning itself is shown by cko_check_incomplete_orders().
  *
  * @param int $order_id Order ID.
  */
@@ -903,9 +904,7 @@ function cko_validate_manual_order_creation( $order_id ) {
 	if ( empty( $billing_email ) || ! is_email( $billing_email ) ) {
 		// Log the issue
 		WC_Checkoutcom_Utility::logger( 'Manual order created without valid billing email. Order ID: ' . $order_id );
-		
-		// Set a transient to show notice on next admin page load
-		set_transient( 'cko_validation_email_' . $order_id, true, 60 );
+
 	}
 	
 	// Check if billing address is missing
@@ -916,9 +915,7 @@ function cko_validate_manual_order_creation( $order_id ) {
 	if ( empty( $billing_address_1 ) || empty( $billing_city ) || empty( $billing_country ) ) {
 		// Log the issue
 		WC_Checkoutcom_Utility::logger( 'Manual order created without complete billing address. Order ID: ' . $order_id );
-		
-		// Set a transient to show notice on next admin page load
-		set_transient( 'cko_validation_address_' . $order_id, true, 60 );
+
 	}
 }
 
@@ -958,6 +955,12 @@ function cko_check_incomplete_orders() {
 	
 	$is_incomplete = false;
 	$missing_fields = array();
+
+	// Flow's order-pay check also needs the billing name.
+	if ( '' === trim( (string) $order->get_billing_first_name() ) || '' === trim( (string) $order->get_billing_last_name() ) ) {
+		$is_incomplete = true;
+		$missing_fields[] = 'billing first and last name';
+	}
 	
 	if ( empty( $billing_email ) || ! is_email( $billing_email ) ) {
 		$is_incomplete = true;
@@ -984,12 +987,13 @@ function cko_check_incomplete_orders() {
  * Show admin notice for incomplete Flow orders.
  */
 function cko_show_flow_incomplete_order_notice() {
-	// Check if we're on the order edit page
-	if ( ! isset( $_GET['post'] ) || ! isset( $_GET['action'] ) || 'edit' !== $_GET['action'] ) {
+	// Order edit page: ?post= (legacy) or ?id= (HPOS Orders screen).
+	// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only admin screen routing.
+	$order_id = isset( $_GET['id'] ) ? absint( wp_unslash( $_GET['id'] ) ) : ( isset( $_GET['post'] ) ? absint( wp_unslash( $_GET['post'] ) ) : 0 );
+	// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only admin screen routing.
+	if ( ! $order_id || ! isset( $_GET['action'] ) || 'edit' !== $_GET['action'] ) {
 		return;
 	}
-	
-	$order_id = absint( $_GET['post'] );
 	$notice_data = get_transient( 'cko_flow_incomplete_order_notice_' . $order_id );
 	
 	if ( ! $notice_data || ! is_array( $notice_data ) ) {

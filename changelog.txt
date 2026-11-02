@@ -1,6 +1,9 @@
 *** Checkout.com Payment Gateway Changelog ***
 
 2026-10-29 - version 5.2.0
+* Fix - MOTO: admin-created orders for guest customers paid through Flow on the order-pay page are sent as MOTO without 3DS (previously 3DS was forced and the payment could be declined). MOTO is decided on the server from the order.
+* Fix - Order-pay and checkout pages no longer fail with "Please fill in the required fields" when the order or cart contains an apostrophe (e.g. O'Brien); the page data is now escaped.
+* Fix - The admin warning for manual orders missing billing details now shows (also on the HPOS Orders screen) and includes the billing name.
 * Update - checkout-sdk-php upgraded from 3.2.8 to 6.7.0; requires PHP 8.1+. Guzzle/PSR packages are namespace-scoped with the SDK.
 * Update - All accounts are NAS: removed the Account Type setting and the ABC ("previous") SDK path and dead ABC code.
 * Remove - Removed the deprecated standalone SEPA gateway and its checkout templates (SEPA is offered through Flow).
