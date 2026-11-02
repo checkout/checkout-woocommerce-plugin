@@ -11,6 +11,8 @@
 
 namespace CheckoutComWC\Vendor\Monolog\Handler;
 
+use CheckoutComWC\Vendor\Monolog\LogRecord;
+
 /**
  * No-op
  *
@@ -23,17 +25,17 @@ namespace CheckoutComWC\Vendor\Monolog\Handler;
 class NoopHandler extends Handler
 {
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
-    public function isHandling(array $record): bool
+    public function isHandling(LogRecord $record): bool
     {
         return true;
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
-    public function handle(array $record): bool
+    public function handle(LogRecord $record): bool
     {
         return false;
     }

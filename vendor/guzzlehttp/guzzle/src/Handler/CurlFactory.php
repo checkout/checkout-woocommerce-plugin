@@ -153,7 +153,7 @@ class CurlFactory implements CurlFactoryInterface
         $protocolVersion = $request->getProtocolVersion();
 
         if ('' === $protocolVersion) {
-            checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.11', 'Sending a request with an empty protocol version is deprecated; guzzlehttp/guzzle 8.0 will reject empty protocol versions.');
+            \trigger_deprecation('guzzlehttp/guzzle', '7.11', 'Sending a request with an empty protocol version is deprecated; guzzlehttp/guzzle 8.0 will reject empty protocol versions.');
 
             $protocolVersion = '1.1';
             $request = Psr7\Utils::modifyRequest($request, ['version' => $protocolVersion]);
@@ -685,7 +685,7 @@ class CurlFactory implements CurlFactoryInterface
             $replacement = $conflictingOptions[$option];
             $since = $sinceOverrides[$option] ?? '7.11';
             if ($replacement !== null) {
-                checkoutcomwc_vendor_trigger_deprecation(
+                \trigger_deprecation(
                     'guzzlehttp/guzzle',
                     $since,
                     \sprintf(
@@ -698,7 +698,7 @@ class CurlFactory implements CurlFactoryInterface
                 continue;
             }
 
-            checkoutcomwc_vendor_trigger_deprecation(
+            \trigger_deprecation(
                 'guzzlehttp/guzzle',
                 $since,
                 \sprintf(
@@ -720,7 +720,7 @@ class CurlFactory implements CurlFactoryInterface
             && \array_key_exists((int) \constant('CURLOPT_PROXYHEADER'), $options['curl'])
             && !CurlVersion::supportsProxyHeaderSeparation()
         ) {
-            checkoutcomwc_vendor_trigger_deprecation(
+            \trigger_deprecation(
                 'guzzlehttp/guzzle',
                 '7.15',
                 \sprintf(
@@ -742,7 +742,7 @@ class CurlFactory implements CurlFactoryInterface
                 continue;
             }
 
-            checkoutcomwc_vendor_trigger_deprecation(
+            \trigger_deprecation(
                 'guzzlehttp/guzzle',
                 '7.12',
                 \sprintf(
@@ -756,7 +756,7 @@ class CurlFactory implements CurlFactoryInterface
     private static function triggerUnsupportedRequestOptionDeprecations(array $options): void
     {
         if (\array_key_exists('stream_context', $options)) {
-            checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.11', 'Passing the "stream_context" request option to a cURL handler is deprecated; guzzlehttp/guzzle 8.0 will reject this option because cURL handlers ignore PHP stream context options.');
+            \trigger_deprecation('guzzlehttp/guzzle', '7.11', 'Passing the "stream_context" request option to a cURL handler is deprecated; guzzlehttp/guzzle 8.0 will reject this option because cURL handlers ignore PHP stream context options.');
         }
     }
 

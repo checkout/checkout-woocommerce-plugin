@@ -27,8 +27,5 @@ namespace CheckoutComWC\Vendor\Monolog;
  */
 interface ResettableInterface
 {
-    /**
-     * @return void
-     */
-    public function reset();
+    public function reset(): void;
 }

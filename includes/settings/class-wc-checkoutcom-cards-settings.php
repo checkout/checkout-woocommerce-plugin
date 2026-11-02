@@ -78,8 +78,7 @@ class WC_Checkoutcom_Cards_Settings {
 			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
 			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$nas_docs      = 'https://www.checkout.com/docs/four/resources/api-authentication/api-keys';
-		$abc_docs      = 'https://www.checkout.com/docs/the-hub/update-your-hub-settings#Manage_the_API_keys';
-		$docs_link     = $nas_docs; // Default to NAS docs since account type is NAS
+		$docs_link     = $nas_docs;
 
 		$checkout_mode = isset( $core_settings['ckocom_checkout_mode'] ) ? $core_settings['ckocom_checkout_mode'] : 'flow';
 
@@ -128,14 +127,11 @@ class WC_Checkoutcom_Cards_Settings {
 		// Load existing values from saved settings
 		$existing_checkout_mode = isset( $core_settings['ckocom_checkout_mode'] ) ? $core_settings['ckocom_checkout_mode'] : 'flow';
 		$existing_environment = isset( $core_settings['ckocom_environment'] ) ? $core_settings['ckocom_environment'] : 'sandbox';
-		$existing_account_type = isset( $core_settings['ckocom_account_type'] ) ? $core_settings['ckocom_account_type'] : 'NAS';
-		// Ensure account type is NAS (cannot be changed)
-		if ( 'NAS' !== $existing_account_type ) {
-			$existing_account_type = 'NAS';
-		}
 		$existing_sk = isset( $core_settings['ckocom_sk'] ) ? $core_settings['ckocom_sk'] : '';
 		$existing_pk = isset( $core_settings['ckocom_pk'] ) ? $core_settings['ckocom_pk'] : '';
 		$existing_title = isset( $core_settings['title'] ) ? $core_settings['title'] : 'Pay by Card with Checkout.com';
+		$existing_client_id = isset( $core_settings['ckocom_client_id'] ) ? $core_settings['ckocom_client_id'] : '';
+		$existing_pc_id = isset( $core_settings['ckocom_processing_channel_id'] ) ? $core_settings['ckocom_processing_channel_id'] : '';
 
 		// SECURITY: never render the stored secret key into the form. Show a masked hint only; an
 		// empty submission is treated as "unchanged" (process_admin_options restores the saved key).
@@ -178,22 +174,6 @@ class WC_Checkoutcom_Cards_Settings {
 				'default'     => 'sandbox',
 				'value'       => $existing_environment, // Load existing value
 			],
-			'ckocom_account_type' => [
-				'id'          => 'ckocom_account_type',
-				'title'       => __( 'Account Type', 'checkout-com-unified-payments-api' ),
-				'type'        => 'select',
-				'description' => __( 'Your account type is set to NAS by default and cannot be changed.', 'checkout-com-unified-payments-api' ),
-				'desc_tip'    => true,
-				'options'     => [
-					'NAS' => __( 'NAS', 'checkout-com-unified-payments-api' ),
-					'ABC' => __( 'ABC', 'checkout-com-unified-payments-api' ),
-				],
-				'default'     => 'NAS',
-				'value'       => 'NAS', // Always NAS, cannot be changed
-				'custom_attributes' => [
-					'disabled' => 'disabled',
-				],
-			],
 			'ckocom_sk'           => [
 				'id'          => 'ckocom_sk',
 				'title'       => __( 'Secret Key', 'checkout-com-unified-payments-api' ),
@@ -214,6 +194,24 @@ class WC_Checkoutcom_Cards_Settings {
 				'description' => sprintf( __( 'You can %1$s find your public key %2$s in the Checkout.com Hub', 'checkout-com-unified-payments-api' ), '<a class="checkoutcom-key-docs" target="_blank" href="' . esc_url( $docs_link ) . '">', '</a>' ),
 				'placeholder' => 'pk_xxx',
 				'value'       => $existing_pk, // Load existing value
+			],
+			'ckocom_client_id' => [
+				'id'          => 'ckocom_client_id',
+				'title'       => __( 'Client ID', 'checkout-com-unified-payments-api' ),
+				'type'        => 'text',
+				'description' => __( 'Optional. Your Checkout.com Client ID (e.g. cli_xxxxxxxxxxxxxxxxxxxxxxxxxx) from the Hub. Used to route API calls to your merchant-specific subdomain. Leave blank to use the global Checkout.com domain.', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => true,
+				'placeholder' => 'cli_xxxxxxxxxxxxxxxxxxxxxxxxxx',
+				'value'       => $existing_client_id,
+			],
+			'ckocom_processing_channel_id' => [
+				'id'          => 'ckocom_processing_channel_id',
+				'title'       => __( 'Processing Channel ID', 'checkout-com-unified-payments-api' ),
+				'type'        => 'text',
+				'description' => __( 'Optional. When set, this processing channel ID (pc_xxx) is sent on payment requests.', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => true,
+				'placeholder' => 'pc_xxx',
+				'value'       => $existing_pc_id,
 			],
 			'title'               => [
 				'id'          => 'title',
@@ -278,7 +276,6 @@ class WC_Checkoutcom_Cards_Settings {
 				'ideal'      => __( 'iDEAL', 'checkout-com-unified-payments-api' ),
 				'klarna'     => __( 'Klarna', 'checkout-com-unified-payments-api' ),
 				'poli'       => __( 'Poli', 'checkout-com-unified-payments-api' ),
-				'sepa'       => __( 'Sepa Direct Debit', 'checkout-com-unified-payments-api' ),
 				'sofort'     => __( 'Sofort', 'checkout-com-unified-payments-api' ),
 				'eps'        => __( 'EPS', 'checkout-com-unified-payments-api' ),
 				'bancontact' => __( 'Bancontact', 'checkout-com-unified-payments-api' ),
@@ -318,12 +315,7 @@ class WC_Checkoutcom_Cards_Settings {
 	public static function core_settings() {
 		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$nas_docs      = 'https://www.checkout.com/docs/four/resources/api-authentication/api-keys';
-		$abc_docs      = 'https://www.checkout.com/docs/the-hub/update-your-hub-settings#Manage_the_API_keys';
-		$docs_link     = $abc_docs;
-
-		if ( isset( $core_settings['ckocom_account_type'] ) && 'NAS' === $core_settings['ckocom_account_type'] ) {
-			$docs_link = $nas_docs;
-		}
+		$docs_link     = $nas_docs;
 
 		$checkout_mode           = $core_settings['ckocom_checkout_mode'] ?? 'flow';
 		$should_disable_checkbox = false;
@@ -391,17 +383,6 @@ class WC_Checkoutcom_Cards_Settings {
 				'description' => __( 'Title that will be displayed on the checkout page', 'checkout-com-unified-payments-api' ),
 				'desc_tip'    => true,
 				'default'     => 'Pay by Card with Checkout.com',
-			],
-			'ckocom_account_type' => [
-				'title'       => __( 'Account Type', 'checkout-com-unified-payments-api' ),
-				'type'        => 'select',
-				'description' => __( 'Contact support team to know your account type.', 'checkout-com-unified-payments-api' ),
-				'desc_tip'    => true,
-				'options'     => [
-					'ABC' => __( 'ABC', 'checkout-com-unified-payments-api' ),
-					'NAS' => __( 'NAS', 'checkout-com-unified-payments-api' ),
-				],
-				'default'     => 'ABC',
 			],
 			'ckocom_sk'           => [
 				'title'       => __( 'Secret Key', 'checkout-com-unified-payments-api' ),
@@ -860,12 +841,7 @@ class WC_Checkoutcom_Cards_Settings {
 	public static function apple_settings() {
 		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$nas_docs      = 'https://www.checkout.com/docs/four/payments/payment-methods/apple-pay';
-		$abc_docs      = 'https://www.checkout.com/docs/payments/payment-methods/wallets/apple-pay';
-		$docs_link     = $abc_docs;
-
-		if ( isset( $core_settings['ckocom_account_type'] ) && 'NAS' === $core_settings['ckocom_account_type'] ) {
-			$docs_link = $nas_docs;
-		}
+		$docs_link     = $nas_docs;
 
 		$checkout_mode           = $core_settings['ckocom_checkout_mode'] ?? 'flow';
 		$should_disable_checkbox = false;
@@ -1494,7 +1470,6 @@ class WC_Checkoutcom_Cards_Settings {
 					'ideal'      => __( 'iDEAL', 'checkout-com-unified-payments-api' ),
 					'klarna'     => __( 'Klarna', 'checkout-com-unified-payments-api' ),
 					'poli'       => __( 'Poli', 'checkout-com-unified-payments-api' ),
-					'sepa'       => __( 'Sepa Direct Debit', 'checkout-com-unified-payments-api' ),
 					'sofort'     => __( 'Sofort', 'checkout-com-unified-payments-api' ),
 					'eps'        => __( 'EPS', 'checkout-com-unified-payments-api' ),
 					'bancontact' => __( 'Bancontact', 'checkout-com-unified-payments-api' ),

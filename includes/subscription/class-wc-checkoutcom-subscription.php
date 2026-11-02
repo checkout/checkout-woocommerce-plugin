@@ -45,6 +45,8 @@ class WC_Checkoutcom_Subscription {
 			// migrating parent-less subscriptions, or on a card change. create_payment() falls back to
 			// the parent order's _cko_payment_id when this is empty (native CKO subscriptions).
 			$args['previous_payment_id'] = $subscriptions_obj->get_meta( '_cko_payment_id' );
+			// Mastercard TLID stored on the subscription (captured from the CIT / prior renewals).
+			$args['scheme_transaction_link_id'] = $subscriptions_obj->get_meta( '_cko_scheme_transaction_link_id' );
 		}
 
 		$payment_result = (array) WC_Checkoutcom_Api_Request::create_payment( $renewal_order, $args, 'renewal' );

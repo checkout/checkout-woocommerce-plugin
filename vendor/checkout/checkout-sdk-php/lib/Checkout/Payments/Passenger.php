@@ -2,20 +2,37 @@
 
 namespace Checkout\Payments;
 
+use DateTime;
+use Checkout\Common\DateOnly;
+
+/**
+ * Contains information about a passenger on the flight.
+ */
 class Passenger
 {
     /**
-     * @var PassengerName
-     */
-    public $name;
-
-    /**
+     * The passenger's first name.
      * @var string
      */
+    public $first_name;
+
+    /**
+     * The passenger's last name.
+     * @var string
+     */
+    public $last_name;
+
+    /**
+     * The passenger's date of birth.
+     * Format: yyyy-MM-dd
+     * @var DateTime
+     */
+    #[DateOnly]
     public $date_of_birth;
 
     /**
-     * @var string values of Country
+     * The passenger's address information.
+     * @var PassengerAddress
      */
-    public $country_code;
+    public $address;
 }

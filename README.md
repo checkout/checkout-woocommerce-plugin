@@ -39,7 +39,9 @@ Checkout.com Payment Gateway plugin for WooCommerce with Flow integration suppor
 
 1. **Secret Key** - Your Checkout.com secret key
 2. **Public Key** - Your Checkout.com public key
-3. **Webhook URL** - Configure in Plugin Settings
+3. **Client ID** (optional, recommended) - `cli_...` from the Hub; routes API calls to your merchant-specific subdomain. Blank = global domain.
+4. **Processing Channel ID** (optional) - `pc_...`; needed when the account has several processing channels (or you see `processing_channel_id_required`).
+5. **Webhook URL** - Register it from the plugin settings (Webhook Status → Register Webhook)
    ```
    https://your-site.com/?wc-api=wc_checkoutcom_webhook
    ```
@@ -58,8 +60,8 @@ Checkout.com Payment Gateway plugin for WooCommerce with Flow integration suppor
 3. In **Quick Setup**, set:
    - **Checkout Mode**: Flow
    - **Environment**: Sandbox (or Live)
-   - **Account Type**: NAS (if applicable)
    - **Secret Key** and **Public Key**
+   - **Client ID** (optional, recommended) and **Processing Channel ID** (optional)
    - **Payment Method Title**
 4. Under **Webhook Status**, click **Refresh Status**.
 5. If not configured, click **Register Webhook**.
@@ -452,11 +454,11 @@ checkout-com-unified-payments-api/
 
 ## Requirements
 
-- WordPress 5.0+
-- WooCommerce 3.0+
-- PHP 7.3+
+- WordPress 6.0+
+- WooCommerce 8.0+
+- PHP 8.1+
 - SSL Certificate (required for production)
-- Tested up to WordPress 6.7.0 and WooCommerce 8.3.1
+- Tested up to WordPress 7.1 and WooCommerce 11.2
 
 ## Support
 

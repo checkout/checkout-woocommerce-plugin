@@ -19,7 +19,7 @@ final class NoSeekStream implements StreamInterface
     public function seek($offset, $whence = SEEK_SET): void
     {
         if (!\is_int($offset)) {
-            checkoutcomwc_vendor_trigger_deprecation(
+            \trigger_deprecation(
                 'guzzlehttp/psr7',
                 '2.11',
                 'Passing %s to StreamInterface::seek() is deprecated; guzzlehttp/psr7 3.0 requires int for $offset.',
@@ -28,7 +28,7 @@ final class NoSeekStream implements StreamInterface
         }
 
         if (!\is_int($whence)) {
-            checkoutcomwc_vendor_trigger_deprecation(
+            \trigger_deprecation(
                 'guzzlehttp/psr7',
                 '2.11',
                 'Passing %s to StreamInterface::seek() is deprecated; guzzlehttp/psr7 3.0 requires int for $whence.',

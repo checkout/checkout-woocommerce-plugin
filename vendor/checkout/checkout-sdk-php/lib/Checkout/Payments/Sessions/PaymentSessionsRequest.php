@@ -2,6 +2,7 @@
 
 namespace Checkout\Payments\Sessions;
 
+use Checkout\Payments\Request\PaymentInstruction;
 use Checkout\Payments\Request\PaymentRetryRequest;
 use Checkout\Payments\RiskRequest;
 use Checkout\Payments\Sender\PaymentSender;
@@ -11,6 +12,7 @@ use Checkout\Payments\BillingDescriptor;
 use Checkout\Payments\BillingInformation;
 use Checkout\Payments\ProcessingSettings;
 use Checkout\Payments\PaymentCustomerRequest;
+use Checkout\Payments\PaymentPlan;
 use Checkout\Payments\ThreeDsRequest;
 use DateTime;
 
@@ -112,9 +114,18 @@ class PaymentSessionsRequest
     public $risk;
 
     /**
-     * @var PaymentRetryRequest
+     * Configuration for retrying failed payments.
+     * [Optional]
+     * @var PaymentRetryRequest|null $customer_retry
      */
-    public $retry;
+    public $customer_retry;
+
+    /**
+     * Details about the payment instruction.
+     * [Optional]
+     * @var PaymentInstruction|null $instruction
+     */
+    public $instruction;
 
     /**
      * @var string
@@ -167,7 +178,18 @@ class PaymentSessionsRequest
     public $ip_address;
 
     /**
-     * @var int
+     * The authorization type.
+     * [Optional]
+     * Enum: "Final" "Estimated"
+     * Default: "Final"
+     * @var string|null $authorization_type value of AuthorizationType
      */
-    public $tax_amount;
+    public $authorization_type;
+
+    /**
+     * The information to process a recurring payment request. To be used when the payment_type is Recurring.
+     * [Optional]
+     * @var PaymentPlan|null $payment_plan
+     */
+    public $payment_plan;
 }

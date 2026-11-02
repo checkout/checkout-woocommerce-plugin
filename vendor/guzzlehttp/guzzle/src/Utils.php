@@ -26,7 +26,7 @@ final class Utils
      */
     public static function describeType($input): string
     {
-        checkoutcomwc_vendor_trigger_deprecation(
+        \trigger_deprecation(
             'guzzlehttp/guzzle',
             '7.12',
             '%s() is deprecated and will be removed in 8.0. Use get_debug_type() instead.',
@@ -268,7 +268,7 @@ final class Utils
      */
     public static function defaultCaBundle(): string
     {
-        checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.1', '%s() is deprecated and will be removed in 8.0. This method is not needed in PHP 5.6+.', __METHOD__);
+        \trigger_deprecation('guzzlehttp/guzzle', '7.1', '%s() is deprecated and will be removed in 8.0. This method is not needed in PHP 5.6+.', __METHOD__);
 
         static $cached = null;
         static $cafiles = [
@@ -313,7 +313,7 @@ No system CA bundle could be found in any of the the common system locations.
 PHP versions earlier than 5.6 are not properly configured to use the system's
 CA bundle by default. In order to verify peer certificates, you will need to
 supply the path on disk to a certificate bundle to the 'verify' request option:
-https://github.com/guzzle/guzzle/blob/7.15/docs/request-options.md#verify. If
+https://github.com/guzzle/guzzle/blob/7.16/docs/request-options.md#verify. If
 you do not need a specific certificate bundle, then Mozilla provides a commonly
 used CA bundle which can be downloaded here (provided by the maintainer of
 cURL): https://curl.se/ca/cacert.pem. Once you have a CA bundle available on
@@ -788,7 +788,7 @@ EOT
      */
     public static function jsonDecode(string $json, bool $assoc = false, int $depth = 512, int $options = 0)
     {
-        checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.15', '%s() is deprecated and will be removed in 8.0. Use PHP\'s json_decode() instead.', __METHOD__);
+        \trigger_deprecation('guzzlehttp/guzzle', '7.15', '%s() is deprecated and will be removed in 8.0. Use PHP\'s json_decode() instead.', __METHOD__);
 
         if ($depth < 1) {
             throw new InvalidArgumentException('json_decode error: Maximum stack depth exceeded');
@@ -816,7 +816,7 @@ EOT
      */
     public static function jsonEncode($value, int $options = 0, int $depth = 512): string
     {
-        checkoutcomwc_vendor_trigger_deprecation('guzzlehttp/guzzle', '7.15', '%s() is deprecated and will be removed in 8.0. Use PHP\'s json_encode() instead.', __METHOD__);
+        \trigger_deprecation('guzzlehttp/guzzle', '7.15', '%s() is deprecated and will be removed in 8.0. Use PHP\'s json_encode() instead.', __METHOD__);
 
         $json = \json_encode($value, $options, $depth);
         if (\JSON_ERROR_NONE !== \json_last_error()) {
@@ -860,7 +860,7 @@ EOT
         }
 
         if ((\is_string($value) && \is_numeric($value)) || (\is_float($value) && \is_finite($value))) {
-            checkoutcomwc_vendor_trigger_deprecation(
+            \trigger_deprecation(
                 'guzzlehttp/guzzle',
                 '7.11',
                 'Passing %s as the "idn_conversion" request option is deprecated; guzzlehttp/guzzle 8.0 will reject values that are not true, false, null, or an integer IDNA_* bitmask.',

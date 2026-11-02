@@ -3,12 +3,16 @@
 namespace Checkout\Payments\Hosted;
 
 use Checkout\Common\CustomerRequest;
-use Checkout\Common\MarketplaceData;
 use Checkout\Payments\BillingDescriptor;
 use Checkout\Payments\BillingInformation;
+use Checkout\Payments\PaymentPlan;
 use Checkout\Payments\PaymentRecipient;
 use Checkout\Payments\ProcessingSettings;
+use Checkout\Payments\Request\PaymentInstruction;
+use Checkout\Payments\Request\PaymentRetryRequest;
 use Checkout\Payments\RiskRequest;
+use Checkout\Payments\Sender\PaymentSender;
+use Checkout\Payments\Sessions\PaymentMethodConfiguration;
 use Checkout\Payments\ShippingDetails;
 use Checkout\Payments\ThreeDsRequest;
 use DateTime;
@@ -131,14 +135,34 @@ class HostedPaymentsSessionRequest
     public $billing_descriptor;
 
     /**
-     * @var string value of PaymentSourceType
+     * @var string[] value of PaymentSourceType
      */
     public $allow_payment_methods;
 
     /**
-     * @var string value of PaymentSourceType
+     * @var string[] values of PaymentSourceType
      */
     public $disabled_payment_methods;
+
+    /**
+     * @var PaymentRetryRequest
+     */
+    public $customer_retry;
+
+    /**
+     * @var PaymentSender
+     */
+    public $sender;
+
+    /**
+     * @var PaymentInstruction
+     */
+    public $instruction;
+
+    /**
+     * @var PaymentMethodConfiguration
+     */
+    public $payment_method_configuration;
 
     //Not available on previous
 
@@ -151,4 +175,20 @@ class HostedPaymentsSessionRequest
      * @var array values of AmountAllocations
      */
     public $amount_allocations;
+
+    /**
+     * The information to process a recurring payment request. To be used when the payment_type is Recurring.
+     * [Optional]
+     * @var PaymentPlan|null $payment_plan
+     */
+    public $payment_plan;
+
+    /**
+     * The authorization type.
+     * [Optional]
+     * Enum: "Final" "Estimated"
+     * Default: "Final"
+     * @var string|null $authorization_type value of AuthorizationType
+     */
+    public $authorization_type;
 }

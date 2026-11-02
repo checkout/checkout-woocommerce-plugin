@@ -113,6 +113,11 @@ class WC_Checkoutcom_Api_Request {
 		}
 		$response = $builder->getPaymentsClient()->requestPayment( $request_param, $cko_idempotency_key );
 
+			// Capture the Mastercard scheme Transaction Link Identifier (TLID) returned in
+			// processing.scheme_transaction_link_id and persist it on the order (and any related
+			// subscription) so it can be sent on future merchant-initiated (recurring) payments.
+			self::record_scheme_transaction_link_id( $order, $response );
+
 			// Check if payment successful.
 			if ( WC_Checkoutcom_Utility::is_successful( $response ) ) {
 				// Check if payment is 3D secure.
@@ -382,6 +387,17 @@ class WC_Checkoutcom_Api_Request {
 		$payment->reference    = $order->get_order_number();
 		$payment->payment_type = PaymentType::$regular;
 
+		// Processing channel id: send it on the payment request when configured.
+		$cko_core_settings = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', [] );
+		$cko_pc_id = is_array( $cko_core_settings ) && ! empty( $cko_core_settings['ckocom_processing_channel_id'] )
+			? trim( (string) $cko_core_settings['ckocom_processing_channel_id'] )
+			: '';
+		if ( '' !== $cko_pc_id ) {
+			$payment->processing_channel_id = $cko_pc_id;
+		}
+
 		$payment->source = $method;
 
 
@@ -453,12 +469,24 @@ class WC_Checkoutcom_Api_Request {
 					$payment->previous_payment_id = $previous_payment_id;
 				}
 
+				// Mastercard TLID: send the stored scheme Transaction Link Identifier on the MIT.
+				// Required when the initial CIT was processed by a different provider; harmless
+				// otherwise (Checkout.com resolves it from previous_payment_id for native chains).
+				$scheme_tlid = ! empty( $arg['scheme_transaction_link_id'] ) ? $arg['scheme_transaction_link_id'] : '';
+				if ( '' !== $scheme_tlid ) {
+					if ( empty( $payment->processing ) ) {
+						$payment->processing = new ProcessingSettings();
+					}
+					$payment->processing->scheme_transaction_link_id = $scheme_tlid;
+				}
+
 				// Make the credential-chain reference visible in the gateway log (for verifying native /
 				// card-changed / migrated subscriptions and for support).
 				WC_Checkoutcom_Utility::logger(
 					'[RENEWAL] MIT for order ' . $order->get_id()
 					. ': source_id=' . ( isset( $arg['source_id'] ) ? $arg['source_id'] : 'n/a' )
 					. ', previous_payment_id=' . ( $previous_payment_id ?: 'NONE' )
+					. ', tlid=' . ( $scheme_tlid ?: 'NONE' )
 					. ' (source: ' . $prev_source . ')'
 				);
 			}
@@ -1071,6 +1099,55 @@ class WC_Checkoutcom_Api_Request {
 	 * @param object|array $response Checkout.com refund response.
 	 * @return void
 	 */
+	/**
+	 * Persist the Mastercard scheme Transaction Link Identifier (TLID) from a payment
+	 * response onto the order and any related subscription(s), for use on future MITs.
+	 *
+	 * @param WC_Order $order    Order object.
+	 * @param mixed    $response Payment response (array or object).
+	 *
+	 * @return void
+	 */
+	private static function record_scheme_transaction_link_id( $order, $response ) {
+		if ( ! ( $order instanceof WC_Order ) ) {
+			return;
+		}
+
+		$tlid = '';
+		if ( is_array( $response ) ) {
+			$tlid = $response['processing']['scheme_transaction_link_id'] ?? '';
+		} elseif ( is_object( $response ) && isset( $response->processing ) ) {
+			$processing = $response->processing;
+			if ( is_array( $processing ) ) {
+				$tlid = $processing['scheme_transaction_link_id'] ?? '';
+			} elseif ( is_object( $processing ) ) {
+				$tlid = $processing->scheme_transaction_link_id ?? '';
+			}
+		}
+
+		$tlid = trim( (string) $tlid );
+		if ( '' === $tlid ) {
+			return;
+		}
+
+		if ( $tlid !== (string) $order->get_meta( '_cko_scheme_transaction_link_id' ) ) {
+			$order->update_meta_data( '_cko_scheme_transaction_link_id', $tlid );
+			$order->save();
+		}
+
+		// Propagate onto the subscription(s) so renewals can send it on the MIT.
+		if ( function_exists( 'wcs_get_subscriptions_for_order' ) && function_exists( 'wcs_order_contains_subscription' )
+			&& wcs_order_contains_subscription( $order, [ 'parent', 'renewal' ] ) ) {
+			$subscriptions = wcs_get_subscriptions_for_order( $order, [ 'order_type' => [ 'parent', 'renewal' ] ] );
+			foreach ( $subscriptions as $subscription ) {
+				if ( $tlid !== (string) $subscription->get_meta( '_cko_scheme_transaction_link_id' ) ) {
+					$subscription->update_meta_data( '_cko_scheme_transaction_link_id', $tlid );
+					$subscription->save();
+				}
+			}
+		}
+	}
+
 	private static function record_refund_action_id( $order, $response ) {
 		if ( ! ( $order instanceof WC_Order ) ) {
 			return;

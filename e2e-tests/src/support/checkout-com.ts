@@ -12,6 +12,8 @@ export interface CkoPayment {
 	actions?: Array<{ id: string; type: string }>;
 	response_code?: string;
 	response_summary?: string;
+	payment_type?: string;
+	'3ds'?: { challenged?: boolean; [key: string]: unknown };
 }
 
 /** Checkout.com sandbox test cards (verified against this sandbox, see README). */

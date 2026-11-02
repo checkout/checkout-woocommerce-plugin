@@ -28,13 +28,6 @@ class Checkout_SDK {
 	private $builder;
 
 	/**
-	 * Account type.
-	 *
-	 * @var bool
-	 */
-	private $nas_account_type;
-
-	/**
 	 * Constructor.
 	 *
 	 * @param bool $use_fallback Use Fallback account flag.
@@ -65,22 +58,27 @@ class Checkout_SDK {
 		}
 		
 		$environment   = 'sandbox' === ( $core_settings['ckocom_environment'] ?? 'sandbox' ) ? Environment::sandbox() : Environment::production();
-		$subdomain     = ! isset( $core_settings['ckocom_region'] ) ? '--' : $core_settings['ckocom_region'];
+		// Derive the merchant-specific subdomain (MSSD) from the configured Client ID
+		// (shared helper; blank/invalid => global domain via useLegacyDomain()).
+		$subdomain = function_exists( 'cko_mssd_subdomain_from_client_id' )
+			? cko_mssd_subdomain_from_client_id( $core_settings['ckocom_client_id'] ?? '' )
+			: '';
 
-		$this->nas_account_type = cko_is_nas_account();
-
-		if ( $this->nas_account_type && false === $use_fallback ) {
-			$builder = CheckoutSdk::builder()->staticKeys();
-		} else {
-			$builder = CheckoutSdk::builder()->previous()->staticKeys();
-		}
+		// All Checkout.com accounts are NAS; the SDK's NAS static-keys builder is
+		// always used (the legacy ABC "previous" builder has been removed).
+		$builder = CheckoutSdk::builder()->staticKeys();
 
 		$builder->publicKey( $public_key );
 		$builder->secretKey( $secret_key );
 		$builder->environment( $environment );
 
-		if ( '--' !== $subdomain && 'global' !== $subdomain ) {
+		if ( '' !== $subdomain ) {
+			// Merchant-specific subdomain configured: route to the merchant subdomain.
 			$builder->environmentSubdomain( $subdomain );
+		} else {
+			// SDK 6.x requires either a merchant-specific subdomain or an explicit
+			// opt-out; with no subdomain configured, use the global api.checkout.com domain.
+			$builder->useLegacyDomain();
 		}
 
 		if ( $use_fallback ) {
@@ -115,12 +113,8 @@ class Checkout_SDK {
 		if ( ! class_exists( 'Checkout\CheckoutSdk' ) ) {
 			return null;
 		}
-		
-		if ( $this->nas_account_type ) {
-			return new Checkout\Payments\Request\PaymentRequest();
-		} else {
-			return new Checkout\Payments\Previous\PaymentRequest();
-		}
+
+		return new Checkout\Payments\Request\PaymentRequest();
 	}
 
 	/**
@@ -132,11 +126,7 @@ class Checkout_SDK {
 		if ( ! class_exists( 'Checkout\CheckoutSdk' ) ) {
 			return null;
 		}
-		
-		if ( $this->nas_account_type ) {
-			return new Checkout\Payments\CaptureRequest();
-		} else {
-			return new Checkout\Payments\Previous\CaptureRequest();
-		}
+
+		return new Checkout\Payments\CaptureRequest();
 	}
 }

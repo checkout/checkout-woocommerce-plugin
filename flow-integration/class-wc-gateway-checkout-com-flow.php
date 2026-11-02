@@ -1984,9 +1984,9 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		<?php endif; ?>
 
 		<?php if ( $order_pay_order_id === null ) : ?>
-			<div id="cart-info" data-cart='<?php echo wp_json_encode( WC_Checkoutcom_Api_Request::get_cart_info(true) ); ?>'></div>
+			<div id="cart-info" data-cart='<?php echo esc_attr( wp_json_encode( WC_Checkoutcom_Api_Request::get_cart_info(true) ) ); ?>'></div>
 		<?php else : ?>
-			<div id="order-pay-info" data-order-pay='<?php echo wp_json_encode( WC_Checkoutcom_Api_Request::get_order_info($order_pay_order_id, true) ); ?>'></div>
+			<div id="order-pay-info" data-order-pay='<?php echo esc_attr( wp_json_encode( WC_Checkoutcom_Api_Request::get_order_info($order_pay_order_id, true) ) ); ?>'></div>
 		<?php endif; ?>
 		
 		<!-- Skeleton loader for better UX while Flow component loads -->
@@ -3171,9 +3171,8 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			}
 			$this->set_order_addresses_consistently( $order, $payment_details );
 			
-			// Record the declined payment id for tracking — but only when the payment really belongs
-			// to this order, and never as the transaction id: a transaction id on an unpaid order used
-			// to make later requests skip payment verification entirely.
+			// Record the declined payment id for tracking only when the payment belongs to this
+			// order, and never as the transaction id (a transaction id means "paid").
 			if ( $is_bound_decline ) {
 				$order->update_meta_data( '_cko_payment_id', $flow_payment_id );
 			
@@ -4453,9 +4452,8 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		if ( 'failed' === $cko_status ) {
 			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] ❌ Checkout.com returned status=failed - Payment was declined' );
 			
-			// SECURITY: this URL is public. Only touch the order when the caller proves ownership with
-			// the order key, and only while it is still unpaid. Never store the client-supplied payment
-			// id: it is unverified, and a stored id used to let later requests skip verification.
+			// SECURITY: public URL. Only touch the order with a valid order key and while it is still
+			// unpaid, and never store the unverified payment id from the URL.
 			$order = null;
 			if ( ! empty( $order_id ) && '' !== $order_key ) {
 				$candidate = wc_get_order( $order_id );
@@ -5303,9 +5301,8 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		$order_status = $order->get_status();
 		$payment_already_processed = in_array( $order_status, array( 'processing', 'completed', 'on-hold' ), true );
 		
-		// NOTE: stored payment/transaction ids are deliberately NOT treated as "already processed":
-		// they can be written before a payment is verified, and skipping validation because of
-		// them made this check dead on the normal flow. Only a paid status skips it.
+		// Only a paid status counts as "already processed". Stored payment/transaction ids do not:
+		// they can exist before a payment is verified.
 		
 		if ( $is_debug ) {
 			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] [SECURITY] Payment already processed check - status: ' . $order_status . ', result: ' . ( $payment_already_processed ? 'YES (skip validation)' : 'NO (run validation)' ) );
@@ -6711,8 +6708,8 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 		$secret_key_raw = $core_settings['ckocom_sk'] ?? '';
 		$secret_key     = cko_is_nas_account() ? 'Bearer ' . $secret_key_raw : $secret_key_raw;
-		// Without a secret key the signing key would be the known string "Bearer ", so any
-		// signature could be forged. Refuse webhooks until a key is configured.
+		// A webhook signature cannot be verified without a secret key: refuse webhooks until one
+		// is configured.
 		if ( '' === trim( (string) $secret_key_raw ) ) {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK: rejected - no secret key configured, signature cannot be verified.' );
 			$this->send_response( 401, 'Unauthorized: webhook signing key not configured' );
@@ -7863,6 +7860,33 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			WC_Checkoutcom_Utility::logger( '[PAYMENT SESSION] Add-payment-method mode — amount=0, capture=false, cards-only, items dropped, reference detached, address ' . ( isset( $payment_session_request['billing'] ) ? 'kept' : 'dropped' ) . '. User ID: ' . get_current_user_id() );
 		}
 
+		// MOTO (admin-created order for a guest, paid on its order-pay page): decided here from the
+		// order, never from the client. The order-pay success_url carries order_id and key; with a
+		// matching key the session is card-only and has no 3DS. A client MOTO claim that can't be
+		// confirmed is downgraded to a regular payment.
+		$moto_order    = false;
+		$success_query = array();
+		if ( ! empty( $payment_session_request['success_url'] ) && is_string( $payment_session_request['success_url'] ) ) {
+			wp_parse_str( (string) wp_parse_url( $payment_session_request['success_url'], PHP_URL_QUERY ), $success_query );
+		}
+		$moto_order_id = isset( $success_query['order_id'] ) ? absint( $success_query['order_id'] ) : 0;
+		$moto_key      = isset( $success_query['key'] ) ? (string) $success_query['key'] : '';
+		if ( $moto_order_id && '' !== $moto_key ) {
+			$maybe_moto = wc_get_order( $moto_order_id );
+			if ( WC_Checkoutcom_Utility::is_moto_order( $maybe_moto ) && hash_equals( (string) $maybe_moto->get_order_key(), $moto_key ) ) {
+				$moto_order = $maybe_moto;
+			}
+		}
+		if ( $moto_order && ! $is_subscription_cit ) {
+			$payment_session_request['payment_type']            = 'MOTO';
+			$payment_session_request['3ds']                     = array( 'enabled' => false );
+			$payment_session_request['enabled_payment_methods'] = array( 'card' );
+			WC_Checkoutcom_Utility::logger( '[PAYMENT SESSION] MOTO order ' . $moto_order->get_id() . ' — payment_type=MOTO, 3DS off, cards only.' );
+		} elseif ( isset( $payment_session_request['payment_type'] ) && 'MOTO' === $payment_session_request['payment_type'] ) {
+			$payment_session_request['payment_type'] = class_exists( 'Checkout\\Payments\\PaymentType' ) ? \Checkout\Payments\PaymentType::$regular : 'Regular';
+			WC_Checkoutcom_Utility::logger( '[PAYMENT SESSION] Client requested MOTO but the order is not a MOTO order — using Regular.' );
+		}
+
 		// Safety net: never send the payment session without a currency. The client derives currency
 		// from #cart-info, which can be empty when init fires early (e.g. browser autocomplete),
 		// producing Checkout.com's "currency is missing" error. Default to the store currency.
@@ -7871,11 +7895,26 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			WC_Checkoutcom_Utility::logger( '[PAYMENT SESSION] Currency missing from request — defaulted to store currency: ' . $payment_session_request['currency'] );
 		}
 
-		// Determine API URL based on environment
-		$api_url = 'https://api.checkout.com/payment-sessions';
-		if ( isset( $core_settings['ckocom_environment'] ) && 'sandbox' === $core_settings['ckocom_environment'] ) {
-			$api_url = 'https://api.sandbox.checkout.com/payment-sessions';
+		// Processing channel id: include it on the session when configured. Accounts with
+		// multiple processing channels require it (otherwise Checkout.com returns
+		// processing_channel_id_required on the payment-session create).
+		$cko_pc_id = isset( $core_settings['ckocom_processing_channel_id'] ) ? trim( (string) $core_settings['ckocom_processing_channel_id'] ) : '';
+		if ( '' !== $cko_pc_id ) {
+			$payment_session_request['processing_channel_id'] = $cko_pc_id;
 		}
+
+		// Determine API host based on environment, then prepend the merchant-specific
+		// subdomain derived from the configured Client ID (blank => global domain).
+		$api_host = ( isset( $core_settings['ckocom_environment'] ) && 'sandbox' === $core_settings['ckocom_environment'] )
+			? 'api.sandbox.checkout.com'
+			: 'api.checkout.com';
+		$cko_subdomain = function_exists( 'cko_mssd_subdomain_from_client_id' )
+			? cko_mssd_subdomain_from_client_id( $core_settings['ckocom_client_id'] ?? '' )
+			: '';
+		if ( '' !== $cko_subdomain ) {
+			$api_host = $cko_subdomain . '.' . $api_host;
+		}
+		$api_url = 'https://' . $api_host . '/payment-sessions';
 
 		// Prepare the API request
 		$request_args = array(
@@ -9546,10 +9585,20 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			}
 		}
 
-		// Enable 3DS
+		// Enable 3DS - except for MOTO orders (admin-created for a guest), which are paid without
+		// 3DS like the direct card API path. Needs the order key so it can't be applied blindly.
+		$submit_moto_order = $order_id > 0 ? wc_get_order( $order_id ) : false;
+		$submit_moto_key   = isset( $_POST['order_key'] ) ? sanitize_text_field( wp_unslash( $_POST['order_key'] ) ) : '';
+		$is_moto_submit    = WC_Checkoutcom_Utility::is_moto_order( $submit_moto_order )
+			&& '' !== $submit_moto_key
+			&& hash_equals( (string) $submit_moto_order->get_order_key(), $submit_moto_key );
+
 		$request_body['3ds'] = array(
-			'enabled' => true,
+			'enabled' => ! $is_moto_submit,
 		);
+		if ( $is_moto_submit ) {
+			WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] MOTO order ' . $order_id . ' — 3DS off.' );
+		}
 
 		// If order exists, update success/failure URLs to include order_id
 		if ( $order_id > 0 ) {

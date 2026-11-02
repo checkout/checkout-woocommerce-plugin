@@ -2,6 +2,12 @@
 
 namespace Checkout\Payments;
 
+use DateTime;
+use Checkout\Common\DateOnly;
+
+/**
+ * Contains information about the airline ticket.
+ */
 class Ticket
 {
     /**
@@ -10,14 +16,21 @@ class Ticket
     public $number;
 
     /**
-     * @var string
+     * Format: yyyy-MM-dd
+     * @var DateTime
      */
+    #[DateOnly]
     public $issue_date;
 
     /**
      * @var string
      */
     public $issuing_carrier_code;
+
+    /**
+     * @var string
+     */
+    public $travel_package_indicator;
 
     /**
      * @var string

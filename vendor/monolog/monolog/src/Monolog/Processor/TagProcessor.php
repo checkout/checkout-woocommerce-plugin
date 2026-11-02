@@ -11,6 +11,8 @@
 
 namespace CheckoutComWC\Vendor\Monolog\Processor;
 
+use CheckoutComWC\Vendor\Monolog\LogRecord;
+
 /**
  * Adds a tags array into record
  *
@@ -19,7 +21,7 @@ namespace CheckoutComWC\Vendor\Monolog\Processor;
 class TagProcessor implements ProcessorInterface
 {
     /** @var string[] */
-    private $tags;
+    private array $tags;
 
     /**
      * @param string[] $tags
@@ -30,7 +32,8 @@ class TagProcessor implements ProcessorInterface
     }
 
     /**
-     * @param string[] $tags
+     * @param  string[] $tags
+     * @return $this
      */
     public function addTags(array $tags = []): self
     {
@@ -40,7 +43,8 @@ class TagProcessor implements ProcessorInterface
     }
 
     /**
-     * @param string[] $tags
+     * @param  string[] $tags
+     * @return $this
      */
     public function setTags(array $tags = []): self
     {
@@ -50,11 +54,11 @@ class TagProcessor implements ProcessorInterface
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
-    public function __invoke(array $record): array
+    public function __invoke(LogRecord $record): LogRecord
     {
-        $record['extra']['tags'] = $this->tags;
+        $record->extra['tags'] = $this->tags;
 
         return $record;
     }

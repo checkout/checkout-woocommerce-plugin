@@ -1995,14 +1995,9 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 
 		$secret_key_raw = $core_settings['ckocom_sk'];
 		$environment = isset( $core_settings['ckocom_environment'] ) ? $core_settings['ckocom_environment'] : 'sandbox';
-		$account_type = isset( $core_settings['ckocom_account_type'] ) ? $core_settings['ckocom_account_type'] : 'ABC';
+		$account_type = 'NAS';
 		$region = isset( $core_settings['ckocom_region'] ) ? $core_settings['ckocom_region'] : 'global';
 		$protocol_version = isset( $_POST['protocol_version'] ) ? sanitize_text_field( $_POST['protocol_version'] ) : 'ec_v1';
-
-		// Check if NAS account
-		if ( function_exists( 'cko_is_nas_account' ) && cko_is_nas_account() ) {
-			$account_type = 'NAS';
-		}
 
 		// Build API URL
 		$base_url = 'https://api.checkout.com';
@@ -2021,16 +2016,8 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		// Remove any existing "Bearer " prefix from the secret key
 		$secret_key_clean = str_replace( 'Bearer ', '', trim( $secret_key_raw ) );
 		
-		// Apple Pay signing-requests endpoint authentication
-		// For NAS accounts, always use Bearer prefix
-		// For ABC accounts, try direct key first (as per other API calls in the codebase)
-		if ( 'NAS' === $account_type ) {
-			$auth_header = 'Bearer ' . $secret_key_clean;
-		} else {
-			// ABC accounts - try direct key first (no Bearer prefix)
-			// This matches how other ABC API calls work in the codebase
-			$auth_header = $secret_key_clean;
-		}
+		// Apple Pay signing-requests endpoint authentication (NAS: Bearer-prefixed key).
+		$auth_header = 'Bearer ' . $secret_key_clean;
 
 		// Prepare request body
 		$request_body = [
@@ -2086,47 +2073,6 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 				}
 			} elseif ( $error_data && isset( $error_data['message'] ) ) {
 				$error_message = $error_data['message'];
-			}
-			
-			// If 401 (Unauthorized) or 400 (Bad Request), try with Bearer for ABC accounts
-			if ( ( 401 === $response_code || 400 === $response_code ) && 'ABC' === $account_type ) {
-				// Retry with Bearer prefix for ABC accounts
-				$auth_header_bearer = 'Bearer ' . $secret_key_clean;
-				
-				WC_Checkoutcom_Utility::logger( 
-					'Apple Pay CSR Generation: Retrying with Bearer authentication for ABC account',
-					null
-				);
-				
-				$response_retry = wp_remote_post(
-					$api_url,
-					[
-						'headers' => [
-							'Authorization' => $auth_header_bearer,
-							'Content-Type'  => 'application/json',
-						],
-						'body'    => json_encode( $request_body ),
-						'timeout' => 30,
-					]
-				);
-				
-				if ( ! is_wp_error( $response_retry ) ) {
-					$retry_code = wp_remote_retrieve_response_code( $response_retry );
-					$retry_body = wp_remote_retrieve_body( $response_retry );
-					if ( 200 === $retry_code || 201 === $retry_code ) {
-						// Success with Bearer, use this response
-						$response_code = $retry_code;
-						$response_body = $retry_body;
-					} else {
-						// Log detailed error for debugging
-						WC_Checkoutcom_Utility::logger( 
-							'Apple Pay CSR Generation Failed (both direct key and Bearer): ' . 
-							'Direct Key: ' . $response_code . ' - ' . $response_body . ', ' .
-							'Bearer: ' . $retry_code . ' - ' . $retry_body,
-							null
-						);
-					}
-				}
 			}
 			
 			// If still an error after retry, send error response
@@ -2311,13 +2257,8 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 
 		$secret_key_raw = $core_settings['ckocom_sk'];
 		$environment = isset( $core_settings['ckocom_environment'] ) ? $core_settings['ckocom_environment'] : 'sandbox';
-		$account_type = isset( $core_settings['ckocom_account_type'] ) ? $core_settings['ckocom_account_type'] : 'ABC';
+		$account_type = 'NAS';
 		$region = isset( $core_settings['ckocom_region'] ) ? $core_settings['ckocom_region'] : 'global';
-
-		// Check if NAS account
-		if ( function_exists( 'cko_is_nas_account' ) && cko_is_nas_account() ) {
-			$account_type = 'NAS';
-		}
 
 		// Build API URL
 		$base_url = 'https://api.checkout.com';
@@ -2332,15 +2273,9 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 
 		$api_url = $base_url . '/applepay/certificates';
 
-		// Prepare authorization header
+		// Prepare authorization header (NAS: Bearer-prefixed key).
 		$secret_key_clean = str_replace( 'Bearer ', '', trim( $secret_key_raw ) );
-		
-		if ( 'NAS' === $account_type ) {
-			$auth_header = 'Bearer ' . $secret_key_clean;
-		} else {
-			// ABC accounts - try direct key first
-			$auth_header = $secret_key_clean;
-		}
+		$auth_header = 'Bearer ' . $secret_key_clean;
 
 		// Prepare request body - According to Checkout.com docs:
 		// "Encode the apple_pay.cer in base64 using: openssl x509 -inform der -in apple_pay.cer -out base64_converted.cer"
@@ -2571,49 +2506,6 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 				}
 			} elseif ( $error_data && isset( $error_data['message'] ) ) {
 				$error_message = $error_data['message'];
-			}
-			
-			// If 401 (Unauthorized) or 400 (Bad Request), try with Bearer for ABC accounts
-			if ( ( 401 === $response_code || 400 === $response_code ) && 'ABC' === $account_type ) {
-				// Retry with Bearer prefix for ABC accounts
-				$auth_header_bearer = 'Bearer ' . $secret_key_clean;
-				
-				WC_Checkoutcom_Utility::logger( 
-					'Apple Pay Certificate Upload: Retrying with Bearer authentication for ABC account',
-					null
-				);
-				
-				$response_retry = wp_remote_post(
-					$api_url,
-					[
-						'headers' => [
-							'Authorization' => $auth_header_bearer,
-							'Content-Type'  => 'application/json',
-						],
-						'body'    => json_encode( $request_body ),
-						'timeout' => 30,
-					]
-				);
-				
-				if ( ! is_wp_error( $response_retry ) ) {
-					$retry_code = wp_remote_retrieve_response_code( $response_retry );
-					$retry_body = wp_remote_retrieve_body( $response_retry );
-					if ( 200 === $retry_code || 201 === $retry_code ) {
-						// Success with Bearer
-						wp_send_json_success( [
-							'message' => __( 'Certificate uploaded successfully!', 'checkout-com-unified-payments-api' ),
-						] );
-						return;
-					} else {
-						// Log detailed error for debugging
-						WC_Checkoutcom_Utility::logger( 
-							'Apple Pay Certificate Upload Failed (both direct key and Bearer): ' . 
-							'Direct Key: ' . $response_code . ' - ' . $response_body . ', ' .
-							'Bearer: ' . $retry_code . ' - ' . $retry_body,
-							null
-						);
-					}
-				}
 			}
 			
 			// Log detailed error for debugging

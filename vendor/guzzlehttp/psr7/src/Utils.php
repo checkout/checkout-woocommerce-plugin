@@ -442,7 +442,7 @@ final class Utils
      */
     private static function warnOnInvalidModifyRequestChange(string $key, string $expected, $value): void
     {
-        checkoutcomwc_vendor_trigger_deprecation(
+        \trigger_deprecation(
             'guzzlehttp/psr7',
             '2.11',
             'Passing %s to Utils::modifyRequest() change "%s" is deprecated; guzzlehttp/psr7 3.0 requires %s.',
@@ -533,7 +533,7 @@ final class Utils
     {
         if (is_scalar($resource)) {
             if (!is_string($resource)) {
-                checkoutcomwc_vendor_trigger_deprecation(
+                \trigger_deprecation(
                     'guzzlehttp/psr7',
                     '2.12',
                     'Passing %s to Utils::streamFor() is deprecated; cast it to a string. guzzlehttp/psr7 3.0 will only accept string, resource, StreamInterface, Stringable, Iterator, callable, or null.',

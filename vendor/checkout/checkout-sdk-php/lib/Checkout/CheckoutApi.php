@@ -2,23 +2,41 @@
 
 namespace Checkout;
 
+use Checkout\Apm\Bacs\BacsClient;
 use Checkout\Accounts\AccountsClient;
+use Checkout\AgenticCommerce\AgenticCommerceClient;
 use Checkout\Balances\BalancesClient;
+use Checkout\ComplianceRequests\ComplianceRequestsClient;
 use Checkout\Customers\CustomersClient;
 use Checkout\Disputes\DisputesClient;
 use Checkout\Financial\FinancialClient;
 use Checkout\Forex\ForexClient;
+use Checkout\Forward\ForwardClient;
+use Checkout\Identities\FaceAuthentication\FaceAuthenticationClient;
+use Checkout\Identities\AddressDocumentVerification\AddressDocumentVerificationClient;
+use Checkout\Identities\IdDocumentVerification\IdDocumentVerificationClient;
+use Checkout\Identities\IdentityVerification\IdentityVerificationClient;
+use Checkout\Identities\AmlScreening\AmlScreeningClient;
+use Checkout\Identities\Applicants\ApplicantsClient;
 use Checkout\Instruments\InstrumentsClient;
+use Checkout\Inventory\InventoryClient;
 use Checkout\Issuing\IssuingClient;
 use Checkout\Metadata\MetadataClient;
+use Checkout\NetworkTokens\NetworkTokensClient;
+use Checkout\OnboardingSimulator\OnboardingSimulatorClient;
+use Checkout\Payments\ApplePay\ApplePayClient;
+use Checkout\Payments\GooglePay\GooglePayClient;
 use Checkout\Payments\Contexts\PaymentContextsClient;
 use Checkout\Payments\Hosted\HostedPaymentsClient;
 use Checkout\Payments\Links\PaymentLinksClient;
 use Checkout\Payments\PaymentsClient;
 use Checkout\Payments\Sessions\PaymentSessionsClient;
+use Checkout\Payments\Setups\PaymentSetupsClient;
+use Checkout\PaymentMethods\PaymentMethodsClient;
 use Checkout\Reports\ReportsClient;
 use Checkout\Risk\RiskClient;
 use Checkout\Sessions\SessionsClient;
+use Checkout\StandaloneAccountUpdater\StandaloneAccountUpdaterClient;
 use Checkout\Tokens\TokensClient;
 use Checkout\Transfers\TransfersClient;
 use Checkout\Workflows\WorkflowsClient;
@@ -29,6 +47,7 @@ final class CheckoutApi extends CheckoutApmApi
     private $customersClient;
     private $paymentsClient;
     private $instrumentsClient;
+    private $bacsClient;
     private $forexClient;
     private $disputesClient;
     private $sessionsClient;
@@ -41,22 +60,63 @@ final class CheckoutApi extends CheckoutApmApi
     private $transfersClient;
     private $reportsClient;
     private $metadataClient;
+    private $networkTokensClient;
+    private $inventoryClient;
     private $financialClient;
     private $issuingClient;
     private $paymentContextClient;
 
     private $paymentSessionsClient;
 
+    private $paymentSetupsClient;
+
+    private $forwardClient;
+
+    private $faceAuthenticationClient;
+
+    private $idDocumentVerificationClient;
+
+    private $addressDocumentVerificationClient;
+
+    private $identityVerificationClient;
+
+    private $amlScreeningClient;
+
+    private $applicantsClient;
+
+    private $paymentMethodsClient;
+
+    private $standaloneAccountUpdaterClient;
+
+    private $applePayClient;
+
+    private $agenticCommerceClient;
+
+    private $complianceRequestsClient;
+
+    private $googlePayClient;
+
+    private $onboardingSimulatorClient;
+
     public function __construct(CheckoutConfiguration $configuration)
     {
         $baseApiClient = $this->getBaseApiClient($configuration);
         parent::__construct($baseApiClient, $configuration);
         $this->tokensClient = new TokensClient($baseApiClient, $configuration);
-        $this->customersClient = new CustomersClient($baseApiClient, $configuration, AuthorizationType::$secretKeyOrOAuth);
+        $this->customersClient = new CustomersClient(
+            $baseApiClient,
+            $configuration,
+            AuthorizationType::$secretKeyOrOAuth
+        );
         $this->paymentsClient = new PaymentsClient($baseApiClient, $configuration);
         $this->instrumentsClient = new InstrumentsClient($baseApiClient, $configuration);
+        $this->bacsClient = new BacsClient($baseApiClient, $configuration);
         $this->forexClient = new ForexClient($baseApiClient, $configuration);
-        $this->disputesClient = new DisputesClient($baseApiClient, $configuration, AuthorizationType::$secretKeyOrOAuth);
+        $this->disputesClient = new DisputesClient(
+            $baseApiClient,
+            $configuration,
+            AuthorizationType::$secretKeyOrOAuth
+        );
         $this->sessionsClient = new SessionsClient($baseApiClient, $configuration);
         $this->hostedPaymentsClient = new HostedPaymentsClient($baseApiClient, $configuration);
         $this->paymentLinksClient = new PaymentLinksClient($baseApiClient, $configuration);
@@ -64,10 +124,24 @@ final class CheckoutApi extends CheckoutApmApi
         $this->workflowsClient = new WorkflowsClient($baseApiClient, $configuration);
         $this->reportsClient = new ReportsClient($baseApiClient, $configuration);
         $this->metadataClient = new MetadataClient($baseApiClient, $configuration);
+        $this->networkTokensClient = new NetworkTokensClient($baseApiClient, $configuration);
+        $this->inventoryClient = new InventoryClient($baseApiClient, $configuration);
         $this->financialClient = new FinancialClient($baseApiClient, $configuration);
         $this->issuingClient = new IssuingClient($baseApiClient, $configuration);
         $this->paymentContextClient = new PaymentContextsClient($baseApiClient, $configuration);
         $this->paymentSessionsClient = new PaymentSessionsClient($baseApiClient, $configuration);
+        $this->paymentSetupsClient = new PaymentSetupsClient($baseApiClient, $configuration);
+        $this->forwardClient = new ForwardClient(
+            $this->getForwardApiClient($configuration),
+            $configuration
+        );
+        $identityApiClient = $this->getIdentityApiClient($configuration);
+        $this->faceAuthenticationClient = new FaceAuthenticationClient($identityApiClient, $configuration);
+        $this->idDocumentVerificationClient = new IdDocumentVerificationClient($identityApiClient, $configuration);
+        $this->addressDocumentVerificationClient = new AddressDocumentVerificationClient($identityApiClient, $configuration);
+        $this->identityVerificationClient = new IdentityVerificationClient($identityApiClient, $configuration);
+        $this->amlScreeningClient = new AmlScreeningClient($identityApiClient, $configuration);
+        $this->applicantsClient = new ApplicantsClient($identityApiClient, $configuration);
         $this->balancesClient = new BalancesClient(
             $this->getBalancesApiClient($configuration),
             $configuration
@@ -81,6 +155,13 @@ final class CheckoutApi extends CheckoutApmApi
             $this->getFilesApiClient($configuration),
             $configuration
         );
+        $this->paymentMethodsClient = new PaymentMethodsClient($baseApiClient, $configuration);
+        $this->standaloneAccountUpdaterClient = new StandaloneAccountUpdaterClient($baseApiClient, $configuration);
+        $this->applePayClient = new ApplePayClient($baseApiClient, $configuration);
+        $this->agenticCommerceClient = new AgenticCommerceClient($baseApiClient, $configuration);
+        $this->onboardingSimulatorClient = new OnboardingSimulatorClient($baseApiClient, $configuration);
+        $this->complianceRequestsClient = new ComplianceRequestsClient($baseApiClient, $configuration);
+        $this->googlePayClient = new GooglePayClient($baseApiClient, $configuration);
     }
 
     /**
@@ -113,6 +194,19 @@ final class CheckoutApi extends CheckoutApmApi
     public function getInstrumentsClient()
     {
         return $this->instrumentsClient;
+    }
+
+    /**
+     * Sends Bacs Direct Debit pre-notifications.
+     *
+     * Registered here rather than on CheckoutApmApi: that class is shared with the previous
+     * platform, and POST /apms/bacs/notifications is a current-platform, secret-key-only endpoint.
+     *
+     * @return BacsClient
+     */
+    public function getBacsClient()
+    {
+        return $this->bacsClient;
     }
 
     /**
@@ -212,6 +306,22 @@ final class CheckoutApi extends CheckoutApmApi
     }
 
     /**
+     * @return NetworkTokensClient
+     */
+    public function getNetworkTokensClient()
+    {
+        return $this->networkTokensClient;
+    }
+
+    /**
+     * @return InventoryClient
+     */
+    public function getInventoryClient()
+    {
+        return $this->inventoryClient;
+    }
+
+    /**
      * @return FinancialClient
      */
     public function getFinancialClient()
@@ -244,6 +354,134 @@ final class CheckoutApi extends CheckoutApmApi
     }
 
     /**
+     * @return PaymentSetupsClient
+     */
+    public function getPaymentSetupsClient()
+    {
+        return $this->paymentSetupsClient;
+    }
+
+    /**
+     * @return ForwardClient
+     */
+    public function getForwardClient()
+    {
+        return $this->forwardClient;
+    }
+
+    /**
+     * @return FaceAuthenticationClient
+     */
+    public function getFaceAuthenticationClient()
+    {
+        return $this->faceAuthenticationClient;
+    }
+
+    /**
+     * @return IdDocumentVerificationClient
+     */
+    public function getIdDocumentVerificationClient()
+    {
+        return $this->idDocumentVerificationClient;
+    }
+
+    /**
+     * @return AddressDocumentVerificationClient
+     */
+    public function getAddressDocumentVerificationClient()
+    {
+        return $this->addressDocumentVerificationClient;
+    }
+
+    /**
+     * @return IdentityVerificationClient
+     */
+    public function getIdentityVerificationClient()
+    {
+        return $this->identityVerificationClient;
+    }
+
+    /**
+     * @return AmlScreeningClient
+     */
+    public function getAmlScreeningClient()
+    {
+        return $this->amlScreeningClient;
+    }
+
+    /**
+     * @return ApplicantsClient
+     */
+    public function getApplicantsClient()
+    {
+        return $this->applicantsClient;
+    }
+
+    /**
+     * @return PaymentMethodsClient
+     */
+    public function getPaymentMethodsClient()
+    {
+        return $this->paymentMethodsClient;
+    }
+
+    /**
+     * @return StandaloneAccountUpdaterClient
+     */
+    public function getStandaloneAccountUpdaterClient()
+    {
+        return $this->standaloneAccountUpdaterClient;
+    }
+
+    /**
+     * @return ApplePayClient
+     */
+    public function getApplePayClient()
+    {
+        return $this->applePayClient;
+    }
+
+    /**
+     * Client for Agentic Commerce Protocol endpoints (for example delegated payment token creation).
+     *
+     * @return AgenticCommerceClient
+     */
+    public function getAgenticCommerceClient()
+    {
+        return $this->agenticCommerceClient;
+    }
+
+    /**
+     * Client for compliance request retrieval and response submission.
+     *
+     * @return ComplianceRequestsClient
+     */
+    public function getComplianceRequestsClient()
+    {
+        return $this->complianceRequestsClient;
+    }
+
+    /**
+     * Client for Google Pay merchant enrollment, domain registration, and enrollment state.
+     *
+     * @return GooglePayClient
+     */
+    public function getGooglePayClient()
+    {
+        return $this->googlePayClient;
+    }
+
+    /**Client for account onboarding simulator endpoints (sandbox testing).
+     *
+     * @return OnboardingSimulatorClient
+     */
+    public function getOnboardingSimulatorClient()
+    {
+        return $this->onboardingSimulatorClient;
+    }
+
+    /**
+        *
      * @param CheckoutConfiguration $configuration
      * @return ApiClient
      */
@@ -283,5 +521,23 @@ final class CheckoutApi extends CheckoutApmApi
     private function getBalancesApiClient(CheckoutConfiguration $configuration)
     {
         return new ApiClient($configuration, $configuration->getEnvironment()->getBalancesUri());
+    }
+
+    /**
+     * @param CheckoutConfiguration $configuration
+     * @return ApiClient
+     */
+    private function getForwardApiClient(CheckoutConfiguration $configuration)
+    {
+        return new ApiClient($configuration, $configuration->getEnvironment()->getForwardUri());
+    }
+
+    /**
+     * @param CheckoutConfiguration $configuration
+     * @return ApiClient
+     */
+    private function getIdentityApiClient(CheckoutConfiguration $configuration)
+    {
+        return new ApiClient($configuration, $configuration->getEnvironment()->getIdentityUri());
     }
 }

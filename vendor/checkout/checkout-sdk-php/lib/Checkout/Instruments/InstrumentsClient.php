@@ -15,6 +15,7 @@ class InstrumentsClient extends Client
 {
     const INSTRUMENTS_PATH = "instruments";
     const VALIDATION_PATH = "validation/bank-accounts";
+    const REVOKE_PATH = "revoke";
 
     public function __construct(ApiClient $apiClient, CheckoutConfiguration $configuration)
     {
@@ -26,7 +27,7 @@ class InstrumentsClient extends Client
      * @return array
      * @throws CheckoutApiException
      */
-    public function create(CreateInstrumentRequest $createInstrumentRequest)
+    public function create(CreateInstrumentRequest $createInstrumentRequest): array
     {
         return $this->apiClient->post(self::INSTRUMENTS_PATH, $createInstrumentRequest, $this->sdkAuthorization());
     }
@@ -36,9 +37,12 @@ class InstrumentsClient extends Client
      * @return array
      * @throws CheckoutApiException
      */
-    public function get($instrumentId)
+    public function get($instrumentId): array
     {
-        return $this->apiClient->get($this->buildPath(self::INSTRUMENTS_PATH, $instrumentId), $this->sdkAuthorization());
+        return $this->apiClient->get($this->buildPath(
+            self::INSTRUMENTS_PATH,
+            $instrumentId
+        ), $this->sdkAuthorization());
     }
 
     /**
@@ -47,9 +51,12 @@ class InstrumentsClient extends Client
      * @return array
      * @throws CheckoutApiException
      */
-    public function update($instrumentId, UpdateInstrumentRequest $updateInstrumentRequest)
+    public function update($instrumentId, UpdateInstrumentRequest $updateInstrumentRequest): array
     {
-        return $this->apiClient->patch($this->buildPath(self::INSTRUMENTS_PATH, $instrumentId), $updateInstrumentRequest, $this->sdkAuthorization());
+        return $this->apiClient->patch($this->buildPath(
+            self::INSTRUMENTS_PATH,
+            $instrumentId
+        ), $updateInstrumentRequest, $this->sdkAuthorization());
     }
 
     /**
@@ -57,9 +64,28 @@ class InstrumentsClient extends Client
      * @return array
      * @throws CheckoutApiException
      */
-    public function delete($instrumentId)
+    public function delete($instrumentId): array
     {
-        return $this->apiClient->delete($this->buildPath(self::INSTRUMENTS_PATH, $instrumentId), $this->sdkAuthorization());
+        return $this->apiClient->delete($this->buildPath(
+            self::INSTRUMENTS_PATH,
+            $instrumentId
+        ), $this->sdkAuthorization());
+    }
+
+    /**
+     * Revoke an instrument, preventing it from being used for future transactions.
+     *
+     * @param $instrumentId
+     * @return array
+     * @throws CheckoutApiException
+     */
+    public function revoke($instrumentId): array
+    {
+        return $this->apiClient->patch($this->buildPath(
+            self::INSTRUMENTS_PATH,
+            $instrumentId,
+            self::REVOKE_PATH
+        ), null, $this->sdkAuthorization());
     }
 
     /**
@@ -69,8 +95,16 @@ class InstrumentsClient extends Client
      * @return array
      * @throws CheckoutApiException
      */
-    public function getBankAccountFieldFormatting($country_code, $currency, BankAccountFieldQuery $query)
+    public function getBankAccountFieldFormatting($country_code, $currency, BankAccountFieldQuery $query): array
     {
-        return $this->apiClient->query($this->buildPath(self::VALIDATION_PATH, $country_code, $currency), $query->normalized(), $this->sdkSpecificAuthorization(AuthorizationType::$oAuth));
+        return $this->apiClient->query(
+            $this->buildPath(
+                self::VALIDATION_PATH,
+                $country_code,
+                $currency
+            ),
+            $query,
+            $this->sdkSpecificAuthorization(AuthorizationType::$oAuth)
+        );
     }
 }

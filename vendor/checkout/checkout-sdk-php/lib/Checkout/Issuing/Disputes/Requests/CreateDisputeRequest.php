@@ -1,0 +1,77 @@
+<?php
+
+namespace Checkout\Issuing\Disputes\Requests;
+
+use Checkout\Issuing\Disputes\Entities\Evidence;
+use Checkout\Issuing\Disputes\Entities\IssuingDisputeFraudDetails;
+
+class CreateDisputeRequest
+{
+    /**
+     * The transaction's unique identifier.
+     * [Required]
+     * ^trx_[a-z0-9]{26}$
+     * min 30 characters, max 30 characters
+     * @var string
+     */
+    public $transaction_id;
+
+    /**
+     * The four-digit scheme-specific reason code for the chargeback.
+     * Only provide this if Checkout.com is your issuing processor.
+     * Checkout.com does not validate this value.
+     * [Required]
+     * @var string
+     */
+    public $reason;
+
+    /**
+     * Your evidence for raising the chargeback, in line with the card scheme's requirements.
+     * [Optional]
+     * @var array of Evidence
+     */
+    public $evidence;
+
+    /**
+     * The chargeback amount, in the minor unit of the transaction currency.
+     * If not provided, Checkout.com uses the full amount of the presentment.
+     * [Optional]
+     * @var int
+     */
+    public $amount;
+
+    /**
+     * The unique identifier for the disputed presentment message, if the transaction has multiple presentments.
+     * If the transaction has only one presentment, Checkout.com uses this automatically.
+     * [Optional]
+     * @var string
+     */
+    public $presentment_message_id;
+
+    /**
+     * Indicates whether to submit the dispute:
+     * • Immediately – Set to true.
+     * • Later – Set to false.
+     * Default: false
+     * [Optional]
+     * @deprecated No longer part of the API schema.
+     * @var bool
+     */
+    public $is_ready_for_submission;
+
+    /**
+     * Short justification for raising this dispute, to be sent to the scheme.
+     * [Optional]
+     * max 100 characters
+     * @var string
+     */
+    public $justification;
+
+    /**
+     * Contains all fraud-related information to be sent with the chargeback.
+     * This field is required if the dispute has a fraud-related reason code.
+     * [Optional]
+     * @var IssuingDisputeFraudDetails
+     */
+    public $fraud_details;
+}

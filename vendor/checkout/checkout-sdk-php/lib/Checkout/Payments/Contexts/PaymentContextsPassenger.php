@@ -3,7 +3,11 @@
 namespace Checkout\Payments\Contexts;
 
 use Checkout\Common\Address;
+use Checkout\Common\DateOnly;
 
+/**
+ * Contains information about a passenger on the flight.
+ */
 class PaymentContextsPassenger
 {
     /**
@@ -17,8 +21,10 @@ class PaymentContextsPassenger
     public $last_name;
 
     /**
+     * Format: yyyy-MM-dd
      * @var DateTime
      */
+    #[DateOnly]
     public $date_of_birth;
 
     /**

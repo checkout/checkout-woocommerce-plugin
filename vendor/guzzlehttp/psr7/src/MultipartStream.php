@@ -44,7 +44,7 @@ final class MultipartStream implements StreamInterface
     public function __construct(array $elements = [], ?string $boundary = null)
     {
         if ($boundary !== null && !self::isValidBoundary($boundary)) {
-            checkoutcomwc_vendor_trigger_deprecation(
+            \trigger_deprecation(
                 'guzzlehttp/psr7',
                 '2.11',
                 'Passing an invalid multipart boundary to MultipartStream::__construct() is deprecated; guzzlehttp/psr7 3.0 rejects invalid multipart boundaries.'
@@ -134,7 +134,7 @@ final class MultipartStream implements StreamInterface
             // reported against MultipartStream instead of transitively through
             // streamFor().
             if (is_float($contents) && !is_finite($contents)) {
-                checkoutcomwc_vendor_trigger_deprecation(
+                \trigger_deprecation(
                     'guzzlehttp/psr7',
                     '2.12',
                     'Passing a non-finite float as multipart contents is deprecated; guzzlehttp/psr7 3.0 rejects non-finite floats.'
@@ -268,7 +268,7 @@ final class MultipartStream implements StreamInterface
                     ));
                 }
 
-                checkoutcomwc_vendor_trigger_deprecation(
+                \trigger_deprecation(
                     'guzzlehttp/psr7',
                     '2.11',
                     'Passing %s as a multipart part header value is deprecated; guzzlehttp/psr7 3.0 requires string multipart part header values.',
@@ -289,7 +289,7 @@ final class MultipartStream implements StreamInterface
     private static function deprecateInvalidPartHeaderName(string $name): void
     {
         if (!preg_match('/^[a-zA-Z0-9\'`#$%&*+.^_|~!-]+$/D', $name)) {
-            checkoutcomwc_vendor_trigger_deprecation(
+            \trigger_deprecation(
                 'guzzlehttp/psr7',
                 '2.11',
                 'Passing an invalid multipart part header name to MultipartStream is deprecated; guzzlehttp/psr7 3.0 rejects invalid multipart part header names.'
@@ -300,7 +300,7 @@ final class MultipartStream implements StreamInterface
     private static function deprecateInvalidPartHeaderValue(string $value): void
     {
         if (!preg_match('/^[\x20\x09\x21-\x7E\x80-\xFF]*$/D', $value)) {
-            checkoutcomwc_vendor_trigger_deprecation(
+            \trigger_deprecation(
                 'guzzlehttp/psr7',
                 '2.11',
                 'Passing an invalid multipart part header value to MultipartStream is deprecated; guzzlehttp/psr7 3.0 rejects invalid multipart part header values.'

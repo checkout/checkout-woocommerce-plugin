@@ -15,7 +15,6 @@ use Checkout\Payments\Previous\Source\Apm\RequestBoletoSource;
 use Checkout\Payments\Previous\Source\Apm\RequestEpsSource;
 use Checkout\Payments\Previous\Source\Apm\RequestKlarnaSource;
 use Checkout\Payments\Previous\Source\Apm\RequestPoliSource;
-use Checkout\Payments\Previous\Source\Apm\RequestSepaSource;
 use Checkout\Payments\Request\Source\Apm\FawryProduct;
 use Checkout\Payments\Request\Source\Apm\RequestBancontactSource;
 use Checkout\Payments\Request\Source\Apm\RequestFawrySource;
@@ -24,8 +23,6 @@ use Checkout\Payments\Request\Source\Apm\RequestKnetSource;
 use Checkout\Payments\Request\Source\Apm\RequestMultiBancoSource;
 use Checkout\Payments\Request\Source\Apm\RequestQPaySource;
 use Checkout\Payments\Request\Source\Apm\RequestSofortSource;
-use Checkout\Sources\Previous\SepaSourceRequest;
-use Checkout\Sources\Previous\SourceData;
 
 /**
  * Class WC_Checkoutcom_APM_Method gives source class for different APMs.
@@ -181,21 +178,6 @@ class WC_Checkoutcom_APM_Method {
 		return $method;
 	}
 
-	/**
-	 * Returns the source data for the sepa APM.
-	 *
-	 * @return RequestSepaSource
-	 */
-	public function sepa() {
-
-		$details = self::get_sepa_info();
-
-		$method = new RequestSepaSource();
-
-		$method->id = $details['id'];
-
-		return $method;
-	}
 
 	/**
 	 * Returns the source data for the ideal APM.
@@ -311,96 +293,6 @@ class WC_Checkoutcom_APM_Method {
 		$fawry_info['products'] = $products;
 
 		return $fawry_info;
-	}
-
-	/**
-	 * Gather info for sepa payment and create source ID.
-	 *
-	 * @return array
-	 */
-	public static function get_sepa_info() {
-
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		$get_data        = sanitize_post( $_GET );
-		$items           = WC()->cart->get_cart();
-		$is_subscription = false;
-		$is_pay_order    = ! empty( $get_data['pay_for_order'] ) && (bool) $get_data['pay_for_order'];
-
-		foreach ( $items as $item => $values ) {
-			$_product        = wc_get_product( $values['data']->get_id() );
-			$is_subscription = WC_Subscriptions_Product::is_subscription( $_product );
-
-			if ( $is_subscription ) {
-				break;
-			}
-		}
-
-		if ( $is_pay_order ) {
-			self::$post['billing_address_1']  = self::$order_info->get_billing_address_1();
-			self::$post['billing_address_2']  = self::$order_info->get_billing_address_2();
-			self::$post['billing_city']       = self::$order_info->get_billing_city();
-			self::$post['billing_postcode']   = self::$order_info->get_billing_postcode();
-			self::$post['billing_country']    = self::$order_info->get_billing_country();
-			self::$post['billing_first_name'] = self::$order_info->get_billing_first_name();
-			self::$post['billing_last_name']  = self::$order_info->get_billing_last_name();
-			self::$post['billing_email']      = self::$order_info->get_billing_email();
-		}
-
-		$address                = new Address();
-		$address->address_line1 = self::$post['billing_address_1'];
-		$address->address_line2 = self::$post['billing_address_2'];
-		$address->city          = self::$post['billing_city'];
-		$address->zip           = self::$post['billing_postcode'];
-		$address->country       = self::$post['billing_country'];
-
-		$address = apply_filters( 'checkout_apm_sepa_address', $address );
-
-		$source_data                     = new SourceData();
-		$source_data->first_name         = self::$post['billing_first_name'];
-		$source_data->last_name          = self::$post['billing_last_name'];
-		$source_data->account_iban       = self::$post['sepa-iban'];
-		$source_data->bic                = ! empty( self::$post['sepa-bic'] ) ? self::$post['sepa-bic'] : '';
-		$source_data->billing_descriptor = 'Thanks for shopping.';
-		$source_data->mandate_type       = $is_subscription ? 'recurring' : 'single';
-
-		$customer_request        = new CustomerRequest();
-		$customer_request->email = self::$post['billing_email'];
-		$customer_request->name  = self::$post['billing_first_name'] . ' ' . self::$post['billing_last_name'];
-
-		$sepa_source_request                  = new SepaSourceRequest();
-		$sepa_source_request->billing_address = $address;
-		$sepa_source_request->source_data     = $source_data;
-		$sepa_source_request->customer        = $customer_request;
-
-		$checkout = new Checkout_SDK();
-
-		$response = [];
-
-		try {
-			$builder = $checkout->get_builder();
-
-			// SEPA support for ABC AC type only.
-			if ( method_exists( $builder, 'getSourcesClient' ) ) {
-
-				$response = $builder->getSourcesClient()->createSepaSource( $sepa_source_request );
-
-				$response_data = $response['response_data'];
-
-				WC()->session->set( 'mandate_reference', $response_data['mandate_reference'] );
-
-				if ( isset( $response['_links']['sepa:mandate-cancel']['href'] ) ) {
-					WC()->session->set( 'mandate_cancel', $response['_links']['sepa:mandate-cancel']['href'] );
-				}
-			}
-		} catch ( CheckoutApiException $ex ) {
-			// Unset any old value if source creation failed.
-			WC()->session->__unset( 'mandate_reference' );
-
-			$error_message = __( 'An error has occurred while getting sepa info.', 'checkout-com-unified-payments-api' );
-			WC_Checkoutcom_Utility::logger( $error_message, $ex );
-		}
-
-		return $response;
 	}
 
 	/**
