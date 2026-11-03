@@ -3022,6 +3022,22 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		if ( 'wc_checkout_com_apple_pay' !== $section ) {
 			return;
 		}
+
+		// Key/certificate files placed by hand inside the web root, outside the protected directory.
+		$exposed_files = $this->get_web_root_cert_files();
+		if ( ! empty( $exposed_files ) ) {
+			echo '<div class="notice notice-error"><p><strong>'
+				. esc_html__( 'Checkout.com Apple Pay:', 'checkout-com-unified-payments-api' ) . '</strong> '
+				. esc_html__( 'These Apple Pay certificate or private key files are inside your website\'s public folder, where they may be downloadable:', 'checkout-com-unified-payments-api' )
+				. '</p><ul style="list-style:disc;margin-left:2em;">';
+			foreach ( $exposed_files as $file ) {
+				echo '<li><code>' . esc_html( $file ) . '</code></li>';
+			}
+			echo '</ul><p>'
+				. esc_html__( 'Move them outside the web root (or into wp-content/uploads/checkout-com-apple-pay/, which the plugin protects) and update the paths below. If the private key may already have been downloaded, revoke the Merchant Identity certificate in your Apple Developer account and create a new one.', 'checkout-com-unified-payments-api' )
+				. '</p></div>';
+		}
+
 		if ( ! $this->is_cert_dir_web_exposed() ) {
 			return;
 		}
@@ -3029,6 +3045,58 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			. esc_html__( 'Checkout.com Apple Pay:', 'checkout-com-unified-payments-api' ) . '</strong> '
 			. esc_html__( 'Your server is serving the Apple Pay certificate directory over HTTP, so the merchant-identity private key can be downloaded. This usually means nginx or LiteSpeed is ignoring the .htaccess protection. Block web access to /wp-content/uploads/checkout-com-apple-pay/ at the server level, or move the key outside the web root.', 'checkout-com-unified-payments-api' )
 			. '</p></div>';
+	}
+
+	/**
+	 * Apple Pay certificate/key files that sit inside the web root but outside the protected
+	 * certificate directory: the configured Certificate/Key paths, plus the standard file names
+	 * dropped by hand into the uploads root. Decided from file paths only, so the private key is
+	 * never fetched over HTTP. Files inside the protected directory are covered by
+	 * is_cert_dir_web_exposed().
+	 *
+	 * @return string[] Absolute paths of exposed files.
+	 */
+	public function get_web_root_cert_files() {
+		$upload_dir = wp_upload_dir();
+		$candidates = array(
+			(string) $this->get_option( 'ckocom_apple_certificate' ),
+			(string) $this->get_option( 'ckocom_apple_key' ),
+		);
+		if ( empty( $upload_dir['error'] ) ) {
+			foreach ( array( 'certificate_sandbox.key', 'certificate_sandbox.pem', 'apple-pay-merchant-private-key.key', 'apple-pay-merchant-certificate.pem' ) as $name ) {
+				$candidates[] = $upload_dir['basedir'] . '/' . $name;
+			}
+		}
+
+		$to_dir = function ( $path ) {
+			$real = $path ? realpath( $path ) : false;
+			return $real ? trailingslashit( wp_normalize_path( $real ) ) : '';
+		};
+		$web_roots = array_filter( array_unique( array(
+			$to_dir( ABSPATH ),
+			$to_dir( WP_CONTENT_DIR ),
+			$to_dir( $upload_dir['basedir'] ?? '' ),
+		) ) );
+		$protected_dir = $to_dir( ( $upload_dir['basedir'] ?? '' ) . '/checkout-com-apple-pay' );
+
+		$exposed = array();
+		foreach ( array_unique( array_filter( $candidates ) ) as $candidate ) {
+			$real = realpath( $candidate );
+			if ( ! $real || ! is_file( $real ) ) {
+				continue;
+			}
+			$file = wp_normalize_path( $real );
+			if ( '' !== $protected_dir && 0 === strpos( $file, $protected_dir ) ) {
+				continue;
+			}
+			foreach ( $web_roots as $root ) {
+				if ( 0 === strpos( $file, $root ) ) {
+					$exposed[ $file ] = $file;
+					break;
+				}
+			}
+		}
+		return array_values( $exposed );
 	}
 
 	/**

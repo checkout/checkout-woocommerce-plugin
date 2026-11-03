@@ -778,10 +778,13 @@ class WC_Checkoutcom_Api_Request {
 				// Store under a dedicated key, NOT _cko_payment_id — see the note on the sibling
 				// decline branch above: writing a declined id to _cko_payment_id poisons the Flow
 				// duplicate-prevention guard and strands the order on-hold on the next retry.
+				// No order for a My Account "Add payment method" card verification (no order_id).
 				if ( 'Declined' === $response['status'] ) {
-					$order = wc_get_order( $response['metadata']['order_id'] );
-					$order->update_meta_data( '_cko_declined_payment_id', $response['id'] );
-					$order->save();
+					$order = ! empty( $response['metadata']['order_id'] ) ? wc_get_order( $response['metadata']['order_id'] ) : false;
+					if ( $order ) {
+						$order->update_meta_data( '_cko_declined_payment_id', $response['id'] );
+						$order->save();
+					}
 				}
 
 				$error_message = __( 'An error has occurred while processing your payment. Please check your card details and try again.', 'checkout-com-unified-payments-api' );

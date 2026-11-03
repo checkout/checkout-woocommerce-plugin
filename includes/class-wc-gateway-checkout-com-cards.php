@@ -953,6 +953,15 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 			exit();
 		}
 
+		// Redirect to my-account/payment-method if card verification failed (before reading
+		// order data: a card verification has no order).
+		// show error to customer.
+		if ( isset( $result['card_verification'] ) && 'error' === $result['card_verification'] ) {
+			WC_Checkoutcom_Utility::wc_add_notice_self( __( 'Unable to add payment method to your account.', 'checkout-com-unified-payments-api' ), 'error' );
+			wp_redirect( $result['redirection_url'] );
+			exit;
+		}
+
 		$order_id = $result['metadata']['order_id'];
 		$action   = $result['actions'];
 
@@ -971,14 +980,6 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 
 			$order    = $orders[0];
 			$order_id = $order->get_id();
-		}
-
-		// Redirect to my-account/payment-method if card verification failed.
-		// show error to customer.
-		if ( isset( $result['card_verification'] ) && 'error' === $result['card_verification'] ) {
-			WC_Checkoutcom_Utility::wc_add_notice_self( __( 'Unable to add payment method to your account.', 'checkout-com-unified-payments-api' ), 'error' );
-			wp_redirect( $result['redirection_url'] );
-			exit;
 		}
 
 		// Redirect to my-account/payment-method if card verification successful.
