@@ -51,6 +51,8 @@ plugin from this repository. Ports 8890/8891 avoid clashing with other local wp-
 | server | `server/refunds` | Admin full and partial refund to Checkout.com |
 | server | `server/closed-orders` | Cancelled/refunded orders are not changed by their own capture, approval, decline or card-verified webhooks, or by a returning payment · partial refunds keep the order open · a failed order can still be completed by its own genuine payment (agreed policy) |
 | server | `server/moto` | Admin order for a guest is paid as MOTO without 3DS (apostrophes in the order) · other order-pay payments keep 3DS · a MOTO claim from the browser is ignored for a normal order · saved cards and "save card" hidden on MOTO · admin warning on manual orders missing billing details |
+| server | `server/apple-pay-cert-warning` | Apple Pay key/certificate files in the web root (uploads root or a configured path) raise an admin warning; files in the protected directory do not |
+| server | `server/add-card-classic` | Classic Add payment method: a declined card verification returns to Payment methods instead of a fatal error |
 | server | `server/settings-sync` | Loading the gateway does not rewrite settings unless the enabled flags change |
 | server | `server/live-webhooks` | Real Checkout.com webhooks complete an order (`@webhook-live`, opt-in) |
 

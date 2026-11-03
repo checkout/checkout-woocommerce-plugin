@@ -195,6 +195,8 @@ Security
 - Important security hardening of payment verification, payment notifications (webhooks) and checkout endpoints. Updating is strongly recommended.
 
 Fixes
+- Apple Pay: the settings screen now warns if your certificate or private key file is in a publicly reachable folder, so you can move it.
+- Classic mode: adding a card that is declined in My Account no longer shows "There has been a critical error".
 - MOTO: orders an admin creates for a guest customer and pays on the order's payment page are now sent as MOTO without 3D Secure, instead of being challenged and declined.
 - The payment page no longer shows "Please fill in the required fields" when the order or cart contains an apostrophe (for example O'Brien).
 - The admin warning for manual orders that are missing billing details now appears, including on the HPOS Orders screen.
