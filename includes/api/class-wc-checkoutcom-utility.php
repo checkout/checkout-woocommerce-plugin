@@ -35,6 +35,18 @@ class WC_Checkoutcom_Utility {
 	}
 
 	/**
+	 * Whether an order is paid as MOTO: created by an admin for a guest customer. Same rule as
+	 * the direct card API path (WC_Checkoutcom_Api_Request); MOTO payments are sent without 3DS.
+	 *
+	 * @param WC_Order|false $order Order.
+	 *
+	 * @return bool
+	 */
+	public static function is_moto_order( $order ) {
+		return $order instanceof WC_Order && $order->is_created_via( 'admin' ) && 0 === (int) $order->get_customer_id();
+	}
+
+	/**
 	 * Whether a create-payment result (WC_Checkoutcom_Api_Request::create_payment) is a final,
 	 * authorised payment that may move an order to the authorised status.
 	 *

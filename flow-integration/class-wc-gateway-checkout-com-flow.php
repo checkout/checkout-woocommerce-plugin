@@ -1984,9 +1984,9 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		<?php endif; ?>
 
 		<?php if ( $order_pay_order_id === null ) : ?>
-			<div id="cart-info" data-cart='<?php echo wp_json_encode( WC_Checkoutcom_Api_Request::get_cart_info(true) ); ?>'></div>
+			<div id="cart-info" data-cart='<?php echo esc_attr( wp_json_encode( WC_Checkoutcom_Api_Request::get_cart_info(true) ) ); ?>'></div>
 		<?php else : ?>
-			<div id="order-pay-info" data-order-pay='<?php echo wp_json_encode( WC_Checkoutcom_Api_Request::get_order_info($order_pay_order_id, true) ); ?>'></div>
+			<div id="order-pay-info" data-order-pay='<?php echo esc_attr( wp_json_encode( WC_Checkoutcom_Api_Request::get_order_info($order_pay_order_id, true) ) ); ?>'></div>
 		<?php endif; ?>
 		
 		<!-- Skeleton loader for better UX while Flow component loads -->
@@ -7863,6 +7863,33 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			WC_Checkoutcom_Utility::logger( '[PAYMENT SESSION] Add-payment-method mode — amount=0, capture=false, cards-only, items dropped, reference detached, address ' . ( isset( $payment_session_request['billing'] ) ? 'kept' : 'dropped' ) . '. User ID: ' . get_current_user_id() );
 		}
 
+		// MOTO (admin-created order for a guest, paid on its order-pay page): decided here from the
+		// order, never from the client. The order-pay success_url carries order_id and key; with a
+		// matching key the session is card-only and has no 3DS. A client MOTO claim that can't be
+		// confirmed is downgraded to a regular payment.
+		$moto_order    = false;
+		$success_query = array();
+		if ( ! empty( $payment_session_request['success_url'] ) && is_string( $payment_session_request['success_url'] ) ) {
+			wp_parse_str( (string) wp_parse_url( $payment_session_request['success_url'], PHP_URL_QUERY ), $success_query );
+		}
+		$moto_order_id = isset( $success_query['order_id'] ) ? absint( $success_query['order_id'] ) : 0;
+		$moto_key      = isset( $success_query['key'] ) ? (string) $success_query['key'] : '';
+		if ( $moto_order_id && '' !== $moto_key ) {
+			$maybe_moto = wc_get_order( $moto_order_id );
+			if ( WC_Checkoutcom_Utility::is_moto_order( $maybe_moto ) && hash_equals( (string) $maybe_moto->get_order_key(), $moto_key ) ) {
+				$moto_order = $maybe_moto;
+			}
+		}
+		if ( $moto_order && ! $is_subscription_cit ) {
+			$payment_session_request['payment_type']            = 'MOTO';
+			$payment_session_request['3ds']                     = array( 'enabled' => false );
+			$payment_session_request['enabled_payment_methods'] = array( 'card' );
+			WC_Checkoutcom_Utility::logger( '[PAYMENT SESSION] MOTO order ' . $moto_order->get_id() . ' — payment_type=MOTO, 3DS off, cards only.' );
+		} elseif ( isset( $payment_session_request['payment_type'] ) && 'MOTO' === $payment_session_request['payment_type'] ) {
+			$payment_session_request['payment_type'] = class_exists( 'Checkout\\Payments\\PaymentType' ) ? \Checkout\Payments\PaymentType::$regular : 'Regular';
+			WC_Checkoutcom_Utility::logger( '[PAYMENT SESSION] Client requested MOTO but the order is not a MOTO order — using Regular.' );
+		}
+
 		// Safety net: never send the payment session without a currency. The client derives currency
 		// from #cart-info, which can be empty when init fires early (e.g. browser autocomplete),
 		// producing Checkout.com's "currency is missing" error. Default to the store currency.
@@ -9546,10 +9573,20 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			}
 		}
 
-		// Enable 3DS
+		// Enable 3DS - except for MOTO orders (admin-created for a guest), which are paid without
+		// 3DS like the direct card API path. Needs the order key so it can't be applied blindly.
+		$submit_moto_order = $order_id > 0 ? wc_get_order( $order_id ) : false;
+		$submit_moto_key   = isset( $_POST['order_key'] ) ? sanitize_text_field( wp_unslash( $_POST['order_key'] ) ) : '';
+		$is_moto_submit    = WC_Checkoutcom_Utility::is_moto_order( $submit_moto_order )
+			&& '' !== $submit_moto_key
+			&& hash_equals( (string) $submit_moto_order->get_order_key(), $submit_moto_key );
+
 		$request_body['3ds'] = array(
-			'enabled' => true,
+			'enabled' => ! $is_moto_submit,
 		);
+		if ( $is_moto_submit ) {
+			WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] MOTO order ' . $order_id . ' — 3DS off.' );
+		}
 
 		// If order exists, update success/failure URLs to include order_id
 		if ( $order_id > 0 ) {

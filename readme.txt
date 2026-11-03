@@ -190,6 +190,9 @@ Security
 - Important security hardening of payment verification, payment notifications (webhooks) and checkout endpoints. Updating is strongly recommended.
 
 Fixes
+- MOTO: orders an admin creates for a guest customer and pays on the order's payment page are now sent as MOTO without 3D Secure, instead of being challenged and declined.
+- The payment page no longer shows "Please fill in the required fields" when the order or cart contains an apostrophe (for example O'Brien).
+- The admin warning for manual orders that are missing billing details now appears, including on the HPOS Orders screen.
 - Saved-card payments that did not need 3D Secure now keep their payment reference, so the order moves to Processing when the payment is captured and can be refunded from the order screen.
 - Refunds created through the WooCommerce REST API or by other plugins now refund the requested amount.
 - Stores using WooCommerce's older (non-HPOS) order storage: a returning payment is always applied to the shopper's own order.

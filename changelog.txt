@@ -1,6 +1,9 @@
 *** Checkout.com Payment Gateway Changelog ***
 
 2026-10-29 - version 5.1.5
+* Fix - MOTO: admin-created orders for guest customers paid through Flow on the order-pay page are sent as MOTO without 3DS (previously 3DS was forced and the payment could be declined). MOTO is decided on the server from the order.
+* Fix - Order-pay and checkout pages no longer fail with "Please fill in the required fields" when the order or cart contains an apostrophe (e.g. O'Brien); the page data is now escaped.
+* Fix - The admin warning for manual orders missing billing details now shows (also on the HPOS Orders screen) and includes the billing name.
 * Fix - Security: important hardening of payment verification, webhook handling and checkout endpoints. Updating is strongly recommended. (Security release for stores that cannot yet run 5.2.0 / PHP 8.1.)
 * Fix - Saved-card Flow payments without a 3DS challenge lost _cko_payment_id/transaction id (order reloaded before save): orders stayed on-hold and admin refunds failed.
 * Fix - Refunds use the amount passed to process_refund() (REST/programmatic refunds previously read only the admin form field).

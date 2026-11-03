@@ -2051,6 +2051,14 @@ var ckoFlow = {
 						// Include reference with WooCommerce order ID for better tracking in Checkout.com dashboard
 						formData.append('reference', orderIdToUse);
 						ckoLogger.debug('[HANDLE SUBMIT] ✅ Reference with order ID being sent:', orderIdToUse);
+
+						// Order-pay page: send the order key so the server can confirm the order
+						// (e.g. a MOTO order is submitted without 3DS).
+						const payPageOrderId = window.location.pathname.match(/\/order-pay\/(\d+)\//)?.[1];
+						const payPageKey = new URLSearchParams(window.location.search).get('key');
+						if (payPageOrderId && payPageKey && String(payPageOrderId) === String(orderIdToUse)) {
+							formData.append('order_key', payPageKey);
+						}
 					}
 
 					// Add-payment-method: flag the submit so the server keeps it a $0, capture:false
