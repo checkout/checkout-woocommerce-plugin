@@ -133,7 +133,6 @@ rsync -av --inplace \
   --exclude='.nvmrc' \
   --exclude='.husky' \
   --exclude='package.json' \
-  --exclude='vendor/wp-cli' \
   --exclude='vendor/bin' \
   --exclude='.claude' \
   --exclude='.tmp' \
