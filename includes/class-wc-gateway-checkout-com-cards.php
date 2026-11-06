@@ -958,6 +958,13 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 
 		$cko_session_id = isset( $_REQUEST['cko-session-id'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['cko-session-id'] ) ) : '';
 
+		// Only well-formed Checkout.com ids are looked up.
+		if ( ! WC_Checkoutcom_Api_Request::is_valid_session_id( $cko_session_id ) ) {
+			WC_Checkoutcom_Utility::wc_add_notice_self( __( 'An error has occurred while processing your payment. Please check your card details and try again.', 'checkout-com-unified-payments-api' ) );
+			wp_safe_redirect( wc_get_checkout_url() );
+			exit();
+		}
+
 		// Verify session id.
 		$result = (array) ( new WC_Checkoutcom_Api_Request() )->verify_session( $cko_session_id );
 
