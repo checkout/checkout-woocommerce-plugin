@@ -2883,6 +2883,21 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 	}
 
 	/**
+	 * Whether content is shaped like an Apple Pay domain association file: non-empty, at most
+	 * 64 KB, and only hex/base64 characters ([A-Za-z0-9+/=]) plus whitespace and line breaks.
+	 *
+	 * @param mixed $content File content.
+	 * @return bool
+	 */
+	private static function is_valid_domain_association_content( $content ) {
+		if ( ! is_string( $content ) || '' === trim( $content ) || strlen( $content ) > 64 * KB_IN_BYTES ) {
+			return false;
+		}
+
+		return 1 === preg_match( '#^[A-Za-z0-9+/=\s]+$#', $content );
+	}
+
+	/**
 	 * AJAX handler for uploading domain association file.
 	 */
 	public function ajax_upload_domain_association() {
@@ -2909,8 +2924,15 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			return;
 		}
 
-		$file_content = is_string( $_POST['file_content'] ) ? wp_unslash( $_POST['file_content'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Apple domain-association file content written verbatim to .well-known; text sanitisation would alter the association file.
-		
+		$file_content = is_string( $_POST['file_content'] ) ? wp_unslash( $_POST['file_content'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Apple domain-association file content; validated below and written verbatim to .well-known; text sanitisation would alter the association file.
+
+		if ( ! self::is_valid_domain_association_content( $file_content ) ) {
+			wp_send_json_error( [
+				'message' => __( 'This does not look like an Apple Pay domain association file. Please upload the apple-developer-merchantid-domain-association file downloaded from your Apple Developer account or Checkout.com, without changes.', 'checkout-com-unified-payments-api' ),
+			] );
+			return;
+		}
+
 		// Get the correct .well-known directory path
 		$well_known_info = $this->get_well_known_path();
 		$well_known_dir = $well_known_info['dir'];
