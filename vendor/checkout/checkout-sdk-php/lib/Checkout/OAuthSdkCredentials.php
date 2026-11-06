@@ -90,7 +90,6 @@ class OAuthSdkCredentials implements SdkCredentialsInterface
         }
         try {
             $response = $this->client->request("POST", $this->authorizationUri, [
-                "verify" => false,
                 "headers" => [
                     "Content-Type" => "application/x-www-form-urlencoded"
                 ],
