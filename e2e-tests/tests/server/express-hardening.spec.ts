@@ -1,12 +1,16 @@
 import { test, expect } from '../../src/fixtures';
-import { latestOrderId } from '../../src/support/store';
+import { createPendingOrder } from '../../src/support/orders';
+import { customerIdByLogin, latestOrderId } from '../../src/support/store';
 import { PRODUCTS } from '../../src/support/test-data';
 import { wpEvalJson } from '../../src/support/wp-cli';
+import { env } from '../../src/env';
 
 /*
  * Express checkout (PayPal, Apple Pay, Google Pay) order handling: the order built from the cart
  * carries the same lines and total as the cart; the Apple Pay Express endpoints answer only while
- * Apple Pay Express is offered, and the order step requires its nonce and a token.
+ * Apple Pay Express is offered, and the order step requires its nonce and a token; the Apple Pay
+ * domain association upload and certificate directory checks; the PayPal order-pay order is only
+ * used for its owner.
  */
 
 type ExpressOrderLines = {
@@ -261,5 +265,43 @@ test.describe('Apple Pay certificate directory check', () => {
 		expect(outside.abspath).toBe(false);
 		expect(outside.uploads).toBe(false);
 		expect(outside.parent, 'the directory above WordPress is outside the web root').toBe(true);
+	});
+});
+
+/**
+ * Which order the PayPal order-pay request would charge for these posted fields, acting as the
+ * given user (0 = guest): the order id, 'refused', or 'none' (not an order-pay request).
+ */
+function paypalPayOrder(post: Record<string, string | number>, userId = 0, validNonce = true): string {
+	return wpEvalJson<string>(`
+		wp_set_current_user( ${Number(userId)} );
+		$_POST = json_decode( ${JSON.stringify(JSON.stringify(post))}, true );
+		$_POST['woocommerce-pay-nonce'] = ${validNonce ? "wp_create_nonce( 'woocommerce-pay' )" : "'not-a-nonce'"};
+		$gateway = new WC_Gateway_Checkout_Com_PayPal();
+		$resolve = new ReflectionMethod( $gateway, 'get_order_pay_order_from_request' );
+		$resolve->setAccessible( true );
+		$order = $resolve->invoke( $gateway );
+		if ( null === $order ) {
+			return 'none';
+		}
+		return $order instanceof WC_Order ? (string) $order->get_id() : 'refused';
+	`);
+}
+
+test.describe('PayPal order-pay order', () => {
+	test('is used only with its order key or for its own customer', () => {
+		const customerId = customerIdByLogin(env.customer.username);
+		const guestOrder = createPendingOrder(PRODUCTS.virtual.sku, 0);
+		const customerOrder = createPendingOrder(PRODUCTS.virtual.sku, customerId);
+
+		expect(paypalPayOrder({}), 'no order named').toBe('none');
+		expect(paypalPayOrder({ cko_pay_order_id: guestOrder.id, cko_pay_order_key: guestOrder.key })).toBe(String(guestOrder.id));
+		expect(paypalPayOrder({ cko_pay_order_id: guestOrder.id, cko_pay_order_key: 'wc_order_wrong' }), 'wrong key').toBe('refused');
+		expect(paypalPayOrder({ cko_pay_order_id: guestOrder.id }), 'no key').toBe('refused');
+		expect(paypalPayOrder({ cko_pay_order_id: guestOrder.id, cko_pay_order_key: guestOrder.key }, 0, false), 'invalid nonce').toBe('refused');
+
+		expect(paypalPayOrder({ cko_pay_order_id: customerOrder.id }, customerId), 'own order when logged in').toBe(String(customerOrder.id));
+		expect(paypalPayOrder({ cko_pay_order_id: customerOrder.id }, 0), 'customer order as guest').toBe('refused');
+		expect(paypalPayOrder({ cko_pay_order_id: guestOrder.id }, customerId), 'another order when logged in').toBe('refused');
 	});
 });
