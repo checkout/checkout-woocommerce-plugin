@@ -78,7 +78,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Klarna extends WC_Gateway_Che
 			}
 			?>
 
-			<div id="cart-info" data-cart='<?php echo wp_json_encode( WC_Checkoutcom_Api_Request::get_cart_info() ); ?>'></div>
+			<div id="cart-info" data-cart="<?php echo esc_attr( wp_json_encode( WC_Checkoutcom_Api_Request::get_cart_info() ) ); ?>"></div>
 
 			<div class="klarna-details"></div>
 			<div id="klarna_container"></div>
