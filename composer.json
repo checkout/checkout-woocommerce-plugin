@@ -19,7 +19,8 @@
     },
     "scripts": {
         "prefix-namespaces": [
-            "sh -c 'test -f ./bin/strauss.phar || curl -sSL -o bin/strauss.phar https://github.com/BrianHenryIE/strauss/releases/latest/download/strauss.phar'",
+            "sh -c 'test -f ./bin/strauss.phar || curl -sSfL -o bin/strauss.phar https://github.com/BrianHenryIE/strauss/releases/download/0.31.1/strauss.phar'",
+            "@php -r \"if ( hash_file( 'sha256', 'bin/strauss.phar' ) !== '17dc2baf27b9a3f52834e3db729c8365d8915a80e37a087d253cf705387aa887' ) { fwrite( STDERR, 'bin/strauss.phar is not Strauss 0.31.1 (checksum mismatch). Delete it and run composer install again.' . PHP_EOL ); exit( 1 ); }\"",
             "@php bin/strauss.phar",
             "@composer dump-autoload"
         ],
