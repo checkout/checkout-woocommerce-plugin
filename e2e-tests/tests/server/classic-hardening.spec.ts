@@ -1,7 +1,8 @@
 import { test, expect } from '../../src/fixtures';
 import { createCkoPayment } from '../../src/support/checkout-com';
 import { createPendingOrder } from '../../src/support/orders';
-import { getOrder } from '../../src/support/store';
+import { customerIdByLogin, customerTokens, getOrder } from '../../src/support/store';
+import { env } from '../../src/env';
 import { wpEvalJson } from '../../src/support/wp-cli';
 
 /*
@@ -160,5 +161,45 @@ test.describe('Classic gateway hardening', () => {
 		expect(out.other).not.toMatch(/onclick/i);
 		expect(out.other).not.toContain('data-cko-payment-id');
 		expect(out.other).not.toContain("'");
+	});
+
+	test('add payment method return saves the card only for the account that started it', async ({ request, baseURL }) => {
+		const customerId = customerIdByLogin(env.customer.username);
+		const before = customerTokens(env.customer.username).length;
+		const payment = await createCkoPayment({
+			amount: 0,
+			currency: 'USD',
+			reference: `cko-add-payment-method-${customerId}`,
+			metadata: { card_verification: 'true', user_id: String(customerId), redirection_url: 'https://example.org/elsewhere/' },
+		});
+		expect(payment.status).toBe('Card Verified');
+
+		// Not logged in as that customer: nothing is saved, and the redirect stays on the store.
+		const res = await request.get(`/?wc-api=wc_checkoutcom_callback&cko-session-id=${payment.id}`, { maxRedirects: 0 });
+		expect(res.status()).toBe(302);
+		const location = new URL(res.headers()['location'] ?? '', baseURL);
+		expect(location.host).toBe(new URL(baseURL ?? '').host);
+		expect(location.pathname).toContain('payment-methods');
+		expect(customerTokens(env.customer.username)).toHaveLength(before);
+	});
+
+	test('payment methods return URL only points at this site', async () => {
+		const out = wpEvalJson<{ external: string; local: string; empty: string; home: string }>(`
+			$gateway = new WC_Gateway_Checkout_Com_Cards();
+			$method  = new ReflectionMethod( $gateway, 'get_payment_methods_redirect_url' );
+			$method->setAccessible( true );
+			$local = wc_get_endpoint_url( 'payment-methods', '', wc_get_page_permalink( 'myaccount' ) );
+			return array(
+				'external' => $method->invoke( $gateway, 'https://example.org/elsewhere/' ),
+				'local'    => $method->invoke( $gateway, $local ),
+				'empty'    => $method->invoke( $gateway, '' ),
+				'home'     => home_url( '/' ),
+			);
+		`);
+		const homeHost = new URL(out.home).host;
+		expect(new URL(out.external).host).toBe(homeHost);
+		expect(out.external).toContain('payment-methods');
+		expect(out.local).toContain('payment-methods');
+		expect(new URL(out.empty).host).toBe(homeHost);
 	});
 });
