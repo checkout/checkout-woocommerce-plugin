@@ -86,6 +86,62 @@ class WC_Checkout_Com_Webhook {
 	}
 
 	/**
+	 * Whether the event's metadata order id and its numeric reference point at two different orders.
+	 *
+	 * The reference may be the order id or the order number (order-number plugins), so it is
+	 * compared with the resolved order's id, current number and the number stored at payment time.
+	 * Only a reference that resolves to another existing order counts as a conflict.
+	 *
+	 * @param WC_Order $order             Order resolved from the metadata order id.
+	 * @param mixed    $metadata_order_id Order id from the event metadata.
+	 * @param mixed    $reference         Payment reference from the event.
+	 * @return bool True when the two values name different orders.
+	 */
+	private static function reference_names_other_order( $order, $metadata_order_id, $reference ) {
+		if ( ! ( $order instanceof WC_Order ) || empty( $metadata_order_id ) ) {
+			return false;
+		}
+
+		$reference = is_scalar( $reference ) ? trim( (string) $reference ) : '';
+		if ( '' === $reference || ! is_numeric( $reference ) ) {
+			return false;
+		}
+
+		$own_references = array(
+			(string) $order->get_id(),
+			(string) $order->get_order_number(),
+			(string) $order->get_meta( '_cko_order_reference' ),
+		);
+		if ( in_array( $reference, $own_references, true ) ) {
+			return false;
+		}
+
+		$other = self::get_wc_order( $reference );
+
+		return ( $other instanceof WC_Abstract_Order ) && (int) $other->get_id() !== (int) $order->get_id();
+	}
+
+	/**
+	 * Log and skip an event whose metadata order id and reference name different orders.
+	 *
+	 * @param string   $handler      Handler name for the log.
+	 * @param WC_Order $order        Order resolved from the metadata order id.
+	 * @param object   $webhook_data The `data` object from the webhook payload.
+	 * @param mixed    $reference    Payment reference used for the comparison.
+	 * @return bool Always true (acknowledged, order not changed).
+	 */
+	private static function skip_for_reference_mismatch( $handler, $order, $webhook_data, $reference ) {
+		WC_Checkoutcom_Utility::logger( sprintf(
+			'WEBHOOK PROCESS: %s - metadata order %s and reference %s refer to different orders - payment %s not applied, order unchanged.',
+			$handler,
+			$order->get_id(),
+			is_scalar( $reference ) ? (string) $reference : '',
+			isset( $webhook_data->id ) ? $webhook_data->id : 'N/A'
+		) );
+		return true;
+	}
+
+	/**
 	 * Process webhook for authorize payment.
 	 *
 	 * @param array $data Webhook data.
@@ -107,6 +163,7 @@ class WC_Checkout_Com_Webhook {
 		}
 		
 		$order_id = isset($webhook_data->metadata->order_id) ? $webhook_data->metadata->order_id : null;
+		$metadata_order_id = $order_id;
 		
 		// FALLBACK: Use reference as order ID if metadata->order_id is not set
 		// We send order_id as reference when submitting payment session
@@ -158,6 +215,12 @@ class WC_Checkout_Com_Webhook {
 		// Use the resolved order's real id from here on: the event's id may be an order
 		// number (or not this store's at all), and reloading by it returned false (fatal).
 		$order_id = $order->get_id();
+
+		// The metadata order id and a numeric reference must name the same order.
+		$event_reference = isset( $webhook_data->reference ) ? $webhook_data->reference : '';
+		if ( self::reference_names_other_order( $order, $metadata_order_id, $event_reference ) ) {
+			return self::skip_for_reference_mismatch( 'authorize_payment', $order, $webhook_data, $event_reference );
+		}
 		
 		// Safety: never apply order-status changes to a WC_Subscription. A subscription card-change
 		// verification ($0 auth) must not flip the subscription's status — that is managed by WCS,
@@ -386,6 +449,34 @@ class WC_Checkout_Com_Webhook {
 			return true;
 		}
 
+		// Only an authorisation covering the order total, in the order currency, may set the
+		// authorised status (same rule as capture_payment). Otherwise hold the order.
+		$order_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $order->get_total(), $order->get_currency() );
+		$webhook_currency   = isset( $webhook_data->currency ) ? strtoupper( (string) $webhook_data->currency ) : '';
+		$currency_mismatch  = '' !== $webhook_currency && strtoupper( (string) $order->get_currency() ) !== $webhook_currency;
+		$is_underpaid       = (float) $amount < (float) $order_amount_cents;
+		if ( $is_underpaid || $currency_mismatch ) {
+			WC_Checkoutcom_Utility::logger( sprintf(
+				'WEBHOOK PROCESS: authorize_payment - amount/currency differs (webhook %s %s vs order %s %s), order %s held on-hold, authorised status not applied.',
+				$amount, $webhook_currency, $order_amount_cents, strtoupper( (string) $order->get_currency() ), $order_id
+			) );
+			$order->update_meta_data( '_cko_payment_id', $payment_id );
+			$order->add_order_note( $message );
+			$order->add_order_note( sprintf(
+				/* translators: 1: Checkout.com payment ID, 2: authorised amount, 3: order total. */
+				esc_html__( 'Checkout.com: Authorised amount or currency does not match the order total - Payment ID: %1$s (%2$s vs %3$s). Order held on-hold.', 'checkout-com-unified-payments-api' ),
+				$payment_id,
+				$formatted_amount ? $formatted_amount : (string) $amount . ' ' . $webhook_currency,
+				wc_price( $order->get_total(), array( 'currency' => $order->get_currency() ) )
+			) );
+			if ( ! $order->has_status( array( 'on-hold', 'processing', 'completed' ) ) ) {
+				$order->update_status( 'on-hold' );
+			} else {
+				$order->save();
+			}
+			return true;
+		}
+
 		$auth_status        = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
 
 		// Don't update status if already authorized AND status matches
@@ -478,6 +569,7 @@ class WC_Checkout_Com_Webhook {
 		
 		$webhook_data = $data->data;
 		$order_id     = isset($webhook_data->metadata->order_id) ? $webhook_data->metadata->order_id : null;
+		$metadata_order_id = $order_id;
 		$action_id    = isset($webhook_data->action_id) ? $webhook_data->action_id : null;
 		
 		// FALLBACK: Use reference as order ID if metadata->order_id is not set
@@ -531,6 +623,12 @@ class WC_Checkout_Com_Webhook {
 		// Use the resolved order's real id from here on: the event's id may be an order
 		// number (or not this store's at all), and reloading by it returned false (fatal).
 		$order_id = $order->get_id();
+
+		// The metadata order id and a numeric reference must name the same order.
+		$event_reference = isset( $webhook_data->reference ) ? $webhook_data->reference : '';
+		if ( self::reference_names_other_order( $order, $metadata_order_id, $event_reference ) ) {
+			return self::skip_for_reference_mismatch( 'card_verified', $order, $webhook_data, $event_reference );
+		}
 		
 		// Safety: never apply order-status changes to a WC_Subscription. A subscription card-change
 		// verification ($0 auth) must not flip the subscription's status — that is managed by WCS,
@@ -563,6 +661,34 @@ class WC_Checkout_Com_Webhook {
 		}
 
 		$payment_id = $webhook_data->id;
+
+		// The order must be bound to this payment (see order_owns_payment) before it is changed.
+		if ( ! self::order_owns_payment( $order, $webhook_data ) ) {
+			WC_Checkoutcom_Utility::logger( sprintf(
+				'WEBHOOK PROCESS: card_verified - order %s is not bound to payment %s - ignoring.',
+				$order_id,
+				$payment_id
+			) );
+			return false;
+		}
+
+		// A card verification carries no funds, so it may only complete an order whose total is zero
+		// (e.g. a free-trial subscription sign-up). Other orders just get a note.
+		$order_amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $order->get_total(), $order->get_currency() );
+		if ( (float) $order_amount_cents > 0 ) {
+			$order->add_order_note( sprintf(
+				/* translators: 1: Checkout.com payment ID, 2: Checkout.com action ID. */
+				__( 'Checkout.com Card verified webhook received - Payment ID: %1$s, Action ID: %2$s. Order status not changed (order total is not zero).', 'checkout-com-unified-payments-api' ),
+				$payment_id,
+				$action_id
+			) );
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: card_verified - order ' . $order_id . ' has a non-zero total, status not changed.' );
+				WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: card_verified END (NOTE ONLY) ===' );
+			}
+			return true;
+		}
+
 		/* translators: 1: Checkout.com payment ID, 2: Checkout.com action ID. */
 		$order->add_order_note( sprintf( __( 'Checkout.com Card verified webhook received - Payment ID: %1$s, Action ID: %2$s', 'checkout-com-unified-payments-api' ), $payment_id, $action_id ) );
 		// Set action id as woo transaction id.
@@ -607,6 +733,7 @@ class WC_Checkout_Com_Webhook {
 		
 		$webhook_data = $data->data;
 		$order_id     = isset($webhook_data->metadata->order_id) ? $webhook_data->metadata->order_id : null;
+		$metadata_order_id = $order_id;
 		
 		// FALLBACK: Use reference as order ID if metadata->order_id is not set
 		if ( empty( $order_id ) && isset( $webhook_data->reference ) && is_numeric( $webhook_data->reference ) ) {
@@ -649,6 +776,12 @@ class WC_Checkout_Com_Webhook {
 		}
 		
 		$order_id = $order->get_id();
+
+		// The metadata order id and a numeric reference must name the same order.
+		$event_reference = isset( $webhook_data->reference ) ? $webhook_data->reference : '';
+		if ( self::reference_names_other_order( $order, $metadata_order_id, $event_reference ) ) {
+			return self::skip_for_reference_mismatch( 'capture_payment', $order, $webhook_data, $event_reference );
+		}
 
 		// Safety: never apply order-status changes to a WC_Subscription (see authorize_payment).
 		if ( function_exists( 'wcs_is_subscription' ) && wcs_is_subscription( $order ) ) {
@@ -1083,6 +1216,7 @@ class WC_Checkout_Com_Webhook {
 		
 		$webhook_data = $data->data;
 		$order_id     = isset($webhook_data->metadata->order_id) ? $webhook_data->metadata->order_id : null;
+		$metadata_order_id = $order_id;
 		
 		// FALLBACK: Use reference as order ID if metadata->order_id is not set
 		if ( empty( $order_id ) && isset( $webhook_data->reference ) && is_numeric( $webhook_data->reference ) ) {
@@ -1124,6 +1258,12 @@ class WC_Checkout_Com_Webhook {
 		
 		$order_id = $order->get_id();
 
+		// The metadata order id and a numeric reference must name the same order.
+		$event_reference = isset( $webhook_data->reference ) ? $webhook_data->reference : '';
+		if ( self::reference_names_other_order( $order, $metadata_order_id, $event_reference ) ) {
+			return self::skip_for_reference_mismatch( 'void_payment', $order, $webhook_data, $event_reference );
+		}
+
 		// Safety: never apply order-status changes to a WC_Subscription (see authorize_payment).
 		if ( function_exists( 'wcs_is_subscription' ) && wcs_is_subscription( $order ) ) {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: resolved order ' . $order_id . ' is a subscription — skipping status update (managed by WCS).' );
@@ -1159,6 +1299,12 @@ class WC_Checkout_Com_Webhook {
 		
 		if ( $webhook_debug_enabled && ! empty( $expected_payment_id ) ) {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: ✅ Payment ID validation passed - Order payment ID: ' . $expected_payment_id . ', Webhook payment ID: ' . $payment_id );
+		}
+
+		// The order must be bound to this payment (see order_owns_payment) before it is voided.
+		if ( ! self::order_owns_payment( $order, $webhook_data ) ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: void_payment - order ' . $order_id . ' is not bound to payment ' . $payment_id . ' - ignoring.' );
+			return false;
 		}
 
 		// check if payment is already captured.
@@ -1239,6 +1385,7 @@ class WC_Checkout_Com_Webhook {
 		
 		$webhook_data = $data->data;
 		$order_id     = isset($webhook_data->metadata->order_id) ? $webhook_data->metadata->order_id : null;
+		$metadata_order_id = $order_id;
 		
 		// FALLBACK: Use reference as order ID if metadata->order_id is not set
 		if ( empty( $order_id ) && isset( $webhook_data->reference ) && is_numeric( $webhook_data->reference ) ) {
@@ -1281,6 +1428,12 @@ class WC_Checkout_Com_Webhook {
 		
 		$order_id = $order->get_id();
 
+		// The metadata order id and a numeric reference must name the same order.
+		$event_reference = isset( $webhook_data->reference ) ? $webhook_data->reference : '';
+		if ( self::reference_names_other_order( $order, $metadata_order_id, $event_reference ) ) {
+			return self::skip_for_reference_mismatch( 'refund_payment', $order, $webhook_data, $event_reference );
+		}
+
 		// Safety: never apply order-status changes to a WC_Subscription (see authorize_payment).
 		if ( function_exists( 'wcs_is_subscription' ) && wcs_is_subscription( $order ) ) {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: resolved order ' . $order_id . ' is a subscription — skipping status update (managed by WCS).' );
@@ -1316,6 +1469,16 @@ class WC_Checkout_Com_Webhook {
 		
 		if ( $webhook_debug_enabled && ! empty( $expected_payment_id ) ) {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: ✅ Payment ID validation passed - Order payment ID: ' . $expected_payment_id . ', Webhook payment ID: ' . $payment_id );
+		}
+
+		// A refund is only booked on an order that holds this Checkout.com payment id. Orders with
+		// no stored payment id are never refunded from a webhook.
+		if ( empty( $expected_payment_id ) || ! self::order_owns_payment( $order, $webhook_data ) ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: refund_payment - order ' . $order_id . ' does not hold payment ' . $payment_id . ' - refund not booked.' );
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: refund_payment END (FAILED - Payment Not On Order) ===' );
+			}
+			return false;
 		}
 
 		// check if payment is already refunded.
@@ -1485,6 +1648,13 @@ class WC_Checkout_Com_Webhook {
 			// Use the resolved order's real id from here on: the event's id may be an order
 			// number (or not this store's at all), and reloading by it returned false (fatal).
 			$order_id = $order->get_id();
+
+			// The metadata order id and a numeric reference must name the same order.
+			$metadata_order_id = ! empty( $details['metadata']['order_id'] ) ? $details['metadata']['order_id'] : null;
+			$event_reference   = isset( $details['reference'] ) ? $details['reference'] : '';
+			if ( self::reference_names_other_order( $order, $metadata_order_id, $event_reference ) ) {
+				return self::skip_for_reference_mismatch( 'cancel_payment', $order, $webhook_data, $event_reference );
+			}
 			
 			if ( $webhook_debug_enabled ) {
 				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order loaded successfully - Order ID: ' . $order->get_id() . ', Status: ' . $order->get_status() );
@@ -1515,6 +1685,15 @@ class WC_Checkout_Com_Webhook {
 			
 			if ( $webhook_debug_enabled && ! empty( $expected_payment_id ) ) {
 				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: ✅ Payment ID validation passed - Order payment ID: ' . $expected_payment_id . ', Webhook payment ID: ' . $payment_id );
+			}
+
+			// The order must be bound to this payment (see order_owns_payment) before it is cancelled.
+			if ( ! self::order_owns_payment( $order, $webhook_data ) ) {
+				WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: cancel_payment - order ' . $order_id . ' is not bound to payment ' . $payment_id . ' - ignoring.' );
+				if ( $webhook_debug_enabled ) {
+					WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: cancel_payment END (FAILED - Payment Not On Order) ===' );
+				}
+				return false;
 			}
 
 			$status  = 'wc-cancelled';
