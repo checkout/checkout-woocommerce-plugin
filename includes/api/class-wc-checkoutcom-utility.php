@@ -35,6 +35,27 @@ class WC_Checkoutcom_Utility {
 	}
 
 	/**
+	 * A Checkout.com id read from a request, or '' when it isn't one.
+	 *
+	 * Ids sent by the browser end up in the path of API calls signed with the secret key, so
+	 * only the expected id format is accepted: the prefix, an underscore and 20-40 letters or
+	 * digits (e.g. pay_..., ps_... for payment sessions, sid_... for 3DS sessions).
+	 *
+	 * @param mixed  $value  Raw request value (already unslashed or not).
+	 * @param string $prefix Expected prefix without the underscore: 'pay', 'ps' or 'sid'.
+	 *
+	 * @return string
+	 */
+	public static function clean_checkout_id( $value, $prefix ) {
+		if ( ! is_string( $value ) ) {
+			return '';
+		}
+		$value = trim( wp_unslash( $value ) );
+
+		return 1 === preg_match( '/^' . preg_quote( $prefix, '/' ) . '_[a-z0-9]{20,40}$/i', $value ) ? $value : '';
+	}
+
+	/**
 	 * Whether an order is paid as MOTO: created by an admin for a guest customer. Same rule as
 	 * the direct card API path (WC_Checkoutcom_Api_Request); MOTO payments are sent without 3DS.
 	 *
