@@ -198,3 +198,68 @@ test.describe('Apple Pay domain association upload', () => {
 		expect(acceptsDomainAssociation('A'.repeat(64 * 1024 + 1)), 'over 64 KB').toBe(false);
 	});
 });
+
+test.describe('Apple Pay certificate directory check', () => {
+	test('is not cached before the directory exists and is cleared on demand', () => {
+		const result = wpEvalJson<{ exposed: boolean; cachedWithoutDir: boolean; clearedAfterSave: boolean }>(`
+			$gateway = new WC_Gateway_Checkout_Com_Apple_Pay();
+			$dir     = wp_upload_dir()['basedir'] . '/checkout-com-apple-pay';
+			$moved   = $dir . '-e2e-' . wp_generate_password( 6, false );
+			$had_dir = is_dir( $dir );
+			if ( $had_dir ) {
+				rename( $dir, $moved );
+			}
+			try {
+				delete_transient( 'cko_applepay_dir_web_exposed' );
+				$exposed = $gateway->is_cert_dir_web_exposed();
+				$cached  = false !== get_transient( 'cko_applepay_dir_web_exposed' );
+			} finally {
+				if ( $had_dir ) {
+					rename( $moved, $dir );
+				}
+			}
+
+			set_transient( 'cko_applepay_dir_web_exposed', 'no', HOUR_IN_SECONDS );
+			$gateway->clear_cert_dir_exposure_check();
+			$cleared = false === get_transient( 'cko_applepay_dir_web_exposed' );
+
+			return array( 'exposed' => $exposed, 'cachedWithoutDir' => $cached, 'clearedAfterSave' => $cleared );
+		`);
+
+		expect(result.exposed).toBe(false);
+		expect(result.cachedWithoutDir, 'no result cached while the directory is missing').toBe(false);
+		expect(result.clearedAfterSave).toBe(true);
+	});
+
+	test('new keys only go to a location outside the web root', () => {
+		const outside = wpEvalJson<Record<string, boolean>>(`
+			$gateway = new WC_Gateway_Checkout_Com_Apple_Pay();
+			$check   = new ReflectionMethod( $gateway, 'is_outside_web_root' );
+			$check->setAccessible( true );
+			$saved = isset( $_SERVER['DOCUMENT_ROOT'] ) ? $_SERVER['DOCUMENT_ROOT'] : null;
+
+			$_SERVER['DOCUMENT_ROOT'] = '';
+			$unknown_root = $check->invoke( $gateway, dirname( untrailingslashit( ABSPATH ) ) );
+
+			$_SERVER['DOCUMENT_ROOT'] = ABSPATH;
+			$result = array(
+				'unknownRoot' => $unknown_root,
+				'abspath'     => $check->invoke( $gateway, untrailingslashit( ABSPATH ) ),
+				'uploads'     => $check->invoke( $gateway, wp_upload_dir()['basedir'] ),
+				'parent'      => $check->invoke( $gateway, dirname( untrailingslashit( ABSPATH ) ) ),
+			);
+
+			if ( null === $saved ) {
+				unset( $_SERVER['DOCUMENT_ROOT'] );
+			} else {
+				$_SERVER['DOCUMENT_ROOT'] = $saved;
+			}
+			return $result;
+		`);
+
+		expect(outside.unknownRoot, 'refused when the document root is unknown').toBe(false);
+		expect(outside.abspath).toBe(false);
+		expect(outside.uploads).toBe(false);
+		expect(outside.parent, 'the directory above WordPress is outside the web root').toBe(true);
+	});
+});
