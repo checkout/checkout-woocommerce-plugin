@@ -481,7 +481,9 @@ class WC_Checkoutcom_Utility {
 		}
 
 		// Convert array to string if needed
-		if ( is_array( $error_message ) || is_object( $error_message ) ) {
+		if ( $error_message instanceof Throwable ) {
+			$error_message = self::describe_exception_for_log( $error_message );
+		} elseif ( is_array( $error_message ) || is_object( $error_message ) ) {
 			$error_message = wc_print_r( $error_message, true );
 		}
 
@@ -523,10 +525,53 @@ class WC_Checkoutcom_Utility {
 			// If exception is an array, redact and print it properly
 			if ( is_array( $exception ) ) {
 				$logger->log( $log_level, $error_message . ' Data: ' . wc_print_r( self::redact_sensitive( $exception ), true ), $context );
+			} elseif ( $exception instanceof Throwable ) {
+				// Never print the exception object itself: its trace holds call arguments
+				// (SDK configuration included). Log a summary instead.
+				$logger->log( $log_level, self::describe_exception_for_log( $exception ), $context );
+			} elseif ( is_object( $exception ) ) {
+				$data = json_decode( (string) wp_json_encode( $exception ), true );
+				$logger->log( $log_level, get_class( $exception ) . ' ' . wc_print_r( is_array( $data ) ? self::redact_sensitive( $data ) : array(), true ), $context );
 			} else {
-				$logger->log( $log_level, wc_print_r( $exception, true ), $context );
+				$logger->log( $log_level, (string) $exception, $context );
 			}
 		}
+	}
+
+	/**
+	 * Summarise an exception for the log: class, message, code and location, plus the HTTP
+	 * status and (redacted) error details for Checkout.com API errors. No trace.
+	 *
+	 * @param Throwable $exception Exception.
+	 *
+	 * @return string
+	 */
+	private static function describe_exception_for_log( $exception ) {
+		$summary = sprintf(
+			'%s: %s (code %s) at %s:%d',
+			get_class( $exception ),
+			$exception->getMessage(),
+			(string) $exception->getCode(),
+			$exception->getFile(),
+			$exception->getLine()
+		);
+
+		if ( $exception instanceof \Checkout\CheckoutApiException ) {
+			if ( isset( $exception->http_metadata ) && is_object( $exception->http_metadata ) && method_exists( $exception->http_metadata, 'getStatusCode' ) ) {
+				$summary .= ' HTTP status: ' . $exception->http_metadata->getStatusCode();
+			}
+			if ( ! empty( $exception->error_details ) ) {
+				$details  = is_array( $exception->error_details ) ? self::redact_sensitive( $exception->error_details ) : (string) $exception->error_details;
+				$summary .= ' Error details: ' . wc_print_r( $details, true );
+			}
+		}
+
+		$previous = $exception->getPrevious();
+		if ( $previous instanceof Throwable ) {
+			$summary .= ' Previous: ' . get_class( $previous ) . ': ' . $previous->getMessage();
+		}
+
+		return $summary;
 	}
 
 	/**

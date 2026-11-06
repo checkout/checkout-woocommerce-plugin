@@ -77,4 +77,40 @@ test.describe('Classic gateway hardening', () => {
 		expect(after.ckoPaymentId).toBe(payment.id);
 		expect(after.notes.join('\n')).toContain('Payment Authorised');
 	});
+
+	test('logger records an exception summary without its call arguments', async () => {
+		const out = wpEvalJson<{ log: string }>(`
+			$saved    = get_option( 'cko_file_logging', false );
+			$captured = array();
+			$capture  = function ( $message ) use ( &$captured ) {
+				$captured[] = $message;
+				return $message;
+			};
+			add_filter( 'woocommerce_logger_log_message', $capture, 10, 1 );
+			update_option( 'cko_file_logging', 'yes' );
+			try {
+				$thrower = function ( $secret ) {
+					throw new Exception( 'e2e logger message' );
+				};
+				try {
+					$thrower( 'sk_sbox_e2e_hidden_value' );
+				} catch ( Exception $e ) {
+					WC_Checkoutcom_Utility::logger( 'e2e logger plain', $e );
+				}
+				$api                = new \\Checkout\\CheckoutApiException( 'e2e api message' );
+				$api->error_details = array( 'error_codes' => array( 'e2e_error_code' ), 'token' => 'tok_e2e_hidden_value' );
+				WC_Checkoutcom_Utility::logger( 'e2e logger api', $api );
+			} finally {
+				remove_filter( 'woocommerce_logger_log_message', $capture, 10 );
+				false === $saved ? delete_option( 'cko_file_logging' ) : update_option( 'cko_file_logging', $saved );
+			}
+			return array( 'log' => implode( "\\n", $captured ) );
+		`);
+		expect(out.log).toContain('e2e logger message');
+		expect(out.log).toContain('Exception');
+		expect(out.log).not.toContain('sk_sbox_e2e_hidden_value');
+		expect(out.log).toContain('e2e api message');
+		expect(out.log).toContain('e2e_error_code');
+		expect(out.log).not.toContain('tok_e2e_hidden_value');
+	});
 });
