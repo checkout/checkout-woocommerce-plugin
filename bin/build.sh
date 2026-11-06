@@ -143,6 +143,7 @@ rsync -av --inplace \
   --exclude='node_modules' \
   --exclude='client' \
   --exclude='webpack.config.js' \
+  --exclude='babel.config.js' \
   --exclude='package-lock.json' \
   --exclude='.wp-env.json' \
   --exclude='.DS_Store' \
