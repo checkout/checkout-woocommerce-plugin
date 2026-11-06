@@ -399,14 +399,9 @@ class WC_Checkoutcom_Api_Request {
 		$is_express_checkout = empty( $customer_address['billing_address_1'] ) && empty( $customer_address['billing_city'] ) && ! empty( $order );
 
 		if ( $is_pay_order ) {
-			if ( ! empty( $get_data['order_id'] ) ) {
-				$order_id = $get_data['order_id'];
-			} elseif ( ! empty( $get_data['key'] ) ) {
-				$order_id = wc_get_order_id_by_order_key( $get_data['key'] );
-			}
-
-			$order = wc_get_order( $order_id );
-
+			// Use the order WooCommerce is paying (its key was checked on the order-pay page),
+			// never one named in the query string: the payment's amount and reference already
+			// come from this order, and the MOTO decision below must be made on the same order.
 			$email = $order->get_billing_email();
 			$name  = $order->get_billing_first_name() . ' ' . $order->get_billing_last_name();
 
@@ -606,9 +601,8 @@ class WC_Checkoutcom_Api_Request {
 
 		// If this is MOTO order (Admin-created order + Order-pay page + Guest customer).
 		$is_order_pay_page = ! empty( $_GET['pay_for_order'] ) && (bool) $_GET['pay_for_order'];
-		$is_guest_customer = $order->get_customer_id() == 0; // Guest customer = no customer account
-		
-		if ( $order->is_created_via( 'admin' ) && $is_order_pay_page && $is_guest_customer ) {
+
+		if ( $is_order_pay_page && WC_Checkoutcom_Utility::is_moto_order( $order ) ) {
 			$payment->payment_type = PaymentType::$moto;
 			unset( $payment->three_ds );
 			WC_Checkoutcom_Utility::logger( 'MOTO payment type set - Admin order + Order-pay page + Guest customer. Order ID: ' . $order->get_id() );
