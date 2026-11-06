@@ -984,35 +984,60 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 			exit;
 		}
 
-		$order_id = $result['metadata']['order_id'];
+		// My Account "Add payment method" card verification (no order).
+		if ( isset( $result['metadata']['card_verification'] ) ) {
+			// Redirect to my-account/payment-method if card verification successful.
+			// show notice to customer.
+			if ( 'Card Verified' === ( $result['status'] ?? '' ) && true === ( $result['approved'] ?? null ) ) {
+
+				$this->save_token( get_current_user_id(), $result );
+
+				WC_Checkoutcom_Utility::wc_add_notice_self( __( 'Payment method successfully added.', 'checkout-com-unified-payments-api' ), 'notice' );
+				wp_redirect( $result['metadata']['redirection_url'] );
+				exit;
+			}
+
+			WC_Checkoutcom_Utility::wc_add_notice_self( __( 'Unable to add payment method to your account.', 'checkout-com-unified-payments-api' ), 'error' );
+			wp_redirect( $result['metadata']['redirection_url'] );
+			exit;
+		}
+
+		$order_id = isset( $result['metadata']['order_id'] ) ? $result['metadata']['order_id'] : 0;
 		$action   = $result['actions'];
 
 		// Get object as an instance of WC_Subscription.
 		$subscription_object = wc_get_order( $order_id );
 
-		$order = new WC_Order( $order_id );
+		$order = $subscription_object;
 
 		// Query order by order number to check if order exist.
-		if ( ! $order ) {
+		if ( ! $order && ! empty( $order_id ) ) {
 			$orders = wc_get_orders(
 				[
 					'order_number' => $order_id,
 				]
 			);
 
-			$order    = $orders[0];
-			$order_id = $order->get_id();
+			$order = ! empty( $orders ) ? $orders[0] : false;
+			if ( $order ) {
+				$order_id            = $order->get_id();
+				$subscription_object = $order;
+			}
 		}
 
-		// Redirect to my-account/payment-method if card verification successful.
-		// show notice to customer.
-		if ( 'Card Verified' === $result['status'] && isset( $result['metadata']['card_verification'] ) ) {
+		if ( ! $order instanceof WC_Order ) {
+			WC_Checkoutcom_Utility::logger( 'Payment return: no order found for payment ' . $result['id'] . '.' );
+			WC_Checkoutcom_Utility::wc_add_notice_self( __( 'An error has occurred while processing your payment. Please check your card details and try again.', 'checkout-com-unified-payments-api' ) );
+			wp_safe_redirect( wc_get_checkout_url() );
+			exit();
+		}
 
-			$this->save_token( get_current_user_id(), $result );
+		// The payment must be approved and pay exactly this order before the order moves on.
+		$verified_details = $result;
+		$verified         = WC_Checkoutcom_Utility::verify_payment_for_order( $order, (string) $result['id'], $verified_details );
 
-			WC_Checkoutcom_Utility::wc_add_notice_self( __( 'Payment method successfully added.', 'checkout-com-unified-payments-api' ), 'notice' );
-			wp_redirect( $result['metadata']['redirection_url'] );
-			exit;
+		if ( is_wp_error( $verified ) ) {
+			$this->handle_unverified_return( $order, $result, $verified );
 		}
 
 		// Set action id as woo transaction id.
@@ -1093,6 +1118,66 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		$url = esc_url( $order->get_checkout_order_received_url() );
 		wp_redirect( $url );
 
+		exit();
+	}
+
+	/**
+	 * Finish a redirect return whose payment did not pass verify_payment_for_order(): the
+	 * order is never marked paid. Ends the request with a redirect.
+	 *
+	 * - amount/currency differ from the order: order put on-hold for the merchant to review;
+	 * - payment still pending (asynchronous payment methods): order put on-hold until the
+	 *   webhook confirms it;
+	 * - anything else: order left as it is and the customer is sent back to checkout.
+	 *
+	 * @param WC_Order $order   Order named by the payment.
+	 * @param array    $result  Payment details from Checkout.com.
+	 * @param WP_Error $error   Verification result.
+	 *
+	 * @return void
+	 */
+	private function handle_unverified_return( $order, $result, $error ) {
+		$payment_id   = isset( $result['id'] ) ? (string) $result['id'] : '';
+		$code         = $error->get_error_code();
+		$can_hold     = in_array( $order->get_status(), [ 'pending', 'failed' ], true );
+		$status       = isset( $result['status'] ) ? (string) $result['status'] : '';
+		$amount_issue = in_array( $code, [ 'cko_amount_mismatch', 'cko_currency_mismatch' ], true );
+
+		WC_Checkoutcom_Utility::logger( 'Payment return for order ' . $order->get_id() . ' not confirmed: ' . $error->get_error_message() );
+
+		if ( $amount_issue || ( 'cko_payment_not_approved' === $code && 'Pending' === $status ) ) {
+			if ( $amount_issue ) {
+				/* translators: %s: Payment ID. */
+				$note = sprintf( esc_html__( 'Payment amount or currency does not match the order - Checkout.com Payment ID : %s', 'checkout-com-unified-payments-api' ), $payment_id );
+			} else {
+				$order->set_transaction_id( $payment_id );
+				$order->update_meta_data( '_cko_payment_id', $payment_id );
+
+				/* translators: %s: Payment ID. */
+				$note = sprintf( esc_html__( 'Checkout.com Payment pending confirmation - Payment ID : %s', 'checkout-com-unified-payments-api' ), $payment_id );
+			}
+
+			if ( $can_hold ) {
+				$order->update_status( 'on-hold', $note );
+			} else {
+				$order->add_order_note( $note );
+			}
+			$order->save();
+
+			if ( WC()->cart ) {
+				WC()->cart->empty_cart();
+			}
+
+			wp_safe_redirect( $order->get_checkout_order_received_url() );
+			exit();
+		}
+
+		/* translators: %s: Payment ID. */
+		$order->add_order_note( sprintf( esc_html__( 'Checkout.com Payment could not be confirmed for this order - Payment ID : %s', 'checkout-com-unified-payments-api' ), $payment_id ) );
+		$order->save();
+
+		WC_Checkoutcom_Utility::wc_add_notice_self( __( 'An error has occurred while processing your payment. Please check your card details and try again.', 'checkout-com-unified-payments-api' ) );
+		wp_safe_redirect( wc_get_checkout_url() );
 		exit();
 	}
 
