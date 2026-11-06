@@ -3,7 +3,7 @@ import { createCkoPayment } from '../../src/support/checkout-com';
 import { createPendingOrder } from '../../src/support/orders';
 import { customerIdByLogin, customerTokens, getOrder } from '../../src/support/store';
 import { env } from '../../src/env';
-import { wpEvalJson } from '../../src/support/wp-cli';
+import { wpEvalFileJson, wpEvalJson } from '../../src/support/wp-cli';
 
 /*
  * Classic card gateway: return path (some tests create sandbox payments), logging and
@@ -80,7 +80,7 @@ test.describe('Classic gateway hardening', () => {
 	});
 
 	test('logger records an exception summary without its call arguments', async () => {
-		const out = wpEvalJson<{ log: string }>(`
+		const out = wpEvalFileJson<{ log: string }>(`
 			$saved    = get_option( 'cko_file_logging', false );
 			$captured = array();
 			$capture  = function ( $message ) use ( &$captured ) {
