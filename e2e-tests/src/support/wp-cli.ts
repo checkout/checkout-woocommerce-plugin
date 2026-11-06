@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
 import path from 'node:path';
 
 const REPO_ROOT = path.resolve(__dirname, '../../..');
@@ -30,6 +31,27 @@ export function wpEvalJson<T>(php: string): T {
 	// wp-env can print notices before the payload; the JSON is the last line.
 	const last = out.split('\n').filter(Boolean).pop() ?? 'null';
 	return JSON.parse(last) as T;
+}
+
+/**
+ * Like wpEvalJson, but runs the PHP from a temporary file (wp eval-file). Use it for code that
+ * `wp eval` can't take as a command-line argument (long code, or code whose output wp-env's
+ * runner doesn't survive). The file lives in the git-ignored test-results folder, which the
+ * store sees because the plugin directory is mounted.
+ */
+export function wpEvalFileJson<T>(php: string): T {
+	const dir = path.join(REPO_ROOT, 'e2e-tests/test-results');
+	fs.mkdirSync(dir, { recursive: true });
+	const file = path.join(dir, `wp-eval-${process.pid}-${Date.now()}.php`);
+	fs.writeFileSync(file, `<?php\necho wp_json_encode( (function () { ${php} })() );\n`);
+	try {
+		const containerPath = `wp-content/plugins/${path.basename(REPO_ROOT)}/${path.relative(REPO_ROOT, file)}`;
+		const out = wp('eval-file', containerPath);
+		const last = out.split('\n').filter(Boolean).pop() ?? 'null';
+		return JSON.parse(last) as T;
+	} finally {
+		fs.rmSync(file, { force: true });
+	}
 }
 
 /** Run one of the bin/e2e helper scripts from the repo root. */

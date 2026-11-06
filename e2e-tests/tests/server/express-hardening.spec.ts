@@ -2,7 +2,7 @@ import { test, expect } from '../../src/fixtures';
 import { createPendingOrder } from '../../src/support/orders';
 import { customerIdByLogin, latestOrderId } from '../../src/support/store';
 import { PRODUCTS } from '../../src/support/test-data';
-import { wpEvalJson } from '../../src/support/wp-cli';
+import { wpEvalFileJson, wpEvalJson } from '../../src/support/wp-cli';
 import { env } from '../../src/env';
 
 /*
@@ -34,7 +34,7 @@ const EXPRESS_GATEWAYS = [
  * create the express order for it with the given gateway class. The order is deleted afterwards.
  */
 function buildExpressOrder(className: string, args: string): ExpressOrderLines {
-	return wpEvalJson<ExpressOrderLines>(`
+	return wpEvalFileJson<ExpressOrderLines>(`
 		wc_load_cart();
 		WC()->cart->empty_cart();
 		WC()->customer->set_shipping_country( 'US' );
@@ -100,7 +100,8 @@ test.describe('Express checkout orders', () => {
 			expect(lines.products).toBe(1);
 			expect(lines.shipping).toEqual(['flat_rate:1']);
 			expect(lines.fees).toEqual(['E2E handling fee']);
-			expect(lines.coupons).toEqual(['applied']);
+			expect(lines.coupons).toHaveLength(1);
+			expect(lines.coupons[0], 'the cart coupon is on the order').toMatch(/^e2e-express-/);
 			expect(lines.orderTotal, 'order total matches the cart total').toBe(lines.cartTotal);
 		});
 	}
@@ -199,7 +200,13 @@ test.describe('Apple Pay domain association upload', () => {
 		expect(acceptsDomainAssociation('<?php echo 1; ?>')).toBe(false);
 		expect(acceptsDomainAssociation('')).toBe(false);
 		expect(acceptsDomainAssociation(' \n\t ')).toBe(false);
-		expect(acceptsDomainAssociation('A'.repeat(64 * 1024 + 1)), 'over 64 KB').toBe(false);
+		// Built in PHP: a 64 KB value is too long to pass on the WP-CLI command line.
+		const oversized = wpEvalJson<boolean>(`
+			$check = new ReflectionMethod( 'WC_Gateway_Checkout_Com_Apple_Pay', 'is_valid_domain_association_content' );
+			$check->setAccessible( true );
+			return $check->invoke( null, str_repeat( 'A', 64 * 1024 + 1 ) );
+		`);
+		expect(oversized, 'over 64 KB').toBe(false);
 	});
 });
 
