@@ -54,6 +54,26 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 	}
 
 	/**
+	 * Whether Google Pay Express is offered: its toggle is on and, in Classic mode, the
+	 * Google Pay gateway is enabled too (same rule as CKO_Google_Pay_Express).
+	 *
+	 * @return bool
+	 */
+	private function is_express_available() {
+		$google_pay_settings = get_option( 'woocommerce_wc_checkout_com_google_pay_settings', array() );
+		if ( ! is_array( $google_pay_settings ) || 'yes' !== ( $google_pay_settings['google_pay_express'] ?? '' ) ) {
+			return false;
+		}
+
+		$core_settings = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		$checkout_mode = isset( $core_settings['ckocom_checkout_mode'] ) ? $core_settings['ckocom_checkout_mode'] : 'classic';
+
+		return 'classic' !== $checkout_mode || 'yes' === ( $google_pay_settings['enabled'] ?? '' );
+	}
+
+	/**
 	 * Handle Google Pay method API requests.
 	 *
 	 * @return void
@@ -61,6 +81,12 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 	public function handle_wc_api() {
 		// Log that API endpoint was hit
 		WC_Checkoutcom_Utility::logger( 'Google Pay: handle_wc_api called' );
+
+		// These actions serve Google Pay Express only; refuse them when it is not offered.
+		if ( ! $this->is_express_available() ) {
+			WC_Checkoutcom_Utility::logger( 'Google Pay: request refused - Google Pay Express is not enabled' );
+			wp_send_json( [ 'result' => 'failed' ], 403 );
+		}
 
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended, WordPress.Security.NonceVerification.Missing
 		if ( ! empty( $_GET['cko_google_pay_action'] ) ) {
