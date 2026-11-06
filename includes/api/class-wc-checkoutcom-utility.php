@@ -227,6 +227,20 @@ class WC_Checkoutcom_Utility {
 			return new WP_Error( 'cko_payment_not_approved', 'Payment is not approved (status: ' . ( '' !== $status ? $status : 'unknown' ) . ').' );
 		}
 
+		// Claim the payment for this order. The order meta check above only sees orders that are
+		// already saved, so two requests verifying the same payment for different orders at the
+		// same time could both pass it. INSERT IGNORE on the unique option_name lets only the first
+		// claim win; every later request reads the winning order id from the database.
+		global $wpdb;
+		$claim_option = 'cko_payment_claim_' . strtolower( $payment_id );
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery -- atomic insert-if-absent; the options API would overwrite on a race.
+		$wpdb->query( $wpdb->prepare( "INSERT IGNORE INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, %s, 'no')", $claim_option, $order_id ) );
+		$claimed_by = (string) $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", $claim_option ) );
+		// phpcs:enable
+		if ( '' !== $claimed_by && $claimed_by !== $order_id ) {
+			return new WP_Error( 'cko_payment_reused', 'Payment is already claimed by order ' . $claimed_by . '.' );
+		}
+
 		return true;
 	}
 
