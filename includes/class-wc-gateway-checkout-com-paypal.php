@@ -282,6 +282,8 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 	 * @return WC_Order|false
 	 */
 	private function create_express_order_from_cart() {
+		$order = null;
+
 		try {
 			// Determine customer ID and email
 			$customer_id = 0;
@@ -312,27 +314,13 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 				$order->set_billing_email( $customer_email );
 			}
 
-			// Add cart items to order
-			foreach ( WC()->cart->get_cart() as $cart_item_key => $cart_item ) {
-				$product = $cart_item['data'];
-				$order->add_product( $product, $cart_item['quantity'] );
-			}
+			// Copy the cart lines (products, fees, shipping, taxes, coupons) onto the order.
+			$this->add_cart_lines_to_express_order( $order );
 
 			// Set order addresses from PayPal data if available
 			$this->set_order_addresses_from_paypal( $order );
 
-			// Set shipping method if available
-			$shipping_packages = WC()->shipping->get_packages();
-			if ( ! empty( $shipping_packages ) ) {
-				foreach ( $shipping_packages as $package ) {
-					$chosen_methods = WC()->session->get( 'chosen_shipping_methods' );
-					if ( ! empty( $chosen_methods ) ) {
-						$order->set_shipping_method( $chosen_methods[0] );
-					}
-				}
-			}
-
-			// Calculate totals
+			// Recalculate totals (and taxes for the wallet address) from the copied lines.
 			$order->calculate_totals();
 
 			// Set payment method to PayPal Express
@@ -348,10 +336,47 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 
 			return $order;
 
-		} catch ( Exception $e ) {
+		} catch ( \Throwable $e ) {
 			WC_Checkoutcom_Utility::logger( 'Error creating PayPal Express order: ' . $e->getMessage(), $e );
+
+			// Do not leave a half-built pending order behind.
+			if ( $order instanceof WC_Order && $order->get_id() ) {
+				$order->delete( true );
+			}
+
 			return false;
 		}
+	}
+
+	/**
+	 * Copy the cart lines onto an express order using the same WooCommerce checkout helpers as
+	 * a normal checkout, so the order carries the cart's products, fees, shipping, taxes and
+	 * coupons and its total matches the cart total.
+	 *
+	 * @param WC_Order $order Order to populate.
+	 * @return void
+	 */
+	private function add_cart_lines_to_express_order( $order ) {
+		$cart     = WC()->cart;
+		$checkout = WC()->checkout();
+
+		// Make sure the shipping packages and totals reflect the current cart.
+		$cart->calculate_totals();
+
+		$chosen_shipping_methods = WC()->session ? (array) WC()->session->get( 'chosen_shipping_methods', array() ) : array();
+
+		$checkout->create_order_line_items( $order, $cart );
+		$checkout->create_order_fee_lines( $order, $cart );
+		$checkout->create_order_shipping_lines( $order, $chosen_shipping_methods, WC()->shipping()->get_packages() );
+		$checkout->create_order_tax_lines( $order, $cart );
+		$checkout->create_order_coupon_lines( $order, $cart );
+
+		$order->set_shipping_total( $cart->get_shipping_total() );
+		$order->set_discount_total( $cart->get_discount_total() );
+		$order->set_discount_tax( $cart->get_discount_tax() );
+		$order->set_cart_tax( $cart->get_cart_contents_tax() + $cart->get_fee_tax() );
+		$order->set_shipping_tax( $cart->get_shipping_tax() );
+		$order->set_total( $cart->get_total( 'edit' ) );
 	}
 
 	/**
