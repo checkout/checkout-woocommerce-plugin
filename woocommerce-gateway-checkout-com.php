@@ -1864,11 +1864,18 @@ function cko_gateway_icon( $icons, $id ) {
 		if ( $display_card_icon ) {
 			$card_icon = WC_Admin_Settings::get_option( 'ckocom_card_icons' );
 
+			// Only the brands offered in the Card Icons setting have an image.
+			$known_icons = [ 'visa', 'mastercard', 'amex', 'dinersclub', 'discover', 'jcb', 'cartesbancaires', 'mada' ];
+
 			$icons = '';
 
-			foreach ( $card_icon as $key => $value ) {
+			foreach ( (array) $card_icon as $key => $value ) {
+				if ( ! is_string( $value ) || ! in_array( $value, $known_icons, true ) ) {
+					continue;
+				}
+
 				$card_icons = $plugin_url . $value . '.svg';
-				$icons     .= sprintf( '<img src="%1$s" id="cards-icon" alt="%2$s">', $card_icons, $value );
+				$icons     .= sprintf( '<img src="%1$s" id="cards-icon" alt="%2$s">', esc_url( $card_icons ), esc_attr( $value ) );
 			}
 
 			return $icons;

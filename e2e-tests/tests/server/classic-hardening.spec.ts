@@ -113,4 +113,52 @@ test.describe('Classic gateway hardening', () => {
 		expect(out.log).toContain('e2e_error_code');
 		expect(out.log).not.toContain('tok_e2e_hidden_value');
 	});
+
+	test('card icon filter renders only known brands, escaped', async () => {
+		const html = wpEvalJson<string>(`
+			$keys  = array( 'ckocom_display_icon', 'ckocom_card_icons' );
+			$saved = array_combine( $keys, array_map( 'get_option', $keys ) );
+			try {
+				update_option( 'ckocom_display_icon', '1' );
+				update_option( 'ckocom_card_icons', array( 'visa', '"><b id="e2e-icon">', 'mastercard', '../../e2e' ) );
+				return (string) apply_filters( 'woocommerce_gateway_icon', '', 'wc_checkout_com_cards' );
+			} finally {
+				foreach ( $saved as $key => $value ) {
+					false === $value ? delete_option( $key ) : update_option( $key, $value );
+				}
+			}
+		`);
+		expect(html).toContain('visa.svg');
+		expect(html).toContain('mastercard.svg');
+		expect(html).not.toContain('e2e-icon');
+		expect(html).not.toContain('../../e2e');
+		expect(html.match(/<img /g) ?? []).toHaveLength(2);
+	});
+
+	test('order list payment id column uses a data attribute and no inline script', async () => {
+		const out = wpEvalJson<{ valid: string; other: string }>(`
+			if ( ! class_exists( 'WC_Checkoutcom_Order_Columns' ) ) {
+				include_once dirname( ( new ReflectionClass( 'WC_Checkoutcom_Utility' ) )->getFileName(), 2 ) . '/admin/class-wc-checkoutcom-order-columns.php';
+			}
+			$render = function ( $payment_id ) {
+				$order = wc_create_order();
+				$order->update_meta_data( '_cko_payment_id', $payment_id );
+				$order->save();
+				ob_start();
+				WC_Checkoutcom_Order_Columns::render_order_column_hpos( 'cko_payment_id', $order );
+				$html = ob_get_clean();
+				$order->delete( true );
+				return $html;
+			};
+			return array(
+				'valid' => $render( 'pay_aaaaaaaaaaaaaaaaaaaaaaaaaa' ),
+				'other' => $render( "x'); alert(1); ('" ),
+			);
+		`);
+		expect(out.valid).toContain('data-cko-payment-id="pay_aaaaaaaaaaaaaaaaaaaaaaaaaa"');
+		expect(out.valid).not.toMatch(/onclick/i);
+		expect(out.other).not.toMatch(/onclick/i);
+		expect(out.other).not.toContain('data-cko-payment-id');
+		expect(out.other).not.toContain("'");
+	});
 });

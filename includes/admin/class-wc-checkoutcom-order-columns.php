@@ -34,6 +34,44 @@ class WC_Checkoutcom_Order_Columns {
 
 		// Add CSS for column width
 		add_action( 'admin_head', array( __CLASS__, 'add_column_styles' ) );
+
+		// Click-to-copy for the payment ID column.
+		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue_scripts' ) );
+	}
+
+	/**
+	 * Whether the current admin screen is an orders list (HPOS or legacy).
+	 *
+	 * @return bool
+	 */
+	private static function is_orders_screen() {
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+
+		return $screen && ( 'edit-shop_order' === $screen->id || 'woocommerce_page_wc-orders' === $screen->id );
+	}
+
+	/**
+	 * Enqueue the click-to-copy script on the orders list.
+	 */
+	public static function enqueue_scripts() {
+		if ( ! self::is_orders_screen() ) {
+			return;
+		}
+
+		wp_enqueue_script(
+			'cko-admin-order-columns',
+			WC_CHECKOUTCOM_PLUGIN_URL . '/assets/js/admin-order-columns.js',
+			array(),
+			WC_CHECKOUTCOM_PLUGIN_VERSION,
+			true
+		);
+		wp_localize_script(
+			'cko-admin-order-columns',
+			'ckoOrderColumns',
+			array(
+				'copied' => __( 'Copied!', 'checkout-com-unified-payments-api' ),
+			)
+		);
 	}
 
 	/**
@@ -97,13 +135,16 @@ class WC_Checkoutcom_Order_Columns {
 			$payment_id = $order->get_meta( '_cko_payment_id' );
 		}
 
-		if ( ! empty( $payment_id ) ) {
+		if ( ! empty( $payment_id ) && WC_Checkoutcom_Utility::is_valid_payment_id( $payment_id ) ) {
+			// Copied by assets/js/admin-order-columns.js (no inline script).
 			printf(
-				'<span class="cko-payment-id" title="%s" style="cursor: pointer;" onclick="navigator.clipboard.writeText(\'%s\'); this.title=\'Copied!\';">%s</span>',
+				'<span class="cko-payment-id" title="%s" style="cursor: pointer;" data-cko-payment-id="%s">%s</span>',
 				esc_attr( __( 'Click to copy', 'checkout-com-unified-payments-api' ) ),
 				esc_attr( $payment_id ),
 				esc_html( $payment_id )
 			);
+		} elseif ( ! empty( $payment_id ) ) {
+			printf( '<span class="cko-payment-id-other">%s</span>', esc_html( (string) $payment_id ) );
 		} else {
 			echo '<span class="cko-payment-id-empty" style="color: #999;">—</span>';
 		}
@@ -124,10 +165,8 @@ class WC_Checkoutcom_Order_Columns {
 	 * Add CSS styles for the column.
 	 */
 	public static function add_column_styles() {
-		$screen = get_current_screen();
-
 		// Check if we're on the orders page (both HPOS and legacy)
-		if ( $screen && ( 'edit-shop_order' === $screen->id || 'woocommerce_page_wc-orders' === $screen->id ) ) {
+		if ( self::is_orders_screen() ) {
 			?>
 			<style type="text/css">
 				.column-cko_payment_id {
