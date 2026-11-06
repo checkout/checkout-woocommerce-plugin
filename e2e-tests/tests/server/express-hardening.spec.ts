@@ -1,10 +1,12 @@
 import { test, expect } from '../../src/fixtures';
+import { latestOrderId } from '../../src/support/store';
 import { PRODUCTS } from '../../src/support/test-data';
 import { wpEvalJson } from '../../src/support/wp-cli';
 
 /*
  * Express checkout (PayPal, Apple Pay, Google Pay) order handling: the order built from the cart
- * carries the same lines and total as the cart.
+ * carries the same lines and total as the cart; the Apple Pay Express endpoints answer only while
+ * Apple Pay Express is offered, and the order step requires its nonce and a token.
  */
 
 type ExpressOrderLines = {
@@ -98,4 +100,74 @@ test.describe('Express checkout orders', () => {
 			expect(lines.orderTotal, 'order total matches the cart total').toBe(lines.cartTotal);
 		});
 	}
+});
+
+/** Set Apple Pay settings keys; returns a restore function. */
+function setApplePaySettings(values: Record<string, string>): () => void {
+	const previous = wpEvalJson<Record<string, string | null>>(`
+		$s = (array) get_option( 'woocommerce_wc_checkout_com_apple_pay_settings', array() );
+		$prev = array();
+		foreach ( json_decode( ${JSON.stringify(JSON.stringify(values))}, true ) as $key => $value ) {
+			$prev[ $key ] = isset( $s[ $key ] ) ? $s[ $key ] : null;
+			$s[ $key ] = $value;
+		}
+		update_option( 'woocommerce_wc_checkout_com_apple_pay_settings', $s );
+		return $prev;
+	`);
+	return () => {
+		wpEvalJson(`
+			$s = (array) get_option( 'woocommerce_wc_checkout_com_apple_pay_settings', array() );
+			foreach ( json_decode( ${JSON.stringify(JSON.stringify(previous))}, true ) as $key => $value ) {
+				if ( null === $value ) {
+					unset( $s[ $key ] );
+				} else {
+					$s[ $key ] = $value;
+				}
+			}
+			update_option( 'woocommerce_wc_checkout_com_apple_pay_settings', $s );
+			return true;
+		`);
+	};
+}
+
+const APPLE_PAY_API = '/?wc-api=CKO_Apple_Pay_Woocommerce&cko_apple_pay_action=';
+
+test.describe('Apple Pay Express endpoints', () => {
+	test('answer only while Apple Pay Express is offered', async ({ request }) => {
+		const restore = setApplePaySettings({ apple_pay_express: 'no', enabled: 'yes' });
+		try {
+			for (const action of ['express_get_cart_total', 'express_add_to_cart', 'express_apple_pay_order_session']) {
+				const res = await request.post(APPLE_PAY_API + action, { form: { nonce: 'x' } });
+				expect(res.status(), `${action} refused while Express is off`).toBe(403);
+			}
+
+			setApplePaySettings({ apple_pay_express: 'yes', enabled: 'yes' });
+			const res = await request.get(APPLE_PAY_API + 'express_get_cart_total');
+			expect(res.status(), 'handled while Express is on').not.toBe(403);
+		} finally {
+			restore();
+		}
+	});
+
+	test('the order step requires its nonce and a token before creating an order', async ({ request }) => {
+		const restore = setApplePaySettings({ apple_pay_express: 'yes', enabled: 'yes' });
+		try {
+			const before = latestOrderId();
+			const url = APPLE_PAY_API + 'express_apple_pay_order_session';
+
+			const noNonce = await request.post(url, { form: { 'cko-apple-card-token': 'tok_e2eexpressplaceholder', payment_data: '{}' } });
+			expect(noNonce.status(), 'refused without the nonce').toBe(403);
+
+			// Guest nonce (user 0), as the product/cart page would localise it.
+			const nonce = wpEvalJson<string>(`wp_set_current_user( 0 ); return wp_create_nonce( 'checkoutcom_apple_pay_express_order' );`);
+			for (const token of ['', 'not-a-token', '<b>tok_</b>']) {
+				const res = await request.post(url, { form: { nonce, 'cko-apple-card-token': token, payment_data: '{}' } });
+				expect(res.status(), `refused for token "${token}"`).toBe(400);
+			}
+
+			expect(latestOrderId(), 'no order created').toBe(before);
+		} finally {
+			restore();
+		}
+	});
 });

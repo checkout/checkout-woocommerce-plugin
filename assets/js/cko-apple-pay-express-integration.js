@@ -879,7 +879,8 @@ jQuery( function ( $ ) {
                     action: 'express_apple_pay_order_session',
                     'cko-apple-card-token': token,
                     payment_data: JSON.stringify(paymentData),
-                    woocommerce_process_checkout: cko_apple_pay_vars.woocommerce_process_checkout
+                    woocommerce_process_checkout: cko_apple_pay_vars.woocommerce_process_checkout,
+                    nonce: cko_apple_pay_vars.apple_pay_express_order_nonce
                 };
 
                 const response = await jQuery.ajax({
