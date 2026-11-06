@@ -980,25 +980,35 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		// show error to customer.
 		if ( isset( $result['card_verification'] ) && 'error' === $result['card_verification'] ) {
 			WC_Checkoutcom_Utility::wc_add_notice_self( __( 'Unable to add payment method to your account.', 'checkout-com-unified-payments-api' ), 'error' );
-			wp_redirect( $result['redirection_url'] );
+			wp_safe_redirect( $this->get_payment_methods_redirect_url( $result['redirection_url'] ?? '' ) );
 			exit;
 		}
 
 		// My Account "Add payment method" card verification (no order).
 		if ( isset( $result['metadata']['card_verification'] ) ) {
+			$redirect_url = $this->get_payment_methods_redirect_url( $result['metadata']['redirection_url'] ?? '' );
+
+			// The card is saved only for the logged-in customer who started the verification.
+			$user_id    = get_current_user_id();
+			$started_by = isset( $result['metadata']['user_id'] ) ? absint( $result['metadata']['user_id'] ) : 0;
+
 			// Redirect to my-account/payment-method if card verification successful.
 			// show notice to customer.
-			if ( 'Card Verified' === ( $result['status'] ?? '' ) && true === ( $result['approved'] ?? null ) ) {
+			if ( 'Card Verified' === ( $result['status'] ?? '' ) && true === ( $result['approved'] ?? null ) && $user_id > 0 && $started_by === $user_id ) {
 
-				$this->save_token( get_current_user_id(), $result );
+				$this->save_token( $user_id, $result );
 
 				WC_Checkoutcom_Utility::wc_add_notice_self( __( 'Payment method successfully added.', 'checkout-com-unified-payments-api' ), 'notice' );
-				wp_redirect( $result['metadata']['redirection_url'] );
+				wp_safe_redirect( $redirect_url );
 				exit;
 			}
 
+			if ( $started_by !== $user_id ) {
+				WC_Checkoutcom_Utility::logger( 'Add payment method return ignored: the verification was started by another account.' );
+			}
+
 			WC_Checkoutcom_Utility::wc_add_notice_self( __( 'Unable to add payment method to your account.', 'checkout-com-unified-payments-api' ), 'error' );
-			wp_redirect( $result['metadata']['redirection_url'] );
+			wp_safe_redirect( $redirect_url );
 			exit;
 		}
 
@@ -1122,6 +1132,24 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 	}
 
 	/**
+	 * My Account "Payment methods" URL to return to after a card verification. A URL taken
+	 * from the payment metadata is used only if it points at this site.
+	 *
+	 * @param string $candidate URL from the payment metadata.
+	 *
+	 * @return string
+	 */
+	private function get_payment_methods_redirect_url( $candidate = '' ) {
+		$fallback = wc_get_endpoint_url( 'payment-methods', '', wc_get_page_permalink( 'myaccount' ) );
+
+		if ( ! is_string( $candidate ) || '' === $candidate ) {
+			return $fallback;
+		}
+
+		return wp_validate_redirect( $candidate, $fallback );
+	}
+
+	/**
 	 * Finish a redirect return whose payment did not pass verify_payment_for_order(): the
 	 * order is never marked paid. Ends the request with a redirect.
 	 *
@@ -1218,10 +1246,13 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		$payment->customer = $customer;
 
 		// Set Metadata in card verification request to use in callback handler.
-		$payment->metadata = [
+		// user_id ties the verification to this customer; the callback checks it.
+		$payment->metadata  = [
 			'card_verification' => true,
 			'redirection_url'   => wc_get_endpoint_url( 'payment-methods' ),
+			'user_id'           => (string) $current_user->ID,
 		];
+		$payment->reference = 'cko-add-payment-method-' . $current_user->ID;
 
 		// Set redirection url in payment request.
 		$redirection_url      = add_query_arg( 'wc-api', 'wc_checkoutcom_callback', home_url( '/' ) );
