@@ -7648,6 +7648,47 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	}
 
 	/**
+	 * The 3ds block for a payment session, built from the merchant's card settings.
+	 *
+	 * Same values the checkout script used to send, but read on the server so the browser cannot
+	 * change them. MOTO sessions switch 3DS off afterwards; the submit step still enables 3DS for
+	 * every non-MOTO card payment.
+	 *
+	 * @return array
+	 */
+	private function get_payment_session_three_ds() {
+		$valid_challenge_indicators = array( 'no_preference', 'no_challenge_requested', 'challenge_requested', 'challenge_requested_mandate' );
+		$valid_exemptions           = array(
+			'low_value',
+			'trusted_listing',
+			'trusted_listing_prompt',
+			'transaction_risk_assessment',
+			'3ds_outage',
+			'sca_delegation',
+			'out_of_sca_scope',
+			'low_risk_program',
+			'recurring_operation',
+			'data_share',
+			'other',
+		);
+
+		$challenge_indicator = WC_Admin_Settings::get_option( 'ckocom_card_3ds_challenge_indicator', 'no_preference' );
+		$exemption           = WC_Admin_Settings::get_option( 'ckocom_card_3ds_exemption', '' );
+
+		$three_ds = array(
+			'enabled'             => '1' === WC_Admin_Settings::get_option( 'ckocom_card_threed', '0' ),
+			'attempt_n3d'         => '1' === WC_Admin_Settings::get_option( 'ckocom_card_notheed', '0' ),
+			'challenge_indicator' => in_array( $challenge_indicator, $valid_challenge_indicators, true ) ? $challenge_indicator : 'no_preference',
+			'allow_upgrade'       => 'yes' === WC_Admin_Settings::get_option( 'ckocom_card_3ds_allow_upgrade', 'yes' ),
+		);
+		if ( in_array( $exemption, $valid_exemptions, true ) ) {
+			$three_ds['exemption'] = $exemption;
+		}
+
+		return $three_ds;
+	}
+
+	/**
 	 * Secure AJAX handler for creating payment sessions.
 	 * This prevents the secret key from being exposed to the frontend.
 	 *
@@ -7863,9 +7904,14 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			WC_Checkoutcom_Utility::logger( '[PAYMENT SESSION] Add-payment-method mode — amount=0, capture=false, cards-only, items dropped, reference detached, address ' . ( isset( $payment_session_request['billing'] ) ? 'kept' : 'dropped' ) . '. User ID: ' . get_current_user_id() );
 		}
 
+		// 3DS is decided here from the merchant's settings; any 3ds block sent by the browser is
+		// replaced.
+		$payment_session_request['3ds'] = $this->get_payment_session_three_ds();
+
 		// MOTO (admin-created order for a guest, paid on its order-pay page): decided here from the
 		// order, never from the client. The order-pay success_url carries order_id and key; with a
-		// matching key the session is card-only and has no 3DS. A client MOTO claim that can't be
+		// matching key on an unpaid MOTO order the session is card-only, has no 3DS, and takes its
+		// amount, currency and reference from that order. A client MOTO claim that can't be
 		// confirmed is downgraded to a regular payment.
 		$moto_order    = false;
 		$success_query = array();
@@ -7876,15 +7922,27 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		$moto_key      = isset( $success_query['key'] ) ? (string) $success_query['key'] : '';
 		if ( $moto_order_id && '' !== $moto_key ) {
 			$maybe_moto = wc_get_order( $moto_order_id );
-			if ( WC_Checkoutcom_Utility::is_moto_order( $maybe_moto ) && hash_equals( (string) $maybe_moto->get_order_key(), $moto_key ) ) {
+			if ( WC_Checkoutcom_Utility::is_moto_order( $maybe_moto )
+				&& $maybe_moto->needs_payment()
+				&& hash_equals( (string) $maybe_moto->get_order_key(), $moto_key ) ) {
 				$moto_order = $maybe_moto;
 			}
 		}
 		if ( $moto_order && ! $is_subscription_cit ) {
+			$moto_currency = $moto_order->get_currency();
+
 			$payment_session_request['payment_type']            = 'MOTO';
 			$payment_session_request['3ds']                     = array( 'enabled' => false );
 			$payment_session_request['enabled_payment_methods'] = array( 'card' );
-			WC_Checkoutcom_Utility::logger( '[PAYMENT SESSION] MOTO order ' . $moto_order->get_id() . ' — payment_type=MOTO, 3DS off, cards only.' );
+			$payment_session_request['amount']                  = (int) WC_Checkoutcom_Utility::value_to_decimal( (float) $moto_order->get_total(), $moto_currency );
+			$payment_session_request['currency']                = $moto_currency;
+			$payment_session_request['reference']               = (string) $moto_order->get_id();
+			if ( ! isset( $payment_session_request['metadata'] ) || ! is_array( $payment_session_request['metadata'] ) ) {
+				$payment_session_request['metadata'] = array();
+			}
+			$payment_session_request['metadata']['order_id'] = $moto_order->get_id();
+			unset( $payment_session_request['items'] );
+			WC_Checkoutcom_Utility::logger( '[PAYMENT SESSION] MOTO order ' . $moto_order->get_id() . ' — payment_type=MOTO, 3DS off, cards only, amount ' . $payment_session_request['amount'] . ' ' . $moto_currency . ' from the order.' );
 		} elseif ( isset( $payment_session_request['payment_type'] ) && 'MOTO' === $payment_session_request['payment_type'] ) {
 			$payment_session_request['payment_type'] = class_exists( 'Checkout\\Payments\\PaymentType' ) ? \Checkout\Payments\PaymentType::$regular : 'Regular';
 			WC_Checkoutcom_Utility::logger( '[PAYMENT SESSION] Client requested MOTO but the order is not a MOTO order — using Regular.' );
