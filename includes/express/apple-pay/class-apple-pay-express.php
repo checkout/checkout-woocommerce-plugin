@@ -243,6 +243,7 @@ class CKO_Apple_Pay_Express {
 			'apple_pay_button_selector'          => '#cko-apple-pay-button-wrapper',
 			'redirect'                            => wc_get_checkout_url(),
 			'apple_pay_express_add_to_cart_nonce' => wp_create_nonce( 'checkoutcom_apple_pay_express_add_to_cart' ),
+			'apple_pay_express_order_nonce'       => wp_create_nonce( 'checkoutcom_apple_pay_express_order' ),
 			'debug'                               => 'yes' === WC_Admin_Settings::get_option( 'cko_console_logging', 'no' ),
 			'environment'                         => $environment ? 'TEST' : 'PRODUCTION',
 			'merchant_id'                         => $apple_pay_settings['ckocom_apple_mercahnt_id'] ?? '',

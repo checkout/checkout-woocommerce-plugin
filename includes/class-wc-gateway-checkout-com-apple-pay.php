@@ -1140,14 +1140,39 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 	}
 
 	/**
+	 * Whether Apple Pay Express is offered: its toggle is on and, in Classic mode, the
+	 * Apple Pay gateway is enabled too (same rule as CKO_Apple_Pay_Express).
+	 *
+	 * @return bool
+	 */
+	private function is_express_available() {
+		$apple_pay_settings = get_option( 'woocommerce_wc_checkout_com_apple_pay_settings', array() );
+		if ( ! is_array( $apple_pay_settings ) || 'yes' !== ( $apple_pay_settings['apple_pay_express'] ?? '' ) ) {
+			return false;
+		}
+
+		$core_settings = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		$checkout_mode = isset( $core_settings['ckocom_checkout_mode'] ) ? $core_settings['ckocom_checkout_mode'] : 'classic';
+
+		return 'classic' !== $checkout_mode || 'yes' === ( $apple_pay_settings['enabled'] ?? '' );
+	}
+
+	/**
 	 * Handle Apple Pay method API requests.
 	 *
 	 * @return void
 	 */
 	public function handle_wc_api() {
+		// These actions serve Apple Pay Express only; refuse them when it is not offered.
+		if ( ! $this->is_express_available() ) {
+			wp_send_json( [ 'result' => 'failed' ], 403 );
+		}
+
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended, WordPress.Security.NonceVerification.Missing
 		if ( ! empty( $_GET['cko_apple_pay_action'] ) ) {
-			switch ( $_GET['cko_apple_pay_action'] ) {
+			switch ( sanitize_key( wp_unslash( $_GET['cko_apple_pay_action'] ) ) ) {
 
 				case 'express_add_to_cart':
 					$this->cko_express_add_to_cart();
@@ -1270,7 +1295,18 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		// Express now uses the same flow as classic Apple Pay
 		// Classic Apple Pay sends: cko-apple-card-token
 		// Express now sends the same field, so we can use the same process_payment method
-		
+
+		$nonce = isset( $_POST['nonce'] ) && is_string( $_POST['nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['nonce'] ) ) : '';
+		if ( ! wp_verify_nonce( $nonce, 'checkoutcom_apple_pay_express_order' ) ) {
+			wp_send_json_error( array( 'messages' => __( 'Your session has expired. Please refresh the page and try again.', 'checkout-com-unified-payments-api' ) ), 403 );
+		}
+
+		// Require a well-formed Checkout.com token before any order is created.
+		$apple_token = ( isset( $_POST['cko-apple-card-token'] ) && is_string( $_POST['cko-apple-card-token'] ) ) ? $_POST['cko-apple-card-token'] : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- opaque token, validated against a strict pattern below.
+		if ( ! self::is_valid_express_token( $apple_token ) ) {
+			wp_send_json_error( array( 'messages' => __( 'There was an issue completing the payment.', 'checkout-com-unified-payments-api' ) ), 400 );
+		}
+
 		// Get payment data for email and address extraction
 		$payment_data_json = ( isset( $_POST['payment_data'] ) && is_string( $_POST['payment_data'] ) ) ? wp_unslash( $_POST['payment_data'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Apple Pay JSON payload; unslashed then json_decode()d and validated below; text sanitisation would corrupt the JSON.
 		$payment_data = ! empty( $payment_data_json ) ? json_decode( $payment_data_json, true ) : array();
@@ -1358,6 +1394,17 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			$error_message = isset( $result['messages'] ) ? $result['messages'] : 'Payment failed.';
 			wp_send_json_error( array( 'messages' => $error_message ) );
 		}
+	}
+
+	/**
+	 * Whether a value looks like a Checkout.com card token (tok_...), as returned for an
+	 * Apple Pay payment by the generate-token endpoint.
+	 *
+	 * @param mixed $token Posted token.
+	 * @return bool
+	 */
+	private static function is_valid_express_token( $token ) {
+		return is_string( $token ) && 1 === preg_match( '/^tok_[A-Za-z0-9_]{8,128}$/', $token );
 	}
 
 	/**
