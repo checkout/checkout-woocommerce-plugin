@@ -2282,6 +2282,16 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			return array( 'result' => 'failure' );
 		}
 
+		// Only this subscription's own approved card verification can be used: the session sets the
+		// reference to cko-card-change-<subscription id> on the server.
+		$expected_reference = 'cko-card-change-' . $subscription_id;
+		$payment_reference  = isset( $data['reference'] ) ? (string) $data['reference'] : '';
+		if ( ! hash_equals( $expected_reference, $payment_reference ) || true !== ( $data['approved'] ?? null ) ) {
+			WC_Checkoutcom_Utility::logger( '[CHANGE PAYMENT METHOD] ERROR: payment ' . $flow_payment_id . ' is not an approved card verification for subscription ' . $subscription_id . ' — not used.' );
+			WC_Checkoutcom_Utility::wc_add_notice_self( __( 'Could not verify the new card. Please try again.', 'checkout-com-unified-payments-api' ), 'error' );
+			return array( 'result' => 'failure' );
+		}
+
 		$source_id = $data['source']['id'];
 
 		// Persist the new source on the subscription so future MIT renewals charge the new card.
@@ -2368,6 +2378,17 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			$err = is_array( $data ) && isset( $data['error'] ) ? $data['error'] : 'Unknown error (HTTP ' . $status . ')';
 			WC_Checkoutcom_Utility::logger( '[ADD PAYMENT METHOD] ERROR: could not fetch card details: ' . $err );
 			wc_add_notice( __( 'Could not retrieve the card details. Please try again.', 'checkout-com-unified-payments-api' ), 'error' );
+			wp_safe_redirect( $payment_methods_url );
+			exit;
+		}
+
+		// Only this user's own card verification can be saved: the session sets the reference to
+		// cko-add-payment-method-<user id> on the server, and it must be approved.
+		$expected_reference = 'cko-add-payment-method-' . $user_id;
+		$payment_reference  = isset( $data['reference'] ) ? (string) $data['reference'] : '';
+		if ( ! $user_id || ! hash_equals( $expected_reference, $payment_reference ) || true !== ( $data['approved'] ?? null ) ) {
+			WC_Checkoutcom_Utility::logger( '[ADD PAYMENT METHOD] ERROR: payment ' . $payment_id . ' is not an approved card verification for user ' . $user_id . ' — card not saved.' );
+			wc_add_notice( __( 'Could not add the card. Please try again.', 'checkout-com-unified-payments-api' ), 'error' );
 			wp_safe_redirect( $payment_methods_url );
 			exit;
 		}
@@ -2903,6 +2924,11 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			if ( ! empty( $existing_orders ) ) {
 				$existing_order = $existing_orders[0];
 				if ( $existing_order->get_id() !== $order_id ) {
+					if ( ! $this->request_can_access_order( $existing_order ) ) {
+						WC_Checkoutcom_Utility::logger( 'DUPLICATE PREVENTION: Payment ID ' . $flow_payment_id . ' belongs to order ' . $existing_order->get_id() . ', which this request cannot access - not reusing it for order ' . $order_id );
+						WC_Checkoutcom_Utility::wc_add_notice_self( __( 'This payment has already been used. Please try again.', 'checkout-com-unified-payments-api' ), 'error' );
+						return array( 'result' => 'failure' );
+					}
 					WC_Checkoutcom_Utility::logger( 'DUPLICATE PREVENTION: Payment ID ' . $flow_payment_id . ' already has order ' . $existing_order->get_id() . ' - reusing existing order instead of ' . $order_id );
 					$order = $existing_order;
 					$order_id = $order->get_id();
@@ -4404,7 +4430,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					'order'      => 'DESC',
 				) );
 				
-				if ( ! empty( $orders ) ) {
+				if ( ! empty( $orders ) && $this->request_can_access_order( $orders[0] ) ) {
 					$order = $orders[0];
 					$redirect_url = $order->get_checkout_order_received_url();
 					WC_Checkoutcom_Utility::logger( '[FLOW 3DS CHECKOUT] Found order by payment ID, redirecting to: ' . $redirect_url );
@@ -4498,6 +4524,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// PERFORMANCE OPTIMIZATION: Early exit - Check order_id FIRST before expensive operations
 		// If order_id and order_key are provided (order-pay page), use them directly (fast path)
 		$order = null;
+		$order_created_on_return = false; // true once this return creates the order itself
 		$payment_details = null;
 		
 		if ( ! empty( $order_id ) && ! empty( $order_key ) ) {
@@ -4569,9 +4596,15 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			}
 			
 			try {
-				// Get payment session ID from URL first (faster), then from payment metadata if needed
+				// Get payment session ID from URL first (faster), then from payment metadata if needed.
+				// When the payment carries its own session id, that one is used: the order is looked up
+				// by the session this payment was really made in, not by a value in the URL.
 				$payment_session_id = $payment_session_id_from_url;
-				
+				$payment_own_session_id = ! empty( $payment_details['metadata']['cko_payment_session_id'] ) ? (string) $payment_details['metadata']['cko_payment_session_id'] : '';
+				if ( '' !== $payment_own_session_id && $payment_own_session_id !== $payment_session_id ) {
+					$payment_session_id = $payment_own_session_id;
+				}
+
 				if ( empty( $payment_session_id ) && ! empty( $payment_details ) ) {
 					// Get payment session ID from cached payment details
 					$payment_session_id = isset( $payment_details['metadata']['cko_payment_session_id'] ) ? $payment_details['metadata']['cko_payment_session_id'] : '';
@@ -4770,7 +4803,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 										$potential_order_currency = $potential_order->get_currency();
 										$order_total_decimal = (float) $potential_order->get_total();
 										$order_amount = (int) WC_Checkoutcom_Utility::value_to_decimal( $order_total_decimal, $potential_order_currency );
-										if ( $order_amount === $payment_amount ) {
+										if ( $order_amount === $payment_amount && $this->request_can_access_order( $potential_order ) ) {
 											$order = $potential_order;
 											$order_id = $order->get_id();
 											if ( $is_debug ) {
@@ -4793,6 +4826,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 									// If we have payment details, create minimal order
 									if ( ! empty( $payment_details ) && ! empty( $payment_id ) ) {
 										$order = $this->create_minimal_order_from_payment_details( $payment_id, $payment_details );
+										$order_created_on_return = true;
 										
 										if ( ! is_wp_error( $order ) && $order ) {
 											if ( $is_debug ) {
@@ -4816,11 +4850,8 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 								
 								if ( $payment_details && isset( $payment_details['customer']['email'] ) ) {
 									$customer_email = $payment_details['customer']['email'];
-									// Try to find customer by email
-									$user = get_user_by( 'email', $customer_email );
-									if ( $user ) {
-										$customer_id = $user->ID;
-									}
+									// The order belongs to the visitor (or is a guest order), never to an account found by the payment email.
+									$customer_id = get_current_user_id();
 								}
 								
 								// Create new order if no reusable order found
@@ -4830,11 +4861,13 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 									}
 									
 									$order = wc_create_order( array( 'customer_id' => $customer_id ) );
+									$order_created_on_return = true;
 								
 									if ( ! $order || is_wp_error( $order ) ) {
 										// Try to create minimal order from payment details
 										if ( ! empty( $payment_details ) && ! empty( $payment_id ) ) {
 											$order = $this->create_minimal_order_from_payment_details( $payment_id, $payment_details );
+											$order_created_on_return = true;
 											
 											if ( ! is_wp_error( $order ) && $order ) {
 												if ( $is_debug ) {
@@ -5039,13 +5072,9 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 									
 									$order_id = $order->get_id();
 									
-									// PERFORMANCE: Defer webhook processing - check if already processed first
-									if ( class_exists( 'WC_Checkout_Com_Webhook_Queue' ) ) {
-										$already_processed = $order->get_meta( 'cko_payment_authorized' ) || $order->get_meta( 'cko_payment_captured' );
-										if ( ! $already_processed ) {
-											WC_Checkout_Com_Webhook_Queue::process_pending_webhooks_for_order( $order );
-										}
-									}
+									// Queued webhooks for this payment are applied only after the payment has
+									// been verified against this order (below).
+									$replay_webhooks_after_verify = true;
 								}
 							}
 						}
@@ -5057,6 +5086,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				if ( ! empty( $payment_details ) && ! empty( $payment_id ) ) {
 					try {
 						$order = $this->create_minimal_order_from_payment_details( $payment_id, $payment_details );
+						$order_created_on_return = true;
 						
 						if ( ! is_wp_error( $order ) && $order ) {
 							// Continue with normal flow - order now exists
@@ -5192,6 +5222,25 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					$error_message = sprintf( __( 'Payment failed with status: %s', 'checkout-com-unified-payments-api' ), esc_html( $payment_details['status'] ) );
 				}
 				
+				// An order found without its key is changed only if this payment is bound to it
+				// (reference or payment session id), or this return created it; otherwise the
+				// customer just sees the error and the order is left alone.
+				if ( $order ) {
+					$declined_reference   = isset( $payment_details['reference'] ) ? (string) $payment_details['reference'] : '';
+					$declined_session_id  = isset( $payment_details['metadata']['cko_payment_session_id'] ) ? (string) $payment_details['metadata']['cko_payment_session_id'] : '';
+					$order_session_id     = (string) $order->get_meta( '_cko_payment_session_id' );
+					$decline_is_for_order = $order_created_on_return
+						|| $this->request_can_access_order( $order )
+						|| ( '' !== $declined_reference && in_array( $declined_reference, array( (string) $order->get_id(), (string) $order->get_order_number() ), true ) )
+						|| ( '' !== $declined_session_id && '' !== $order_session_id && hash_equals( $order_session_id, $declined_session_id ) );
+					if ( ! $decline_is_for_order || ! $order->has_status( array( 'pending', 'failed' ) ) ) {
+						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Declined payment ' . $payment_id . ' not applied to order ' . $order->get_id() . ' (not bound to this payment, or not unpaid).' );
+						WC_Checkoutcom_Utility::wc_add_notice_self( $error_message, 'error' );
+						wp_safe_redirect( add_query_arg( 'payment_failed', '1', wc_get_checkout_url() ) );
+						exit;
+					}
+				}
+
 				// If we have an order, update it and redirect to checkout/order-pay with error
 				if ( $order ) {
 					// CRITICAL: Set addresses consistently for failed payments (same logic as successful payments)
@@ -5299,7 +5348,9 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// PERFORMANCE OPTIMIZATION: Check order status first (fastest check) - skip validation if already processed
 		// Postage is added BEFORE payment session call, so payment amount already includes postage
 		$order_status = $order->get_status();
-		$payment_already_processed = in_array( $order_status, array( 'processing', 'completed', 'on-hold' ), true );
+		// on-hold is not treated as paid here: an unverified authorisation can leave an order
+		// on-hold, so it is still checked below (a genuine payment passes the check).
+		$payment_already_processed = in_array( $order_status, array( 'processing', 'completed' ), true );
 		
 		// Only a paid status counts as "already processed". Stored payment/transaction ids do not:
 		// they can exist before a payment is verified.
@@ -5380,6 +5431,14 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			}
 		}
 		
+		// The payment is verified for this order (or the order is already paid): apply any webhooks
+		// that were queued for it while the order was being created on this return.
+		if ( ! empty( $replay_webhooks_after_verify ) && class_exists( 'WC_Checkout_Com_Webhook_Queue' )
+			&& ! $order->get_meta( 'cko_payment_authorized' ) && ! $order->get_meta( 'cko_payment_captured' ) ) {
+			WC_Checkout_Com_Webhook_Queue::process_pending_webhooks_for_order( $order );
+			$order = wc_get_order( $order->get_id() );
+		}
+
 		// Process the payment by storing payment data in order meta (WordPress-compliant approach)
 		// CRITICAL: Prioritize payment_type over source.type for tokenized payments (Google Pay, Apple Pay, etc.)
 		// For tokenized payments, source.type is 'card' but payment_type correctly identifies the payment method
@@ -5928,7 +5987,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// So we need to detect shipping by multiple methods: type field, reference pattern, or name pattern
 		foreach ( $payment_details['items'] as $index => $item_data ) {
 			$item_type = isset( $item_data['type'] ) ? $item_data['type'] : '';
-			$item_name = isset( $item_data['name'] ) ? $item_data['name'] : 'Unknown';
+			$item_name = isset( $item_data['name'] ) ? sanitize_text_field( wp_strip_all_tags( (string) $item_data['name'] ) ) : 'Unknown';
 			$item_reference = isset( $item_data['reference'] ) ? $item_data['reference'] : '';
 			$item_quantity = isset( $item_data['quantity'] ) ? intval( $item_data['quantity'] ) : 1;
 			
@@ -6000,11 +6059,8 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			
 			if ( isset( $payment_details['customer']['email'] ) ) {
 				$customer_email = $payment_details['customer']['email'];
-				// Try to find customer by email
-				$user = get_user_by( 'email', $customer_email );
-				if ( $user ) {
-					$customer_id = $user->ID;
-				}
+				// The order belongs to the visitor (or is a guest order), never to an account found by the payment email.
+				$customer_id = get_current_user_id();
 			}
 			
 			if ( isset( $payment_details['customer']['name'] ) ) {
@@ -6102,7 +6158,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			if ( isset( $payment_details['items'] ) && is_array( $payment_details['items'] ) ) {
 				foreach ( $payment_details['items'] as $idx => $item_data ) {
 					$item_type = isset( $item_data['type'] ) ? $item_data['type'] : '';
-					$item_name = isset( $item_data['name'] ) ? $item_data['name'] : 'Unknown';
+					$item_name = isset( $item_data['name'] ) ? sanitize_text_field( wp_strip_all_tags( (string) $item_data['name'] ) ) : 'Unknown';
 					$item_reference = isset( $item_data['reference'] ) ? $item_data['reference'] : '';
 					$item_quantity = isset( $item_data['quantity'] ) ? intval( $item_data['quantity'] ) : 1;
 					
@@ -6150,7 +6206,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 						$order->add_item( $shipping_item );
 					} else {
 						// Add product item
-						$product_name = isset( $item_data['name'] ) ? $item_data['name'] : __( 'Product', 'checkout-com-unified-payments-api' );
+						$product_name = isset( $item_data['name'] ) ? sanitize_text_field( wp_strip_all_tags( (string) $item_data['name'] ) ) : __( 'Product', 'checkout-com-unified-payments-api' );
 						// CRITICAL FIX: Use utility function to convert from currency subunit to decimal
 						// This handles zero-decimal (JPY, ISK, UGX), three-decimal (BHD, KWD), and two-decimal (USD, EUR) currencies correctly
 						$order_currency = $order->get_currency();
@@ -7645,6 +7701,40 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	}
 
 	/**
+	 * Whether the current request may act on an order: the logged-in user is its customer, it is
+	 * the order this visitor's WooCommerce session is paying, or the request carries its order key
+	 * (order_key / key in POST or GET).
+	 *
+	 * @param WC_Order|false $order Order.
+	 *
+	 * @return bool
+	 */
+	private function request_can_access_order( $order ) {
+		if ( ! $order instanceof WC_Order ) {
+			return false;
+		}
+
+		$customer_id = (int) $order->get_customer_id();
+		if ( $customer_id > 0 && get_current_user_id() === $customer_id ) {
+			return true;
+		}
+
+		if ( function_exists( 'WC' ) && WC()->session && absint( WC()->session->get( 'order_awaiting_payment' ) ) === $order->get_id() ) {
+			return true;
+		}
+
+		// phpcs:disable WordPress.Security.NonceVerification.Missing, WordPress.Security.NonceVerification.Recommended -- order key check, callers verify their own nonces.
+		foreach ( array( $_POST['order_key'] ?? null, $_POST['key'] ?? null, $_GET['key'] ?? null ) as $key ) {
+			if ( is_string( $key ) && '' !== $key && hash_equals( (string) $order->get_order_key(), sanitize_text_field( wp_unslash( $key ) ) ) ) {
+				return true;
+			}
+		}
+		// phpcs:enable
+
+		return false;
+	}
+
+	/**
 	 * The 3ds block for a payment session, built from the merchant's card settings.
 	 *
 	 * Same values the checkout script used to send, but read on the server so the browser cannot
@@ -9107,6 +9197,14 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		$order_id = $order->get_id();
 		$status   = $order->get_status();
 
+		// Only an order this visitor can access may be reused (its key is returned to the browser).
+		if ( ! $this->request_can_access_order( $order ) ) {
+			return array(
+				'can_reuse' => false,
+				'reason'    => 'Order is not accessible to this request',
+			);
+		}
+
 		// Detect if this is an order-pay page request.
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Just checking context, not processing data
 		$is_order_pay_page = isset( $_POST['is_order_pay'] ) && 'yes' === sanitize_text_field( wp_unslash( $_POST['is_order_pay'] ) );
@@ -9337,39 +9435,20 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			return;
 		}
 		
-		// SECURITY: Verify order ownership - order must belong to current user/session
-		$current_user_id = get_current_user_id();
-		$order_customer_id = $order->get_customer_id();
-		
-		// For logged-in users, verify order belongs to them
-		if ( $current_user_id > 0 && $order_customer_id > 0 && $current_user_id !== $order_customer_id ) {
-			WC_Checkoutcom_Utility::logger( '[SAVE PAYMENT SESSION ID] ❌ SECURITY: User ID mismatch - Current: ' . $current_user_id . ', Order Customer: ' . $order_customer_id );
+		// The order must belong to this visitor (customer, checkout session or order key) and be unpaid.
+		if ( ! $this->request_can_access_order( $order ) ) {
+			WC_Checkoutcom_Utility::logger( '[SAVE PAYMENT SESSION ID] Order ' . $order_id . ' is not accessible to this request - not linked.' );
 			wp_send_json_error( array(
 				'message' => __( 'You do not have permission to modify this order.', 'checkout-com-unified-payments-api' ),
 			) );
 			return;
 		}
-		
-		// For guest orders, verify order is pending and matches current checkout session
-		if ( 0 === $current_user_id || 0 === $order_customer_id ) {
-			// Only allow pending orders to be linked
-			if ( ! in_array( $order->get_status(), array( 'pending', 'failed' ), true ) ) {
-				WC_Checkoutcom_Utility::logger( '[SAVE PAYMENT SESSION ID] ❌ SECURITY: Guest order not in pending/failed status - Order ID: ' . $order_id . ', Status: ' . $order->get_status() );
-				wp_send_json_error( array(
-					'message' => __( 'Order is not in a valid state for payment processing.', 'checkout-com-unified-payments-api' ),
-				) );
-				return;
-			}
-			
-			// Verify order key if provided (additional security for guest orders)
-			$provided_order_key = isset( $_POST['order_key'] ) ? sanitize_text_field( wp_unslash( $_POST['order_key'] ) ) : '';
-			if ( ! empty( $provided_order_key ) && $provided_order_key !== $order->get_order_key() ) {
-				WC_Checkoutcom_Utility::logger( '[SAVE PAYMENT SESSION ID] ❌ SECURITY: Order key mismatch - Order ID: ' . $order_id );
-				wp_send_json_error( array(
-					'message' => __( 'Invalid order key.', 'checkout-com-unified-payments-api' ),
-				) );
-				return;
-			}
+		if ( ! in_array( $order->get_status(), array( 'pending', 'failed' ), true ) ) {
+			WC_Checkoutcom_Utility::logger( '[SAVE PAYMENT SESSION ID] Order not in pending/failed status - Order ID: ' . $order_id . ', Status: ' . $order->get_status() );
+			wp_send_json_error( array(
+				'message' => __( 'Order is not in a valid state for payment processing.', 'checkout-com-unified-payments-api' ),
+			) );
+			return;
 		}
 		
 		// CRITICAL: Check if payment session ID already saved (prevent overwriting)
@@ -9463,7 +9542,9 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		$session_data       = isset( $_POST['session_data'] ) ? wp_unslash( $_POST['session_data'] ) : '';
 		$amount             = isset( $_POST['amount'] ) ? absint( $_POST['amount'] ) : 0;
 		$order_id           = isset( $_POST['order_id'] ) ? absint( $_POST['order_id'] ) : 0;
-		$reference          = isset( $_POST['reference'] ) ? sanitize_text_field( wp_unslash( $_POST['reference'] ) ) : '';
+		// The reference is set on the server below (from the order, or the add-payment-method /
+		// card-change value); a reference sent by the browser is not used.
+		$reference          = '';
 		
 		// Get billing/shipping address updates (JSON strings from JavaScript)
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- billing is JSON that will be decoded and sanitized
@@ -9482,30 +9563,18 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			return;
 		}
 
-		// SECURITY: this endpoint is public (nopriv). It derives the amount from `order_id`, writes
-		// payment meta onto that order, and echoes the order key in the return URL. Verify the caller
-		// is entitled to act on the order before using it. Scoped to reject only the demonstrated
-		// abuse — an order that belongs to a registered customer who is NOT the current visitor and
-		// with no matching order key or checkout-session link — so guest checkouts, owner retries,
-		// and the order-less Blocks path (order_id = 0) are unaffected.
+		// This endpoint is public (nopriv). It derives the amount from `order_id`, writes payment meta
+		// onto that order, and echoes the order key in the return URL, so the caller must be able to
+		// access the order (customer, checkout session or order key) — guest orders included. The
+		// order-less Blocks path (order_id = 0) is handled below.
 		if ( $order_id > 0 ) {
 			$submit_order = wc_get_order( $order_id );
-			if ( $submit_order ) {
-				$owner_id     = (int) $submit_order->get_customer_id();
-				$current_uid  = get_current_user_id();
-				$session_oid  = (int) ( WC()->session ? WC()->session->get( 'order_awaiting_payment' ) : 0 );
-				$provided_key = isset( $_POST['order_key'] ) ? sanitize_text_field( wp_unslash( $_POST['order_key'] ) ) : '';
-				$key_ok       = '' !== $provided_key && hash_equals( (string) $submit_order->get_order_key(), $provided_key );
-				$owner_ok     = $owner_id > 0 && $owner_id === $current_uid;
-				$session_ok   = $order_id === $session_oid;
-
-				if ( $owner_id > 0 && ! $owner_ok && ! $key_ok && ! $session_ok ) {
-					WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] REJECTED: order ' . $order_id . ' belongs to another customer and the request carries no matching order key or session link.' );
-					wp_send_json_error( array(
-						'message' => __( 'Security check failed. Please refresh the page and try again.', 'checkout-com-unified-payments-api' ),
-					) );
-					return;
-				}
+			if ( $submit_order && ! $this->request_can_access_order( $submit_order ) ) {
+				WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] REJECTED: order ' . $order_id . ' is not accessible to this request (no matching customer, session or order key).' );
+				wp_send_json_error( array(
+					'message' => __( 'Security check failed. Please refresh the page and try again.', 'checkout-com-unified-payments-api' ),
+				) );
+				return;
 			}
 		}
 
@@ -9535,7 +9604,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 		// CRITICAL: Always get the correct amount from WooCommerce order or cart
 		// This ensures coupons/discounts are properly applied even if client-side tracking fails
-		$final_amount = $amount; // Start with client-provided amount
+		$final_amount = 0; // Set below from the order or the cart; the client amount is only logged
 
 		if ( $is_sub_pay_change || $is_add_pm ) {
 			// Zero-amount card verification — never charge for a card change / add-card.
@@ -9573,6 +9642,15 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Cart amount check - Cart total: ' . $cart_total . ' ' . $cart_currency . ', Minor units: ' . $cart_amount_minor . ', Client amount: ' . $amount );
 
 				$final_amount = $cart_amount_minor;
+			}
+
+			// No order and no cart: nothing on the server to take the amount from.
+			if ( $final_amount <= 0 && empty( $order ) ) {
+				WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] REJECTED: no order or cart to take the amount from.' );
+				wp_send_json_error( array(
+					'message' => __( 'Your session has expired. Please refresh the page and try again.', 'checkout-com-unified-payments-api' ),
+				) );
+				return;
 			}
 
 			// Add amount to request (always include to ensure correct discounted amount)
