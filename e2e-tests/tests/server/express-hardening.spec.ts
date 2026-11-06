@@ -171,3 +171,30 @@ test.describe('Apple Pay Express endpoints', () => {
 		}
 	});
 });
+
+/** Whether the Apple Pay settings accept this as domain association file content. */
+function acceptsDomainAssociation(content: string): boolean {
+	return wpEvalJson<boolean>(`
+		$check = new ReflectionMethod( 'WC_Gateway_Checkout_Com_Apple_Pay', 'is_valid_domain_association_content' );
+		$check->setAccessible( true );
+		return $check->invoke( null, base64_decode( ${JSON.stringify(Buffer.from(content).toString('base64'))} ) );
+	`);
+}
+
+test.describe('Apple Pay domain association upload', () => {
+	test('accepts a file shaped like an Apple domain association file', () => {
+		const hex = '7B227073704964223A2246324244453130433742414337303943443033443939353732363132433830413238383344313742424133443246444531373844463543324633413239413342222C2276657273696F6E223A312C22637265617465644F6E223A313539373838343131373730377D';
+		expect(acceptsDomainAssociation(hex)).toBe(true);
+		expect(acceptsDomainAssociation(`${hex.slice(0, 64)}\n${hex.slice(64)}\n`), 'line breaks allowed').toBe(true);
+		expect(acceptsDomainAssociation('MIIQdgYJKoZIhvcNAQcCoIIQZzCCEGMCAQExCzAJBgUrDgMCGgUAMIIG+Q==\r\n'), 'base64 allowed').toBe(true);
+	});
+
+	test('rejects markup, empty and oversized content', () => {
+		expect(acceptsDomainAssociation('<html><body>hello</body></html>')).toBe(false);
+		expect(acceptsDomainAssociation('7B2270<script>7370</script>')).toBe(false);
+		expect(acceptsDomainAssociation('<?php echo 1; ?>')).toBe(false);
+		expect(acceptsDomainAssociation('')).toBe(false);
+		expect(acceptsDomainAssociation(' \n\t ')).toBe(false);
+		expect(acceptsDomainAssociation('A'.repeat(64 * 1024 + 1)), 'over 64 KB').toBe(false);
+	});
+});
