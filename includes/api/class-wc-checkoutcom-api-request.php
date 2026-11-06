@@ -739,6 +739,18 @@ class WC_Checkoutcom_Api_Request {
 	}
 
 	/**
+	 * Whether a value has the format of a Checkout.com payment or payment session id
+	 * (pay_xxx / sid_xxx), as sent back in the cko-session-id return parameter.
+	 *
+	 * @param mixed $session_id Value to check.
+	 *
+	 * @return bool
+	 */
+	public static function is_valid_session_id( $session_id ) {
+		return is_string( $session_id ) && 1 === preg_match( '/^(pay|sid)_[a-z0-9]{20,40}$/i', $session_id );
+	}
+
+	/**
 	 * Verify session id given by checkout api on checkout.
 	 *
 	 * @param string $session_id Session id.
@@ -747,6 +759,13 @@ class WC_Checkoutcom_Api_Request {
 	 */
 	public static function verify_session( $session_id ) {
 		$gateway_debug = 'yes' === WC_Admin_Settings::get_option( 'cko_gateway_responses', 'no' );
+
+		// Only well-formed Checkout.com ids are looked up.
+		if ( ! self::is_valid_session_id( $session_id ) ) {
+			WC_Checkoutcom_Utility::logger( 'Payment return ignored: the session id has an unexpected format.' );
+
+			return [ 'error' => __( 'An error has occurred while processing your payment. Please check your card details and try again.', 'checkout-com-unified-payments-api' ) ];
+		}
 
 		// Initialize the Checkout Api.
 		$checkout = new Checkout_SDK();
