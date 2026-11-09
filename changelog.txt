@@ -1,5 +1,10 @@
 *** Checkout.com Payment Gateway Changelog ***
 
+2026-11-09 - version 5.1.6
+* Fix - Security: hardening of payment processing, webhooks, express payments and Apple Pay setup. Updating is strongly recommended.
+* Note - If file logging was enabled in the plugin settings, we recommend rotating your Checkout.com secret key after updating.
+* Note - If payments fail with a connection error after updating, ask your hosting provider to make sure the server's SSL/CA certificates are up to date.
+
 2026-10-29 - version 5.1.5
 * Fix - Apple Pay: an admin warning lists certificate/private key files that are inside the web root outside the protected certificate directory (configured paths and files left in the uploads root).
 * Fix - Classic mode: a declined card on My Account > Add payment method no longer causes a fatal error; the shopper sees "Unable to add payment method".
