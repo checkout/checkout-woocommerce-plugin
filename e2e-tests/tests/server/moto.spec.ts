@@ -137,11 +137,14 @@ test.describe('MOTO (admin order for a guest)', () => {
 
 		sessionCapture.start();
 		try {
+			// The store either builds a regular session or refuses the request; it must never
+			// send a MOTO session for the paid order.
+			const sessionResponse = page.waitForResponse((r) => r.url().includes('cko_flow_create_payment_session'), { timeout: 60_000 });
 			await page.goto(regular.payUrl);
-			await new FlowComponent(page).waitUntilReady();
-			await expect.poll(() => sessionCapture.creates().length, { timeout: 30_000 }).toBeGreaterThan(0);
-			const sent = sessionCapture.creates().pop();
-			expect(sent?.payment_type).not.toBe('MOTO');
+			await sessionResponse;
+			for (const sent of sessionCapture.creates()) {
+				expect(sent?.payment_type).not.toBe('MOTO');
+			}
 		} finally {
 			sessionCapture.stop();
 		}

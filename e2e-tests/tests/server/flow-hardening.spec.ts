@@ -37,13 +37,20 @@ const HANDLER_PRELUDE = `
 		return array( 'headers' => array(), 'body' => wp_json_encode( $body ), 'response' => array( 'code' => 201, 'message' => 'Created' ), 'cookies' => array(), 'filename' => null );
 	}, 10, 3 );
 	add_filter( 'wp_doing_ajax', '__return_true' );
+	// wp_send_json() ends the request in WordPress. Keep the first response it sends, as a browser
+	// would see it, and stop the handler there.
+	$GLOBALS['cko_e2e_first_json'] = null;
 	add_filter( 'wp_die_ajax_handler', function () {
 		return function () {
+			if ( null === $GLOBALS['cko_e2e_first_json'] ) {
+				$GLOBALS['cko_e2e_first_json'] = (string) ob_get_contents();
+			}
 			throw new RuntimeException( 'cko-e2e-json-sent' );
 		};
 	} );
 	$run = function ( $method ) use ( &$sent ) {
 		$sent    = array();
+		$GLOBALS['cko_e2e_first_json'] = null;
 		$gateway = new WC_Gateway_Checkout_Com_Flow();
 		ob_start();
 		try {
@@ -55,6 +62,9 @@ const HANDLER_PRELUDE = `
 			}
 		}
 		$out = ob_get_clean();
+		if ( null !== $GLOBALS['cko_e2e_first_json'] ) {
+			$out = $GLOBALS['cko_e2e_first_json'];
+		}
 		return array( 'response' => json_decode( $out, true ), 'sent' => $sent );
 	};
 	$fill_cart = function () {
@@ -343,6 +353,7 @@ test.describe('Flow payment session security hardening', () => {
 			$order      = $order_id ? wc_get_order( $order_id ) : false;
 			$out = array(
 				'success'    => ! empty( $run_result['response']['success'] ),
+				'debug'      => $run_result,
 				'cartTotal'  => $cart_total,
 				'orderTotal' => $order ? wc_format_decimal( $order->get_total(), wc_get_price_decimals() ) : '',
 				'shipping'   => $order ? count( $order->get_items( 'shipping' ) ) : 0,
@@ -356,7 +367,7 @@ test.describe('Flow payment session security hardening', () => {
 			WC()->cart->empty_cart();
 			return $out;
 		`);
-		expect(result.success).toBe(true);
+		expect(result.success, JSON.stringify((result as any).debug)).toBe(true);
 		expect(result.shipping).toBe(1);
 		expect(result.fees).toBe(1);
 		expect(result.coupons).toHaveLength(1);
