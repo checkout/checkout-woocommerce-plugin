@@ -2,7 +2,7 @@
 Contributors: checkoutintegration
 Tags: payments, credit card, payment gateway, apple pay, google pay
 Requires at least: 6.0
-Stable tag: 5.1.5
+Stable tag: 5.1.6
 Requires PHP: 7.4
 Tested up to: 7.1
 WC requires at least: 8.0
@@ -181,6 +181,16 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v5.1.6 9th November 2026
+Security
+- Security hardening of payment processing, webhooks, express payments and Apple Pay setup. Updating is strongly recommended.
+- If file logging was enabled in the plugin settings, we recommend rotating your Checkout.com secret key after updating.
+- If payments fail with a connection error after updating, ask your hosting provider to make sure the server's SSL/CA certificates are up to date.
+Changes you may notice
+- Orders whose payment amount or currency does not match are placed on-hold for review.
+- Pending alternative payments are placed on-hold until Checkout.com confirms them.
+- Express payment orders now include shipping, fee and coupon lines.
+
 v5.1.5 29th October 2026
 Important
 - This is a security release for stores that cannot yet run version 5.2.0 (which requires PHP 8.1). Updating is strongly recommended.
@@ -621,6 +631,9 @@ v4.0.0 3 Sep 2019
 · Checkout.com Woocommerce module for the Unified Payments API
 
 == Upgrade Notice ==
+= 5.1.6 =
+Security update - updating is strongly recommended. If file logging was enabled, rotate your Checkout.com secret key after updating.
+
 = 5.1.5 =
 Important security update - updating is strongly recommended. For stores that cannot yet run 5.2.0 (PHP 8.1).
 
