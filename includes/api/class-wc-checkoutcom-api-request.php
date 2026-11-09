@@ -558,6 +558,10 @@ class WC_Checkoutcom_Api_Request {
 			$redirection_url = home_url( '/checkoutcom-callback' );
 		}
 
+		// The return carries the order key so the shopper can prove the order is theirs even if
+		// their session cookie is lost during the redirect.
+		$redirection_url = add_query_arg( 'key', rawurlencode( $order->get_order_key() ), $redirection_url );
+
 		$payment->success_url = $redirection_url;
 		$payment->failure_url = $redirection_url;
 
