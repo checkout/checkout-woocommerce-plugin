@@ -1049,6 +1049,11 @@ var ckoFlow = {
 				saveFormData.append('nonce', cko_flow_vars.payment_session_nonce);
 				saveFormData.append('order_id', orderIdToSave);
 				saveFormData.append('payment_session_id', paymentSession.id);
+				// The order key proves the order belongs to this visitor (order-pay URL carries it).
+				const saveOrderKey = new URLSearchParams(window.location.search).get('key') || FlowSessionStorage.getOrderKey() || '';
+				if (saveOrderKey) {
+					saveFormData.append('order_key', saveOrderKey);
+				}
 
 				// Fire and forget - don't wait for response (non-blocking)
 				fetch(getCkoAjaxUrl('cko_flow_save_payment_session_id'), {
@@ -2058,6 +2063,9 @@ var ckoFlow = {
 						const payPageKey = new URLSearchParams(window.location.search).get('key');
 						if (payPageOrderId && payPageKey && String(payPageOrderId) === String(orderIdToUse)) {
 							formData.append('order_key', payPageKey);
+						} else if (FlowSessionStorage.getOrderKey() && String(sessionOrderId) === String(orderIdToUse)) {
+							// Order created for this checkout: its key proves the order is this visitor's.
+							formData.append('order_key', FlowSessionStorage.getOrderKey());
 						}
 					}
 

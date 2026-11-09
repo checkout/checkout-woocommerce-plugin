@@ -282,6 +282,8 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 	 * @return WC_Order|false
 	 */
 	private function create_express_order_from_cart() {
+		$order = null;
+
 		try {
 			// Determine customer ID and email
 			$customer_id = 0;
@@ -312,27 +314,13 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 				$order->set_billing_email( $customer_email );
 			}
 
-			// Add cart items to order
-			foreach ( WC()->cart->get_cart() as $cart_item_key => $cart_item ) {
-				$product = $cart_item['data'];
-				$order->add_product( $product, $cart_item['quantity'] );
-			}
+			// Copy the cart lines (products, fees, shipping, taxes, coupons) onto the order.
+			$this->add_cart_lines_to_express_order( $order );
 
 			// Set order addresses from PayPal data if available
 			$this->set_order_addresses_from_paypal( $order );
 
-			// Set shipping method if available
-			$shipping_packages = WC()->shipping->get_packages();
-			if ( ! empty( $shipping_packages ) ) {
-				foreach ( $shipping_packages as $package ) {
-					$chosen_methods = WC()->session->get( 'chosen_shipping_methods' );
-					if ( ! empty( $chosen_methods ) ) {
-						$order->set_shipping_method( $chosen_methods[0] );
-					}
-				}
-			}
-
-			// Calculate totals
+			// Recalculate totals (and taxes for the wallet address) from the copied lines.
 			$order->calculate_totals();
 
 			// Set payment method to PayPal Express
@@ -348,10 +336,47 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 
 			return $order;
 
-		} catch ( Exception $e ) {
+		} catch ( \Throwable $e ) {
 			WC_Checkoutcom_Utility::logger( 'Error creating PayPal Express order: ' . $e->getMessage(), $e );
+
+			// Do not leave a half-built pending order behind.
+			if ( $order instanceof WC_Order && $order->get_id() ) {
+				$order->delete( true );
+			}
+
 			return false;
 		}
+	}
+
+	/**
+	 * Copy the cart lines onto an express order using the same WooCommerce checkout helpers as
+	 * a normal checkout, so the order carries the cart's products, fees, shipping, taxes and
+	 * coupons and its total matches the cart total.
+	 *
+	 * @param WC_Order $order Order to populate.
+	 * @return void
+	 */
+	private function add_cart_lines_to_express_order( $order ) {
+		$cart     = WC()->cart;
+		$checkout = WC()->checkout();
+
+		// Make sure the shipping packages and totals reflect the current cart.
+		$cart->calculate_totals();
+
+		$chosen_shipping_methods = WC()->session ? (array) WC()->session->get( 'chosen_shipping_methods', array() ) : array();
+
+		$checkout->create_order_line_items( $order, $cart );
+		$checkout->create_order_fee_lines( $order, $cart );
+		$checkout->create_order_shipping_lines( $order, $chosen_shipping_methods, WC()->shipping()->get_packages() );
+		$checkout->create_order_tax_lines( $order, $cart );
+		$checkout->create_order_coupon_lines( $order, $cart );
+
+		$order->set_shipping_total( $cart->get_shipping_total() );
+		$order->set_discount_total( $cart->get_discount_total() );
+		$order->set_discount_tax( $cart->get_discount_tax() );
+		$order->set_cart_tax( $cart->get_cart_contents_tax() + $cart->get_fee_tax() );
+		$order->set_shipping_tax( $cart->get_shipping_tax() );
+		$order->set_total( $cart->get_total( 'edit' ) );
 	}
 
 	/**
@@ -532,6 +557,43 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 	}
 
 	/**
+	 * Order being paid on the order-pay page, taken from the dedicated cko_pay_order_id /
+	 * cko_pay_order_key request fields (added to the order-pay form by payment_fields()).
+	 *
+	 * The order is only used when the request carries a valid woocommerce-pay nonce and the
+	 * caller proves the order is theirs: the posted order key matches, or the logged-in user is
+	 * the order's customer. The order must also still need payment.
+	 *
+	 * @return WC_Order|false|null Order to pay; false when an order was named but may not be used;
+	 *                             null when this is not an order-pay request.
+	 */
+	private function get_order_pay_order_from_request() {
+		// phpcs:disable WordPress.Security.NonceVerification.Missing -- the woocommerce-pay nonce is verified below.
+		$nonce = isset( $_POST['woocommerce-pay-nonce'] ) && is_string( $_POST['woocommerce-pay-nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['woocommerce-pay-nonce'] ) ) : '';
+		if ( '' === $nonce || ! isset( $_POST['cko_pay_order_id'] ) ) {
+			return null;
+		}
+
+		$order_id  = absint( wp_unslash( $_POST['cko_pay_order_id'] ) );
+		$order_key = isset( $_POST['cko_pay_order_key'] ) && is_string( $_POST['cko_pay_order_key'] ) ? wc_clean( wp_unslash( $_POST['cko_pay_order_key'] ) ) : '';
+		// phpcs:enable
+
+		if ( ! wp_verify_nonce( $nonce, 'woocommerce-pay' ) || ! $order_id ) {
+			return false;
+		}
+
+		$order = wc_get_order( $order_id );
+		if ( ! $order instanceof WC_Order || ! $order->needs_payment() ) {
+			return false;
+		}
+
+		$key_matches = '' !== $order_key && hash_equals( (string) $order->get_order_key(), $order_key );
+		$is_customer = is_user_logged_in() && $order->get_customer_id() && get_current_user_id() === (int) $order->get_customer_id();
+
+		return ( $key_matches || $is_customer ) ? $order : false;
+	}
+
+	/**
 	 * Handle PayPal PaymentContexts request with cart data.
 	 *
 	 * 1st step to generate PayPal Order ID.
@@ -540,29 +602,39 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 	 */
 	public function cko_create_order_request( $is_express = false ) {
 
+		// Order-pay page: the order being paid, once the caller has shown it is theirs.
+		$pay_order = $is_express ? null : $this->get_order_pay_order_from_request();
+
+		if ( false === $pay_order ) {
+			wp_send_json_error( array( 'messages' => __( 'This order cannot be paid. Please use the payment link from your order email or account.', 'checkout-com-unified-payments-api' ) ) );
+			return;
+		}
+
 		// Ensure cart is loaded and totals are calculated
 		// This is important for Blocks cart pages
-		if ( ! WC()->cart ) {
+		if ( ! $pay_order && ! WC()->cart ) {
 			wp_send_json_error( array( 'messages' => 'Cart not initialized' ) );
 			return;
 		}
 
-		// For Blocks cart pages, ensure cart is loaded from session
-		// Sometimes the cart needs to be refreshed from the session
-		if ( WC()->cart->is_empty() ) {
-			// Try to load cart from session
-			WC()->cart->get_cart_from_session();
-			WC()->cart->calculate_totals();
-		}
-		
-		// Recalculate totals to ensure we have the latest (important for Blocks cart)
-		WC()->cart->calculate_totals();
+		if ( ! $pay_order ) {
+			// For Blocks cart pages, ensure cart is loaded from session
+			// Sometimes the cart needs to be refreshed from the session
+			if ( WC()->cart->is_empty() ) {
+				// Try to load cart from session
+				WC()->cart->get_cart_from_session();
+				WC()->cart->calculate_totals();
+			}
 
-		// For Blocks cart pages, ensure cart contents are loaded
-		if ( WC()->cart->is_empty() ) {
-			WC_Checkoutcom_Utility::logger( 'PayPal Express: Cart is empty after session load. Item count: ' . WC()->cart->get_cart_contents_count() );
-			wp_send_json_error( array( 'messages' => 'Cart is empty. Please add items to your cart.' ) );
-			return;
+			// Recalculate totals to ensure we have the latest (important for Blocks cart)
+			WC()->cart->calculate_totals();
+
+			// For Blocks cart pages, ensure cart contents are loaded
+			if ( WC()->cart->is_empty() ) {
+				WC_Checkoutcom_Utility::logger( 'PayPal Express: Cart is empty after session load. Item count: ' . WC()->cart->get_cart_contents_count() );
+				wp_send_json_error( array( 'messages' => 'Cart is empty. Please add items to your cart.' ) );
+				return;
+			}
 		}
 
 		$paymentContextsRequest           = new Checkout\Payments\Contexts\PaymentContextsRequest();
@@ -576,42 +648,24 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 			$paymentContextsRequest->processing->user_action = Checkout\Payments\UserAction::$CONTINUE;
 		}
 
-		// Get cart total - use 'raw' to get the numeric value directly
-		$total_amount = WC()->cart->get_total( 'raw' );
-		
-		// Fallback to formatted total if raw is 0
-		if ( $total_amount <= 0 ) {
-			$total_amount = WC()->cart->total;
+		if ( $pay_order ) {
+			// Order-pay page: charge the order being paid.
+			$total_amount = $pay_order->get_total();
+		} else {
+			// Get cart total - use 'raw' to get the numeric value directly
+			$total_amount = WC()->cart->get_total( 'raw' );
+
+			// Fallback to formatted total if raw is 0
+			if ( $total_amount <= 0 ) {
+				$total_amount = WC()->cart->total;
+			}
 		}
 
 		// Validate that we have a valid total amount
 		if ( $total_amount <= 0 ) {
-			WC_Checkoutcom_Utility::logger( 'PayPal Express: Invalid cart total (' . floatval( $total_amount ) . '). Item count: ' . WC()->cart->get_cart_contents_count() );
+			WC_Checkoutcom_Utility::logger( 'PayPal: Invalid total (' . floatval( $total_amount ) . ').' );
 			wp_send_json_error( array( 'messages' => 'Cart total is invalid. Please refresh the page and try again.' ) );
 			return;
-		}
-
-		// Logic for order-pay page.
-
-		$is_order_pay = get_option( 'woocommerce_checkout_pay_endpoint', 'order-pay' );
-
-		$nonce = isset( $_POST['woocommerce-pay-nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['woocommerce-pay-nonce'] ) ) : '';
-
-		if ( ! empty( $nonce ) && wp_verify_nonce( $nonce, 'woocommerce-pay' ) ) {
-			
-			$referer_url = isset( $_POST['_wp_http_referer'] ) ? esc_url_raw( wp_unslash( $_POST['_wp_http_referer'] ) ) : '';
-
-			if ( strpos( $referer_url, "/{$is_order_pay}/" ) !== false ) {
-				$parts = explode( '/', trim( $referer_url, '/' ) );
-
-				$order_pay_id = isset( $parts[2] ) ? absint( $parts[2] ) : 0;
-
-				$pay_order = wc_get_order( $order_pay_id );
-				
-				if ( $pay_order ) {
-					$total_amount = $pay_order->get_total();
-				}
-			}
 		}
 
 		$amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $total_amount, get_woocommerce_currency() );
@@ -621,7 +675,7 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 
 		$paymentContextsRequest->payment_type = PaymentType::$regular;
 
-		if ( WC_Checkoutcom_Utility::is_cart_contains_subscription() ) {
+		if ( WC()->cart && WC_Checkoutcom_Utility::is_cart_contains_subscription() ) {
 			$paymentContextsRequest->payment_type = PaymentType::$recurring;
 
 			$plan       = new Checkout\Payments\BillingPlan();
@@ -1001,6 +1055,20 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 
 		if ( ! empty( $this->get_option( 'description' ) ) ) {
 			echo esc_html( $this->get_option( 'description' ) );
+		}
+
+		// Order-pay page: name the order being paid (with its key) for the PayPal order request.
+		if ( is_wc_endpoint_url( 'order-pay' ) ) {
+			$pay_order_id  = absint( get_query_var( 'order-pay' ) );
+			$pay_order_key = isset( $_GET['key'] ) ? wc_clean( wp_unslash( $_GET['key'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- order key from the order-pay URL; checked server-side.
+
+			if ( $pay_order_id ) {
+				printf(
+					'<input type="hidden" name="cko_pay_order_id" value="%1$s" /><input type="hidden" name="cko_pay_order_key" value="%2$s" />',
+					esc_attr( $pay_order_id ),
+					esc_attr( $pay_order_key )
+				);
+			}
 		}
 	}
 

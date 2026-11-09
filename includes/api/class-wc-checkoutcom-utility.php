@@ -35,6 +35,27 @@ class WC_Checkoutcom_Utility {
 	}
 
 	/**
+	 * A Checkout.com id read from a request, or '' when it isn't one.
+	 *
+	 * Ids sent by the browser end up in the path of API calls signed with the secret key, so
+	 * only the expected id format is accepted: the prefix, an underscore and 20-40 letters or
+	 * digits (e.g. pay_..., ps_... for payment sessions, sid_... for 3DS sessions).
+	 *
+	 * @param mixed  $value  Raw request value (already unslashed or not).
+	 * @param string $prefix Expected prefix without the underscore: 'pay', 'ps' or 'sid'.
+	 *
+	 * @return string
+	 */
+	public static function clean_checkout_id( $value, $prefix ) {
+		if ( ! is_string( $value ) ) {
+			return '';
+		}
+		$value = trim( wp_unslash( $value ) );
+
+		return 1 === preg_match( '/^' . preg_quote( $prefix, '/' ) . '_[a-z0-9]{20,40}$/i', $value ) ? $value : '';
+	}
+
+	/**
 	 * Whether an order is paid as MOTO: created by an admin for a guest customer. Same rule as
 	 * the direct card API path (WC_Checkoutcom_Api_Request); MOTO payments are sent without 3DS.
 	 *
@@ -204,6 +225,20 @@ class WC_Checkoutcom_Utility {
 		}
 		if ( true !== ( $payment_details['approved'] ?? null ) || ! in_array( $status, $allowed_status, true ) ) {
 			return new WP_Error( 'cko_payment_not_approved', 'Payment is not approved (status: ' . ( '' !== $status ? $status : 'unknown' ) . ').' );
+		}
+
+		// Claim the payment for this order. The order meta check above only sees orders that are
+		// already saved, so two requests verifying the same payment for different orders at the
+		// same time could both pass it. INSERT IGNORE on the unique option_name lets only the first
+		// claim win; every later request reads the winning order id from the database.
+		global $wpdb;
+		$claim_option = 'cko_payment_claim_' . strtolower( $payment_id );
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery -- atomic insert-if-absent; the options API would overwrite on a race.
+		$wpdb->query( $wpdb->prepare( "INSERT IGNORE INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, %s, 'no')", $claim_option, $order_id ) );
+		$claimed_by = (string) $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", $claim_option ) );
+		// phpcs:enable
+		if ( '' !== $claimed_by && $claimed_by !== $order_id ) {
+			return new WP_Error( 'cko_payment_reused', 'Payment is already claimed by order ' . $claimed_by . '.' );
 		}
 
 		return true;
@@ -446,7 +481,9 @@ class WC_Checkoutcom_Utility {
 		}
 
 		// Convert array to string if needed
-		if ( is_array( $error_message ) || is_object( $error_message ) ) {
+		if ( $error_message instanceof Throwable ) {
+			$error_message = self::describe_exception_for_log( $error_message );
+		} elseif ( is_array( $error_message ) || is_object( $error_message ) ) {
 			$error_message = wc_print_r( $error_message, true );
 		}
 
@@ -488,10 +525,53 @@ class WC_Checkoutcom_Utility {
 			// If exception is an array, redact and print it properly
 			if ( is_array( $exception ) ) {
 				$logger->log( $log_level, $error_message . ' Data: ' . wc_print_r( self::redact_sensitive( $exception ), true ), $context );
+			} elseif ( $exception instanceof Throwable ) {
+				// Never print the exception object itself: its trace holds call arguments
+				// (SDK configuration included). Log a summary instead.
+				$logger->log( $log_level, self::describe_exception_for_log( $exception ), $context );
+			} elseif ( is_object( $exception ) ) {
+				$data = json_decode( (string) wp_json_encode( $exception ), true );
+				$logger->log( $log_level, get_class( $exception ) . ' ' . wc_print_r( is_array( $data ) ? self::redact_sensitive( $data ) : array(), true ), $context );
 			} else {
-				$logger->log( $log_level, wc_print_r( $exception, true ), $context );
+				$logger->log( $log_level, (string) $exception, $context );
 			}
 		}
+	}
+
+	/**
+	 * Summarise an exception for the log: class, message, code and location, plus the HTTP
+	 * status and (redacted) error details for Checkout.com API errors. No trace.
+	 *
+	 * @param Throwable $exception Exception.
+	 *
+	 * @return string
+	 */
+	private static function describe_exception_for_log( $exception ) {
+		$summary = sprintf(
+			'%s: %s (code %s) at %s:%d',
+			get_class( $exception ),
+			$exception->getMessage(),
+			(string) $exception->getCode(),
+			$exception->getFile(),
+			$exception->getLine()
+		);
+
+		if ( $exception instanceof \Checkout\CheckoutApiException ) {
+			if ( isset( $exception->http_metadata ) && is_object( $exception->http_metadata ) && method_exists( $exception->http_metadata, 'getStatusCode' ) ) {
+				$summary .= ' HTTP status: ' . $exception->http_metadata->getStatusCode();
+			}
+			if ( ! empty( $exception->error_details ) ) {
+				$details  = is_array( $exception->error_details ) ? self::redact_sensitive( $exception->error_details ) : (string) $exception->error_details;
+				$summary .= ' Error details: ' . wc_print_r( $details, true );
+			}
+		}
+
+		$previous = $exception->getPrevious();
+		if ( $previous instanceof Throwable ) {
+			$summary .= ' Previous: ' . get_class( $previous ) . ': ' . $previous->getMessage();
+		}
+
+		return $summary;
 	}
 
 	/**

@@ -3,8 +3,9 @@ import type { Page } from '@playwright/test';
 import { FlowComponent } from '../../src/pages/FlowComponent';
 import { ThreeDSChallenge } from '../../src/pages/ThreeDSChallenge';
 import { getCkoPayment } from '../../src/support/checkout-com';
+import { changeSessionRequestInBrowser, sessionCapture } from '../../src/support/http-capture';
 import { getOrder } from '../../src/support/store';
-import { APPROVED_CARD, PRODUCTS } from '../../src/support/test-data';
+import { APPROVED_CARD, PRODUCTS, toMinorUnits } from '../../src/support/test-data';
 import { wpEvalJson } from '../../src/support/wp-cli';
 
 /*
@@ -97,6 +98,53 @@ test.describe('MOTO (admin order for a guest)', () => {
 		const payment = await getCkoPayment(getOrder(order.id).ckoPaymentId);
 		expect(payment.payment_type).toBe('Regular');
 		expect(payment['3ds']?.challenged).toBe(true);
+	});
+
+	test('a MOTO session takes its amount, currency and reference from the order', async ({ page, loginAsAdmin }) => {
+		const order = createOrder({ createdVia: 'admin' });
+		const stored = getOrder(order.id);
+		const totalMinor = toMinorUnits(stored.total);
+		await loginAsAdmin();
+		await changeSessionRequestInBrowser(page, { set: { amount: 1, reference: 'e2e-not-this-order' } });
+
+		sessionCapture.start();
+		try {
+			expect(await payOnOrderPayPage(page, order.payUrl), 'MOTO must not show a 3DS challenge').toBe(false);
+
+			const sent = sessionCapture.creates().pop();
+			expect(sent?.payment_type).toBe('MOTO');
+			expect(sent?.['3ds']).toEqual({ enabled: false });
+			expect(sent?.amount, 'session amount comes from the order').toBe(totalMinor);
+			expect(sent?.currency).toBe(stored.currency);
+			expect(sent?.reference).toBe(String(order.id));
+			expect(Number(sent?.metadata?.order_id)).toBe(order.id);
+		} finally {
+			sessionCapture.stop();
+		}
+
+		const payment = await getCkoPayment(getOrder(order.id).ckoPaymentId);
+		expect(payment.payment_type).toBe('MOTO');
+		expect(payment.amount).toBe(totalMinor);
+	});
+
+	test('a MOTO order that is already paid does not make a session MOTO', async ({ page }) => {
+		const paid = createOrder({ createdVia: 'admin' });
+		wpEvalJson(`$o = wc_get_order( ${paid.id} ); $o->set_status( 'processing' ); $o->save(); return true;`);
+		const paidKey = new URL(paid.payUrl).searchParams.get('key') as string;
+		const regular = createOrder({ createdVia: 'checkout' });
+		// The session request names the paid MOTO order; the store must not grant MOTO for it.
+		await changeSessionRequestInBrowser(page, { successUrlQuery: { order_id: String(paid.id), key: paidKey } });
+
+		sessionCapture.start();
+		try {
+			await page.goto(regular.payUrl);
+			await new FlowComponent(page).waitUntilReady();
+			await expect.poll(() => sessionCapture.creates().length, { timeout: 30_000 }).toBeGreaterThan(0);
+			const sent = sessionCapture.creates().pop();
+			expect(sent?.payment_type).not.toBe('MOTO');
+		} finally {
+			sessionCapture.stop();
+		}
 	});
 
 	test('saved cards and "save card" are hidden on a MOTO order', async ({ page, loginAsAdmin }) => {

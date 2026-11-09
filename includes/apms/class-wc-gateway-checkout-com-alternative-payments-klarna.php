@@ -78,7 +78,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Klarna extends WC_Gateway_Che
 			}
 			?>
 
-			<div id="cart-info" data-cart='<?php echo wp_json_encode( WC_Checkoutcom_Api_Request::get_cart_info() ); ?>'></div>
+			<div id="cart-info" data-cart="<?php echo esc_attr( wp_json_encode( WC_Checkoutcom_Api_Request::get_cart_info() ) ); ?>"></div>
 
 			<div class="klarna-details"></div>
 			<div id="klarna_container"></div>
@@ -193,11 +193,37 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Klarna extends WC_Gateway_Che
 					WC_Checkoutcom_Subscription::save_source_id( $order->get_id(), $order, $response['source']['id'] );
 				}
 
-				// Get cko auth status configured in admin.
-				$status = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
+				// The payment context was created when the checkout was shown; only an approved
+				// payment for this order's amount and currency moves it to the authorised status.
+				$verified = new WP_Error( 'cko_payment_pending', 'Payment is pending (HTTP 202).' );
+				if ( 201 === $response_code ) {
+					// Use the response when it carries amount and currency, otherwise fetch the details.
+					$details  = ( isset( $response['amount'], $response['currency'] ) ) ? (array) $response : null;
+					$verified = WC_Checkoutcom_Utility::verify_payment_for_order( $order, (string) $response['id'], $details );
+				}
 
-				$order->update_meta_data( 'cko_payment_authorized', true );
-				$order->update_status( $status );
+				if ( is_wp_error( $verified ) ) {
+					WC_Checkoutcom_Utility::logger( 'Klarna payment for order ' . $order->get_id() . ' not confirmed: ' . $verified->get_error_message() );
+
+					if ( in_array( $verified->get_error_code(), [ 'cko_amount_mismatch', 'cko_currency_mismatch' ], true ) ) {
+						/* translators: %s: Payment ID. */
+						$note = sprintf( esc_html__( 'Payment amount or currency does not match the order - Checkout.com Payment ID : %s', 'checkout-com-unified-payments-api' ), $response['id'] );
+					} elseif ( 'cko_payment_pending' === $verified->get_error_code() ) {
+						/* translators: %s: Payment ID. */
+						$note = sprintf( esc_html__( 'Checkout.com Klarna payment pending confirmation - Payment ID : %s', 'checkout-com-unified-payments-api' ), $response['id'] );
+					} else {
+						/* translators: %s: Payment ID. */
+						$note = sprintf( esc_html__( 'Checkout.com Klarna payment could not be confirmed for this order - Payment ID : %s', 'checkout-com-unified-payments-api' ), $response['id'] );
+					}
+
+					$order->update_status( 'on-hold', $note );
+				} else {
+					// Get cko auth status configured in admin.
+					$status = WC_Admin_Settings::get_option( 'ckocom_order_authorised', 'on-hold' );
+
+					$order->update_meta_data( 'cko_payment_authorized', true );
+					$order->update_status( $status );
+				}
 
 				// Reduce stock levels.
 				wc_reduce_stock_levels( $order->get_id() );

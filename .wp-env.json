@@ -6,6 +6,9 @@
 		"https://downloads.wordpress.org/plugin/woocommerce.11.1.0.zip",
 		"."
 	],
+	"mappings": {
+		"wp-content/mu-plugins": "./e2e-tests/mu-plugins"
+	},
 	"port": 8892,
 	"testsPort": 8893,
 	"config": {
