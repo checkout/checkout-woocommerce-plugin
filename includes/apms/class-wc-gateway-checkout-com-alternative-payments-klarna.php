@@ -185,14 +185,6 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Klarna extends WC_Gateway_Che
 			 */
 			if ( in_array( $response_code, [ 201, 202 ], true ) ) {
 
-				$order->set_transaction_id( $response['id'] );
-				$order->update_meta_data( '_cko_payment_id', $response['id'] );
-
-				if ( class_exists( 'WC_Subscriptions_Order' ) && isset( $response['source'] ) ) {
-					// Save source id for subscription.
-					WC_Checkoutcom_Subscription::save_source_id( $order->get_id(), $order, $response['source']['id'] );
-				}
-
 				// The payment context was created when the checkout was shown; only an approved
 				// payment for this order's amount and currency moves it to the authorised status.
 				$verified = new WP_Error( 'cko_payment_pending', 'Payment is pending (HTTP 202).' );
@@ -202,19 +194,29 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Klarna extends WC_Gateway_Che
 					$verified = WC_Checkoutcom_Utility::verify_payment_for_order( $order, (string) $response['id'], $details );
 				}
 
+				// A payment that could not be confirmed for this order does not complete the
+				// checkout: stock and cart are left alone and the shopper sees an error.
+				$is_pending = is_wp_error( $verified )
+					&& ( 'cko_payment_pending' === $verified->get_error_code()
+						|| ( 'cko_payment_not_approved' === $verified->get_error_code() && 'Pending' === ( is_array( $details ?? null ) ? ( $details['status'] ?? '' ) : '' ) ) );
+
+				if ( is_wp_error( $verified ) && ! $is_pending ) {
+					return $this->reject_unconfirmed_payment( $order, $response, $verified );
+				}
+
+				$order->set_transaction_id( $response['id'] );
+				$order->update_meta_data( '_cko_payment_id', $response['id'] );
+
+				if ( class_exists( 'WC_Subscriptions_Order' ) && isset( $response['source'] ) ) {
+					// Save source id for subscription.
+					WC_Checkoutcom_Subscription::save_source_id( $order->get_id(), $order, $response['source']['id'] );
+				}
+
 				if ( is_wp_error( $verified ) ) {
 					WC_Checkoutcom_Utility::logger( 'Klarna payment for order ' . $order->get_id() . ' not confirmed: ' . $verified->get_error_message() );
 
-					if ( in_array( $verified->get_error_code(), [ 'cko_amount_mismatch', 'cko_currency_mismatch' ], true ) ) {
-						/* translators: %s: Payment ID. */
-						$note = sprintf( esc_html__( 'Payment amount or currency does not match the order - Checkout.com Payment ID : %s', 'checkout-com-unified-payments-api' ), $response['id'] );
-					} elseif ( 'cko_payment_pending' === $verified->get_error_code() ) {
-						/* translators: %s: Payment ID. */
-						$note = sprintf( esc_html__( 'Checkout.com Klarna payment pending confirmation - Payment ID : %s', 'checkout-com-unified-payments-api' ), $response['id'] );
-					} else {
-						/* translators: %s: Payment ID. */
-						$note = sprintf( esc_html__( 'Checkout.com Klarna payment could not be confirmed for this order - Payment ID : %s', 'checkout-com-unified-payments-api' ), $response['id'] );
-					}
+					/* translators: %s: Payment ID. */
+					$note = sprintf( esc_html__( 'Checkout.com Klarna payment pending confirmation - Payment ID : %s', 'checkout-com-unified-payments-api' ), $response['id'] );
 
 					$order->update_status( 'on-hold', $note );
 				} else {
@@ -252,6 +254,55 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Klarna extends WC_Gateway_Che
 
 			wp_send_json_error( [ 'messages' => $error_message ] );
 		}
+	}
+
+	/**
+	 * Handle a Klarna payment that did not pass verify_payment_for_order(): the payment is
+	 * voided when possible, the order is marked failed (not bound to the payment) and an error
+	 * is returned to the checkout.
+	 *
+	 * @param WC_Order $order    Order.
+	 * @param array    $response Payment response.
+	 * @param WP_Error $error    Verification result.
+	 *
+	 * @return array
+	 */
+	private function reject_unconfirmed_payment( WC_Order $order, $response, $error ) {
+		$payment_id = isset( $response['id'] ) ? (string) $response['id'] : '';
+
+		WC_Checkoutcom_Utility::logger( 'Klarna payment for order ' . $order->get_id() . ' not confirmed: ' . $error->get_error_message() );
+
+		$voided = false;
+		if ( WC_Checkoutcom_Utility::is_valid_payment_id( $payment_id ) ) {
+			try {
+				$checkout                = new Checkout_SDK();
+				$void_request            = new Checkout\Payments\VoidRequest();
+				$void_request->reference = (string) $order->get_order_number();
+
+				$void_response = $checkout->get_builder()->getPaymentsClient()->voidPayment( $payment_id, $void_request );
+				$voided        = WC_Checkoutcom_Utility::is_successful( $void_response );
+			} catch ( Exception $ex ) {
+				WC_Checkoutcom_Utility::logger( 'Klarna payment ' . $payment_id . ' could not be voided.', $ex );
+			}
+		}
+
+		if ( in_array( $error->get_error_code(), [ 'cko_amount_mismatch', 'cko_currency_mismatch' ], true ) ) {
+			/* translators: %s: Payment ID. */
+			$note = sprintf( esc_html__( 'Payment amount or currency does not match the order - Checkout.com Payment ID : %s', 'checkout-com-unified-payments-api' ), $payment_id );
+		} else {
+			/* translators: %s: Payment ID. */
+			$note = sprintf( esc_html__( 'Checkout.com Klarna payment could not be confirmed for this order - Payment ID : %s', 'checkout-com-unified-payments-api' ), $payment_id );
+		}
+
+		$note .= $voided
+			? ' ' . esc_html__( '(payment voided)', 'checkout-com-unified-payments-api' )
+			: ' ' . esc_html__( '(payment could not be voided automatically, please review it in the Checkout.com dashboard)', 'checkout-com-unified-payments-api' );
+
+		$order->update_status( 'failed', $note );
+
+		return [
+			'error' => esc_html__( 'An error has occurred while Klarna payment request. ', 'checkout-com-unified-payments-api' ),
+		];
 	}
 
 	/**
