@@ -4819,6 +4819,9 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 				// the block checkout creates before the payment and never posts on a 3DS redirect.
 				if ( ! $order ) {
 					$order = $this->adopt_store_api_draft_order( $payment_id, $payment_details, isset( $payment_session_id ) ? $payment_session_id : '' );
+					if ( ! $order ) {
+						$order = $this->create_order_from_own_cart( $payment_id, $payment_details, isset( $payment_session_id ) ? $payment_session_id : '' );
+					}
 					if ( $order ) {
 						$order_id                     = $order->get_id();
 						$order_created_on_return      = true;
@@ -5609,6 +5612,120 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Using the block checkout draft order ' . $draft->get_id() . ' for returning payment ' . $payment_id . '.' );
 
 		return $draft;
+	}
+
+	/**
+	 * Remember a payment this visitor's own session submitted, so a 3DS return for it can be
+	 * matched to this visitor's cart.
+	 *
+	 * @param string $payment_id Checkout.com payment id.
+	 *
+	 * @return void
+	 */
+	private function remember_session_payment( $payment_id ) {
+		if ( ! function_exists( 'WC' ) || ! WC()->session || '' === (string) $payment_id ) {
+			return;
+		}
+		$ids   = (array) WC()->session->get( 'cko_flow_session_payment_ids', array() );
+		$ids[] = (string) $payment_id;
+		WC()->session->set( 'cko_flow_session_payment_ids', array_slice( array_values( array_unique( $ids ) ), -10 ) );
+	}
+
+	/**
+	 * Create the order for a Checkout block payment that returns from a 3DS redirect.
+	 *
+	 * The block checkout takes the payment before it places the order, and the full-page 3DS
+	 * redirect skips that step. The order is built only from this visitor's own cart, through
+	 * WooCommerce's checkout (line items, shipping, fees, coupons and taxes), and only for a
+	 * payment this visitor's session submitted. The payment is verified against it afterwards
+	 * like any other order (amount, currency and binding).
+	 *
+	 * @param string     $payment_id         Checkout.com payment id.
+	 * @param array|null $payment_details    Payment details fetched from Checkout.com.
+	 * @param string     $payment_session_id Payment session id, if known.
+	 *
+	 * @return WC_Order|null
+	 */
+	private function create_order_from_own_cart( $payment_id, $payment_details, $payment_session_id = '' ) {
+		if ( ! function_exists( 'WC' ) || ! WC()->session || ! WC()->cart || WC()->cart->is_empty() || empty( $payment_details ) ) {
+			return null;
+		}
+
+		$own_payments = (array) WC()->session->get( 'cko_flow_session_payment_ids', array() );
+		if ( ! in_array( (string) $payment_id, $own_payments, true ) ) {
+			return null;
+		}
+
+		WC()->cart->calculate_shipping();
+		WC()->cart->calculate_totals();
+
+		// A cart that needs shipping must have a valid rate chosen for every package.
+		if ( WC()->cart->needs_shipping() ) {
+			$chosen   = (array) WC()->session->get( 'chosen_shipping_methods', array() );
+			$packages = WC()->shipping()->get_packages();
+			if ( empty( $packages ) ) {
+				return null;
+			}
+			foreach ( $packages as $package_key => $package ) {
+				$rate_id = isset( $chosen[ $package_key ] ) ? (string) $chosen[ $package_key ] : '';
+				if ( '' === $rate_id || empty( $package['rates'] ) || ! isset( $package['rates'][ $rate_id ] ) ) {
+					return null;
+				}
+			}
+		}
+
+		$customer = WC()->customer;
+		$data     = array(
+			'payment_method'            => $this->id,
+			'ship_to_different_address' => true,
+			'order_comments'            => '',
+		);
+		foreach ( array( 'first_name', 'last_name', 'company', 'address_1', 'address_2', 'city', 'state', 'postcode', 'country', 'email', 'phone' ) as $field ) {
+			$getter                    = 'get_billing_' . $field;
+			$data[ 'billing_' . $field ] = $customer && is_callable( array( $customer, $getter ) ) ? (string) $customer->$getter() : '';
+		}
+		foreach ( array( 'first_name', 'last_name', 'company', 'address_1', 'address_2', 'city', 'state', 'postcode', 'country', 'phone' ) as $field ) {
+			$getter                     = 'get_shipping_' . $field;
+			$data[ 'shipping_' . $field ] = $customer && is_callable( array( $customer, $getter ) ) ? (string) $customer->$getter() : '';
+		}
+
+		// A new order, never a resumed one.
+		WC()->session->set( 'order_awaiting_payment', null );
+
+		try {
+			$order_id = WC()->checkout()->create_order( $data );
+		} catch ( \Throwable $e ) {
+			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Could not create the block checkout order for payment ' . $payment_id . ': ' . $e->getMessage() );
+			return null;
+		}
+		if ( is_wp_error( $order_id ) || ! $order_id ) {
+			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Could not create the block checkout order for payment ' . $payment_id . ': ' . ( is_wp_error( $order_id ) ? $order_id->get_error_message() : 'no order id' ) );
+			return null;
+		}
+
+		$order = wc_get_order( $order_id );
+		if ( ! $order instanceof WC_Order ) {
+			return null;
+		}
+
+		$order->set_payment_method_title( $this->get_payment_method_title_by_type( $order, $payment_details ) );
+		if ( ! empty( $payment_session_id ) ) {
+			$order->update_meta_data( '_cko_payment_session_id', $payment_session_id );
+		}
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- save-card preference only.
+		if ( isset( $_GET['cko-save-card'] ) && 'yes' === sanitize_text_field( wp_unslash( $_GET['cko-save-card'] ) ) ) {
+			$order->update_meta_data( '_cko_save_card_preference', 'yes' );
+		}
+		$order->set_status( 'pending' );
+		$order->save();
+
+		// Each submitted payment can create at most one order.
+		WC()->session->set( 'cko_flow_session_payment_ids', array_values( array_diff( $own_payments, array( (string) $payment_id ) ) ) );
+		WC()->session->set( 'order_awaiting_payment', $order->get_id() );
+
+		WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Created order ' . $order->get_id() . ' from the visitor\'s cart for returning payment ' . $payment_id . '.' );
+
+		return $order;
 	}
 
 	/**
@@ -9898,6 +10015,9 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 		// Success - return the response for Flow to handle
 		WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] ✅ Payment submitted successfully - Payment ID: ' . ( $response_data['id'] ?? 'N/A' ) . ', Status: ' . ( $response_data['status'] ?? 'N/A' ) );
+		if ( ! empty( $response_data['id'] ) && is_string( $response_data['id'] ) ) {
+			$this->remember_session_payment( $response_data['id'] );
+		}
 
 		// Save payment ID and payment session ID to order if available
 		// MULTI-TAB SUPPORT: Track ALL payment attempts, let first successful one win
