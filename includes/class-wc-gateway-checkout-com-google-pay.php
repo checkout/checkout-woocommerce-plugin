@@ -781,10 +781,15 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 			return false;
 		}
 
-		$approved_minor = (int) round( (float) WC_Checkoutcom_Utility::value_to_decimal( (float) $total, $cart_currency ) );
-		$cart_minor     = (int) round( (float) WC_Checkoutcom_Utility::value_to_decimal( (float) WC()->cart->get_total( 'edit' ), $cart_currency ) );
+		// Compare at the precision the wallet sheet shows: whole units for zero-decimal currencies,
+		// otherwise two decimals (the wallet scripts round three-decimal currencies to two).
+		$zero_decimal = (float) WC_Checkoutcom_Utility::value_to_decimal( 1, $cart_currency ) <= 1.0;
+		$precision    = $zero_decimal ? 0 : 2;
+		// Allow less than one displayed unit of difference, which only absorbs rounding: two-decimal
+		// totals still have to match exactly.
+		$difference = abs( (float) WC()->cart->get_total( 'edit' ) - (float) $total );
 
-		return $approved_minor === $cart_minor;
+		return $difference < ( pow( 10, -$precision ) - 1e-9 );
 	}
 
 	/**
