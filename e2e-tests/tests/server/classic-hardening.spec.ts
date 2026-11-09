@@ -51,7 +51,7 @@ test.describe('Classic gateway hardening', () => {
 		});
 		expect(payment.status).toBe('Authorized');
 
-		const res = await request.get(`/?wc-api=wc_checkoutcom_callback&cko-session-id=${payment.id}`, { maxRedirects: 0 });
+		const res = await request.get(`/?wc-api=wc_checkoutcom_callback&cko-session-id=${payment.id}&key=${order.key}`, { maxRedirects: 0 });
 		expect(res.status(), 'callback redirects').toBe(302);
 
 		const after = getOrder(order.id);
@@ -70,7 +70,7 @@ test.describe('Classic gateway hardening', () => {
 		});
 		expect(payment.status).toBe('Authorized');
 
-		const res = await request.get(`/?wc-api=wc_checkoutcom_callback&cko-session-id=${payment.id}`, { maxRedirects: 0 });
+		const res = await request.get(`/?wc-api=wc_checkoutcom_callback&cko-session-id=${payment.id}&key=${order.key}`, { maxRedirects: 0 });
 		expect(res.status()).toBe(302);
 		expect(res.headers()['location']).toContain('order-received');
 
