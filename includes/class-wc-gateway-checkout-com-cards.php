@@ -1027,6 +1027,14 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 			exit();
 		}
 
+		// Only the shopper paying this order may act on it or be sent to its order page.
+		if ( ! WC_Checkoutcom_Utility::request_can_access_order( $order ) ) {
+			WC_Checkoutcom_Utility::logger( 'Payment return for order ' . $order->get_id() . ' ignored: the request is not linked to this order.' );
+			WC_Checkoutcom_Utility::wc_add_notice_self( __( 'An error has occurred while processing your payment. Please check your card details and try again.', 'checkout-com-unified-payments-api' ) );
+			wp_safe_redirect( wc_get_checkout_url() );
+			exit();
+		}
+
 		// The payment must be approved and pay exactly this order before the order moves on.
 		$verified_details = $result;
 		$verified         = WC_Checkoutcom_Utility::verify_payment_for_order( $order, (string) $result['id'], $verified_details );
@@ -1140,7 +1148,8 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 	 *
 	 * - amount/currency differ from the order: order put on-hold for the merchant to review;
 	 * - payment still pending (asynchronous payment methods): order put on-hold until the
-	 *   webhook confirms it;
+	 *   webhook confirms it. Card payments are not: a pending card payment has not finished
+	 *   authentication, so the order is left as it is;
 	 * - anything else: order left as it is and the customer is sent back to checkout.
 	 *
 	 * @param WC_Order $order   Order named by the payment.
@@ -1155,10 +1164,13 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		$can_hold     = in_array( $order->get_status(), [ 'pending', 'failed' ], true );
 		$status       = isset( $result['status'] ) ? (string) $result['status'] : '';
 		$amount_issue = in_array( $code, [ 'cko_amount_mismatch', 'cko_currency_mismatch' ], true );
+		$source_type  = isset( $result['source']['type'] ) ? (string) $result['source']['type'] : '';
+		$is_card      = 'card' === $source_type || $this->id === $order->get_payment_method();
+		$apm_pending  = ! $is_card && 'cko_payment_not_approved' === $code && 'Pending' === $status;
 
 		WC_Checkoutcom_Utility::logger( 'Payment return for order ' . $order->get_id() . ' not confirmed: ' . $error->get_error_message() );
 
-		if ( $amount_issue || ( 'cko_payment_not_approved' === $code && 'Pending' === $status ) ) {
+		if ( $amount_issue || $apm_pending ) {
 			if ( $amount_issue ) {
 				/* translators: %s: Payment ID. */
 				$note = sprintf( esc_html__( 'Payment amount or currency does not match the order - Checkout.com Payment ID : %s', 'checkout-com-unified-payments-api' ), $payment_id );
