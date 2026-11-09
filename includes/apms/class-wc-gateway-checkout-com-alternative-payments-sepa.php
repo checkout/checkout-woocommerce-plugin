@@ -128,7 +128,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Sepa extends WC_Gateway_Check
 			$message = esc_html__( 'Checkout.com - SEPA payment for free order.', 'checkout-com-unified-payments-api' );
 
 			// phpcs:ignore WordPress.Security.NonceVerification.Missing
-			$post_data = sanitize_post( $_POST );
+			$post_data = WC_Checkoutcom_Utility::get_request_fields( $_POST, array( 'billing_email', 'billing_first_name', 'billing_last_name' ) );
 			$method    = WC_Checkoutcom_Api_Request::get_apm_method( $post_data, $order, 'sepa' );
 
 			if ( ! empty( $method->id ) ) {

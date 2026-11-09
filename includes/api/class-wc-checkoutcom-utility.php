@@ -68,6 +68,93 @@ class WC_Checkoutcom_Utility {
 	}
 
 	/**
+	 * Whether the current request may act on an order: the logged-in user is the order's
+	 * customer, the WooCommerce session is paying this order, or the request carries the
+	 * order key.
+	 *
+	 * @param WC_Order|false $order Order.
+	 *
+	 * @return bool
+	 */
+	public static function request_can_access_order( $order ) {
+		if ( ! $order instanceof WC_Order ) {
+			return false;
+		}
+
+		$customer_id = (int) $order->get_customer_id();
+		if ( $customer_id > 0 && get_current_user_id() === $customer_id ) {
+			return true;
+		}
+
+		if ( function_exists( 'WC' ) && WC()->session ) {
+			foreach ( array( 'order_awaiting_payment', 'store_api_draft_order' ) as $session_key ) {
+				if ( absint( WC()->session->get( $session_key ) ) === $order->get_id() ) {
+					return true;
+				}
+			}
+		}
+
+		// phpcs:disable WordPress.Security.NonceVerification.Missing, WordPress.Security.NonceVerification.Recommended -- order key check, callers verify their own nonces.
+		foreach ( array( $_POST['order_key'] ?? null, $_POST['key'] ?? null, $_GET['key'] ?? null ) as $key ) {
+			if ( is_string( $key ) && '' !== $key && hash_equals( (string) $order->get_order_key(), sanitize_text_field( wp_unslash( $key ) ) ) ) {
+				return true;
+			}
+		}
+		// phpcs:enable
+
+		return false;
+	}
+
+	/**
+	 * Read named fields from a request array ($_POST / $_GET): each value is unslashed and
+	 * sanitized as text (arrays are kept as arrays, sanitized recursively). Keys that are not
+	 * present are left out, so isset()/empty() checks behave as on the raw request.
+	 *
+	 * @param array $source Request array.
+	 * @param array $keys   Field names to read.
+	 *
+	 * @return array
+	 */
+	public static function get_request_fields( $source, array $keys ) {
+		$fields = array();
+
+		if ( ! is_array( $source ) ) {
+			return $fields;
+		}
+
+		foreach ( $keys as $key ) {
+			if ( array_key_exists( $key, $source ) ) {
+				$fields[ $key ] = self::sanitize_request_value( wp_unslash( $source[ $key ] ) );
+			}
+		}
+
+		return $fields;
+	}
+
+	/**
+	 * Sanitize a request value as text, recursively for arrays.
+	 *
+	 * @param mixed $value Unslashed value.
+	 *
+	 * @return mixed
+	 */
+	private static function sanitize_request_value( $value ) {
+		if ( is_array( $value ) ) {
+			foreach ( $value as $k => $v ) {
+				$value[ $k ] = self::sanitize_request_value( $v );
+			}
+
+			return $value;
+		}
+
+		if ( is_scalar( $value ) ) {
+			return sanitize_text_field( (string) $value );
+		}
+
+		return '';
+	}
+
+	/**
 	 * Whether a create-payment result (WC_Checkoutcom_Api_Request::create_payment) is a final,
 	 * authorised payment that may move an order to the authorised status.
 	 *
