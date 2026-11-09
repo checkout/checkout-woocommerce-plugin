@@ -888,6 +888,12 @@ var ckoFlow = {
 				formData.append('is_add_payment_method', '1');
 			}
 
+			// Order-pay page: the server takes amount, currency and items from the order named in
+			// success_url (with its key) rather than from the cart.
+			if (window.location.pathname.includes('/order-pay/')) {
+				formData.append('is_order_pay', '1');
+			}
+
 			// Subscription "Change payment method" flow. WCS routes the customer/admin card-change
 			// through an order-pay page carrying ?change_payment_method=<id> in the URL. Flag it so
 			// the server can build a zero-amount, capture:false card-verification session (no charge
