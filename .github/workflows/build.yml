@@ -1,24 +1,52 @@
 name: Main
 
+# Builds the plugin zip for a pushed tag and attaches it to that tag's GitHub release.
+# Uses only GitHub-owned actions plus the PHP and gh CLI preinstalled on the runner.
+
 on:
   push:
     tags:
       - "*"
 
+permissions:
+  contents: write
+
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          php-version: '7.3'
+          node-version: '20'
+
+      - name: Show tool versions
+        run: |
+          php --version
+          node --version
+          npm --version
+
       - name: Build zip
         run: bash bin/build.sh
-      - name: Release
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          files: checkout-com-unified-payments-api.zip
+
+      - name: Attach zip to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          VERSION="${TAG#v}"
+          VERSION="${VERSION#V}"
+          ZIP="checkout-com-unified-payments-api-${VERSION}.zip"
+          mv checkout-com-unified-payments-api.zip "$ZIP"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            # A release made by hand keeps its notes; the zip is added, or replaced if present.
+            gh release upload "$TAG" "$ZIP" --clobber
+          else
+            # No release yet: create a draft for a maintainer to review and publish.
+            gh release create "$TAG" "$ZIP" --draft --verify-tag \
+              --title "Checkout.com WooCommerce Module - ${TAG}" \
+              --notes "See changelog.txt for the changes in this version."
+          fi
