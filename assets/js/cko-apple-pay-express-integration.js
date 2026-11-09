@@ -810,6 +810,11 @@ jQuery( function ( $ ) {
                                 shippingContact: shippingContact,
                                 billingContact: billingContact
                             };
+                            // Total and currency approved in the sheet: sent as a check only.
+                            const approvedTotal = {
+                                total: paymentRequest.total.amount,
+                                currency: paymentRequest.currencyCode
+                            };
                             
                             if (cko_apple_pay_vars.debug) {
                                 console.log('[Apple Pay Express] Browser:', browserName);
@@ -823,7 +828,7 @@ jQuery( function ( $ ) {
                             }
                             
                             // Process payment with token
-                            this.processPayment(outcome, paymentData, loadingContainer, context, productId);
+                            this.processPayment(outcome, paymentData, loadingContainer, context, productId, approvedTotal);
                             
                             session.completePayment(ApplePaySession.STATUS_SUCCESS);
                         } else {
@@ -872,10 +877,12 @@ jQuery( function ( $ ) {
             }
         },
 
-        processPayment: async function(token, paymentData, loadingContainer, context, productId) {
+        processPayment: async function(token, paymentData, loadingContainer, context, productId, approvedTotal) {
             try {
                 // Prepare payment data for backend
                 const postData = {
+                    approved_total: approvedTotal && approvedTotal.total ? approvedTotal.total : '',
+                    approved_currency: approvedTotal && approvedTotal.currency ? approvedTotal.currency : '',
                     action: 'express_apple_pay_order_session',
                     'cko-apple-card-token': token,
                     payment_data: JSON.stringify(paymentData),

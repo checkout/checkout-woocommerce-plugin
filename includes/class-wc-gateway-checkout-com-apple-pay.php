@@ -1371,7 +1371,7 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		}
 		
 		// Create the order from cart
-		$order = $this->create_express_order_from_cart( $email, $shipping_address, $billing_address );
+		$order = $this->create_express_order_from_cart( $email, $shipping_address, $billing_address, $this->get_posted_approved_total() );
 		
 		if ( ! $order ) {
 			wp_send_json_error( array( 'messages' => '' !== $this->express_order_error ? $this->express_order_error : 'Failed to create order for Apple Pay Express checkout.' ) );
@@ -1420,9 +1420,10 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 	 * @param string $email Email address from Apple Pay.
 	 * @param array  $shipping_address Shipping address from Apple Pay.
 	 * @param array  $billing_address Billing address from Apple Pay (optional, defaults to shipping address).
+	 * @param array  $approved Total and currency approved in the Apple Pay sheet ('total', 'currency').
 	 * @return WC_Order|false
 	 */
-	private function create_express_order_from_cart( $email = '', $shipping_address = null, $billing_address = null ) {
+	private function create_express_order_from_cart( $email = '', $shipping_address = null, $billing_address = null, $approved = null ) {
 		$order                     = null;
 		$this->express_order_error = '';
 
@@ -1478,6 +1479,10 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 
 			// Rate shipping and taxes for the wallet address before building the order lines.
 			$this->express_order_error = $this->prepare_express_cart_for_order( $order );
+			if ( '' === $this->express_order_error && ! $this->approved_total_matches_cart( $approved ) ) {
+				// Never charge a total other than the one approved in the wallet sheet.
+				$this->express_order_error = __( 'Your order total was updated for the selected address. You have not been charged. Please try again.', 'checkout-com-unified-payments-api' );
+			}
 			if ( '' !== $this->express_order_error ) {
 				$order->delete( true );
 				return false;
@@ -1510,6 +1515,57 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 
 			return false;
 		}
+	}
+
+	/**
+	 * Approved wallet total and currency posted by the express script with the order request.
+	 * Only used to check the recalculated cart total, never as the amount charged.
+	 *
+	 * @return array{total: string, currency: string}|null Null when missing.
+	 */
+	private function get_posted_approved_total() {
+		// phpcs:disable WordPress.Security.NonceVerification.Missing -- the order step nonce is verified before this is called.
+		$total    = isset( $_POST['approved_total'] ) && is_string( $_POST['approved_total'] ) ? sanitize_text_field( wp_unslash( $_POST['approved_total'] ) ) : '';
+		$currency = isset( $_POST['approved_currency'] ) && is_string( $_POST['approved_currency'] ) ? sanitize_text_field( wp_unslash( $_POST['approved_currency'] ) ) : '';
+		// phpcs:enable
+
+		if ( '' === $total || '' === $currency ) {
+			return null;
+		}
+
+		return array(
+			'total'    => $total,
+			'currency' => $currency,
+		);
+	}
+
+	/**
+	 * Whether the total and currency approved in the wallet sheet equal the recalculated cart
+	 * total and the store currency (compared in minor units).
+	 *
+	 * @param array|null $approved Approved values ('total', 'currency').
+	 * @return bool False when they differ or are missing.
+	 */
+	private function approved_total_matches_cart( $approved ) {
+		if ( ! is_array( $approved ) ) {
+			return false;
+		}
+
+		$total    = isset( $approved['total'] ) && is_scalar( $approved['total'] ) ? trim( (string) $approved['total'] ) : '';
+		$currency = isset( $approved['currency'] ) && is_string( $approved['currency'] ) ? strtoupper( trim( $approved['currency'] ) ) : '';
+		if ( '' === $total || ! is_numeric( $total ) || '' === $currency ) {
+			return false;
+		}
+
+		$cart_currency = strtoupper( get_woocommerce_currency() );
+		if ( $currency !== $cart_currency ) {
+			return false;
+		}
+
+		$approved_minor = (int) round( (float) WC_Checkoutcom_Utility::value_to_decimal( (float) $total, $cart_currency ) );
+		$cart_minor     = (int) round( (float) WC_Checkoutcom_Utility::value_to_decimal( (float) WC()->cart->get_total( 'edit' ), $cart_currency ) );
+
+		return $approved_minor === $cart_minor;
 	}
 
 	/**

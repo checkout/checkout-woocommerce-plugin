@@ -26,16 +26,30 @@ const GB_ADDRESS = {
 };
 
 const WALLET_GATEWAYS = [
-	{ name: 'PayPal', className: 'WC_Gateway_Checkout_Com_PayPal', setup: GB_ADDRESS.paypal, args: '' },
-	{ name: 'Apple Pay', className: 'WC_Gateway_Checkout_Com_Apple_Pay', setup: '', args: `'', ${GB_ADDRESS.apple}, null` },
-	{ name: 'Google Pay', className: 'WC_Gateway_Checkout_Com_Google_Pay', setup: '', args: `'', ${GB_ADDRESS.google}` },
+	{ name: 'PayPal', className: 'WC_Gateway_Checkout_Com_PayPal', setup: GB_ADDRESS.paypal, args: '', walletSheet: false },
+	{ name: 'Apple Pay', className: 'WC_Gateway_Checkout_Com_Apple_Pay', setup: '', args: `'', ${GB_ADDRESS.apple}, null`, walletSheet: true },
+	{ name: 'Google Pay', className: 'WC_Gateway_Checkout_Com_Google_Pay', setup: '', args: `'', ${GB_ADDRESS.google}`, walletSheet: true },
 ] as const;
+
+/**
+ * Total passed as approved in the wallet sheet: the total for the wallet address, the total for
+ * the session address, none, or (PayPal, which checks the approved amount when charging) no argument.
+ */
+type Approved = 'wallet' | 'session' | 'missing' | 'none';
+
+const APPROVED_ARG: Record<Approved, string> = {
+	wallet: "array( 'total' => $wallet_total, 'currency' => get_woocommerce_currency() )",
+	session: "array( 'total' => $session_total, 'currency' => get_woocommerce_currency() )",
+	missing: 'null',
+	none: '',
+};
 
 /**
  * With the session address in the US, create an express order whose wallet address is in GB.
  * Shipping costs 5 to the US and 20 to GB, or has no rate to GB when gbRate is false.
  */
-function buildWalletOrder(className: string, setup: string, args: string, gbRate: boolean): WalletOrder {
+function buildWalletOrder(className: string, setup: string, args: string, gbRate: boolean, approved: Approved): WalletOrder {
+	const allArgs = [args, APPROVED_ARG[approved]].filter(Boolean).join(', ');
 	return wpEvalFileJson<WalletOrder>(`
 		wc_load_cart();
 		WC()->cart->empty_cart();
@@ -55,12 +69,30 @@ function buildWalletOrder(className: string, setup: string, args: string, gbRate
 		WC()->cart->add_to_cart( wc_get_product_id_by_sku( ${JSON.stringify(PRODUCTS.physical.sku)} ), 1 );
 		WC()->session->set( 'chosen_shipping_methods', array( 'e2e_rate:1' ) );
 		WC()->cart->calculate_totals();
+		$session_total = wc_format_decimal( WC()->cart->get_total( 'edit' ), wc_get_price_decimals() );
+
+		// What the wallet sheet shows once it is rated for the GB address.
+		WC()->customer->set_shipping_country( 'GB' );
+		WC()->customer->set_shipping_state( '' );
+		WC()->customer->set_shipping_postcode( 'SW1A 1AA' );
+		WC()->customer->set_billing_country( 'GB' );
+		WC()->shipping()->reset_shipping();
+		WC()->cart->calculate_totals();
+		$wallet_total = wc_format_decimal( WC()->cart->get_total( 'edit' ), wc_get_price_decimals() );
+
+		WC()->customer->set_shipping_country( 'US' );
+		WC()->customer->set_shipping_state( 'CA' );
+		WC()->customer->set_shipping_postcode( '94103' );
+		WC()->customer->set_billing_country( 'US' );
+		WC()->session->set( 'chosen_shipping_methods', array( 'e2e_rate:1' ) );
+		WC()->shipping()->reset_shipping();
+		WC()->cart->calculate_totals();
 
 		${setup}
 		$gateway = new ${className}();
 		$create  = new ReflectionMethod( $gateway, 'create_express_order_from_cart' );
 		$create->setAccessible( true );
-		$order = $create->invoke( $gateway${args ? `, ${args}` : ''} );
+		$order = $create->invoke( $gateway${allArgs ? `, ${allArgs}` : ''} );
 
 		$error = new ReflectionProperty( $gateway, 'express_order_error' );
 		$error->setAccessible( true );
@@ -92,7 +124,7 @@ function buildWalletOrder(className: string, setup: string, args: string, gbRate
 test.describe('Express orders use the wallet address', () => {
 	for (const gateway of WALLET_GATEWAYS) {
 		test(`${gateway.name} Express order is rated for the wallet address`, () => {
-			const order = buildWalletOrder(gateway.className, gateway.setup, gateway.args, true);
+			const order = buildWalletOrder(gateway.className, gateway.setup, gateway.args, true, gateway.walletSheet ? 'wallet' : 'none');
 
 			expect(order.created, 'order created').toBe(true);
 			expect(order.shippingCountry).toBe('GB');
@@ -102,12 +134,25 @@ test.describe('Express orders use the wallet address', () => {
 
 		test(`${gateway.name} Express order is refused when the wallet address has no shipping rate`, () => {
 			const before = latestOrderId();
-			const order = buildWalletOrder(gateway.className, gateway.setup, gateway.args, false);
+			const order = buildWalletOrder(gateway.className, gateway.setup, gateway.args, false, gateway.walletSheet ? 'wallet' : 'none');
 
 			expect(order.created, 'no order created').toBe(false);
 			expect(order.error).toContain('cannot ship');
 			expect(latestOrderId(), 'no order left behind').toBe(before);
 		});
+
+		if (gateway.walletSheet) {
+			for (const approved of ['session', 'missing'] as const) {
+				test(`${gateway.name} Express order is refused when the approved wallet total is ${approved === 'session' ? 'different' : 'missing'}`, () => {
+					const before = latestOrderId();
+					const order = buildWalletOrder(gateway.className, gateway.setup, gateway.args, true, approved);
+
+					expect(order.created, 'no order created').toBe(false);
+					expect(order.error).toContain('You have not been charged');
+					expect(latestOrderId(), 'no order left behind').toBe(before);
+				});
+			}
+		}
 	}
 });
 

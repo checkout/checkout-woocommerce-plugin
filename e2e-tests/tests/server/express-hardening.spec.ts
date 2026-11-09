@@ -35,13 +35,13 @@ const EXPRESS_GATEWAYS = [
 	{
 		name: 'Apple Pay',
 		className: 'WC_Gateway_Checkout_Com_Apple_Pay',
-		args: "'', array( 'givenName' => 'E2E', 'familyName' => 'Shopper', 'addressLines' => array( '1 Market St' ), 'locality' => 'San Francisco', 'administrativeArea' => 'CA', 'postalCode' => '94103', 'countryCode' => 'us' ), null",
+		args: "'', array( 'givenName' => 'E2E', 'familyName' => 'Shopper', 'addressLines' => array( '1 Market St' ), 'locality' => 'San Francisco', 'administrativeArea' => 'CA', 'postalCode' => '94103', 'countryCode' => 'us' ), null, array( 'total' => $cart_total, 'currency' => get_woocommerce_currency() )",
 		setup: '',
 	},
 	{
 		name: 'Google Pay',
 		className: 'WC_Gateway_Checkout_Com_Google_Pay',
-		args: "'', array( 'name' => 'E2E Shopper', 'address1' => '1 Market St', 'locality' => 'San Francisco', 'administrativeArea' => 'CA', 'postalCode' => '94103', 'countryCode' => 'US' )",
+		args: "'', array( 'name' => 'E2E Shopper', 'address1' => '1 Market St', 'locality' => 'San Francisco', 'administrativeArea' => 'CA', 'postalCode' => '94103', 'countryCode' => 'US' ), array( 'total' => $cart_total, 'currency' => get_woocommerce_currency() )",
 		setup: '',
 	},
 ] as const;
