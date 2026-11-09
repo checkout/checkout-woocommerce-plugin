@@ -312,7 +312,7 @@ test.describe('PayPal payment request', () => {
 
 test.describe('Apple Pay key location', () => {
 	test('new keys are never written inside the web root', () => {
-		const result = wpEvalJson<{ uploadsRefused: boolean; abspathRefused: boolean; outsideAccepted: boolean; outsideDir: string; writeDirInWebRoot: boolean }>(`
+		const result = wpEvalFileJson<{ uploadsRefused: boolean; abspathRefused: boolean; outsideAccepted: boolean; outsideDir: string; writeDirInWebRoot: boolean }>(`
 			$gateway = new WC_Gateway_Checkout_Com_Apple_Pay();
 			$dir_fn  = new ReflectionMethod( $gateway, 'get_private_apple_pay_key_dir' );
 			$dir_fn->setAccessible( true );
