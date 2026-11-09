@@ -1769,9 +1769,10 @@ class WC_Checkout_Com_Webhook {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Event ID: ' . ( isset( $data->id ) ? $data->id : 'N/A' ) . ', type: ' . ( isset( $data->type ) ? $data->type : 'N/A' ) );
 		}
 		
-		$webhook_data     = $data->data;
-		$order_id         = isset($webhook_data->metadata->order_id) ? $webhook_data->metadata->order_id : null;
-		$payment_id       = isset($webhook_data->id) ? $webhook_data->id : null;
+		$webhook_data      = $data->data;
+		$order_id          = isset($webhook_data->metadata->order_id) ? $webhook_data->metadata->order_id : null;
+		$metadata_order_id = $order_id;
+		$payment_id        = isset($webhook_data->id) ? $webhook_data->id : null;
 		$action_id        = isset($webhook_data->action_id) ? $webhook_data->action_id : null;
 		$response_summary = isset($webhook_data->response_summary) ? $webhook_data->response_summary : null;
 		
@@ -1816,6 +1817,12 @@ class WC_Checkout_Com_Webhook {
 		// Use the resolved order's real id from here on: the event's id may be an order
 		// number (or not this store's at all), and reloading by it returned false (fatal).
 		$order_id = $order->get_id();
+
+		// The metadata order id and a numeric reference must name the same order.
+		$event_reference = isset( $webhook_data->reference ) ? $webhook_data->reference : '';
+		if ( self::reference_names_other_order( $order, $metadata_order_id, $event_reference ) ) {
+			return self::skip_for_reference_mismatch( 'decline_payment', $order, $webhook_data, $event_reference );
+		}
 		
 		// Safety: never apply order-status changes to a WC_Subscription. A subscription card-change
 		// verification ($0 auth) must not flip the subscription's status — that is managed by WCS,
@@ -1827,6 +1834,15 @@ class WC_Checkout_Com_Webhook {
 
 		if ( $webhook_debug_enabled ) {
 			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: Order loaded successfully - Order ID: ' . $order->get_id() . ', Status: ' . $order->get_status() );
+		}
+
+		// The order must be bound to this payment (see order_owns_payment) before it is failed.
+		if ( ! self::order_owns_payment( $order, $webhook_data ) ) {
+			WC_Checkoutcom_Utility::logger( 'WEBHOOK PROCESS: decline_payment - order ' . $order_id . ' is not bound to payment ' . ( $payment_id ?? 'NULL' ) . ' - ignoring.' );
+			if ( $webhook_debug_enabled ) {
+				WC_Checkoutcom_Utility::logger( '=== WEBHOOK PROCESS: decline_payment END (FAILED - Payment Not On Order) ===' );
+			}
+			return false;
 		}
 
 		// MULTI-TAB DETECTION: Check if this payment ID is different from the order's primary payment
