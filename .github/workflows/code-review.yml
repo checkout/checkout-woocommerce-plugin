@@ -45,7 +45,9 @@ jobs:
         continue-on-error: true
 
       - name: Install PHPStan
-        run: composer global require phpstan/phpstan phpstan/extension-installer szepeviktor/phpstan-wordpress --no-progress
+        run: |
+          composer global config allow-plugins.phpstan/extension-installer true
+          composer global require phpstan/phpstan phpstan/extension-installer szepeviktor/phpstan-wordpress --no-progress
 
       - name: Run PHPStan
         run: ~/.composer/vendor/bin/phpstan analyse --configuration=phpstan.neon --memory-limit=1G
@@ -93,9 +95,9 @@ jobs:
           node-version: '20'
 
       - name: Install ESLint
-        run: |
-          npm init -y
-          npm install eslint @eslint/js globals --save-dev
+        # --no-save keeps package.json unchanged; --legacy-peer-deps avoids a peer clash with the
+        # build tooling already listed there.
+        run: npm install --no-save --no-audit --no-fund --legacy-peer-deps eslint@9 @eslint/js@9 globals
 
       - name: Run ESLint
         run: npx eslint "flow-integration/assets/js/**/*.js" --config eslint.config.mjs
