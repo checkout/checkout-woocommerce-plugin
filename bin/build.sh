@@ -191,6 +191,14 @@ else
     echo "✅ Vendor dependencies found"
 fi
 
+# Ship only production Composer packages, and prove the staged autoloader loads.
+# Fails if vendor/ was installed with dev packages (the cause of a fatal when their
+# folders are missing), and drops leftover package folders such as vendor/wp-cli.
+php bin/check-vendor.php "${PLUGIN_DIR}" || {
+    rm -rf "${TEMP_DIR}"
+    exit 1
+}
+
 echo "✅ Files copied to plugin folder"
 
 # Create zip from temp directory (so folder structure is preserved)
