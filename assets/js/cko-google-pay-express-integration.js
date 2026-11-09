@@ -1109,6 +1109,7 @@ jQuery( function ( $ ) {
                     cko_google_pay_vars.google_pay_order_session_url + 
                     "&woocommerce-process-checkout-nonce=" + cko_google_pay_vars.woocommerce_process_checkout,
                     {
+                        nonce: cko_google_pay_vars.google_pay_express_order_nonce,
                         // Send token fields exactly like classic Google Pay form fields
                         'cko-google-signature': signature,
                         'cko-google-protocolVersion': protocolVersion,

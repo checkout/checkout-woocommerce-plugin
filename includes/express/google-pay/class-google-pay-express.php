@@ -239,6 +239,7 @@ class CKO_Google_Pay_Express {
 			'google_pay_express_add_to_cart_nonce'          => wp_create_nonce( 'checkoutcom_google_pay_express_add_to_cart' ),
 			'create_payment_context_nonce'                  => wp_create_nonce( 'checkoutcom_google_pay_express_create_payment_context' ),
 			'get_cart_total_nonce'                          => wp_create_nonce( 'checkoutcom_google_pay_express_get_cart_total' ),
+			'google_pay_express_order_nonce'                => wp_create_nonce( 'checkoutcom_google_pay_express_order' ),
 			'debug'                               => 'yes' === WC_Admin_Settings::get_option( 'cko_console_logging', 'no' ),
 			'environment'                         => $environment ? 'TEST' : 'PRODUCTION',
 			'public_key'                          => $core_settings['ckocom_pk'] ?? '',
