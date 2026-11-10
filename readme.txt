@@ -174,7 +174,7 @@ support@checkout.com
 
 = Requirements =
 
-* A Checkout.com account. You can test with a Sandbox account first. Don't have one? Contact partnerships@checkout.com.
+* A Checkout.com account. You can test with a Sandbox account first. Don't have one? [Get a test account](https://www.checkout.com/get-test-account).
 * WordPress 6.0 or later, WooCommerce 8.0 or later and PHP 7.4 or later.
 * An SSL certificate: your store must use https://.
 
