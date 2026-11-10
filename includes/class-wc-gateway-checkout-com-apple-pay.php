@@ -1883,6 +1883,11 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 
 		// 3DS required: send the customer to the challenge; the order is NOT authorised yet.
 		if ( ! empty( $result['3d'] ) ) {
+			// Link the order to its payment before the 3DS redirect, so early webhooks can match it.
+			if ( ! empty( $result['id'] ) && WC_Checkoutcom_Utility::is_valid_payment_id( $result['id'] ) ) {
+				$order->update_meta_data( '_cko_payment_id', $result['id'] );
+				$order->save();
+			}
 			/* translators: %s: 3DS redirect URL. */
 			$order->add_order_note( sprintf( esc_html__( 'Checkout.com 3d Redirect waiting. URL : %s', 'checkout-com-unified-payments-api' ), $result['3d'] ) );
 

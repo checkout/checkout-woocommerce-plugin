@@ -581,6 +581,11 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 
 			// Check for 3DS redirect (same as normal Google Pay)
 			if ( isset( $payment_result['3d'] ) && ! empty( $payment_result['3d'] ) ) {
+				// Link the order to its payment before the 3DS redirect, so early webhooks can match it.
+				if ( ! empty( $payment_result['id'] ) && WC_Checkoutcom_Utility::is_valid_payment_id( $payment_result['id'] ) ) {
+					$order->update_meta_data( '_cko_payment_id', $payment_result['id'] );
+					$order->save();
+				}
 				$order->add_order_note(
 					sprintf(
 						/* translators: %s: URL */
@@ -1310,6 +1315,11 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 
 		// Redirect to apm if redirection url is available.
 		if ( isset( $result['3d'] ) && ! empty( $result['3d'] ) ) {
+			// Link the order to its payment before the 3DS redirect, so early webhooks can match it.
+			if ( ! empty( $result['id'] ) && WC_Checkoutcom_Utility::is_valid_payment_id( $result['id'] ) ) {
+				$order->update_meta_data( '_cko_payment_id', $result['id'] );
+				$order->save();
+			}
 
 			$order->add_order_note(
 				sprintf(
