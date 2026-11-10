@@ -601,6 +601,9 @@ jQuery( function ( $ ) {
                 // For Google Pay Express, we don't need payment contexts - process payment directly
                 // But we still need to add product to cart if on product/shop page
                 let cartTotal = 0;
+                // Whether the sheet offers shipping options (only when known to be needed).
+                let needsShipping = false;
+                this.cartNeedsShipping = false;
                 if (context === 'shop' && productId) {
                     let addToCartSuccess = await cko_express_add_to_cart_for_product(productId);
                     if (!addToCartSuccess || addToCartSuccess.result === 'error') {
@@ -617,6 +620,7 @@ jQuery( function ( $ ) {
                     }
                     // Get cart total from add to cart response
                     cartTotal = parseFloat(addToCartSuccess.total || 0);
+                    needsShipping = true === addToCartSuccess.needs_shipping;
                 } else if (context === 'product') {
                     // For product page, use the form-based add to cart function
                     let addToCartSuccess = await cko_express_add_to_cart();
@@ -630,6 +634,7 @@ jQuery( function ( $ ) {
                     }
                     // Get cart total from add to cart response
                     cartTotal = parseFloat(addToCartSuccess.total || 0);
+                    needsShipping = true === addToCartSuccess.needs_shipping;
                 } else {
                     // For cart page, try multiple methods to get cart total
                     // First try the dedicated API endpoint (most reliable)
@@ -649,6 +654,10 @@ jQuery( function ( $ ) {
                     if (cartTotal === 0 || isNaN(cartTotal)) {
                         cartTotal = await this.getCartTotalFromAPI();
                     }
+                }
+
+                if (context === 'cart') {
+                    needsShipping = true === this.cartNeedsShipping;
                 }
 
                 // If cart total is still 0, try one more time from DOM as final fallback
@@ -677,11 +686,6 @@ jQuery( function ( $ ) {
                     showError('Unable to calculate cart total. Please refresh the page and try again.');
                     return;
                 }
-
-                // Now create payment data request
-                const paymentsClient = new google.payments.api.PaymentsClient({
-                    environment: cko_google_pay_vars.environment || 'TEST'
-                });
 
                 // Get cart items for display
                 let displayItems = await this.getCartItemsForDisplay();
@@ -740,68 +744,185 @@ jQuery( function ( $ ) {
                 const isZeroDecimal = zeroDecimalCurrencies.includes(currencyCode.toUpperCase());
                 const formattedAmount = isZeroDecimal ? Math.round(cartTotal).toString() : cartTotal.toFixed(2);
 
+                const formatAmount = function (value) {
+                    const amount = parseFloat(value) || 0;
+                    return isZeroDecimal ? Math.round(amount).toString() : amount.toFixed(2);
+                };
+
+                const transactionInfo = {
+                    currencyCode: currencyCode,
+                    totalPriceStatus: 'FINAL',
+                    totalPrice: formattedAmount,
+                    totalPriceLabel: 'Total',
+                    displayItems: displayItems.map(function (item) {
+                        return {
+                            label: item.label,
+                            type: 'LINE_ITEM',
+                            price: formatAmount(item.price)
+                        };
+                    })
+                };
+                if (cko_google_pay_vars.country_code) {
+                    transactionInfo.countryCode = cko_google_pay_vars.country_code;
+                }
+
+                // Google Pay API version 2 request: needed for the sheet to update its total when
+                // the shopper selects a shipping address or shipping option.
                 const paymentDataRequest = {
-                    merchantId: cko_google_pay_vars.merchant_id.trim(),
-                    paymentMethodTokenizationParameters: {
-                        tokenizationType: 'PAYMENT_GATEWAY',
+                    apiVersion: 2,
+                    apiVersionMinor: 0,
+                    merchantInfo: {
+                        merchantId: cko_google_pay_vars.merchant_id.trim(),
+                        merchantName: cko_google_pay_vars.merchant_name || window.location.host
+                    },
+                    allowedPaymentMethods: [{
+                        type: 'CARD',
                         parameters: {
-                            'gateway': 'checkoutltd',
-                            'gatewayMerchantId': cko_google_pay_vars.public_key.trim()
+                            allowedAuthMethods: ['PAN_ONLY', 'CRYPTOGRAM_3DS'],
+                            allowedCardNetworks: ['AMEX', 'DISCOVER', 'JCB', 'MASTERCARD', 'VISA']
+                        },
+                        tokenizationSpecification: {
+                            type: 'PAYMENT_GATEWAY',
+                            parameters: {
+                                'gateway': 'checkoutltd',
+                                'gatewayMerchantId': cko_google_pay_vars.public_key.trim()
+                            }
                         }
-                    },
-                    allowedPaymentMethods: ['CARD', 'TOKENIZED_CARD'],
-                    cardRequirements: {
-                        allowedCardNetworks: ['AMEX', 'DISCOVER', 'JCB', 'MASTERCARD', 'VISA'],
-                        allowedCardAuthMethods: ['CRYPTOGRAM_3DS']
-                    },
-                    transactionInfo: {
-                        currencyCode: currencyCode,
-                        totalPriceStatus: 'FINAL',
-                        totalPrice: formattedAmount,
-                        totalPriceLabel: 'Total'
-                    },
-                    displayItems: displayItems,
+                    }],
+                    transactionInfo: transactionInfo,
                     shippingAddressRequired: true,
                     emailRequired: true,
                     shippingAddressParameters: {
                         phoneNumberRequired: false
-                    }
+                    },
+                    callbackIntents: needsShipping ? ['SHIPPING_ADDRESS', 'SHIPPING_OPTION'] : ['SHIPPING_ADDRESS']
                 };
+                if (needsShipping) {
+                    paymentDataRequest.shippingOptionRequired = true;
+                }
+
+                // Last transaction info shown in the sheet: posted as the approved total.
+                let approvedTransactionInfo = transactionInfo;
+
+                const unserviceable = function (message) {
+                    return {
+                        error: {
+                            reason: 'SHIPPING_ADDRESS_UNSERVICEABLE',
+                            message: message || 'We cannot ship to this address.',
+                            intent: 'SHIPPING_ADDRESS'
+                        }
+                    };
+                };
+
+                // Rate the cart for the address / shipping option selected in the sheet.
+                const onPaymentDataChanged = (intermediatePaymentData) => {
+                    const trigger = intermediatePaymentData.callbackTrigger;
+                    const address = intermediatePaymentData.shippingAddress || null;
+                    let optionId = trigger === 'SHIPPING_OPTION' && intermediatePaymentData.shippingOptionData
+                        ? intermediatePaymentData.shippingOptionData.id
+                        : '';
+                    if (optionId === 'shipping_option_unselected') {
+                        optionId = '';
+                    }
+
+                    return this.updateShipping(address, optionId).then((data) => {
+                        if (!data) {
+                            return {
+                                error: {
+                                    reason: trigger === 'SHIPPING_OPTION' ? 'SHIPPING_OPTION_INVALID' : 'OTHER_ERROR',
+                                    message: 'Unable to calculate shipping for this address. Please try again.',
+                                    intent: trigger === 'SHIPPING_OPTION' ? 'SHIPPING_OPTION' : 'SHIPPING_ADDRESS'
+                                }
+                            };
+                        }
+
+                        if (data.needs_shipping && !data.shipping_available) {
+                            return unserviceable(data.message);
+                        }
+
+                        const newTransactionInfo = {
+                            currencyCode: currencyCode,
+                            totalPriceStatus: 'FINAL',
+                            totalPrice: formatAmount(data.total),
+                            totalPriceLabel: 'Total',
+                            displayItems: (Array.isArray(data.line_items) ? data.line_items : []).map(function (item) {
+                                return {
+                                    label: item.label,
+                                    type: item.type === 'subtotal' ? 'SUBTOTAL' : (item.type === 'tax' ? 'TAX' : 'LINE_ITEM'),
+                                    price: formatAmount(item.amount)
+                                };
+                            })
+                        };
+                        if (transactionInfo.countryCode) {
+                            newTransactionInfo.countryCode = transactionInfo.countryCode;
+                        }
+
+                        const update = { newTransactionInfo: newTransactionInfo };
+
+                        if (needsShipping && trigger !== 'SHIPPING_OPTION') {
+                            const rates = Array.isArray(data.shipping_rates) ? data.shipping_rates : [];
+                            if (!rates.length) {
+                                return unserviceable(data.message);
+                            }
+                            const chosen = rates.some(function (rate) { return rate.id === data.chosen_shipping_rate; })
+                                ? data.chosen_shipping_rate
+                                : rates[0].id;
+                            update.newShippingOptionParameters = {
+                                defaultSelectedOptionId: chosen,
+                                shippingOptions: rates.map(function (rate) {
+                                    return {
+                                        id: rate.id,
+                                        label: rate.label,
+                                        description: rate.formatted || formatAmount(rate.amount)
+                                    };
+                                })
+                            };
+                        }
+
+                        approvedTransactionInfo = newTransactionInfo;
+                        return update;
+                    });
+                };
+
+                const paymentsClient = new google.payments.api.PaymentsClient({
+                    environment: cko_google_pay_vars.environment || 'TEST',
+                    paymentDataCallbacks: {
+                        onPaymentDataChanged: onPaymentDataChanged
+                    }
+                });
 
                 // Load payment data
                 try {
                     let paymentData = await paymentsClient.loadPaymentData(paymentDataRequest);
-                    
+
                     // Clear the timeout since we got payment data
                     clearTimeout(timeoutFallback);
 
-                    // IMPORTANT: Extract token data directly from paymentData, matching classic Google Pay
-                    // Classic Google Pay does: JSON.parse(paymentData.paymentMethodToken.token).signedMessage
-                    // We need to extract the token data and ensure it's in the same format
-                    let tokenData = null;
-                    if (paymentData.paymentMethodToken && paymentData.paymentMethodToken.token) {
-                        // Parse the token JSON string to extract the token data (same as classic)
-                        tokenData = JSON.parse(paymentData.paymentMethodToken.token);
+                    // IMPORTANT: Extract token data directly from paymentData, matching classic Google Pay.
+                    // The token (paymentMethodData.tokenizationData.token) is the same JSON string that
+                    // classic Google Pay parses for signature, protocolVersion and signedMessage.
+                    const methodData = paymentData.paymentMethodData || {};
+                    const tokenizationData = methodData.tokenizationData || {};
+                    if (tokenizationData.token) {
+                        const tokenData = JSON.parse(tokenizationData.token);
                         cko_google_pay_vars.debug && console.log('[Google Pay Express] Token data extracted - protocolVersion:', tokenData.protocolVersion);
 
-                        // Create a modified payment data object with the token data properly formatted
-                        // This ensures the signedMessage is in the exact same format as classic Google Pay
-                        // Note: We use a new variable to avoid reassigning const
+                        // Keep the shape processPayment expects.
                         paymentData = {
-                            cardInfo: paymentData.cardInfo,
+                            cardInfo: methodData.info,
                             email: paymentData.email,
                             shippingAddress: paymentData.shippingAddress,
                             // Keep the token as a JSON string (matching classic format)
                             paymentMethodToken: {
-                                token: paymentData.paymentMethodToken.token, // Keep original token string
-                                tokenizationType: paymentData.paymentMethodToken.tokenizationType
+                                token: tokenizationData.token, // Keep original token string
+                                tokenizationType: tokenizationData.type
                             }
                         };
                     }
 
-                    // Total and currency approved in the sheet: sent as a check only.
-                    paymentData.ckoApprovedTotal = paymentDataRequest.transactionInfo.totalPrice;
-                    paymentData.ckoApprovedCurrency = paymentDataRequest.transactionInfo.currencyCode;
+                    // Total and currency approved in the sheet (the last update shown): sent as a check only.
+                    paymentData.ckoApprovedTotal = approvedTransactionInfo.totalPrice;
+                    paymentData.ckoApprovedCurrency = approvedTransactionInfo.currencyCode;
 
                     // Process the payment (no payment context needed for Google Pay)
                     await this.processPayment(paymentData, null, loadingContainer);
@@ -846,6 +967,42 @@ jQuery( function ( $ ) {
             }
         },
 
+        /**
+         * Rate the cart for the (partial) shipping address selected in the sheet, optionally with
+         * a chosen shipping option. Resolves with the server data, or null when the request fails.
+         */
+        updateShipping: async function(address, shippingMethod) {
+            if (!cko_google_pay_vars.update_shipping_url) {
+                return null;
+            }
+
+            try {
+                const response = await jQuery.ajax({
+                    url: cko_google_pay_vars.update_shipping_url,
+                    type: 'POST',
+                    dataType: 'json',
+                    timeout: 20000,
+                    data: {
+                        nonce: cko_google_pay_vars.update_shipping_nonce,
+                        country: address && address.countryCode ? String(address.countryCode).toUpperCase() : '',
+                        state: address && address.administrativeArea ? address.administrativeArea : '',
+                        postcode: address && address.postalCode ? address.postalCode : '',
+                        city: address && address.locality ? address.locality : '',
+                        shipping_method: shippingMethod || ''
+                    }
+                });
+
+                if (response && response.success && response.data) {
+                    cko_google_pay_vars.debug && console.log('[Google Pay Express] Shipping update:', response.data);
+                    return response.data;
+                }
+            } catch (error) {
+                cko_google_pay_vars.debug && console.log('[Google Pay Express] Shipping update failed:', error);
+            }
+
+            return null;
+        },
+
         getCartTotalFromAPI: async function() {
             // Get cart total directly from WooCommerce API endpoint
             // This works for both classic and Blocks cart pages
@@ -866,6 +1023,8 @@ jQuery( function ( $ ) {
 
                 if (response && response.success && response.data && response.data.total) {
                     const total = parseFloat(response.data.total) || 0;
+                    // Whether the sheet should offer shipping options for this cart.
+                    this.cartNeedsShipping = true === response.data.needs_shipping;
                     if (cko_google_pay_vars.debug) {
                         console.log('[Google Pay Express] Cart total from API (Blocks/Classic):', total, response.data);
                     }

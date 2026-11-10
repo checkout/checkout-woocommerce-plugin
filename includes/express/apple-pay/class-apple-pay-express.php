@@ -235,6 +235,7 @@ class CKO_Apple_Pay_Express {
 		$vars = [
 			'add_to_cart_url'                     => add_query_arg( [ 'cko_apple_pay_action' => 'express_add_to_cart' ], WC()->api_request_url( 'CKO_Apple_Pay_Woocommerce' ) ),
 			'get_cart_total_url'                  => add_query_arg( [ 'cko_apple_pay_action' => 'express_get_cart_total' ], WC()->api_request_url( 'CKO_Apple_Pay_Woocommerce' ) ),
+			'update_shipping_url'                 => add_query_arg( [ 'cko_apple_pay_action' => 'express_update_shipping' ], WC()->api_request_url( 'CKO_Apple_Pay_Woocommerce' ) ),
 			'apple_pay_order_session_url'       => add_query_arg( [ 'cko_apple_pay_action' => 'express_apple_pay_order_session' ], WC()->api_request_url( 'CKO_Apple_Pay_Woocommerce' ) ),
 			'session_url'                          => $session_url,
 			'generate_token_url'                   => $generate_token_url,
@@ -244,6 +245,7 @@ class CKO_Apple_Pay_Express {
 			'redirect'                            => wc_get_checkout_url(),
 			'apple_pay_express_add_to_cart_nonce' => wp_create_nonce( 'checkoutcom_apple_pay_express_add_to_cart' ),
 			'apple_pay_express_order_nonce'       => wp_create_nonce( 'checkoutcom_apple_pay_express_order' ),
+			'update_shipping_nonce'               => wp_create_nonce( 'checkoutcom_apple_pay_express_shipping' ),
 			'debug'                               => 'yes' === WC_Admin_Settings::get_option( 'cko_console_logging', 'no' ),
 			'environment'                         => $environment ? 'TEST' : 'PRODUCTION',
 			'merchant_id'                         => $apple_pay_settings['ckocom_apple_mercahnt_id'] ?? '',

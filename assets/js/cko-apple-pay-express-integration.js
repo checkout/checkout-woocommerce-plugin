@@ -310,6 +310,42 @@ jQuery( function ( $ ) {
         return items;
     };
 
+    /**
+     * Rate the cart for the (partial) shipping address selected in the sheet, optionally with a
+     * chosen shipping rate. Resolves with the server data, or null when the request fails.
+     */
+    const cko_express_update_shipping = async function (address, shippingMethod) {
+        if (!cko_apple_pay_vars.update_shipping_url) {
+            return null;
+        }
+
+        try {
+            const response = await jQuery.ajax({
+                url: cko_apple_pay_vars.update_shipping_url,
+                type: 'POST',
+                dataType: 'json',
+                timeout: 20000,
+                data: {
+                    nonce: cko_apple_pay_vars.update_shipping_nonce,
+                    country: address && address.countryCode ? String(address.countryCode).toUpperCase() : '',
+                    state: address && address.administrativeArea ? address.administrativeArea : '',
+                    postcode: address && address.postalCode ? address.postalCode : '',
+                    city: address && address.locality ? address.locality : '',
+                    shipping_method: shippingMethod || ''
+                }
+            });
+
+            if (response && response.success && response.data) {
+                cko_apple_pay_vars.debug && console.log('[Apple Pay Express] Shipping update:', response.data);
+                return response.data;
+            }
+        } catch (error) {
+            cko_apple_pay_vars.debug && console.log('[Apple Pay Express] Shipping update failed:', error);
+        }
+
+        return null;
+    };
+
     const performAppleUrlValidation = function(valURL, callback) {
         jQuery.ajax({
             type: 'POST',
@@ -712,8 +748,104 @@ jQuery( function ( $ ) {
                     });
                 }
 
+                const formatAmount = function (value) {
+                    const amount = parseFloat(value) || 0;
+                    return isZeroDecimal ? Math.round(amount).toString() : amount.toFixed(2);
+                };
+
+                // Sheet values for the server's rating of the selected address. The approved
+                // total posted with the order is paymentRequest.total.amount, so it is kept in
+                // sync with the last update shown in the sheet.
+                const applyShippingUpdate = function (data) {
+                    const newTotal = {
+                        label: paymentRequest.total.label,
+                        amount: formatAmount(data.total),
+                        type: 'final'
+                    };
+                    const newLineItems = (Array.isArray(data.line_items) ? data.line_items : []).map(function (item) {
+                        return {
+                            label: item.label,
+                            amount: formatAmount(item.amount),
+                            type: 'final'
+                        };
+                    });
+
+                    paymentRequest.total = newTotal;
+                    paymentRequest.lineItems = newLineItems;
+
+                    return { newTotal: newTotal, newLineItems: newLineItems };
+                };
+
+                const currentSheet = function () {
+                    return {
+                        newTotal: paymentRequest.total,
+                        newLineItems: paymentRequest.lineItems || []
+                    };
+                };
+
+                // Shipping methods for the sheet, the chosen one first (Apple Pay selects the first).
+                const toShippingMethods = function (data) {
+                    const rates = Array.isArray(data.shipping_rates) ? data.shipping_rates.slice() : [];
+                    rates.sort(function (a, b) {
+                        return (b.id === data.chosen_shipping_rate) - (a.id === data.chosen_shipping_rate);
+                    });
+                    return rates.map(function (rate) {
+                        return {
+                            label: rate.label,
+                            detail: '',
+                            amount: formatAmount(rate.amount),
+                            identifier: rate.id
+                        };
+                    });
+                };
+
+                let selectedShippingAddress = null;
+
                 // Create Apple Pay session
                 const session = new ApplePaySession(3, paymentRequest);
+
+                // Update the total, line items and shipping methods for the selected address.
+                session.onshippingcontactselected = (event) => {
+                    selectedShippingAddress = event.shippingContact || null;
+
+                    cko_express_update_shipping(selectedShippingAddress, '').then((data) => {
+                        if (!data) {
+                            session.completeShippingContactSelection(Object.assign(currentSheet(), {
+                                errors: [new ApplePayError('shippingContactInvalid', 'postalAddress', 'Unable to calculate shipping for this address. Please try again.')]
+                            }));
+                            return;
+                        }
+
+                        if (data.needs_shipping && !data.shipping_available) {
+                            session.completeShippingContactSelection(Object.assign(currentSheet(), {
+                                newShippingMethods: [],
+                                errors: [new ApplePayError('shippingContactInvalid', 'postalAddress', data.message || 'We cannot ship to this address.')]
+                            }));
+                            return;
+                        }
+
+                        const update = applyShippingUpdate(data);
+                        if (data.needs_shipping) {
+                            update.newShippingMethods = toShippingMethods(data);
+                        }
+                        session.completeShippingContactSelection(update);
+                    });
+                };
+
+                // Update the total and line items for the selected shipping method.
+                session.onshippingmethodselected = (event) => {
+                    const identifier = event.shippingMethod && event.shippingMethod.identifier ? event.shippingMethod.identifier : '';
+
+                    cko_express_update_shipping(selectedShippingAddress, identifier).then((data) => {
+                        if (!data || (data.needs_shipping && !data.shipping_available)) {
+                            // Keep the sheet as it is; the order step still checks the total.
+                            session.completeShippingMethodSelection(currentSheet());
+                            return;
+                        }
+
+                        session.completeShippingMethodSelection(applyShippingUpdate(data));
+                    });
+                };
 
                 // Handle merchant validation
                 session.onvalidatemerchant = (event) => {

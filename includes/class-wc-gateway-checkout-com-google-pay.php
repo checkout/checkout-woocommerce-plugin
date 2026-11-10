@@ -8,6 +8,7 @@
 defined( 'ABSPATH' ) || exit;
 
 require_once __DIR__ . '/express/google-pay/class-google-pay-express.php';
+require_once __DIR__ . '/express/class-wc-checkoutcom-express-shipping-preview.php';
 
 use Checkout\CheckoutApiException;
 use Checkout\Payments\PaymentType;
@@ -114,6 +115,10 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 					$this->cko_express_get_cart_total();
 					break;
 
+				case 'express_update_shipping':
+					$this->cko_express_update_shipping();
+					break;
+
 				case 'express_google_pay_order_session':
 					WC_Checkoutcom_Utility::logger( 'Google Pay: Calling cko_express_google_pay_order_session' );
 					$this->cko_express_google_pay_order_session();
@@ -167,9 +172,10 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 
 		WC()->cart->calculate_totals();
 
-		$data           = [];
-		$data['result'] = 'success';
-		$data['total']  = WC()->cart->total;
+		$data                   = [];
+		$data['result']         = 'success';
+		$data['total']          = WC()->cart->total;
+		$data['needs_shipping'] = WC()->cart->needs_shipping();
 
 		wp_send_json( $data );
 	}
@@ -245,7 +251,40 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 			'total' => floatval( $cart_total_raw ),
 			'total_formatted' => $cart_total_formatted,
 			'currency' => get_woocommerce_currency(),
+			'needs_shipping' => WC()->cart->needs_shipping(),
 		) );
+	}
+
+	/**
+	 * Rate the cart for the shipping address (and shipping rate) selected in the Google Pay sheet and
+	 * return the updated total, line items and shipping rates, so the sheet shows the total the
+	 * order will be created for. The order step uses the Google Pay shipping address for billing
+	 * too, so it is rated the same way here.
+	 *
+	 * @return void
+	 */
+	public function cko_express_update_shipping() {
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- compared only.
+		if ( ! isset( $_SERVER['REQUEST_METHOD'] ) || 'POST' !== strtoupper( (string) wp_unslash( $_SERVER['REQUEST_METHOD'] ) ) ) {
+			wp_send_json_error( array( 'messages' => __( 'Invalid request.', 'checkout-com-unified-payments-api' ) ), 405 );
+		}
+
+		$nonce = isset( $_POST['nonce'] ) && is_string( $_POST['nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['nonce'] ) ) : '';
+		if ( ! wp_verify_nonce( $nonce, 'checkoutcom_google_pay_express_shipping' ) ) {
+			wp_send_json_error( array( 'messages' => __( 'Your session has expired. Please refresh the page and try again.', 'checkout-com-unified-payments-api' ) ), 403 );
+		}
+
+		$preview = WC_Checkoutcom_Express_Shipping_Preview::preview(
+			WC_Checkoutcom_Express_Shipping_Preview::get_posted_address(),
+			WC_Checkoutcom_Express_Shipping_Preview::get_posted_shipping_method(),
+			true
+		);
+
+		if ( null === $preview ) {
+			wp_send_json_error( array( 'messages' => __( 'Your cart is empty.', 'checkout-com-unified-payments-api' ) ), 400 );
+		}
+
+		wp_send_json_success( $preview );
 	}
 
 	public function cko_express_google_pay_order_session() {
