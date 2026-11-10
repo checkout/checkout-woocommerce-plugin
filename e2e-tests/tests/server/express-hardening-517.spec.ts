@@ -371,3 +371,202 @@ test.describe('Apple Pay key location', () => {
 		expect(result.writeDirInWebRoot, 'the default key location is never inside the web root').toBe(false);
 	});
 });
+
+type ShippingPreview = {
+	success: boolean;
+	data: {
+		total: number;
+		currency: string;
+		needs_shipping: boolean;
+		shipping_available: boolean;
+		error: string;
+		line_items: { type: string; label: string; amount: number }[];
+		shipping_rates: { id: string; label: string; amount: number }[];
+		chosen_shipping_rate: string;
+	};
+};
+
+type ShippingPreviewRun = {
+	us: ShippingPreview;
+	gb: ShippingPreview;
+	usExpress: ShippingPreview;
+	fr: ShippingPreview;
+	gbOrderCreated: boolean;
+	gbOrderError: string;
+	gbOrderTotal: string;
+};
+
+const SHIPPING_PREVIEW_GATEWAYS = [
+	{ name: 'Apple Pay', className: 'WC_Gateway_Checkout_Com_Apple_Pay', nonce: 'checkoutcom_apple_pay_express_shipping', orderArgs: `'', ${GB_ADDRESS.apple}, null` },
+	{ name: 'Google Pay', className: 'WC_Gateway_Checkout_Com_Google_Pay', nonce: 'checkoutcom_google_pay_express_shipping', orderArgs: `'', ${GB_ADDRESS.google}` },
+] as const;
+
+/**
+ * Ask the gateway's wallet shipping endpoint to rate the cart for US (with and without a chosen
+ * rate), GB and FR addresses. Shipping to the US costs 5 (standard) or 15 (express), to GB 20,
+ * and there is no rate to FR. Then create the express order for the GB address with the total
+ * the endpoint returned for it as the approved total.
+ */
+function runShippingPreview(className: string, nonceAction: string, orderArgs: string): ShippingPreviewRun {
+	return wpEvalFileJson<ShippingPreviewRun>(`
+		wc_load_cart();
+		WC()->cart->empty_cart();
+		WC()->customer->set_shipping_country( 'US' );
+		WC()->customer->set_shipping_state( 'CA' );
+		WC()->customer->set_shipping_postcode( '94103' );
+		WC()->customer->set_billing_country( 'US' );
+
+		add_filter( 'woocommerce_package_rates', function ( $rates, $package ) {
+			$country = isset( $package['destination']['country'] ) ? $package['destination']['country'] : '';
+			if ( 'GB' === $country ) {
+				return array( 'e2e_rate:1' => new WC_Shipping_Rate( 'e2e_rate:1', 'E2E rate', 20, array(), 'flat_rate', 1 ) );
+			}
+			if ( 'US' === $country ) {
+				return array(
+					'e2e_rate:1'    => new WC_Shipping_Rate( 'e2e_rate:1', 'E2E rate', 5, array(), 'flat_rate', 1 ),
+					'e2e_express:2' => new WC_Shipping_Rate( 'e2e_express:2', 'E2E express', 15, array(), 'flat_rate', 2 ),
+				);
+			}
+			return array();
+		}, 10, 2 );
+
+		WC()->cart->add_to_cart( wc_get_product_id_by_sku( ${JSON.stringify(PRODUCTS.physical.sku)} ), 1 );
+		WC()->session->set( 'chosen_shipping_methods', array( 'e2e_rate:1' ) );
+		WC()->cart->calculate_totals();
+
+		add_filter( 'wp_doing_ajax', '__return_true' );
+		add_filter( 'wp_die_ajax_handler', function () {
+			return function () {
+				throw new RuntimeException( 'e2e-stop' );
+			};
+		} );
+
+		$gateway = new ${className}();
+		$nonce   = wp_create_nonce( ${JSON.stringify(nonceAction)} );
+		$call    = function ( $post ) use ( $gateway, $nonce ) {
+			$_SERVER['REQUEST_METHOD'] = 'POST';
+			$_POST = array_merge( array( 'nonce' => $nonce ), $post );
+			ob_start();
+			try {
+				$gateway->cko_express_update_shipping();
+			} catch ( RuntimeException $e ) {
+				// wp_send_json() stopped here.
+			}
+			$out   = ob_get_clean();
+			$_POST = array();
+			return json_decode( $out, true );
+		};
+
+		$result = array(
+			'us'        => $call( array( 'country' => 'US', 'state' => 'CA', 'postcode' => '94103', 'city' => 'San Francisco' ) ),
+			'gb'        => $call( array( 'country' => 'GB', 'state' => '', 'postcode' => 'SW1A 1', 'city' => 'London' ) ),
+			'usExpress' => $call( array( 'country' => 'US', 'state' => 'CA', 'postcode' => '94103', 'city' => 'San Francisco', 'shipping_method' => 'e2e_express:2' ) ),
+			'fr'        => $call( array( 'country' => 'FR', 'state' => '', 'postcode' => '75001', 'city' => 'Paris' ) ),
+		);
+
+		// The GB total shown in the sheet is accepted by the order step for that address.
+		$call( array( 'country' => 'GB', 'state' => '', 'postcode' => 'SW1A 1', 'city' => 'London', 'shipping_method' => 'e2e_rate:1' ) );
+		$gb_total = isset( $result['gb']['data']['total'] ) ? (string) $result['gb']['data']['total'] : '';
+		$create   = new ReflectionMethod( $gateway, 'create_express_order_from_cart' );
+		$create->setAccessible( true );
+		$order = $create->invoke( $gateway, ${orderArgs}, array( 'total' => $gb_total, 'currency' => get_woocommerce_currency() ) );
+		$error = new ReflectionProperty( $gateway, 'express_order_error' );
+		$error->setAccessible( true );
+
+		$result['gbOrderCreated'] = $order instanceof WC_Order;
+		$result['gbOrderError']   = (string) $error->getValue( $gateway );
+		$result['gbOrderTotal']   = '';
+		if ( $order instanceof WC_Order ) {
+			$order = wc_get_order( $order->get_id() );
+			$result['gbOrderTotal'] = wc_format_decimal( $order->get_total(), wc_get_price_decimals() );
+			$order->delete( true );
+		}
+
+		WC()->cart->empty_cart();
+		WC()->session->set( 'chosen_shipping_methods', array() );
+		WC()->customer->set_shipping_country( 'US' );
+		WC()->customer->set_billing_country( 'US' );
+		return $result;
+	`);
+}
+
+function shippingLine(preview: ShippingPreview): number | undefined {
+	return preview.data.line_items.find((item) => item.type === 'shipping')?.amount;
+}
+
+const SHIPPING_API = [
+	{
+		name: 'Apple Pay',
+		settings: 'woocommerce_wc_checkout_com_apple_pay_settings',
+		values: { apple_pay_express: 'yes', enabled: 'yes' },
+		url: '/?wc-api=CKO_Apple_Pay_Woocommerce&cko_apple_pay_action=express_update_shipping',
+		nonce: 'checkoutcom_apple_pay_express_shipping',
+	},
+	{
+		name: 'Google Pay',
+		settings: GOOGLE_PAY_SETTINGS,
+		values: { google_pay_express: 'yes', enabled: 'yes' },
+		url: GOOGLE_PAY_API + 'express_update_shipping',
+		nonce: 'checkoutcom_google_pay_express_shipping',
+	},
+] as const;
+
+test.describe('Wallet sheet shipping update', () => {
+	for (const gateway of SHIPPING_PREVIEW_GATEWAYS) {
+		test(`${gateway.name} Express returns the rates and total for the selected address`, () => {
+			const run = runShippingPreview(gateway.className, gateway.nonce, gateway.orderArgs);
+
+			for (const key of ['us', 'gb', 'usExpress', 'fr'] as const) {
+				expect(run[key]?.success, `${key} answered`).toBe(true);
+			}
+
+			const { us, gb, usExpress, fr } = run;
+			expect(us.data.needs_shipping).toBe(true);
+			expect(us.data.shipping_available).toBe(true);
+			expect(us.data.shipping_rates.map((r) => r.id).sort()).toEqual(['e2e_express:2', 'e2e_rate:1']);
+			expect(us.data.chosen_shipping_rate).toBe('e2e_rate:1');
+			expect(shippingLine(us), 'US standard shipping').toBe(5);
+			expect(us.data.line_items.some((item) => item.type === 'subtotal'), 'subtotal line').toBe(true);
+
+			expect(gb.data.shipping_available).toBe(true);
+			expect(gb.data.shipping_rates.map((r) => r.id)).toEqual(['e2e_rate:1']);
+			expect(shippingLine(gb), 'GB shipping').toBe(20);
+			expect(gb.data.total, 'total follows the address').toBeCloseTo(us.data.total + 15, 2);
+
+			expect(usExpress.data.chosen_shipping_rate, 'chosen rate applied').toBe('e2e_express:2');
+			expect(shippingLine(usExpress), 'US express shipping').toBe(15);
+			expect(usExpress.data.total).toBeCloseTo(us.data.total + 10, 2);
+
+			expect(fr.data.needs_shipping).toBe(true);
+			expect(fr.data.shipping_available, 'no rate for FR').toBe(false);
+			expect(fr.data.error).toBe('no_shipping_rate');
+			expect(fr.data.shipping_rates).toEqual([]);
+
+			expect(run.gbOrderError, 'no order error').toBe('');
+			expect(run.gbOrderCreated, 'order accepted with the total shown for the address').toBe(true);
+			expect(Number(run.gbOrderTotal)).toBeCloseTo(gb.data.total, 2);
+		});
+	}
+
+	for (const api of SHIPPING_API) {
+		test(`${api.name} Express shipping update requires its nonce and POST`, async ({ request }) => {
+			const restore = setSettings(api.settings, api.values);
+			try {
+				const form = { country: 'GB', postcode: 'SW1A 1', city: 'London' };
+
+				const noNonce = await request.post(api.url, { form });
+				expect(noNonce.status(), 'refused without the nonce').toBe(403);
+				expect((await noNonce.json()).success).toBe(false);
+
+				const badNonce = await request.post(api.url, { form: { ...form, nonce: 'not-a-nonce' } });
+				expect(badNonce.status(), 'refused with an invalid nonce').toBe(403);
+
+				const nonce = guestNonce(api.nonce);
+				const get = await request.get(`${api.url}&nonce=${encodeURIComponent(nonce)}&country=GB`);
+				expect(get.status(), 'refused over GET').toBe(405);
+			} finally {
+				restore();
+			}
+		});
+	}
+});

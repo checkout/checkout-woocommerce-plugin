@@ -129,8 +129,12 @@ class WC_Checkoutcom_Api_Request {
 							return [ '3d_redirection_error' => true ];
 						}
 
-						// return 3d redirection url.
-						return [ '3d' => WC_Checkoutcom_Utility::get_redirect_url( $response ) ];
+						// Return the 3DS redirection url, and the payment id so the order can be linked to
+						// its payment before the shopper leaves for the redirect.
+						return [
+							'3d' => WC_Checkoutcom_Utility::get_redirect_url( $response ),
+							'id' => isset( $response['id'] ) && is_string( $response['id'] ) ? $response['id'] : '',
+						];
 
 					} else {
 						$error_message = __( 'An error has occurred while processing your payment. Redirection link not found', 'checkout-com-unified-payments-api' );

@@ -231,6 +231,7 @@ class CKO_Google_Pay_Express {
 			'add_to_cart_url'                     => add_query_arg( [ 'cko_google_pay_action' => 'express_add_to_cart' ], WC()->api_request_url( 'CKO_Google_Pay_Woocommerce' ) ),
 			'create_payment_context_url'          => add_query_arg( [ 'cko_google_pay_action' => 'express_create_payment_context' ], WC()->api_request_url( 'CKO_Google_Pay_Woocommerce' ) ),
 			'get_cart_total_url'                  => add_query_arg( [ 'cko_google_pay_action' => 'express_get_cart_total' ], WC()->api_request_url( 'CKO_Google_Pay_Woocommerce' ) ),
+			'update_shipping_url'                 => add_query_arg( [ 'cko_google_pay_action' => 'express_update_shipping' ], WC()->api_request_url( 'CKO_Google_Pay_Woocommerce' ) ),
 			'google_pay_order_session_url'       => add_query_arg( [ 'cko_google_pay_action' => 'express_google_pay_order_session' ], WC()->api_request_url( 'CKO_Google_Pay_Woocommerce' ) ),
 			'woocommerce_process_checkout'        => wp_create_nonce( 'woocommerce-process_checkout' ),
 			'is_cart_contains_subscription'      => WC_Checkoutcom_Utility::is_cart_contains_subscription(),
@@ -240,12 +241,14 @@ class CKO_Google_Pay_Express {
 			'create_payment_context_nonce'                  => wp_create_nonce( 'checkoutcom_google_pay_express_create_payment_context' ),
 			'get_cart_total_nonce'                          => wp_create_nonce( 'checkoutcom_google_pay_express_get_cart_total' ),
 			'google_pay_express_order_nonce'                => wp_create_nonce( 'checkoutcom_google_pay_express_order' ),
+			'update_shipping_nonce'                         => wp_create_nonce( 'checkoutcom_google_pay_express_shipping' ),
 			'debug'                               => 'yes' === WC_Admin_Settings::get_option( 'cko_console_logging', 'no' ),
 			'environment'                         => $environment ? 'TEST' : 'PRODUCTION',
 			'public_key'                          => $core_settings['ckocom_pk'] ?? '',
 			'merchant_id'                         => $google_pay_settings['ckocom_google_merchant_id'] ?? '',
 			'merchant_name'                       => get_bloginfo( 'name' ),
 			'currency_code'                       => get_woocommerce_currency(),
+			'country_code'                        => WC()->countries ? WC()->countries->get_base_country() : '',
 			'button_style'                        => $google_pay_settings['ckocom_google_style'] ?? 'google-pay-black',
 		];
 
