@@ -19,6 +19,13 @@ use Checkout\Payments\PaymentType;
 class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 
 	/**
+	 * Shopper-facing reason the last express order could not be created ('' when none).
+	 *
+	 * @var string
+	 */
+	private $express_order_error = '';
+
+	/**
 	 * WC_Gateway_Checkout_Com_PayPal constructor.
 	 */
 	public function __construct() {
@@ -62,8 +69,24 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 	public function handle_wc_api() {
 
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended, WordPress.Security.NonceVerification.Missing
-		if ( ! empty( $_GET['cko_paypal_action'] ) ) {
-			switch ( $_GET['cko_paypal_action'] ) {
+		$action = isset( $_GET['cko_paypal_action'] ) && is_string( $_GET['cko_paypal_action'] ) ? sanitize_key( wp_unslash( $_GET['cko_paypal_action'] ) ) : '';
+
+		$is_express = 0 === strpos( $action, 'express_' )
+			|| ( 'create_order' === $action && ( ! empty( $_POST['express_checkout'] ) || ! empty( $_POST['use_existing_cart'] ) ) );
+
+		// Refuse every action while PayPal (or, for the express actions, PayPal Express) is not offered.
+		if ( ! $this->is_api_request_allowed( $is_express ) ) {
+			WC_Checkoutcom_Utility::logger( 'PayPal: request refused - PayPal' . ( $is_express ? ' Express' : '' ) . ' is not enabled' );
+			wp_send_json( [ 'result' => 'failed' ], 403 );
+		}
+
+		// The express order steps change state, and the express script always POSTs them.
+		if ( in_array( $action, [ 'express_create_order', 'express_paypal_order_session' ], true ) && ! $this->is_post_request() ) {
+			wp_send_json_error( [ 'messages' => __( 'Invalid request.', 'checkout-com-unified-payments-api' ) ], 405 );
+		}
+
+		if ( '' !== $action ) {
+			switch ( $action ) {
 
 			case 'create_order':
 				if ( ! empty( $_POST ) ) {
@@ -113,7 +136,6 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 					break;
 
 				case 'express_paypal_order_session':
-					WC_Checkoutcom_Utility::cko_set_session( 'cko_paypal_order_id', wc_clean( $_GET['paypal_order_id'] ) );
 					$this->cko_express_paypal_order_session();
 					break;
 
@@ -125,6 +147,61 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 
 		// phpcs:enable
 		exit();
+	}
+
+	/**
+	 * Whether the PayPal API actions may run: the PayPal gateway is enabled, and for the express
+	 * actions PayPal Express is enabled too (in Flow mode PayPal Express does not need the gateway
+	 * toggle, same rule as CKO_Paypal_Express).
+	 *
+	 * @param bool $is_express Whether the request is an express action.
+	 * @return bool
+	 */
+	private function is_api_request_allowed( $is_express ) {
+		$paypal_settings = get_option( 'woocommerce_wc_checkout_com_paypal_settings', array() );
+		if ( ! is_array( $paypal_settings ) ) {
+			return false;
+		}
+
+		$gateway_enabled = 'yes' === ( $paypal_settings['enabled'] ?? '' );
+		if ( ! $is_express ) {
+			return $gateway_enabled;
+		}
+
+		if ( 'yes' !== ( $paypal_settings['paypal_express'] ?? '' ) ) {
+			return false;
+		}
+
+		$core_settings = function_exists( 'cko_get_raw_option' )
+			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
+			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		$checkout_mode = isset( $core_settings['ckocom_checkout_mode'] ) ? $core_settings['ckocom_checkout_mode'] : 'classic';
+
+		return 'classic' !== $checkout_mode || $gateway_enabled;
+	}
+
+	/**
+	 * Whether the current request is a POST.
+	 *
+	 * @return bool
+	 */
+	private function is_post_request() {
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- compared only.
+		return isset( $_SERVER['REQUEST_METHOD'] ) && 'POST' === strtoupper( (string) wp_unslash( $_SERVER['REQUEST_METHOD'] ) );
+	}
+
+	/**
+	 * Verify the per-action nonce posted by the PayPal Express script; ends the request when invalid.
+	 *
+	 * @param string $action Nonce action.
+	 * @return void
+	 */
+	private function verify_express_nonce( $action ) {
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- this is the nonce check.
+		$nonce = isset( $_POST['nonce'] ) && is_string( $_POST['nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['nonce'] ) ) : '';
+		if ( ! wp_verify_nonce( $nonce, $action ) ) {
+			wp_send_json_error( [ 'messages' => __( 'Your session has expired. Please refresh the page and try again.', 'checkout-com-unified-payments-api' ) ], 403 );
+		}
 	}
 
 	public function cko_express_add_to_cart() {
@@ -169,6 +246,7 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 	}
 
 	public function cko_express_create_order() {
+		$this->verify_express_nonce( 'checkoutcom_paypal_express_create_order' );
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing
 		$express_checkout = ! empty( $_POST['express_checkout'] );
@@ -213,29 +291,36 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 	}
 
 	public function cko_express_paypal_order_session() {
+		$this->verify_express_nonce( 'checkoutcom_paypal_express_order' );
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- nonce verified above.
+		$paypal_order_id = isset( $_GET['paypal_order_id'] ) && is_string( $_GET['paypal_order_id'] ) ? wc_clean( wp_unslash( $_GET['paypal_order_id'] ) ) : '';
+		WC_Checkoutcom_Utility::cko_set_session( 'cko_paypal_order_id', $paypal_order_id );
+
 		$cko_paypal_order_id = WC_Checkoutcom_Utility::cko_get_session( 'cko_paypal_order_id' );
 		$cko_pc_id           = WC_Checkoutcom_Utility::cko_get_session( 'cko_pc_id' );
 
 		// If we have a payment context, process the express checkout immediately
 		if ( ! empty( $cko_pc_id ) ) {
 			try {
+				// Get payment context details first: the order uses the PayPal address from them.
+				$checkout = new Checkout_SDK();
+				$response = $checkout->get_builder()->getPaymentContextsClient()->getPaymentContextDetails( $cko_pc_id );
+				WC_Checkoutcom_Utility::cko_set_session( 'cko_pc_details', $response );
+
 				// Create the order from cart
 				$order = $this->create_express_order_from_cart();
-				
+
 				if ( ! $order ) {
-					wp_send_json_error( array( 'messages' => 'Failed to create order for PayPal Express checkout.' ) );
+					wp_send_json_error( array( 'messages' => '' !== $this->express_order_error ? $this->express_order_error : 'Failed to create order for PayPal Express checkout.' ) );
 					return;
 				}
 
-				// Get payment context details
-				$checkout = new Checkout_SDK();
-				$response = $checkout->get_builder()->getPaymentContextsClient()->getPaymentContextDetails( $cko_pc_id );
-				
 				$payment_context_id    = $cko_pc_id;
 				$processing_channel_id = $response['payment_request']['processing_channel_id'];
 
 				// Process the payment immediately
-				$payment_response = $this->request_payment( $order, $payment_context_id, $processing_channel_id );
+				$payment_response = $this->request_payment( $order, $payment_context_id, $processing_channel_id, $response );
 
 				WC_Checkoutcom_Utility::logger( 'PayPal Express: Payment response received. ID: ' . ( isset( $payment_response['id'] ) ? $payment_response['id'] : 'N/A' ) . ', status: ' . ( isset( $payment_response['status'] ) ? $payment_response['status'] : 'N/A' ) );
 
@@ -282,7 +367,8 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 	 * @return WC_Order|false
 	 */
 	private function create_express_order_from_cart() {
-		$order = null;
+		$order                     = null;
+		$this->express_order_error = '';
 
 		try {
 			// Determine customer ID and email
@@ -314,14 +400,19 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 				$order->set_billing_email( $customer_email );
 			}
 
-			// Copy the cart lines (products, fees, shipping, taxes, coupons) onto the order.
-			$this->add_cart_lines_to_express_order( $order );
-
 			// Set order addresses from PayPal data if available
 			$this->set_order_addresses_from_paypal( $order );
 
-			// Recalculate totals (and taxes for the wallet address) from the copied lines.
-			$order->calculate_totals();
+			// Rate shipping and taxes for the PayPal address before building the order lines.
+			$this->express_order_error = $this->prepare_express_cart_for_order( $order );
+			if ( '' !== $this->express_order_error ) {
+				$order->delete( true );
+				return false;
+			}
+
+			// Copy the cart lines (products, fees, shipping, taxes, coupons) onto the order; the
+			// order total is the recalculated cart total.
+			$this->add_cart_lines_to_express_order( $order );
 
 			// Set payment method to PayPal Express
 			$order->set_payment_method( 'wc_checkout_com_paypal' );
@@ -346,6 +437,64 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 
 			return false;
 		}
+	}
+
+	/**
+	 * Point the cart at the address the express order ships to (already set on the order from the
+	 * wallet data) and recalculate shipping and totals for it, so the order lines are rated for that
+	 * address. Refuses when the cart needs shipping and the address has no valid shipping rate.
+	 *
+	 * @param WC_Order $order Order carrying the wallet addresses.
+	 * @return string Error message for the shopper, or '' when the cart is ready.
+	 */
+	private function prepare_express_cart_for_order( $order ) {
+		$cart     = WC()->cart;
+		$customer = WC()->customer;
+
+		if ( $customer instanceof WC_Customer ) {
+			if ( $order->get_billing_country() ) {
+				$customer->set_billing_country( $order->get_billing_country() );
+				$customer->set_billing_state( $order->get_billing_state() );
+				$customer->set_billing_postcode( $order->get_billing_postcode() );
+				$customer->set_billing_city( $order->get_billing_city() );
+				$customer->set_billing_address_1( $order->get_billing_address_1() );
+				$customer->set_billing_address_2( $order->get_billing_address_2() );
+			}
+			if ( $order->get_shipping_country() ) {
+				$customer->set_shipping_country( $order->get_shipping_country() );
+				$customer->set_shipping_state( $order->get_shipping_state() );
+				$customer->set_shipping_postcode( $order->get_shipping_postcode() );
+				$customer->set_shipping_city( $order->get_shipping_city() );
+				$customer->set_shipping_address_1( $order->get_shipping_address_1() );
+				$customer->set_shipping_address_2( $order->get_shipping_address_2() );
+			}
+		}
+
+		WC()->shipping()->reset_shipping();
+		$cart->calculate_totals();
+
+		if ( ! $cart->needs_shipping() ) {
+			return '';
+		}
+
+		$no_rate_message = __( 'Sorry, we cannot ship to the address selected in your wallet. Please choose another address or use a different payment method.', 'checkout-com-unified-payments-api' );
+
+		if ( ! $order->get_shipping_country() ) {
+			return $no_rate_message;
+		}
+
+		$packages = WC()->shipping()->get_packages();
+		$chosen   = WC()->session ? (array) WC()->session->get( 'chosen_shipping_methods', array() ) : array();
+		if ( empty( $packages ) ) {
+			return $no_rate_message;
+		}
+		foreach ( $packages as $package_key => $package ) {
+			if ( empty( $package['rates'] ) || ! isset( $chosen[ $package_key ] ) || ! isset( $package['rates'][ $chosen[ $package_key ] ] ) ) {
+				return $no_rate_message;
+			}
+		}
+
+		return '';
 	}
 
 	/**
@@ -415,6 +564,7 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 			$order->set_shipping_address_1( $paypal_shipping_address['address_line1'] ?? '' );
 			$order->set_shipping_address_2( $paypal_shipping_address['address_line2'] ?? '' );
 			$order->set_shipping_city( $paypal_shipping_address['city'] ?? '' );
+			$order->set_shipping_state( $paypal_shipping_address['state'] ?? '' );
 			$order->set_shipping_postcode( $paypal_shipping_address['zip'] ?? '' );
 			$order->set_shipping_country( $paypal_shipping_address['country'] ?? '' );
 
@@ -424,6 +574,7 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 			$order->set_billing_address_1( $paypal_shipping_address['address_line1'] ?? '' );
 			$order->set_billing_address_2( $paypal_shipping_address['address_line2'] ?? '' );
 			$order->set_billing_city( $paypal_shipping_address['city'] ?? '' );
+			$order->set_billing_state( $paypal_shipping_address['state'] ?? '' );
 			$order->set_billing_postcode( $paypal_shipping_address['zip'] ?? '' );
 			$order->set_billing_country( $paypal_shipping_address['country'] ?? '' );
 
@@ -528,7 +679,7 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 				$processing_channel_id = $response['payment_request']['processing_channel_id'];
 
 				// Payment request to capture amount.
-				$return_response = $this->request_payment( $order, $payment_context_id, $processing_channel_id );
+				$return_response = $this->request_payment( $order, $payment_context_id, $processing_channel_id, $response );
 
 				WC_Checkoutcom_Utility::cko_set_session( 'cko_paypal_order_id', '' );
 				WC_Checkoutcom_Utility::cko_set_session( 'cko_pc_id', '' );
@@ -789,7 +940,7 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 			$processing_channel_id = $response['payment_request']['processing_channel_id'];
 
 			// Payment request to capture amount.
-			$return_response = $this->request_payment( $order, $payment_context_id, $processing_channel_id );
+			$return_response = $this->request_payment( $order, $payment_context_id, $processing_channel_id, $response );
 
 			WC_Checkoutcom_Utility::cko_set_session( 'cko_paypal_order_id', '' );
 			WC_Checkoutcom_Utility::cko_set_session( 'cko_pc_id', '' );
@@ -817,15 +968,35 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 	 * @param WC_Order $order Order object.
 	 * @param string   $payment_context_id Payment Context ID.
 	 * @param string   $processing_channel_id Processing channel ID.
+	 * @param array    $context_details Payment context details, when already fetched.
 	 * @return array|void
 	 */
-	public function request_payment( $order, $payment_context_id, $processing_channel_id ) {
+	public function request_payment( $order, $payment_context_id, $processing_channel_id, $context_details = null ) {
 
 		try {
 			$checkout = new Checkout_SDK();
 
 			$amount       = $order->get_total();
 			$amount_cents = WC_Checkoutcom_Utility::value_to_decimal( $amount, $order->get_currency() );
+
+			// Only charge the amount and currency the shopper approved in PayPal.
+			if ( null === $context_details ) {
+				$context_details = $checkout->get_builder()->getPaymentContextsClient()->getPaymentContextDetails( $payment_context_id );
+			}
+			$approved_amount   = isset( $context_details['payment_request']['amount'] ) && is_numeric( $context_details['payment_request']['amount'] ) ? (int) round( (float) $context_details['payment_request']['amount'] ) : null;
+			$approved_currency = isset( $context_details['payment_request']['currency'] ) && is_string( $context_details['payment_request']['currency'] ) ? strtoupper( $context_details['payment_request']['currency'] ) : '';
+
+			if ( null === $approved_amount || (int) round( (float) $amount_cents ) !== $approved_amount || strtoupper( (string) $order->get_currency() ) !== $approved_currency ) {
+				WC_Checkoutcom_Utility::logger( 'PayPal: payment not requested for order ' . $order->get_id() . ' - order amount ' . $amount_cents . ' ' . $order->get_currency() . ' differs from the approved ' . ( null === $approved_amount ? 'N/A' : $approved_amount ) . ' ' . $approved_currency );
+				$order->add_order_note( __( 'Checkout.com PayPal payment not requested: the order total differs from the amount approved in PayPal.', 'checkout-com-unified-payments-api' ) );
+
+				// Start a fresh PayPal approval on the next attempt.
+				WC_Checkoutcom_Utility::cko_set_session( 'cko_paypal_order_id', '' );
+				WC_Checkoutcom_Utility::cko_set_session( 'cko_pc_id', '' );
+				WC_Checkoutcom_Utility::cko_set_session( 'cko_pc_details', '' );
+
+				wp_send_json_error( [ 'messages' => __( 'Your order total was updated after you approved the PayPal payment. You have not been charged. Please try PayPal again.', 'checkout-com-unified-payments-api' ) ] );
+			}
 
 			$payment_request_param                        = $checkout->get_payment_request();
 			$payment_request_param->payment_context_id    = $payment_context_id;

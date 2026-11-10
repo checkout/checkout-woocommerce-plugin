@@ -62,7 +62,23 @@ class WC_Checkoutcom_APM_Method {
 	public function __construct( $data, $order ) {
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing
-		self::$post       = sanitize_post( $_POST );
+		self::$post       = WC_Checkoutcom_Utility::get_request_fields(
+			$_POST,
+			array(
+				'billing_first_name',
+				'billing_last_name',
+				'billing_email',
+				'billing_phone',
+				'billing_address_1',
+				'billing_address_2',
+				'billing_city',
+				'billing_postcode',
+				'billing_country',
+				'cko-klarna-token',
+				'sepa-iban',
+				'sepa-bic',
+			)
+		);
 		self::$data_info  = $data;
 		self::$order_info = $order;
 	}
@@ -321,7 +337,7 @@ class WC_Checkoutcom_APM_Method {
 	public static function get_sepa_info() {
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		$get_data        = sanitize_post( $_GET );
+		$get_data        = WC_Checkoutcom_Utility::get_request_fields( $_GET, array( 'pay_for_order' ) );
 		$items           = WC()->cart->get_cart();
 		$is_subscription = false;
 		$is_pay_order    = ! empty( $get_data['pay_for_order'] ) && (bool) $get_data['pay_for_order'];

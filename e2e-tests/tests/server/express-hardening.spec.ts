@@ -23,17 +23,34 @@ type ExpressOrderLines = {
 	products: number;
 };
 
+// Each gateway is given a wallet address in the same place as the cart's session address, so the
+// order is rated for the address it ships to (PayPal takes it from the payment context details).
 const EXPRESS_GATEWAYS = [
-	{ name: 'PayPal', className: 'WC_Gateway_Checkout_Com_PayPal', args: '' },
-	{ name: 'Apple Pay', className: 'WC_Gateway_Checkout_Com_Apple_Pay', args: "'', null, null" },
-	{ name: 'Google Pay', className: 'WC_Gateway_Checkout_Com_Google_Pay', args: "'', null" },
+	{
+		name: 'PayPal',
+		className: 'WC_Gateway_Checkout_Com_PayPal',
+		args: '',
+		setup: `WC_Checkoutcom_Utility::cko_set_session( 'cko_pc_details', array( 'payment_request' => array( 'shipping' => array( 'first_name' => 'E2E Shopper', 'address' => array( 'address_line1' => '1 Market St', 'city' => 'San Francisco', 'state' => 'CA', 'zip' => '94103', 'country' => 'US' ) ) ) ) );`,
+	},
+	{
+		name: 'Apple Pay',
+		className: 'WC_Gateway_Checkout_Com_Apple_Pay',
+		args: "'', array( 'givenName' => 'E2E', 'familyName' => 'Shopper', 'addressLines' => array( '1 Market St' ), 'locality' => 'San Francisco', 'administrativeArea' => 'CA', 'postalCode' => '94103', 'countryCode' => 'us' ), null, array( 'total' => $cart_total, 'currency' => get_woocommerce_currency() )",
+		setup: '',
+	},
+	{
+		name: 'Google Pay',
+		className: 'WC_Gateway_Checkout_Com_Google_Pay',
+		args: "'', array( 'name' => 'E2E Shopper', 'address1' => '1 Market St', 'locality' => 'San Francisco', 'administrativeArea' => 'CA', 'postalCode' => '94103', 'countryCode' => 'US' ), array( 'total' => $cart_total, 'currency' => get_woocommerce_currency() )",
+		setup: '',
+	},
 ] as const;
 
 /**
  * Build a cart with a physical product, a fee, a fixed coupon and a chosen shipping rate, then
  * create the express order for it with the given gateway class. The order is deleted afterwards.
  */
-function buildExpressOrder(className: string, args: string): ExpressOrderLines {
+function buildExpressOrder(className: string, args: string, setup = ''): ExpressOrderLines {
 	return wpEvalFileJson<ExpressOrderLines>(`
 		wc_load_cart();
 		WC()->cart->empty_cart();
@@ -62,6 +79,7 @@ function buildExpressOrder(className: string, args: string): ExpressOrderLines {
 		WC()->cart->calculate_totals();
 		$cart_total = wc_format_decimal( WC()->cart->get_total( 'edit' ), wc_get_price_decimals() );
 
+		${setup}
 		$gateway = new ${className}();
 		$create  = new ReflectionMethod( $gateway, 'create_express_order_from_cart' );
 		$create->setAccessible( true );
@@ -85,6 +103,7 @@ function buildExpressOrder(className: string, args: string): ExpressOrderLines {
 		}
 
 		WC()->cart->empty_cart();
+		WC_Checkoutcom_Utility::cko_set_session( 'cko_pc_details', '' );
 		wp_delete_post( $coupon->get_id(), true );
 		$result['coupons'] = array_map( function ( $c ) use ( $code ) { return $c === $code ? 'applied' : $c; }, $result['coupons'] );
 		return $result;
@@ -94,7 +113,7 @@ function buildExpressOrder(className: string, args: string): ExpressOrderLines {
 test.describe('Express checkout orders', () => {
 	for (const gateway of EXPRESS_GATEWAYS) {
 		test(`${gateway.name} Express order carries the cart's shipping, fee and coupon lines`, async () => {
-			const lines = buildExpressOrder(gateway.className, gateway.args);
+			const lines = buildExpressOrder(gateway.className, gateway.args, gateway.setup);
 
 			expect(lines.created, 'order created').toBe(true);
 			expect(lines.products).toBe(1);

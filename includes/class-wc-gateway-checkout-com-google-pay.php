@@ -19,6 +19,13 @@ use Checkout\Payments\PaymentType;
 class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 
 	/**
+	 * Shopper-facing reason the last express order could not be created ('' when none).
+	 *
+	 * @var string
+	 */
+	private $express_order_error = '';
+
+	/**
 	 * WC_Gateway_Checkout_Com_Google_Pay constructor.
 	 */
 	public function __construct() {
@@ -109,7 +116,6 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 
 				case 'express_google_pay_order_session':
 					WC_Checkoutcom_Utility::logger( 'Google Pay: Calling cko_express_google_pay_order_session' );
-					WC_Checkoutcom_Utility::cko_set_session( 'cko_google_pay_order_id', isset( $_GET['google_pay_order_id'] ) ? wc_clean( $_GET['google_pay_order_id'] ) : '' );
 					$this->cko_express_google_pay_order_session();
 					break;
 			}
@@ -243,6 +249,16 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 	}
 
 	public function cko_express_google_pay_order_session() {
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- compared only.
+		if ( ! isset( $_SERVER['REQUEST_METHOD'] ) || 'POST' !== strtoupper( (string) wp_unslash( $_SERVER['REQUEST_METHOD'] ) ) ) {
+			wp_send_json_error( array( 'messages' => __( 'Invalid request.', 'checkout-com-unified-payments-api' ) ), 405 );
+		}
+
+		$nonce = isset( $_POST['nonce'] ) && is_string( $_POST['nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['nonce'] ) ) : '';
+		if ( ! wp_verify_nonce( $nonce, 'checkoutcom_google_pay_express_order' ) ) {
+			wp_send_json_error( array( 'messages' => __( 'Your session has expired. Please refresh the page and try again.', 'checkout-com-unified-payments-api' ) ), 403 );
+		}
+
 		// Express now uses the exact same flow as classic Google Pay
 		// Classic Google Pay sends: cko-google-signature, cko-google-protocolVersion, cko-google-signedMessage
 		// Express now sends the same fields, so we can use the same process_payment method
@@ -266,10 +282,10 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 			}
 			
 			// Create the order from cart
-			$order = $this->create_express_order_from_cart( $email, $shipping_address );
+			$order = $this->create_express_order_from_cart( $email, $shipping_address, $this->get_posted_approved_total() );
 			
 			if ( ! $order ) {
-				wp_send_json_error( array( 'messages' => 'Failed to create order for Google Pay Express checkout.' ) );
+				wp_send_json_error( array( 'messages' => '' !== $this->express_order_error ? $this->express_order_error : 'Failed to create order for Google Pay Express checkout.' ) );
 				return;
 			}
 			
@@ -395,10 +411,10 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 			WC_Checkoutcom_Utility::cko_set_session( 'cko_google_pay_payment_data', $payment_data );
 			
 			// Create the order from cart
-			$order = $this->create_express_order_from_cart( $email, $shipping_address );
+			$order = $this->create_express_order_from_cart( $email, $shipping_address, $this->get_posted_approved_total() );
 			
 			if ( ! $order ) {
-				wp_send_json_error( array( 'messages' => 'Failed to create order for Google Pay Express checkout.' ) );
+				wp_send_json_error( array( 'messages' => '' !== $this->express_order_error ? $this->express_order_error : 'Failed to create order for Google Pay Express checkout.' ) );
 				return;
 			}
 
@@ -628,10 +644,12 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 	 *
 	 * @param string $email Email address from Google Pay.
 	 * @param array  $shipping_address Shipping address from Google Pay.
+	 * @param array  $approved Total and currency approved in the Google Pay sheet ('total', 'currency').
 	 * @return WC_Order|false
 	 */
-	private function create_express_order_from_cart( $email = '', $shipping_address = null ) {
-		$order = null;
+	private function create_express_order_from_cart( $email = '', $shipping_address = null, $approved = null ) {
+		$order                     = null;
+		$this->express_order_error = '';
 
 		try {
 			// Determine customer ID and email
@@ -666,14 +684,11 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 				$order->set_billing_email( $customer_email );
 			}
 
-			// Copy the cart lines (products, fees, shipping, taxes, coupons) onto the order.
-			$this->add_cart_lines_to_express_order( $order );
-
 			// Set order addresses from Google Pay payment data if available
 			// IMPORTANT: For Google Pay Express:
 			// - If logged in: Use logged-in user's email (already set above), but address from Google Pay
 			// - If guest: Use Google Pay email and address
-			if ( ! empty( $shipping_address ) ) {
+			if ( ! empty( $shipping_address ) && is_array( $shipping_address ) ) {
 				// For logged-in users: Don't pass email to set_order_addresses_from_google_pay_data
 				// because we want to keep the logged-in user's email (already set above)
 				// For guest users: Pass Google Pay email so it gets set in the address
@@ -681,8 +696,20 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 				$this->set_order_addresses_from_google_pay_data( $order, $shipping_address, $email_for_address );
 			}
 
-			// Recalculate totals (and taxes for the wallet address) from the copied lines.
-			$order->calculate_totals();
+			// Rate shipping and taxes for the wallet address before building the order lines.
+			$this->express_order_error = $this->prepare_express_cart_for_order( $order );
+			if ( '' === $this->express_order_error && ! $this->approved_total_matches_cart( $approved ) ) {
+				// Never charge a total other than the one approved in the wallet sheet.
+				$this->express_order_error = __( 'Your order total was updated for the selected address. You have not been charged. Please try again.', 'checkout-com-unified-payments-api' );
+			}
+			if ( '' !== $this->express_order_error ) {
+				$order->delete( true );
+				return false;
+			}
+
+			// Copy the cart lines (products, fees, shipping, taxes, coupons) onto the order; the
+			// order total is the recalculated cart total.
+			$this->add_cart_lines_to_express_order( $order );
 
 			// Set payment method to Google Pay Express
 			$order->set_payment_method( 'wc_checkout_com_google_pay' );
@@ -707,6 +734,120 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 
 			return false;
 		}
+	}
+
+	/**
+	 * Approved wallet total and currency posted by the express script with the order request.
+	 * Only used to check the recalculated cart total, never as the amount charged.
+	 *
+	 * @return array{total: string, currency: string}|null Null when missing.
+	 */
+	private function get_posted_approved_total() {
+		// phpcs:disable WordPress.Security.NonceVerification.Missing -- the order step nonce is verified before this is called.
+		$total    = isset( $_POST['approved_total'] ) && is_string( $_POST['approved_total'] ) ? sanitize_text_field( wp_unslash( $_POST['approved_total'] ) ) : '';
+		$currency = isset( $_POST['approved_currency'] ) && is_string( $_POST['approved_currency'] ) ? sanitize_text_field( wp_unslash( $_POST['approved_currency'] ) ) : '';
+		// phpcs:enable
+
+		if ( '' === $total || '' === $currency ) {
+			return null;
+		}
+
+		return array(
+			'total'    => $total,
+			'currency' => $currency,
+		);
+	}
+
+	/**
+	 * Whether the total and currency approved in the wallet sheet equal the recalculated cart
+	 * total and the store currency (compared in minor units).
+	 *
+	 * @param array|null $approved Approved values ('total', 'currency').
+	 * @return bool False when they differ or are missing.
+	 */
+	private function approved_total_matches_cart( $approved ) {
+		if ( ! is_array( $approved ) ) {
+			return false;
+		}
+
+		$total    = isset( $approved['total'] ) && is_scalar( $approved['total'] ) ? trim( (string) $approved['total'] ) : '';
+		$currency = isset( $approved['currency'] ) && is_string( $approved['currency'] ) ? strtoupper( trim( $approved['currency'] ) ) : '';
+		if ( '' === $total || ! is_numeric( $total ) || '' === $currency ) {
+			return false;
+		}
+
+		$cart_currency = strtoupper( get_woocommerce_currency() );
+		if ( $currency !== $cart_currency ) {
+			return false;
+		}
+
+		// Compare at the precision the wallet sheet shows: whole units for zero-decimal currencies,
+		// otherwise two decimals (the wallet scripts round three-decimal currencies to two).
+		$zero_decimal = (float) WC_Checkoutcom_Utility::value_to_decimal( 1, $cart_currency ) <= 1.0;
+		$precision    = $zero_decimal ? 0 : 2;
+		// Allow less than one displayed unit of difference, which only absorbs rounding: two-decimal
+		// totals still have to match exactly.
+		$difference = abs( (float) WC()->cart->get_total( 'edit' ) - (float) $total );
+
+		return $difference < ( pow( 10, -$precision ) - 1e-9 );
+	}
+
+	/**
+	 * Point the cart at the address the express order ships to (already set on the order from the
+	 * wallet data) and recalculate shipping and totals for it, so the order lines are rated for that
+	 * address. Refuses when the cart needs shipping and the address has no valid shipping rate.
+	 *
+	 * @param WC_Order $order Order carrying the wallet addresses.
+	 * @return string Error message for the shopper, or '' when the cart is ready.
+	 */
+	private function prepare_express_cart_for_order( $order ) {
+		$cart     = WC()->cart;
+		$customer = WC()->customer;
+
+		if ( $customer instanceof WC_Customer ) {
+			if ( $order->get_billing_country() ) {
+				$customer->set_billing_country( $order->get_billing_country() );
+				$customer->set_billing_state( $order->get_billing_state() );
+				$customer->set_billing_postcode( $order->get_billing_postcode() );
+				$customer->set_billing_city( $order->get_billing_city() );
+				$customer->set_billing_address_1( $order->get_billing_address_1() );
+				$customer->set_billing_address_2( $order->get_billing_address_2() );
+			}
+			if ( $order->get_shipping_country() ) {
+				$customer->set_shipping_country( $order->get_shipping_country() );
+				$customer->set_shipping_state( $order->get_shipping_state() );
+				$customer->set_shipping_postcode( $order->get_shipping_postcode() );
+				$customer->set_shipping_city( $order->get_shipping_city() );
+				$customer->set_shipping_address_1( $order->get_shipping_address_1() );
+				$customer->set_shipping_address_2( $order->get_shipping_address_2() );
+			}
+		}
+
+		WC()->shipping()->reset_shipping();
+		$cart->calculate_totals();
+
+		if ( ! $cart->needs_shipping() ) {
+			return '';
+		}
+
+		$no_rate_message = __( 'Sorry, we cannot ship to the address selected in your wallet. Please choose another address or use a different payment method.', 'checkout-com-unified-payments-api' );
+
+		if ( ! $order->get_shipping_country() ) {
+			return $no_rate_message;
+		}
+
+		$packages = WC()->shipping()->get_packages();
+		$chosen   = WC()->session ? (array) WC()->session->get( 'chosen_shipping_methods', array() ) : array();
+		if ( empty( $packages ) ) {
+			return $no_rate_message;
+		}
+		foreach ( $packages as $package_key => $package ) {
+			if ( empty( $package['rates'] ) || ! isset( $chosen[ $package_key ] ) || ! isset( $package['rates'][ $chosen[ $package_key ] ] ) ) {
+				return $no_rate_message;
+			}
+		}
+
+		return '';
 	}
 
 	/**
@@ -810,6 +951,15 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 		$state = $shipping_address['administrativeArea'] ?? $shipping_address['state'] ?? '';
 		$postcode = $shipping_address['postalCode'] ?? $shipping_address['postal_code'] ?? '';
 		$country = $shipping_address['countryCode'] ?? $shipping_address['country'] ?? '';
+
+		$first_name    = is_string( $first_name ) ? sanitize_text_field( $first_name ) : '';
+		$last_name     = is_string( $last_name ) ? sanitize_text_field( $last_name ) : '';
+		$address_line1 = is_string( $address_line1 ) ? sanitize_text_field( $address_line1 ) : '';
+		$address_line2 = is_string( $address_line2 ) ? sanitize_text_field( $address_line2 ) : '';
+		$city          = is_string( $city ) ? sanitize_text_field( $city ) : '';
+		$state         = is_string( $state ) ? sanitize_text_field( $state ) : '';
+		$postcode      = is_string( $postcode ) ? sanitize_text_field( $postcode ) : '';
+		$country       = is_string( $country ) ? strtoupper( sanitize_text_field( $country ) ) : '';
 
 		// Set billing address (always set all fields to ensure address is saved)
 		$order->set_billing_first_name( $first_name );

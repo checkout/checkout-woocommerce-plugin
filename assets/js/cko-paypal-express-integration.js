@@ -149,7 +149,8 @@ jQuery( function ( $ ) {
 
     let data = {
         express_checkout: true,
-        add_to_cart: addToCartSuccess.result
+        add_to_cart: addToCartSuccess.result,
+        nonce: cko_paypal_vars.paypal_express_create_order_nonce
     }
     
     return fetch( cko_paypal_vars.create_order_url, {
@@ -209,7 +210,8 @@ const cko_express_create_order_id_for_cart = async function () {
     
     let data = {
         express_checkout: true,
-        use_existing_cart: true
+        use_existing_cart: true,
+        nonce: cko_paypal_vars.paypal_express_create_order_nonce
     }
     
     return fetch( cko_paypal_vars.create_order_url, {
@@ -298,7 +300,8 @@ const cko_express_create_order_id = async function () {
         // Prepare add-to-cart for express checkout.
         let data = {
             express_checkout: true,
-            add_to_cart: addToCartSuccess.result
+            add_to_cart: addToCartSuccess.result,
+            nonce: cko_paypal_vars.paypal_express_create_order_nonce
         }
 
         cko_paypal_vars.debug && console.log( data );
@@ -560,7 +563,7 @@ const cko_express_create_order_id = async function () {
                             var separator = requestUrl.indexOf('?') !== -1 ? '&' : '?';
                             requestUrl += separator + 'paypal_order_id=' + encodeURIComponent(data.orderID) + '&woocommerce-process-checkout-nonce=' + encodeURIComponent(cko_paypal_vars.woocommerce_process_checkout);
                             
-                            jQuery.post(requestUrl, function (response) {
+                            jQuery.post(requestUrl, { nonce: cko_paypal_vars.paypal_express_order_nonce }, function (response) {
                 
                 // Clear the timeout since we got a response
                 clearTimeout(timeoutFallback);

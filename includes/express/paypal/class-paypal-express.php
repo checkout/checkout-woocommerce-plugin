@@ -276,6 +276,8 @@ class CKO_Paypal_Express {
 			'paypal_button_selector'           => '#cko-paypal-button-wrapper',
 			'redirect'                         => wc_get_checkout_url(),
 			'paypal_express_add_to_cart_nonce' => wp_create_nonce( 'checkoutcom_paypal_express_add_to_cart' ),
+			'paypal_express_create_order_nonce' => wp_create_nonce( 'checkoutcom_paypal_express_create_order' ),
+			'paypal_express_order_nonce'       => wp_create_nonce( 'checkoutcom_paypal_express_order' ),
 			'debug'                            => 'yes' === WC_Admin_Settings::get_option( 'cko_console_logging', 'no' ),
 		];
 

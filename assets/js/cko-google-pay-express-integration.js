@@ -799,6 +799,10 @@ jQuery( function ( $ ) {
                         };
                     }
 
+                    // Total and currency approved in the sheet: sent as a check only.
+                    paymentData.ckoApprovedTotal = paymentDataRequest.transactionInfo.totalPrice;
+                    paymentData.ckoApprovedCurrency = paymentDataRequest.transactionInfo.currencyCode;
+
                     // Process the payment (no payment context needed for Google Pay)
                     await this.processPayment(paymentData, null, loadingContainer);
                     } catch (loadError) {
@@ -1109,6 +1113,9 @@ jQuery( function ( $ ) {
                     cko_google_pay_vars.google_pay_order_session_url + 
                     "&woocommerce-process-checkout-nonce=" + cko_google_pay_vars.woocommerce_process_checkout,
                     {
+                        nonce: cko_google_pay_vars.google_pay_express_order_nonce,
+                        approved_total: paymentData.ckoApprovedTotal || '',
+                        approved_currency: paymentData.ckoApprovedCurrency || '',
                         // Send token fields exactly like classic Google Pay form fields
                         'cko-google-signature': signature,
                         'cko-google-protocolVersion': protocolVersion,

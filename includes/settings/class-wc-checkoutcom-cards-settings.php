@@ -502,6 +502,13 @@ class WC_Checkoutcom_Cards_Settings {
 				'default'  => 0,
 				'desc'     => '3D secure payment',
 			],
+			'ckocom_card_3ds_off_confirmed'         => [
+				'id'       => 'ckocom_card_3ds_off_confirmed',
+				'title'    => __( 'Confirm turning off 3D Secure (Flow)', 'checkout-com-unified-payments-api' ),
+				'type'     => 'checkbox',
+				'default'  => 'no',
+				'desc'     => __( 'Flow applies 3D Secure unless you confirm here. Without 3D Secure you are liable for fraud chargebacks, and in regions that require Strong Customer Authentication (such as the UK and EU) many payments may be declined.', 'checkout-com-unified-payments-api' ),
+			],
 			'ckocom_card_notheed'                   => [
 				'id'       => 'ckocom_card_notheed',
 				'title'    => __( 'Attempt non-3D Secure', 'checkout-com-unified-payments-api' ),

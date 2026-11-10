@@ -17,6 +17,13 @@ require_once __DIR__ . '/express/apple-pay/class-apple-pay-express.php';
 class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 
 	/**
+	 * Shopper-facing reason the last express order could not be created ('' when none).
+	 *
+	 * @var string
+	 */
+	private $express_order_error = '';
+
+	/**
 	 * WC_Gateway_Checkout_Com_Apple_Pay constructor.
 	 */
 	public function __construct() {
@@ -1184,7 +1191,6 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 					break;
 
 				case 'express_apple_pay_order_session':
-					WC_Checkoutcom_Utility::cko_set_session( 'cko_apple_pay_order_id', isset( $_GET['apple_pay_order_id'] ) ? wc_clean( wp_unslash( $_GET['apple_pay_order_id'] ) ) : '' );
 					$this->cko_express_apple_pay_order_session();
 					break;
 			}
@@ -1365,10 +1371,10 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		}
 		
 		// Create the order from cart
-		$order = $this->create_express_order_from_cart( $email, $shipping_address, $billing_address );
+		$order = $this->create_express_order_from_cart( $email, $shipping_address, $billing_address, $this->get_posted_approved_total() );
 		
 		if ( ! $order ) {
-			wp_send_json_error( array( 'messages' => 'Failed to create order for Apple Pay Express checkout.' ) );
+			wp_send_json_error( array( 'messages' => '' !== $this->express_order_error ? $this->express_order_error : 'Failed to create order for Apple Pay Express checkout.' ) );
 			return;
 		}
 		
@@ -1414,10 +1420,12 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 	 * @param string $email Email address from Apple Pay.
 	 * @param array  $shipping_address Shipping address from Apple Pay.
 	 * @param array  $billing_address Billing address from Apple Pay (optional, defaults to shipping address).
+	 * @param array  $approved Total and currency approved in the Apple Pay sheet ('total', 'currency').
 	 * @return WC_Order|false
 	 */
-	private function create_express_order_from_cart( $email = '', $shipping_address = null, $billing_address = null ) {
-		$order = null;
+	private function create_express_order_from_cart( $email = '', $shipping_address = null, $billing_address = null, $approved = null ) {
+		$order                     = null;
+		$this->express_order_error = '';
 
 		try {
 			// Determine customer ID and email
@@ -1452,28 +1460,37 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 				$order->set_billing_email( $customer_email );
 			}
 
-			// Copy the cart lines (products, fees, shipping, taxes, coupons) onto the order.
-			$this->add_cart_lines_to_express_order( $order );
-
 			// Set order addresses from Apple Pay payment data (MANDATORY - addresses must always be copied from Apple Pay)
 			// IMPORTANT: For Apple Pay Express:
 			// - Addresses are MANDATORY from Apple Pay for both logged-in and guest users
 			// - If logged in: Use logged-in user's email (already set above), but ALWAYS copy address from Apple Pay
 			// - If guest: Use Apple Pay email and address (both mandatory from Apple Pay)
-			if ( ! empty( $shipping_address ) ) {
+			if ( ! empty( $shipping_address ) && is_array( $shipping_address ) ) {
 				// For logged-in users: Don't pass email to set_order_addresses_from_apple_pay_data
 				// because we want to keep the logged-in user's email (already set above)
 				// Addresses are ALWAYS copied from Apple Pay regardless of login status (MANDATORY)
 				// For guest users: Pass Apple Pay email so it gets set in the address
 				$email_for_address = is_user_logged_in() ? '' : $customer_email;
 				// Use billing address if different, otherwise use shipping address for both
-				$billing_address_to_use = ! empty( $billing_address ) ? $billing_address : $shipping_address;
+				$billing_address_to_use = ! empty( $billing_address ) && is_array( $billing_address ) ? $billing_address : $shipping_address;
 				
 				$this->set_order_addresses_from_apple_pay_data( $order, $shipping_address, $email_for_address, $billing_address_to_use );
 			}
 
-			// Recalculate totals (and taxes for the wallet address) from the copied lines.
-			$order->calculate_totals();
+			// Rate shipping and taxes for the wallet address before building the order lines.
+			$this->express_order_error = $this->prepare_express_cart_for_order( $order );
+			if ( '' === $this->express_order_error && ! $this->approved_total_matches_cart( $approved ) ) {
+				// Never charge a total other than the one approved in the wallet sheet.
+				$this->express_order_error = __( 'Your order total was updated for the selected address. You have not been charged. Please try again.', 'checkout-com-unified-payments-api' );
+			}
+			if ( '' !== $this->express_order_error ) {
+				$order->delete( true );
+				return false;
+			}
+
+			// Copy the cart lines (products, fees, shipping, taxes, coupons) onto the order; the
+			// order total is the recalculated cart total.
+			$this->add_cart_lines_to_express_order( $order );
 
 			// Set payment method to Apple Pay Express
 			$order->set_payment_method( 'wc_checkout_com_apple_pay' );
@@ -1498,6 +1515,120 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 
 			return false;
 		}
+	}
+
+	/**
+	 * Approved wallet total and currency posted by the express script with the order request.
+	 * Only used to check the recalculated cart total, never as the amount charged.
+	 *
+	 * @return array{total: string, currency: string}|null Null when missing.
+	 */
+	private function get_posted_approved_total() {
+		// phpcs:disable WordPress.Security.NonceVerification.Missing -- the order step nonce is verified before this is called.
+		$total    = isset( $_POST['approved_total'] ) && is_string( $_POST['approved_total'] ) ? sanitize_text_field( wp_unslash( $_POST['approved_total'] ) ) : '';
+		$currency = isset( $_POST['approved_currency'] ) && is_string( $_POST['approved_currency'] ) ? sanitize_text_field( wp_unslash( $_POST['approved_currency'] ) ) : '';
+		// phpcs:enable
+
+		if ( '' === $total || '' === $currency ) {
+			return null;
+		}
+
+		return array(
+			'total'    => $total,
+			'currency' => $currency,
+		);
+	}
+
+	/**
+	 * Whether the total and currency approved in the wallet sheet equal the recalculated cart
+	 * total and the store currency (compared in minor units).
+	 *
+	 * @param array|null $approved Approved values ('total', 'currency').
+	 * @return bool False when they differ or are missing.
+	 */
+	private function approved_total_matches_cart( $approved ) {
+		if ( ! is_array( $approved ) ) {
+			return false;
+		}
+
+		$total    = isset( $approved['total'] ) && is_scalar( $approved['total'] ) ? trim( (string) $approved['total'] ) : '';
+		$currency = isset( $approved['currency'] ) && is_string( $approved['currency'] ) ? strtoupper( trim( $approved['currency'] ) ) : '';
+		if ( '' === $total || ! is_numeric( $total ) || '' === $currency ) {
+			return false;
+		}
+
+		$cart_currency = strtoupper( get_woocommerce_currency() );
+		if ( $currency !== $cart_currency ) {
+			return false;
+		}
+
+		// Compare at the precision the wallet sheet shows: whole units for zero-decimal currencies,
+		// otherwise two decimals (the wallet scripts round three-decimal currencies to two).
+		$zero_decimal = (float) WC_Checkoutcom_Utility::value_to_decimal( 1, $cart_currency ) <= 1.0;
+		$precision    = $zero_decimal ? 0 : 2;
+		// Allow less than one displayed unit of difference, which only absorbs rounding: two-decimal
+		// totals still have to match exactly.
+		$difference = abs( (float) WC()->cart->get_total( 'edit' ) - (float) $total );
+
+		return $difference < ( pow( 10, -$precision ) - 1e-9 );
+	}
+
+	/**
+	 * Point the cart at the address the express order ships to (already set on the order from the
+	 * wallet data) and recalculate shipping and totals for it, so the order lines are rated for that
+	 * address. Refuses when the cart needs shipping and the address has no valid shipping rate.
+	 *
+	 * @param WC_Order $order Order carrying the wallet addresses.
+	 * @return string Error message for the shopper, or '' when the cart is ready.
+	 */
+	private function prepare_express_cart_for_order( $order ) {
+		$cart     = WC()->cart;
+		$customer = WC()->customer;
+
+		if ( $customer instanceof WC_Customer ) {
+			if ( $order->get_billing_country() ) {
+				$customer->set_billing_country( $order->get_billing_country() );
+				$customer->set_billing_state( $order->get_billing_state() );
+				$customer->set_billing_postcode( $order->get_billing_postcode() );
+				$customer->set_billing_city( $order->get_billing_city() );
+				$customer->set_billing_address_1( $order->get_billing_address_1() );
+				$customer->set_billing_address_2( $order->get_billing_address_2() );
+			}
+			if ( $order->get_shipping_country() ) {
+				$customer->set_shipping_country( $order->get_shipping_country() );
+				$customer->set_shipping_state( $order->get_shipping_state() );
+				$customer->set_shipping_postcode( $order->get_shipping_postcode() );
+				$customer->set_shipping_city( $order->get_shipping_city() );
+				$customer->set_shipping_address_1( $order->get_shipping_address_1() );
+				$customer->set_shipping_address_2( $order->get_shipping_address_2() );
+			}
+		}
+
+		WC()->shipping()->reset_shipping();
+		$cart->calculate_totals();
+
+		if ( ! $cart->needs_shipping() ) {
+			return '';
+		}
+
+		$no_rate_message = __( 'Sorry, we cannot ship to the address selected in your wallet. Please choose another address or use a different payment method.', 'checkout-com-unified-payments-api' );
+
+		if ( ! $order->get_shipping_country() ) {
+			return $no_rate_message;
+		}
+
+		$packages = WC()->shipping()->get_packages();
+		$chosen   = WC()->session ? (array) WC()->session->get( 'chosen_shipping_methods', array() ) : array();
+		if ( empty( $packages ) ) {
+			return $no_rate_message;
+		}
+		foreach ( $packages as $package_key => $package ) {
+			if ( empty( $package['rates'] ) || ! isset( $chosen[ $package_key ] ) || ! isset( $package['rates'][ $chosen[ $package_key ] ] ) ) {
+				return $no_rate_message;
+			}
+		}
+
+		return '';
 	}
 
 	/**
@@ -3075,15 +3206,47 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 
 	/**
 	 * Directory for newly generated merchant-identity keys outside the web root, created with 0700
-	 * when possible: a per-site "checkout-com-apple-pay-<id>" directory next to the WordPress
-	 * directory (or one level above wp-content). Returns '' when no such location is writable or it
-	 * cannot be confirmed to be outside the web root; callers then use the uploads directory.
+	 * when possible. A host can choose the location with the CKO_APPLE_PAY_KEY_DIR constant or the
+	 * cko_apple_pay_key_dir filter; otherwise a per-site "checkout-com-apple-pay-<id>" directory next
+	 * to the WordPress directory (or one level above wp-content) is used. Returns '' when no such
+	 * location is writable or it cannot be confirmed to be outside the web root.
 	 *
-	 * Only used for new files — configured certificate/key paths are always read from the settings.
+	 * Only used for new files - configured certificate/key paths are always read from the settings.
 	 *
 	 * @return string Absolute path, or '' when unavailable.
 	 */
 	private function get_private_apple_pay_key_dir() {
+		$custom_dir = defined( 'CKO_APPLE_PAY_KEY_DIR' ) ? (string) CKO_APPLE_PAY_KEY_DIR : '';
+		/**
+		 * Filter the directory used for newly generated Apple Pay merchant-identity keys.
+		 *
+		 * The directory must be writable and outside the web root; otherwise key generation is refused.
+		 *
+		 * @param string $custom_dir Absolute directory path, or '' for the default location.
+		 */
+		$custom_dir = apply_filters( 'cko_apple_pay_key_dir', $custom_dir );
+
+		if ( is_string( $custom_dir ) && '' !== trim( $custom_dir ) ) {
+			$dir = untrailingslashit( wp_normalize_path( trim( $custom_dir ) ) );
+			// phpcs:disable WordPress.PHP.NoSilencedErrors.Discouraged, WordPress.WP.AlternativeFunctions.file_system_operations_mkdir, WordPress.WP.AlternativeFunctions.file_system_operations_is_writable -- probing a location that may be outside open_basedir; a failure just means "not available".
+			$created = false;
+			if ( ! @is_dir( $dir ) ) {
+				$created = @mkdir( $dir, 0700, true );
+			}
+			$dir_real = @realpath( $dir );
+			if ( ! $dir_real || ! @is_writable( $dir_real ) || ! $this->is_outside_web_root( $dir_real ) ) {
+				if ( $created ) {
+					@rmdir( $dir ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir -- remove the empty directory created above.
+				}
+				return '';
+			}
+			// phpcs:enable
+
+			$dir_real = untrailingslashit( wp_normalize_path( $dir_real ) );
+			$this->write_cert_dir_guards( $dir_real );
+			return $dir_real;
+		}
+
 		$site_id = substr( md5( wp_normalize_path( ABSPATH ) ), 0, 10 );
 		$parents = array_unique(
 			array(
@@ -3149,19 +3312,14 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 	}
 
 	/**
-	 * Directory to write a newly generated merchant-identity key into: outside the web root when
-	 * possible, otherwise the protected uploads directory.
+	 * Directory to write a newly generated merchant-identity key into. New keys are only ever
+	 * written outside the web root; returns '' when no such location is available, and the caller
+	 * then refuses to generate the key.
 	 *
-	 * @param array $upload_dir Result of wp_upload_dir().
-	 * @return string Absolute directory path.
+	 * @return string Absolute directory path, or '' when unavailable.
 	 */
-	private function get_apple_pay_key_write_dir( $upload_dir ) {
-		$private_dir = $this->get_private_apple_pay_key_dir();
-		if ( '' !== $private_dir ) {
-			return $private_dir;
-		}
-
-		return $this->get_protected_apple_pay_cert_dir( $upload_dir );
+	private function get_apple_pay_key_write_dir() {
+		return $this->get_private_apple_pay_key_dir();
 	}
 
 	/**
@@ -3422,17 +3580,14 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			return;
 		}
 
-		// Save private key file on server
-		$upload_dir = wp_upload_dir();
-		if ( $upload_dir['error'] ) {
-			wp_send_json_error( [ 
-				'message' => __( 'Failed to access uploads directory.', 'checkout-com-unified-payments-api' ),
+		// New keys are only written outside the web root.
+		$certificate_dir = $this->get_apple_pay_key_write_dir();
+		if ( '' === $certificate_dir ) {
+			wp_send_json_error( [
+				'message' => __( 'No writable directory outside the website\'s public folder was found, so the private key was not generated. Ask your hosting provider to create a writable directory outside the web root and define CKO_APPLE_PAY_KEY_DIR with its path in wp-config.php (or set it with the cko_apple_pay_key_dir filter), then try again.', 'checkout-com-unified-payments-api' ),
 			] );
 			return;
 		}
-
-		// New keys go outside the web root when possible, otherwise into the protected uploads directory.
-		$certificate_dir = $this->get_apple_pay_key_write_dir( $upload_dir );
 
 		// Save key file on server
 		$key_file = $certificate_dir . '/certificate_sandbox.key';

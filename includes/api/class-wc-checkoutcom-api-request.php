@@ -221,8 +221,41 @@ class WC_Checkoutcom_Api_Request {
 		$apms_settings  = get_option( 'woocommerce_wc_checkout_com_alternative_payments_settings' );
 		$apms_selected  = ! empty( $apms_settings['ckocom_apms_selector'] ) ? $apms_settings['ckocom_apms_selector'] : [];
 
-		$post_data = sanitize_post( $_POST );
-		$get_data  = sanitize_post( $_GET );
+		// phpcs:disable WordPress.Security.NonceVerification.Missing, WordPress.Security.NonceVerification.Recommended -- checkout form fields, nonce checked by WooCommerce.
+		$post_data = WC_Checkoutcom_Utility::get_request_fields(
+			$_POST,
+			array(
+				'payment_method',
+				'cko-card-scheme',
+				'cko-card-bin',
+				'wc_checkout_com_cards-card-cvv',
+				'wc_checkout_com_flow-card-cvv',
+				'wc-wc_checkout_com_cards-new-payment-method',
+				'billing_first_name',
+				'billing_last_name',
+				'billing_email',
+				'billing_phone',
+				'billing_address_1',
+				'billing_address_2',
+				'billing_city',
+				'billing_state',
+				'billing_postcode',
+				'billing_country',
+				'ship_to_different_address',
+				'shipping_first_name',
+				'shipping_last_name',
+				'shipping_address_1',
+				'shipping_address_2',
+				'shipping_city',
+				'shipping_state',
+				'shipping_postcode',
+				'shipping_country',
+				'name',
+				'cpf',
+			)
+		);
+		$get_data  = WC_Checkoutcom_Utility::get_request_fields( $_GET, array( 'pay_for_order' ) );
+		// phpcs:enable
 
 		// Cartes Bancaires card scheme.
 		$card_scheme = null;
@@ -525,6 +558,10 @@ class WC_Checkoutcom_Api_Request {
 			$redirection_url = home_url( '/checkoutcom-callback' );
 		}
 
+		// The return carries the order key so the shopper can prove the order is theirs even if
+		// their session cookie is lost during the redirect.
+		$redirection_url = add_query_arg( 'key', rawurlencode( $order->get_order_key() ), $redirection_url );
+
 		$payment->success_url = $redirection_url;
 		$payment->failure_url = $redirection_url;
 
@@ -657,18 +694,10 @@ class WC_Checkoutcom_Api_Request {
 			$shipping_state      = empty( $data['shipping_state'] ) ? '' : wc_clean( $data['shipping_state'] );
 			$shipping_postcode   = empty( $data['shipping_postcode'] ) ? '' : wc_clean( $data['shipping_postcode'] );
 			$shipping_country    = empty( $data['shipping_country'] ) ? '' : wc_clean( $data['shipping_country'] );
-		} elseif ( $is_pay_order ) {
+		} elseif ( $is_pay_order && $order instanceof WC_Order ) {
 
 			// In case payment is from pay_order.
-			// Get billing and shipping details from order.
-			if ( ! empty( $_GET['order_id'] ) ) {
-				$order_id = absint( wp_unslash( $_GET['order_id'] ) );
-			} elseif ( ! empty( $_GET['key'] ) ) {
-				$order_id = wc_get_order_id_by_order_key( sanitize_text_field( wp_unslash( $_GET['key'] ) ) );
-			}
-
-			$order = wc_get_order( $order_id );
-
+			// Get billing and shipping details from the order being paid.
 			$billing_first_name = $order->get_billing_first_name();
 			$billing_last_name  = $order->get_billing_last_name();
 			$billing_address_1  = $order->get_billing_address_1();
