@@ -1,5 +1,15 @@
 *** Checkout.com Payment Gateway Changelog ***
 
+2026-11-10 - version 5.1.7
+* Fix - Security: further hardening of Flow checkout, card returns, webhooks and express payments. Updating is strongly recommended.
+* Tweak - Flow: 3D Secure stays on for card payments. To turn it off, set "Use 3D Secure" to No and tick the new "Confirm turning off 3D Secure (Flow)" option in Card Settings.
+* Tweak - Apple Pay and Google Pay Express: the wallet sheet now updates the total and shipping options for the selected address; addresses the store cannot ship to are refused in the sheet.
+* Tweak - Express checkout: shipping is priced for the wallet address, and an order whose total no longer matches what the shopper approved is not charged.
+* Tweak - Apple Pay: new merchant identity keys are only created outside the web root; hosts can set the CKO_APPLE_PAY_KEY_DIR constant or the cko_apple_pay_key_dir filter.
+* Tweak - Klarna: a payment that does not match the order is voided and the order is marked Failed.
+* Dev - Bundled Checkout.com PHP SDK updated to 3.2.9.
+* Note - Clear any page cache after updating so express payment buttons load the updated scripts.
+
 2026-11-09 - version 5.1.6
 * Fix - Security: hardening of payment processing, webhooks, express payments and Apple Pay setup. Updating is strongly recommended.
 * Note - If file logging was enabled in the plugin settings, we recommend rotating your Checkout.com secret key after updating.

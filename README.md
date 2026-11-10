@@ -4,7 +4,7 @@ Checkout.com Payment Gateway plugin for WooCommerce with Flow integration suppor
 
 ## Version
 
-**Current Version:** 5.1.4.4
+**Current Version:** 5.1.7
 
 ## Features
 
@@ -452,11 +452,11 @@ checkout-com-unified-payments-api/
 
 ## Requirements
 
-- WordPress 5.0+
-- WooCommerce 3.0+
-- PHP 7.3+
+- WordPress 6.0+
+- WooCommerce 8.0+
+- PHP 7.4+
 - SSL Certificate (required for production)
-- Tested up to WordPress 6.7.0 and WooCommerce 8.3.1
+- Tested up to WordPress 7.1 and WooCommerce 11.2
 
 ## Support
 
@@ -470,6 +470,15 @@ For support and integration help:
 GPL v2 or later
 
 ## Changelog
+
+The full changelog for every release is in [changelog.txt](changelog.txt).
+
+### Version 5.1.7
+- Further security hardening of Flow checkout, card returns, webhooks and express payments. Updating is strongly recommended.
+- Flow: 3D Secure stays on for card payments. To turn it off, set "Use 3D Secure" to No and tick "Confirm turning off 3D Secure (Flow)" in Card Settings.
+- Apple Pay and Google Pay Express update the total and shipping options in the wallet sheet for the selected address.
+- Bundled Checkout.com PHP SDK updated to 3.2.9.
+- Clear any page cache after updating so express payment buttons load the updated scripts.
 
 ### Version 5.0.4
 - Prevent Flow reload on address changes - send updates via handleSubmit API
