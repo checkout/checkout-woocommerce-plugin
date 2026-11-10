@@ -95,9 +95,10 @@ jobs:
           node-version: '20'
 
       - name: Install ESLint
-        # --no-save keeps package.json unchanged; --legacy-peer-deps avoids a peer clash with the
-        # build tooling already listed there.
-        run: npm install --no-save --no-audit --no-fund --legacy-peer-deps eslint@9 @eslint/js@9 globals
+        # Exact versions; --ignore-scripts stops package install scripts from running. --no-save
+        # keeps package.json unchanged; --legacy-peer-deps avoids a peer clash with the build
+        # tooling already listed there.
+        run: npm install --no-save --no-audit --no-fund --ignore-scripts --legacy-peer-deps eslint@9.39.5 @eslint/js@9.39.5 globals@17.14.0
 
       - name: Run ESLint
         run: npx eslint "flow-integration/assets/js/**/*.js" --config eslint.config.mjs
