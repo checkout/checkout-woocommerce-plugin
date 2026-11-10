@@ -74,12 +74,10 @@ Contact us at: partnerships@checkout.com
 
 == Screenshots ==
 
-
-1. Installation
-2. Configuration
-3. Checkout
-4. Webhook
-
+1. Quick Setup: choose Flow, add your Checkout.com keys and register the webhook
+2. Flow payment form in the WooCommerce Checkout block
+3. Express Payments settings for Google Pay, Apple Pay and PayPal
+4. Card settings, including the 3D Secure options
 
 == Frequently Asked Questions ==
 
