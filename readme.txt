@@ -2,7 +2,7 @@
 Contributors: checkoutintegration
 Tags: payments, credit card, payment gateway, apple pay, google pay
 Requires at least: 6.0
-Stable tag: 5.1.6
+Stable tag: 5.1.7
 Requires PHP: 7.4
 Tested up to: 7.1
 WC requires at least: 8.0
@@ -181,6 +181,17 @@ http://example.com/?wc-api=wc_checkoutcom_webhook
 After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
 
 == Changelog ==
+v5.1.7 10th November 2026
+Security
+- Further security hardening of Flow checkout, card returns, webhooks and express payments. Updating is strongly recommended.
+Changes you may notice
+- Flow: 3D Secure stays on for card payments. To turn it off, set "Use 3D Secure" to No and tick "Confirm turning off 3D Secure (Flow)" in Card Settings.
+- Apple Pay and Google Pay Express update the total and shipping options in the wallet sheet for the selected address.
+- Express orders whose total no longer matches what the shopper approved are not charged; the shopper can try again.
+- Klarna payments that do not match the order are voided and the order is marked Failed.
+- Bundled Checkout.com PHP SDK updated to 3.2.9.
+- Clear any page cache after updating so express payment buttons load the updated scripts.
+
 v5.1.6 9th November 2026
 Security
 - Security hardening of payment processing, webhooks, express payments and Apple Pay setup. Updating is strongly recommended.
@@ -631,6 +642,9 @@ v4.0.0 3 Sep 2019
 · Checkout.com Woocommerce module for the Unified Payments API
 
 == Upgrade Notice ==
+= 5.1.7 =
+Security update - updating is strongly recommended. Clear any page cache after updating.
+
 = 5.1.6 =
 Security update - updating is strongly recommended. If file logging was enabled, rotate your Checkout.com secret key after updating.
 
