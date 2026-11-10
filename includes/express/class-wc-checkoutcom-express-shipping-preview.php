@@ -103,14 +103,22 @@ class WC_Checkoutcom_Express_Shipping_Preview {
 			$customer->save();
 		}
 
-		if ( '' !== $shipping_method && WC()->session ) {
-			$chosen    = (array) WC()->session->get( 'chosen_shipping_methods', array() );
-			$chosen[0] = $shipping_method;
-			WC()->session->set( 'chosen_shipping_methods', $chosen );
-		}
-
+		// Rate the cart for the address first: WooCommerce resets the chosen rate when the
+		// address changes the available rates, so the shopper's choice is applied afterwards.
 		WC()->shipping()->reset_shipping();
 		$cart->calculate_totals();
+
+		if ( '' !== $shipping_method && WC()->session ) {
+			$rated    = WC()->shipping()->get_packages();
+			$is_rated = ! empty( $rated[0]['rates'] ) && isset( $rated[0]['rates'][ $shipping_method ] );
+			if ( $is_rated ) {
+				$chosen    = (array) WC()->session->get( 'chosen_shipping_methods', array() );
+				$chosen[0] = $shipping_method;
+				WC()->session->set( 'chosen_shipping_methods', $chosen );
+				WC()->shipping()->reset_shipping();
+				$cart->calculate_totals();
+			}
+		}
 
 		$needs_shipping = $cart->needs_shipping();
 		$packages       = $needs_shipping ? WC()->shipping()->get_packages() : array();
