@@ -27,6 +27,7 @@
   "overrides": {
     "express": {
       "qs": "^6.16.1"
-    }
+    },
+    "isomorphic-git": "1.38.6"
   }
 }
