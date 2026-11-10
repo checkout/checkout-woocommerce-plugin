@@ -6,19 +6,23 @@ on:
   push:
     branches: [5.0.2, main, master]
 
+# PHP and Composer come preinstalled on the runner. Global Composer tools go to ~/.composer so
+# the paths below work.
+env:
+  COMPOSER_HOME: /home/runner/.composer
+
 jobs:
   php-syntax:
     name: PHP Syntax Check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.1'
-          tools: composer
+      - name: Show PHP version
+        run: |
+          php --version
+          composer --version
 
       - name: Check PHP syntax
         run: |
@@ -26,23 +30,24 @@ jobs:
 
   phpstan:
     name: PHPStan Static Analysis
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.1'
-          tools: composer
+      - name: Show PHP version
+        run: |
+          php --version
+          composer --version
 
       - name: Install Composer dependencies
         run: composer install --no-progress --prefer-dist --optimize-autoloader
         continue-on-error: true
 
       - name: Install PHPStan
-        run: composer global require phpstan/phpstan phpstan/extension-installer szepeviktor/phpstan-wordpress --no-progress
+        run: |
+          composer global config allow-plugins.phpstan/extension-installer true
+          composer global require phpstan/phpstan phpstan/extension-installer szepeviktor/phpstan-wordpress --no-progress
 
       - name: Run PHPStan
         run: ~/.composer/vendor/bin/phpstan analyse --configuration=phpstan.neon --memory-limit=1G
@@ -50,21 +55,20 @@ jobs:
 
   phpcs:
     name: PHP CodeSniffer (WordPress Standards)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.1'
-          tools: cs2pr, phpcs
+      - name: Show PHP version
+        run: |
+          php --version
+          composer --version
 
       - name: Install WordPress Coding Standards
         run: |
           composer global config allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
-          composer global require --dev wp-coding-standards/wpcs:"^3.0" phpcompatibility/phpcompatibility-wp:"*" --no-progress
+          composer global require --dev wp-coding-standards/wpcs:"^3.0" phpcompatibility/phpcompatibility-wp:"*" staabm/annotate-pull-request-from-checkstyle --no-progress
           ~/.composer/vendor/bin/phpcs --config-set installed_paths ~/.composer/vendor/wp-coding-standards/wpcs,~/.composer/vendor/phpcompatibility/php-compatibility,~/.composer/vendor/phpcompatibility/phpcompatibility-paragonie,~/.composer/vendor/phpcompatibility/phpcompatibility-wp
 
       - name: Run PHPCS (Security checks only)
@@ -75,12 +79,12 @@ jobs:
             --extensions=php \
             --ignore=vendor/,node_modules/,e2e-tests/ \
             --report=checkstyle \
-            . | cs2pr
+            . | ~/.composer/vendor/bin/cs2pr
         continue-on-error: true
 
   eslint:
     name: ESLint JavaScript Analysis
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -91,9 +95,10 @@ jobs:
           node-version: '20'
 
       - name: Install ESLint
-        run: |
-          npm init -y
-          npm install eslint @eslint/js globals --save-dev
+        # Exact versions; --ignore-scripts stops package install scripts from running. --no-save
+        # keeps package.json unchanged; --legacy-peer-deps avoids a peer clash with the build
+        # tooling already listed there.
+        run: npm install --no-save --no-audit --no-fund --ignore-scripts --legacy-peer-deps eslint@9.39.5 @eslint/js@9.39.5 globals@17.14.0
 
       - name: Run ESLint
         run: npx eslint "flow-integration/assets/js/**/*.js" --config eslint.config.mjs
@@ -101,16 +106,15 @@ jobs:
 
   security-audit:
     name: Security Audit
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.1'
-          tools: composer
+      - name: Show PHP version
+        run: |
+          php --version
+          composer --version
 
       - name: Check for known vulnerabilities
         run: composer audit --no-dev
