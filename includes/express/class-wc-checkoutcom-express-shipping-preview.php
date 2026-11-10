@@ -115,8 +115,15 @@ class WC_Checkoutcom_Express_Shipping_Preview {
 				$chosen    = (array) WC()->session->get( 'chosen_shipping_methods', array() );
 				$chosen[0] = $shipping_method;
 				WC()->session->set( 'chosen_shipping_methods', $chosen );
+				// WooCommerce may fall back to its default rate while recalculating; prefer the
+				// shopper's choice for the first package when it is offered.
+				$prefer = function ( $default, $rates ) use ( $shipping_method ) {
+					return is_array( $rates ) && isset( $rates[ $shipping_method ] ) ? $shipping_method : $default;
+				};
+				add_filter( 'woocommerce_shipping_chosen_method', $prefer, 99, 2 );
 				WC()->shipping()->reset_shipping();
 				$cart->calculate_totals();
+				remove_filter( 'woocommerce_shipping_chosen_method', $prefer, 99 );
 			}
 		}
 
