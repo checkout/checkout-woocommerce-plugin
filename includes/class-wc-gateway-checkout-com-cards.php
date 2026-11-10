@@ -857,6 +857,13 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 				WC()->session->set( 'wc-wc_checkout_com_cards-new-payment-method', 'no' );
 			}
 
+			// Link the order to its payment now, so webhooks that arrive before the shopper returns
+			// (for example a decline) can be matched to it.
+			if ( ! empty( $result['id'] ) && WC_Checkoutcom_Utility::is_valid_payment_id( $result['id'] ) ) {
+				$order->update_meta_data( '_cko_payment_id', $result['id'] );
+				$order->save();
+			}
+
 			$order->add_order_note(
 				sprintf(
 					/* translators: %s: 3DS redirect URL. */

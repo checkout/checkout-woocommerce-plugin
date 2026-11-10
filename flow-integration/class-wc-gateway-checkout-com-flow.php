@@ -198,7 +198,8 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			return;
 		}
 
-		$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
+		// Raw read: Polylang filters get_option() for these settings.
+		$core_settings = function_exists( 'cko_get_raw_option' ) ? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' ) : get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 		$checkout_mode = is_array( $core_settings ) && isset( $core_settings['ckocom_checkout_mode'] ) ? $core_settings['ckocom_checkout_mode'] : 'classic';
 		if ( 'flow' !== $checkout_mode ) {
 			return;
@@ -5573,6 +5574,12 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			return null;
 		}
 
+		// Only a payment this visitor's own session submitted may be applied to its draft order.
+		$own_payments = (array) WC()->session->get( 'cko_flow_session_payment_ids', array() );
+		if ( ! in_array( (string) $payment_id, $own_payments, true ) ) {
+			return null;
+		}
+
 		$draft_id = absint( WC()->session->get( 'store_api_draft_order' ) );
 		$draft    = $draft_id ? wc_get_order( $draft_id ) : false;
 		if ( ! $draft instanceof WC_Order || ! $draft->has_status( 'checkout-draft' ) ) {
@@ -5608,6 +5615,8 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// The draft is now a real order; the block checkout starts a fresh draft next time.
 		WC()->session->set( 'store_api_draft_order', null );
 		WC()->session->set( 'order_awaiting_payment', $draft->get_id() );
+		// Each submitted payment can be applied to at most one order.
+		WC()->session->set( 'cko_flow_session_payment_ids', array_values( array_diff( $own_payments, array( (string) $payment_id ) ) ) );
 
 		WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Using the block checkout draft order ' . $draft->get_id() . ' for returning payment ' . $payment_id . '.' );
 
@@ -5749,8 +5758,28 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 					'meta_value' => $payment_id, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value
 				)
 			);
+			if ( empty( $held_by ) ) {
+				$held_by = wc_get_orders(
+					array(
+						'limit'      => 1,
+						'return'     => 'ids',
+						'meta_key'   => '_cko_flow_payment_id', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key
+						'meta_value' => $payment_id, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value
+					)
+				);
+			}
+			// A payment whose reference or metadata names an existing order (for example a payment
+			// started in a second tab and recorded as an attempt) is left for that order's webhooks.
+			$names_order = false;
+			foreach ( array( $payment_details['reference'] ?? '', $payment_details['metadata']['order_id'] ?? '' ) as $named ) {
+				$named = is_scalar( $named ) ? (string) $named : '';
+				if ( '' !== $named && ctype_digit( $named ) && wc_get_order( (int) $named ) ) {
+					$names_order = true;
+					break;
+				}
+			}
 			$claimed = (string) get_option( 'cko_payment_claim_' . strtolower( $payment_id ), '' );
-			if ( empty( $held_by ) && '' === $claimed ) {
+			if ( empty( $held_by ) && ! $names_order && '' === $claimed ) {
 				$voided = $this->cko_flow_void_payment( $payment_id );
 				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Unmatched approved payment ' . $payment_id . ' void ' . ( $voided ? 'requested successfully' : 'failed - review it in the Checkout.com dashboard' ) . '.' );
 			}
