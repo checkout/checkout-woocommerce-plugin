@@ -14,52 +14,57 @@ Offer more payment methods and currencies with Checkout.com — best-in-class pr
 
 == Description ==
 
-**Fast Checkout with Checkout.com FLOW** - Deliver lightning-fast checkout experiences with Checkout.com FLOW, our modern payment solution that reduces friction and increases conversions.
+**Fast checkout with Checkout.com Flow** - Deliver fast, low-friction checkout experiences with Flow, Checkout.com's embedded payment solution that helps reduce drop-off and increase conversions.
 
-Checkout.com helps your business offer more payment methods and currencies to more customers. We combine gateway, international acquiring, and payment processing services, all through one integration with WooCommerce.
+Checkout.com helps your business offer more payment methods and currencies to more customers. We combine gateway, international acquiring and payment processing services, all through one integration with WooCommerce.
 
-The Checkout.com plugin for WooCommerce allows shop owners to process online payments through the Checkout.com Payment Gateway. This plugin offers multiple payment modes including FLOW for fast checkout and is maintained by Checkout.com.
+The Checkout.com plugin for WooCommerce lets shop owners take online payments through the Checkout.com Payment Gateway. It is built and maintained by Checkout.com, and works with both the WooCommerce Checkout block and the classic checkout.
 
-= Card Payments with FLOW =
+= Card payments with Flow =
 
-**Checkout.com FLOW** provides fast, secure checkout with an embedded payment form. Shoppers complete payments without leaving your website. The FLOW payment form is cross-browser and cross-device compatible, accepting payments from all major credit cards.
+**Checkout.com Flow** provides fast, secure checkout with an embedded payment form. Shoppers complete their payment without leaving your store. Flow works across browsers and devices and accepts all major card schemes.
 
-FLOW features include:
+Flow features include:
 
-* **Fast Checkout** - Streamlined payment flow that reduces cart abandonment
-* **Saved Cards** - Securely save payment methods for instant future checkouts
-* **3D Secure** - Built-in 3DS authentication for enhanced security
-* **Real-time Validation** - Instant card validation before order submission
-* **Modern UI** - Responsive payment forms for all devices
+* **Fast checkout** - A streamlined payment form that helps reduce cart abandonment
+* **The right payment methods** - Flow shows each shopper the payment methods available for their country and currency
+* **Remember Me** - Shoppers can save their payment details with Checkout.com and pay in a few taps next time
+* **Saved cards** - Logged-in customers can save a card to their store account for faster checkout and subscription renewals
+* **3D Secure** - Built-in 3DS authentication that supports Strong Customer Authentication (SCA)
+* **Real-time validation** - Card details are checked before the order is submitted
+* **Your look and feel** - Match the payment form's colours, fonts and buttons to your store
 
-= Alternative Payments =
+= Alternative payments =
 
-Users can place orders with alternative and local payment options: Alipay (China & Hong Kong), Alma, Bancontact, Benefit, Dana, EPS, GCash, Ideal, Kakaopay, Klarna, KNet, MBWay, Multibanco, P24 (Przelewy24), QPay, SEPA (WooCommerce subscription compatible), STCPay, Tabby, Tamara, TNG, TrueMoney.
+Shoppers can pay with alternative and local payment methods: Alipay (China & Hong Kong), Alma, Bancontact, Benefit, Dana, EPS, GCash, iDEAL, Kakaopay, Klarna, KNet, MB WAY, Multibanco, P24 (Przelewy24), QPay, SEPA (WooCommerce Subscriptions compatible), STC Pay, Tabby, Tamara, TNG, TrueMoney.
 
-= Digital Wallets =
-* **Google Pay** - Fast, secure checkout with one tap
+= Digital wallets =
+
+* **Google Pay** - Fast, secure checkout in one tap
 * **Apple Pay** - One-tap checkout on Apple devices
-* **PayPal** - Standard and Express checkout support
+* **PayPal** - Standard and Express checkout
 
-= Express Checkout =
+= Express checkout =
 
-Users can place orders with PayPal, Google Pay, and Apple Pay Express checkout on product pages, shop pages, and cart pages without going through the full checkout process. Express checkout options appear in a unified container when enabled.
+Shoppers can pay with PayPal, Google Pay and Apple Pay Express on product, shop and cart pages without filling in the full checkout form. The wallet sheet shows the total and shipping options for the address the shopper selects.
 
-= Additional Features =
+= Additional features =
 
-* **MOTO Payments** - Process Mail Order/Telephone Order payments
-* **Recurring Payments** - Full support for subscriptions with SEPA Direct Debit compatibility
-* **Saved Cards** - With FLOW integration, saved cards enable instant checkout for faster payments
-* **WooCommerce Invoicing** - Send invoice emails to customers for payment
+* **MOTO payments** - Take card payments over the phone or by mail for orders created in the admin
+* **Recurring payments** - Works with WooCommerce Subscriptions, including SEPA Direct Debit
+* **Authorise now, capture later** - Capture automatically, after a delay, or manually from the order screen
+* **Refunds** - Full and partial refunds from the WooCommerce order screen
+* **WooCommerce invoicing** - Send invoice emails so customers can pay later
 
 = Features =
 
-* **FLOW Integration** - Fast, secure checkout with Checkout.com FLOW
-* Credit Cards, Google Pay, Apple Pay, PayPal
+* **Flow integration** - Fast, secure embedded checkout
+* Cards, Google Pay, Apple Pay and PayPal
 * 150+ currencies, 60+ countries supported
+* WooCommerce Checkout block and classic checkout
 * WooCommerce Subscriptions compatible
-* Webhook processing with queue system
-* Automatic order status updates
+* High-Performance Order Storage (HPOS) compatible
+* Webhook processing with a queue system, and automatic order status updates
 
 Contact us at: partnerships@checkout.com
 
@@ -167,18 +172,37 @@ support@checkout.com
 
 == Installation ==
 
-**From merchant’s WordPress admin**
-1. Go to plugin section-> Add new
-2. Search for "Checkout.com Payment Gateway"
-3. Click on Install Now
-4. Click on Activate
-5. Click on Settings to configure the module
-6. Configure the webhook url in your checkout hub account.
+= Requirements =
 
-**Webhook URL:**
-http://example.com/?wc-api=wc_checkoutcom_webhook
+* A Checkout.com account. You can test with a Sandbox account first. Don't have one? Contact partnerships@checkout.com.
+* WordPress 6.0 or later, WooCommerce 8.0 or later and PHP 7.4 or later.
+* An SSL certificate: your store must use https://.
 
-After the plugin has been configured, customers will be able to choose Checkout.com as a valid payment method.
+= Install the plugin =
+
+1. In your WordPress admin, go to **Plugins → Add New Plugin**.
+2. Search for "Checkout.com Payment Gateway".
+3. Click **Install Now**, then **Activate**.
+
+= Connect your Checkout.com account =
+
+1. Go to **WooCommerce → Settings → Payments** and open **Checkout.com**. The **Quick Setup** screen opens.
+2. Set **Checkout Mode** to **Flow** (recommended).
+3. Set **Environment** to **SandBox** while you test, or **Live** to take real payments.
+4. Enter your **Secret Key** and **Public Key** from the Checkout.com Dashboard. Sandbox and Live use different keys.
+5. Click **Save changes**.
+6. Click **Register Webhook**, then **Run Webhook check** to confirm it is working. Webhooks keep your orders up to date when payments are captured, refunded or declined. If you change your store's address, register the webhook again.
+
+= Choose your payment methods =
+
+* **Cards and local payment methods:** select them under **Enabled Payment Methods** on the Quick Setup screen. Leave it empty to show every method available on your Checkout.com account.
+* **Apple Pay, Google Pay and PayPal:** open **Express Payments** and enable each wallet. Apple Pay needs a few one-time steps with Apple, which the settings screen walks you through.
+
+= Go live =
+
+1. Place a test order in Sandbox with a Checkout.com test card.
+2. Switch **Environment** to **Live**, enter your Live keys and click **Register Webhook** again.
+3. Place one small real order and refund it to check everything works.
 
 == Changelog ==
 v5.1.7 10th November 2026
