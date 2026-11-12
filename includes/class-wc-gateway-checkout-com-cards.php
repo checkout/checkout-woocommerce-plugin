@@ -535,6 +535,20 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 			$settings['flow_no_billing_address'] = ( isset( $_POST['woocommerce_wc_checkout_com_cards_settings']['flow_no_billing_address'] )
 				|| isset( $_POST['flow_no_billing_address'] ) ) ? 'yes' : 'no';
 
+			// Manually save the optional Client ID and Processing Channel ID (save_fields() is
+			// unreliable here, as above). An empty value is allowed: it clears the setting.
+			foreach ( array( 'ckocom_client_id', 'ckocom_processing_channel_id' ) as $optional_key ) {
+				$optional_value = null;
+				if ( isset( $_POST['woocommerce_wc_checkout_com_cards_settings'][ $optional_key ] ) && is_string( $_POST['woocommerce_wc_checkout_com_cards_settings'][ $optional_key ] ) ) {
+					$optional_value = wp_unslash( $_POST['woocommerce_wc_checkout_com_cards_settings'][ $optional_key ] );
+				} elseif ( isset( $_POST[ $optional_key ] ) && is_string( $_POST[ $optional_key ] ) ) {
+					$optional_value = wp_unslash( $_POST[ $optional_key ] );
+				}
+				if ( null !== $optional_value ) {
+					$settings[ $optional_key ] = substr( sanitize_text_field( $optional_value ), 0, 70 );
+				}
+			}
+
 			$settings['ckocom_account_type'] = 'NAS';
 			update_option( 'woocommerce_wc_checkout_com_cards_settings', $settings );
 			// Force-write directly to wp_options so Polylang filter cannot block or redirect the save.
@@ -1100,6 +1114,8 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		if ( class_exists( 'WC_Subscriptions_Order' ) ) {
 			// save source id for subscription.
 			WC_Checkoutcom_Subscription::save_source_id( $order_id, $subscription_object, $result['source']['id'] );
+			// Mastercard TLID for renewals (a card change on a subscription starts a new chain).
+			WC_Checkoutcom_Subscription::save_scheme_transaction_link_id( $subscription_object, $result, $subscription_object instanceof WC_Subscription );
 
 			// save Cartes Bancaires card scheme for subscription.
 			$card_scheme = WC()->session->get( '_cko_preferred_scheme' );
@@ -1238,6 +1254,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		$payment           = $checkout->get_payment_request();
 		$payment->source   = $method;
 		$payment->currency = get_woocommerce_currency();
+		cko_apply_processing_channel_id( $payment );
 
 		// Load current user.
 		$current_user = wp_get_current_user();

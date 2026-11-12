@@ -136,6 +136,8 @@ class WC_Checkoutcom_Cards_Settings {
 		$existing_sk = isset( $core_settings['ckocom_sk'] ) ? $core_settings['ckocom_sk'] : '';
 		$existing_pk = isset( $core_settings['ckocom_pk'] ) ? $core_settings['ckocom_pk'] : '';
 		$existing_title = isset( $core_settings['title'] ) ? $core_settings['title'] : 'Pay by Card with Checkout.com';
+		$existing_client_id = isset( $core_settings['ckocom_client_id'] ) ? $core_settings['ckocom_client_id'] : '';
+		$existing_pc_id     = isset( $core_settings['ckocom_processing_channel_id'] ) ? $core_settings['ckocom_processing_channel_id'] : '';
 
 		// SECURITY: never render the stored secret key into the form. Show a masked hint only; an
 		// empty submission is treated as "unchanged" (process_admin_options restores the saved key).
@@ -214,6 +216,24 @@ class WC_Checkoutcom_Cards_Settings {
 				'description' => sprintf( __( 'You can %1$s find your public key %2$s in the Checkout.com Hub', 'checkout-com-unified-payments-api' ), '<a class="checkoutcom-key-docs" target="_blank" href="' . esc_url( $docs_link ) . '">', '</a>' ),
 				'placeholder' => 'pk_xxx',
 				'value'       => $existing_pk, // Load existing value
+			],
+			'ckocom_client_id'    => [
+				'id'          => 'ckocom_client_id',
+				'title'       => __( 'Client ID', 'checkout-com-unified-payments-api' ),
+				'type'        => 'text',
+				'description' => __( 'Optional. Your Client ID (cli_...) from the Checkout.com Dashboard. When set, API requests go to your merchant-specific subdomain. Leave blank to use the global Checkout.com domain.', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => true,
+				'placeholder' => 'cli_xxxxxxxxxxxxxxxxxxxxxxxxxx',
+				'value'       => $existing_client_id,
+			],
+			'ckocom_processing_channel_id' => [
+				'id'          => 'ckocom_processing_channel_id',
+				'title'       => __( 'Processing Channel ID', 'checkout-com-unified-payments-api' ),
+				'type'        => 'text',
+				'description' => __( 'Optional. Your Processing Channel ID (pc_...) from the Checkout.com Dashboard. Needed when your account has more than one processing channel. Leave blank to use your account default.', 'checkout-com-unified-payments-api' ),
+				'desc_tip'    => true,
+				'placeholder' => 'pc_xxxxxxxxxxxxxxxxxxxxxxxxxx',
+				'value'       => $existing_pc_id,
 			],
 			'title'               => [
 				'id'          => 'title',

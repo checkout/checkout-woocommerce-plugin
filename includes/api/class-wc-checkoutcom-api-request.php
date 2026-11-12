@@ -113,6 +113,11 @@ class WC_Checkoutcom_Api_Request {
 		}
 		$response = $builder->getPaymentsClient()->requestPayment( $request_param, $cko_idempotency_key );
 
+			// Keep the Mastercard Transaction Link Identifier (TLID) for future renewals.
+			if ( class_exists( 'WC_Checkoutcom_Subscription' ) ) {
+				WC_Checkoutcom_Subscription::save_scheme_transaction_link_id( $order, $response );
+			}
+
 			// Check if payment successful.
 			if ( WC_Checkoutcom_Utility::is_successful( $response ) ) {
 				// Check if payment is 3D secure.
@@ -413,6 +418,7 @@ class WC_Checkoutcom_Api_Request {
 
 		$checkout              = new Checkout_SDK();
 		$payment               = $checkout->get_payment_request();
+		cko_apply_processing_channel_id( $payment );
 		$payment->capture      = $auto_capture;
 		$payment->amount       = $amount_cents;
 		$payment->currency     = $order->get_currency();
@@ -485,12 +491,24 @@ class WC_Checkoutcom_Api_Request {
 					$payment->previous_payment_id = $previous_payment_id;
 				}
 
+				// Mastercard Transaction Link Identifier (TLID) from the first payment in the chain.
+				// Needed when that payment went through another provider (migrated subscriptions);
+				// for Checkout.com chains it is the TLID Checkout.com returned on earlier payments.
+				$scheme_tlid = class_exists( 'WC_Checkoutcom_Subscription' )
+					? WC_Checkoutcom_Subscription::sanitize_scheme_transaction_link_id( $arg['scheme_transaction_link_id'] ?? '' )
+					: '';
+				if ( '' !== $scheme_tlid ) {
+					$payment->processing                             = self::new_processing_settings();
+					$payment->processing->scheme_transaction_link_id = $scheme_tlid;
+				}
+
 				// Make the credential-chain reference visible in the gateway log (for verifying native /
 				// card-changed / migrated subscriptions and for support).
 				WC_Checkoutcom_Utility::logger(
 					'[RENEWAL] MIT for order ' . $order->get_id()
 					. ': source_id=' . ( isset( $arg['source_id'] ) ? $arg['source_id'] : 'n/a' )
 					. ', previous_payment_id=' . ( $previous_payment_id ?: 'NONE' )
+					. ', tlid=' . ( '' !== $scheme_tlid ? 'yes' : 'NONE' )
 					. ' (source: ' . $prev_source . ')'
 				);
 			}
@@ -623,7 +641,7 @@ class WC_Checkoutcom_Api_Request {
 
 		// Cartes Bancaires card scheme.
 		if ( ! empty( $card_scheme ) ) {
-			$processing_settings = new ProcessingSettings();
+			$processing_settings = $payment->processing instanceof ProcessingSettings ? $payment->processing : self::new_processing_settings();
 
 			if ( in_array(
 				$card_scheme,
@@ -1113,6 +1131,17 @@ class WC_Checkoutcom_Api_Request {
 	}
 
 	/**
+	 * Processing settings that can also carry processing.scheme_transaction_link_id.
+	 *
+	 * @return ProcessingSettings
+	 */
+	private static function new_processing_settings() {
+		require_once __DIR__ . '/class-wc-checkoutcom-processing-settings.php';
+
+		return new WC_Checkoutcom_Processing_Settings();
+	}
+
+	/**
 	 * Record a successful refund's action id on the order so the refund webhook can recognise it as
 	 * already booked and not create a duplicate WooCommerce refund (over-refund protection).
 	 *
@@ -1490,6 +1519,7 @@ class WC_Checkoutcom_Api_Request {
 		$paymentContextsRequest->payment_type = PaymentType::$regular;
 		$paymentContextsRequest->items        = $products;
 		$paymentContextsRequest->processing   = $processing;
+		cko_apply_processing_channel_id( $paymentContextsRequest );
 
 		// Initialize the Checkout Api.
 		$checkout = new Checkout_SDK();
