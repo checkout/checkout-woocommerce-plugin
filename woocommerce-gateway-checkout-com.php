@@ -1014,7 +1014,7 @@ function cko_show_flow_incomplete_order_notice() {
 function cko_add_flow_resource_hints() {
 	$core_settings = get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
 	$environment = isset( $core_settings['ckocom_environment'] ) ? $core_settings['ckocom_environment'] : 'sandbox';
-	$api_domain = 'sandbox' === $environment ? 'api.sandbox.checkout.com' : 'api.checkout.com';
+	$api_domain = wp_parse_url( cko_get_api_base_url( $core_settings ), PHP_URL_HOST );
 	?>
 	<link rel="dns-prefetch" href="//checkout-web-components.checkout.com">
 	<link rel="preconnect" href="https://checkout-web-components.checkout.com" crossorigin>
@@ -1443,11 +1443,7 @@ function cko_enqueue_frontend_assets() {
 		$payment_session_version
 	);
 
-		$url = 'https://api.checkout.com/payment-sessions';
-
-		if ( 'sandbox' === $core_settings['ckocom_environment'] ) {
-			$url = 'https://api.sandbox.checkout.com/payment-sessions';
-		}
+		$url = cko_get_api_base_url( $core_settings ) . '/payment-sessions';
 
 		global $woocommerce, $wp_version;
 
@@ -1950,6 +1946,100 @@ function cko_is_nas_account() {
 	return isset( $core_settings['ckocom_account_type'] ) && ( 'NAS' === $core_settings['ckocom_account_type'] );
 }
 
+/**
+ * Derive the merchant-specific subdomain (MSSD) from a Checkout.com Client ID.
+ *
+ * Checkout.com routes each merchant to its own API host, named after the first 8
+ * characters of the Client ID after the "cli_" prefix
+ * (cli_abcd1234... => https://abcd1234.api.checkout.com). A bare subdomain is accepted too.
+ *
+ * @param string $client_id Client ID (or subdomain) as entered in the settings.
+ * @return string The subdomain, or '' when blank or not a valid subdomain.
+ */
+function cko_mssd_subdomain_from_client_id( $client_id ) {
+	$client_id = strtolower( trim( (string) $client_id ) );
+	if ( '' === $client_id ) {
+		return '';
+	}
+	$raw       = ( 0 === strpos( $client_id, 'cli_' ) ) ? substr( $client_id, 4 ) : $client_id;
+	$candidate = substr( $raw, 0, 8 );
+
+	// Same rule as the SDK's EnvironmentSubdomain, so the SDK and the direct calls agree.
+	return 1 === preg_match( '/^[0-9a-z]{8}$/', $candidate ) ? $candidate : '';
+}
+
+/**
+ * API subdomain for the configured account: the MSSD from the Client ID, otherwise the
+ * legacy region subdomain (e.g. "ksa"), otherwise '' for the global domain.
+ *
+ * @param array|null $core_settings Card settings; read from the database when null.
+ * @return string
+ */
+function cko_get_api_subdomain( $core_settings = null ) {
+	if ( ! is_array( $core_settings ) ) {
+		$core_settings = cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' );
+	}
+
+	$mssd = cko_mssd_subdomain_from_client_id( $core_settings['ckocom_client_id'] ?? '' );
+	if ( '' !== $mssd ) {
+		return $mssd;
+	}
+
+	$region = isset( $core_settings['ckocom_region'] ) ? (string) $core_settings['ckocom_region'] : '';
+
+	return in_array( $region, array( 'ksa' ), true ) ? $region : '';
+}
+
+/**
+ * Processing Channel ID (pc_...) configured in the settings.
+ *
+ * @param array|null $core_settings Card settings; read from the database when null.
+ * @return string The channel id, or '' when blank or not valid.
+ */
+function cko_get_processing_channel_id( $core_settings = null ) {
+	if ( ! is_array( $core_settings ) ) {
+		$core_settings = cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' );
+	}
+	$pc_id = strtolower( trim( (string) ( $core_settings['ckocom_processing_channel_id'] ?? '' ) ) );
+
+	return 1 === preg_match( '/^pc_[a-z0-9]{1,64}$/', $pc_id ) ? $pc_id : '';
+}
+
+/**
+ * Set the configured Processing Channel ID on an SDK request, unless the request already has one
+ * (e.g. taken from a payment context) or its type has no such field (legacy ABC requests).
+ *
+ * @param object|null $request SDK request object.
+ * @return void
+ */
+function cko_apply_processing_channel_id( $request ) {
+	if ( ! is_object( $request ) || ! property_exists( $request, 'processing_channel_id' ) || ! empty( $request->processing_channel_id ) ) {
+		return;
+	}
+	$pc_id = cko_get_processing_channel_id();
+	if ( '' !== $pc_id ) {
+		$request->processing_channel_id = $pc_id;
+	}
+}
+
+/**
+ * Base URL of the Checkout.com API for the configured environment and subdomain,
+ * e.g. https://api.sandbox.checkout.com or https://abcd1234.api.checkout.com (no trailing slash).
+ *
+ * @param array|null $core_settings Card settings; read from the database when null.
+ * @return string
+ */
+function cko_get_api_base_url( $core_settings = null ) {
+	if ( ! is_array( $core_settings ) ) {
+		$core_settings = cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' );
+	}
+
+	$host      = 'sandbox' === ( $core_settings['ckocom_environment'] ?? 'sandbox' ) ? 'api.sandbox.checkout.com' : 'api.checkout.com';
+	$subdomain = cko_get_api_subdomain( $core_settings );
+
+	return 'https://' . ( '' !== $subdomain ? $subdomain . '.' : '' ) . $host;
+}
+
 add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_cards', 'cko_subscription_payment', 10, 2 );
 add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_alternative_payments_sepa', 'cko_subscription_payment', 10, 2 );
 add_action( 'woocommerce_scheduled_subscription_payment_wc_checkout_com_google_pay', 'cko_subscription_payment', 10, 2 );
@@ -2262,9 +2352,7 @@ function cko_get_payment_session() {
 		}
 		
 		// Make API call to Checkout.com to get payment session details
-		$api_url = $environment === 'sandbox' 
-			? 'https://api.sandbox.checkout.com/payment-sessions/' . $session_id
-			: 'https://api.checkout.com/payment-sessions/' . $session_id;
+		$api_url = cko_get_api_base_url( $core_settings ) . '/payment-sessions/' . $session_id;
 		
 		WC_Checkoutcom_Utility::logger( 'API URL: ' . $api_url );
 		
@@ -2418,9 +2506,7 @@ function cko_get_payment_status( $request ) {
 	}
 
 	// Use correct API URL based on environment
-	$url = ( 'sandbox' === $env )
-		? "https://api.sandbox.checkout.com/payments/{$payment_id}"
-		: "https://api.checkout.com/payments/{$payment_id}";
+	$url = cko_get_api_base_url( $core_settings ) . '/payments/' . $payment_id;
 
 	// Send the GET request to Checkout.com.
 	$response = wp_remote_get(

@@ -970,7 +970,6 @@ class WC_Checkoutcom_Webhook {
 			return array();
 		}
 
-		$environment = ( 'sandbox' === ( $core_settings['ckocom_environment'] ?? 'sandbox' ) );
 		$secret_key = $core_settings['ckocom_sk'] ?? '';
 		
 		if ( empty( $secret_key ) ) {
@@ -978,7 +977,7 @@ class WC_Checkoutcom_Webhook {
 		}
 
 		// Build API URL for ABC accounts (webhooks endpoint)
-		$base_url = $environment ? 'https://api.sandbox.checkout.com' : 'https://api.checkout.com';
+		$base_url = cko_get_api_base_url( $core_settings );
 		$api_url = $base_url . '/webhooks';
 
 		// Prepare authorization header

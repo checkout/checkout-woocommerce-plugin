@@ -2242,7 +2242,6 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		$secret_key_raw = $core_settings['ckocom_sk'];
 		$environment = isset( $core_settings['ckocom_environment'] ) ? $core_settings['ckocom_environment'] : 'sandbox';
 		$account_type = isset( $core_settings['ckocom_account_type'] ) ? $core_settings['ckocom_account_type'] : 'ABC';
-		$region = isset( $core_settings['ckocom_region'] ) ? $core_settings['ckocom_region'] : 'global';
 		$protocol_version = isset( $_POST['protocol_version'] ) ? sanitize_text_field( $_POST['protocol_version'] ) : 'ec_v1';
 
 		// Check if NAS account
@@ -2250,16 +2249,8 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			$account_type = 'NAS';
 		}
 
-		// Build API URL
-		$base_url = 'https://api.checkout.com';
-		if ( 'sandbox' === $environment ) {
-			$base_url = 'https://api.sandbox.checkout.com';
-		}
-
-		// Add region subdomain if not global
-		if ( 'global' !== $region && ! empty( $region ) ) {
-			$base_url = str_replace( 'api.', $region . '.api.', $base_url );
-		}
+		// Environment host, with the merchant-specific (or region) subdomain when configured.
+		$base_url = cko_get_api_base_url( $core_settings );
 
 		$api_url = $base_url . '/applepay/signing-requests';
 
@@ -2558,23 +2549,14 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 		$secret_key_raw = $core_settings['ckocom_sk'];
 		$environment = isset( $core_settings['ckocom_environment'] ) ? $core_settings['ckocom_environment'] : 'sandbox';
 		$account_type = isset( $core_settings['ckocom_account_type'] ) ? $core_settings['ckocom_account_type'] : 'ABC';
-		$region = isset( $core_settings['ckocom_region'] ) ? $core_settings['ckocom_region'] : 'global';
 
 		// Check if NAS account
 		if ( function_exists( 'cko_is_nas_account' ) && cko_is_nas_account() ) {
 			$account_type = 'NAS';
 		}
 
-		// Build API URL
-		$base_url = 'https://api.checkout.com';
-		if ( 'sandbox' === $environment ) {
-			$base_url = 'https://api.sandbox.checkout.com';
-		}
-
-		// Add region subdomain if not global
-		if ( 'global' !== $region && ! empty( $region ) ) {
-			$base_url = str_replace( 'api.', $region . '.api.', $base_url );
-		}
+		// Environment host, with the merchant-specific (or region) subdomain when configured.
+		$base_url = cko_get_api_base_url( $core_settings );
 
 		$api_url = $base_url . '/applepay/certificates';
 

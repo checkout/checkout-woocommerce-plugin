@@ -45,6 +45,9 @@ class WC_Checkoutcom_Subscription {
 			// migrating parent-less subscriptions, or on a card change. create_payment() falls back to
 			// the parent order's _cko_payment_id when this is empty (native CKO subscriptions).
 			$args['previous_payment_id'] = $subscriptions_obj->get_meta( '_cko_payment_id' );
+			// Mastercard Transaction Link Identifier (TLID): returned by Checkout.com on earlier
+			// payments, or imported with a subscription migrated from another provider.
+			$args['scheme_transaction_link_id'] = $subscriptions_obj->get_meta( self::TLID_META_KEY );
 		}
 
 		$payment_result = (array) WC_Checkoutcom_Api_Request::create_payment( $renewal_order, $args, 'renewal' );
@@ -113,6 +116,103 @@ class WC_Checkoutcom_Subscription {
 
 		// Reduce stock levels.
 		wc_reduce_stock_levels( $order_id );
+	}
+
+	/**
+	 * Order / subscription meta key for the Mastercard Transaction Link Identifier (TLID).
+	 * Merchants migrating subscriptions from another provider can import it under this key.
+	 */
+	const TLID_META_KEY = '_cko_scheme_transaction_link_id';
+
+	/**
+	 * Clean a TLID value: printable ASCII without spaces, at most 64 characters.
+	 *
+	 * @param mixed $value Raw value.
+	 * @return string The TLID, or '' when empty or not valid.
+	 */
+	public static function sanitize_scheme_transaction_link_id( $value ) {
+		if ( ! is_scalar( $value ) ) {
+			return '';
+		}
+		$value = trim( (string) $value );
+
+		return 1 === preg_match( '/^[\x21-\x7E]{1,64}$/', $value ) ? $value : '';
+	}
+
+	/**
+	 * Read processing.scheme_transaction_link_id from a payment response or payment details.
+	 *
+	 * @param mixed $payment Payment (array or object).
+	 * @return string
+	 */
+	public static function get_scheme_transaction_link_id( $payment ) {
+		$processing = null;
+		if ( is_array( $payment ) ) {
+			$processing = $payment['processing'] ?? null;
+		} elseif ( is_object( $payment ) && isset( $payment->processing ) ) {
+			$processing = $payment->processing;
+		}
+
+		$tlid = '';
+		if ( is_array( $processing ) ) {
+			$tlid = $processing['scheme_transaction_link_id'] ?? '';
+		} elseif ( is_object( $processing ) && isset( $processing->scheme_transaction_link_id ) ) {
+			$tlid = $processing->scheme_transaction_link_id;
+		}
+
+		return self::sanitize_scheme_transaction_link_id( $tlid );
+	}
+
+	/**
+	 * Store the TLID from a payment on the order and its subscription(s), so renewals can send it.
+	 *
+	 * The subscription keeps the TLID of the first payment in its credential chain (the parent
+	 * order, or the card verification on a card change), like previous_payment_id. Each renewal
+	 * gets a TLID of its own, which is kept on the renewal order only. Subscriptions created before
+	 * this was added have none and keep relying on previous_payment_id.
+	 *
+	 * @param WC_Order|WC_Subscription $order           Order (or subscription, on a card change).
+	 * @param mixed                    $payment         Payment response or payment details.
+	 * @param bool                     $replace_missing Remove a stored TLID when the payment has
+	 *                                                  none (the card changed, so the old chain no
+	 *                                                  longer applies).
+	 * @return void
+	 */
+	public static function save_scheme_transaction_link_id( $order, $payment, $replace_missing = false ) {
+		if ( ! ( $order instanceof WC_Order ) ) {
+			return;
+		}
+
+		$tlid = self::get_scheme_transaction_link_id( $payment );
+		if ( '' === $tlid && ! $replace_missing ) {
+			return;
+		}
+
+		$targets = array( $order );
+		if ( ! ( $order instanceof WC_Subscription ) ) {
+			// Only subscription orders need it; one-off orders are left alone.
+			if ( ! function_exists( 'wcs_order_contains_subscription' ) || ! function_exists( 'wcs_get_subscriptions_for_order' )
+				|| ! wcs_order_contains_subscription( $order, array( 'parent', 'renewal' ) ) ) {
+				return;
+			}
+			// Only the parent order starts the chain; a renewal's TLID stays on the renewal order.
+			if ( wcs_order_contains_subscription( $order, 'parent' ) ) {
+				$targets = array_merge( $targets, array_values( wcs_get_subscriptions_for_order( $order, array( 'order_type' => 'parent' ) ) ) );
+			}
+		}
+
+		foreach ( $targets as $target ) {
+			$stored = (string) $target->get_meta( self::TLID_META_KEY );
+			if ( '' === $tlid ) {
+				if ( '' !== $stored ) {
+					$target->delete_meta_data( self::TLID_META_KEY );
+					$target->save();
+				}
+			} elseif ( $tlid !== $stored ) {
+				$target->update_meta_data( self::TLID_META_KEY, $tlid );
+				$target->save();
+			}
+		}
 	}
 
 	/**

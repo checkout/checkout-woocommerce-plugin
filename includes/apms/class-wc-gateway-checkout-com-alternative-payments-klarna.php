@@ -157,6 +157,7 @@ class WC_Gateway_Checkout_Com_Alternative_Payments_Klarna extends WC_Gateway_Che
 
 			$payment_request_param                     = $checkout->get_payment_request();
 			$payment_request_param->payment_context_id = $payment_context_id;
+			cko_apply_processing_channel_id( $payment_request_param );
 			$payment_request_param->reference          = $order->get_order_number();
 			$payment_request_param->metadata           = $metadata;
 

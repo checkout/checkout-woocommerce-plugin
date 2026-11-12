@@ -2330,6 +2330,8 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 		// Persist the new source on the subscription so future MIT renewals charge the new card.
 		WC_Checkoutcom_Subscription::save_source_id( $subscription_id, $subscription, $source_id );
+		// The new card starts a new credential chain: keep its TLID, or drop the old card's one.
+		WC_Checkoutcom_Subscription::save_scheme_transaction_link_id( $subscription, $data, true );
 		if ( ! empty( $data['source']['scheme'] ) ) {
 			$this->save_preferred_card_scheme( $subscription_id, $subscription, $data['source']['scheme'] );
 		}
@@ -2506,8 +2508,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			return false;
 		}
 
-		$env  = isset( $core_settings['ckocom_environment'] ) ? $core_settings['ckocom_environment'] : 'sandbox';
-		$base = ( 'sandbox' === $env ) ? 'https://api.sandbox.checkout.com' : 'https://api.checkout.com';
+		$base = cko_get_api_base_url( is_array( $core_settings ) ? $core_settings : null );
 
 		$response = wp_remote_post( $base . '/payments/' . rawurlencode( $payment_id ) . '/voids', array(
 			'timeout' => 15,
@@ -4278,6 +4279,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	if ( class_exists( 'WC_Subscriptions_Order' ) && $flow_result !== null ) {
 			// Save source id for subscription.
 				WC_Checkoutcom_Subscription::save_source_id( $order_id, $order, $flow_result['source']['id'] );
+				WC_Checkoutcom_Subscription::save_scheme_transaction_link_id( $order, $flow_result );
 
 			if ( "card" === $subs_payment_type ) {
 				$this->save_preferred_card_scheme( $order_id, $order, $flow_result['source']['scheme'] );
@@ -5402,6 +5404,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 					if ( $source_verified && is_array( $source_data ) && ! empty( $source_data['source']['id'] ) ) {
 						WC_Checkoutcom_Subscription::save_source_id( $order_id, $order, $source_data['source']['id'] );
+						WC_Checkoutcom_Subscription::save_scheme_transaction_link_id( $order, $source_data );
 						WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] [SUBSCRIPTION SOURCE] ✅ Saved source_id ' . $source_data['source']['id'] . ' on order ' . $order_id );
 
 						// Also save the preferred card scheme (mirrors the normal-path save at line ~3702).
@@ -8178,11 +8181,14 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			$payment_session_request['failure_url'] = $return_url;
 		}
 
-		// Determine API URL based on environment
-		$api_url = 'https://api.checkout.com/payment-sessions';
-		if ( isset( $core_settings['ckocom_environment'] ) && 'sandbox' === $core_settings['ckocom_environment'] ) {
-			$api_url = 'https://api.sandbox.checkout.com/payment-sessions';
+		// Processing Channel ID, when configured (accounts with several channels need it).
+		$cko_pc_id = cko_get_processing_channel_id( is_array( $core_settings ) ? $core_settings : null );
+		if ( '' !== $cko_pc_id ) {
+			$payment_session_request['processing_channel_id'] = $cko_pc_id;
 		}
+
+		// Environment host, with the merchant-specific subdomain when a Client ID is set.
+		$api_url = cko_get_api_base_url( is_array( $core_settings ) ? $core_settings : null ) . '/payment-sessions';
 
 		// Prepare the API request
 		$request_args = array(
@@ -9945,7 +9951,6 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		$core_settings  = function_exists( 'cko_get_raw_option' )
 			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
 			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
-		$environment    = ! empty( $core_settings['ckocom_environment'] ) ? $core_settings['ckocom_environment'] : 'sandbox';
 
 		// Get secret key - single key is used for both environments (determined by the key itself)
 		$secret_key_raw = ! empty( $core_settings['ckocom_sk'] ) ? $core_settings['ckocom_sk'] : '';
@@ -9988,9 +9993,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		}
 
 		// Build API URL
-		$api_base_url = 'sandbox' === $environment
-			? 'https://api.sandbox.checkout.com'
-			: 'https://api.checkout.com';
+		$api_base_url = cko_get_api_base_url( is_array( $core_settings ) ? $core_settings : null );
 		$api_url      = $api_base_url . '/payment-sessions/' . rawurlencode( $payment_session_id ) . '/submit';
 
 		WC_Checkoutcom_Utility::logger( '[SUBMIT PAYMENT SESSION] Calling Checkout.com API - URL: ' . $api_url );
