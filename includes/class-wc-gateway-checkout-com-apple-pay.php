@@ -3684,10 +3684,15 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			}
 		}
 
-		// Fallback: build the PEM from the DER bytes in PHP (what `openssl x509 -inform DER
-		// -outform PEM` prints), without running a shell command.
-		if ( empty( $certificate_pem ) && '' !== $certificate_der ) {
-			$certificate_pem = "-----BEGIN CERTIFICATE-----\n" . chunk_split( base64_encode( $certificate_der ), 64, "\n" ) . "-----END CERTIFICATE-----\n";
+		// Fallback: wrap the DER bytes as PEM (what `openssl x509 -inform DER -outform PEM` does),
+		// then keep it only if OpenSSL parses it as a certificate. What is saved is OpenSSL's own
+		// export of the parsed certificate, never the uploaded bytes.
+		if ( empty( $certificate_pem ) && '' !== $certificate_der && function_exists( 'openssl_x509_read' ) ) {
+			$wrapped = "-----BEGIN CERTIFICATE-----\n" . chunk_split( base64_encode( $certificate_der ), 64, "\n" ) . "-----END CERTIFICATE-----\n";
+			$cert    = openssl_x509_read( $wrapped );
+			if ( false !== $cert ) {
+				openssl_x509_export( $cert, $certificate_pem );
+			}
 		}
 
 		if ( empty( $certificate_pem ) ) {
