@@ -69,7 +69,10 @@ jobs:
       - name: Run Playwright
         if: steps.creds.outputs.available == 'true'
         working-directory: e2e-tests
-        run: npx playwright test --grep "${{ github.event.inputs.grep || '@smoke|@qit' }}"
+        # Passed through the environment, not pasted into the script, so the input can't inject shell.
+        env:
+          GREP: ${{ github.event.inputs.grep || '@smoke|@qit' }}
+        run: npx playwright test --grep "$GREP"
 
       - name: Upload report and traces
         if: always() && steps.creds.outputs.available == 'true'
