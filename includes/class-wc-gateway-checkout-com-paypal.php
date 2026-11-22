@@ -123,7 +123,7 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 					WC_Checkoutcom_Utility::cko_set_session( 'cko_pc_id', '' );
 
 				case 'cc_capture':
-					WC_Checkoutcom_Utility::cko_set_session( 'cko_paypal_order_id', wc_clean( $_GET['paypal_order_id'] ) );
+					WC_Checkoutcom_Utility::cko_set_session( 'cko_paypal_order_id', wc_clean( wp_unslash( $_GET['paypal_order_id'] ) ) );
 					$this->cko_cc_capture();
 					break;
 

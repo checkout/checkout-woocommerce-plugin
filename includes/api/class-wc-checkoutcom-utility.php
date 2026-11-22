@@ -95,7 +95,7 @@ class WC_Checkoutcom_Utility {
 		}
 
 		// phpcs:disable WordPress.Security.NonceVerification.Missing, WordPress.Security.NonceVerification.Recommended -- order key check, callers verify their own nonces.
-		foreach ( array( $_POST['order_key'] ?? null, $_POST['key'] ?? null, $_GET['key'] ?? null ) as $key ) {
+		foreach ( array( isset( $_POST['order_key'] ) ? sanitize_text_field( wp_unslash( $_POST['order_key'] ) ) : null, isset( $_POST['key'] ) ? sanitize_text_field( wp_unslash( $_POST['key'] ) ) : null, isset( $_GET['key'] ) ? sanitize_text_field( wp_unslash( $_GET['key'] ) ) : null ) as $key ) {
 			if ( is_string( $key ) && '' !== $key && hash_equals( (string) $order->get_order_key(), sanitize_text_field( wp_unslash( $key ) ) ) ) {
 				return true;
 			}
