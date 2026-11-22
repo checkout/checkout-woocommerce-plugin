@@ -20,6 +20,7 @@ type ExpressOrderLines = {
 	shipping: string[];
 	fees: string[];
 	coupons: string[];
+	couponCode: string;
 	products: number;
 };
 
@@ -66,7 +67,8 @@ function buildExpressOrder(className: string, args: string, setup = ''): Express
 			return array( 'e2e_rate:1' => new WC_Shipping_Rate( 'e2e_rate:1', 'E2E rate', 5, array(), 'flat_rate', 1 ) );
 		} );
 
-		$code = 'e2e-express-' . wp_generate_password( 6, false );
+		// WooCommerce stores coupon codes lowercased; use that form so the order's code can be compared exactly.
+		$code = wc_format_coupon_code( 'e2e-express-' . strtolower( wp_generate_password( 6, false ) ) );
 		$coupon = new WC_Coupon();
 		$coupon->set_code( $code );
 		$coupon->set_discount_type( 'fixed_cart' );
@@ -85,7 +87,7 @@ function buildExpressOrder(className: string, args: string, setup = ''): Express
 		$create->setAccessible( true );
 		$order = $create->invoke( $gateway${args ? `, ${args}` : ''} );
 
-		$result = array( 'created' => $order instanceof WC_Order, 'cartTotal' => $cart_total, 'orderTotal' => '', 'shipping' => array(), 'fees' => array(), 'coupons' => array(), 'products' => 0 );
+		$result = array( 'created' => $order instanceof WC_Order, 'couponCode' => $code, 'cartTotal' => $cart_total, 'orderTotal' => '', 'shipping' => array(), 'fees' => array(), 'coupons' => array(), 'products' => 0 );
 		if ( $order instanceof WC_Order ) {
 			$order = wc_get_order( $order->get_id() );
 			$result['orderTotal'] = wc_format_decimal( $order->get_total(), wc_get_price_decimals() );
@@ -105,7 +107,6 @@ function buildExpressOrder(className: string, args: string, setup = ''): Express
 		WC()->cart->empty_cart();
 		WC_Checkoutcom_Utility::cko_set_session( 'cko_pc_details', '' );
 		wp_delete_post( $coupon->get_id(), true );
-		$result['coupons'] = array_map( function ( $c ) use ( $code ) { return $c === $code ? 'applied' : $c; }, $result['coupons'] );
 		return $result;
 	`);
 }
@@ -119,8 +120,7 @@ test.describe('Express checkout orders', () => {
 			expect(lines.products).toBe(1);
 			expect(lines.shipping).toEqual(['flat_rate:1']);
 			expect(lines.fees).toEqual(['E2E handling fee']);
-			expect(lines.coupons).toHaveLength(1);
-			expect(lines.coupons[0], 'the cart coupon is on the order').toMatch(/^e2e-express-/);
+			expect(lines.coupons, 'exactly the cart coupon is on the order').toEqual([lines.couponCode]);
 			expect(lines.orderTotal, 'order total matches the cart total').toBe(lines.cartTotal);
 		});
 	}
