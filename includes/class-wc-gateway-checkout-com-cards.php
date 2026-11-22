@@ -540,12 +540,12 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 			foreach ( array( 'ckocom_client_id', 'ckocom_processing_channel_id' ) as $optional_key ) {
 				$optional_value = null;
 				if ( isset( $_POST['woocommerce_wc_checkout_com_cards_settings'][ $optional_key ] ) && is_string( $_POST['woocommerce_wc_checkout_com_cards_settings'][ $optional_key ] ) ) {
-					$optional_value = wp_unslash( $_POST['woocommerce_wc_checkout_com_cards_settings'][ $optional_key ] );
+					$optional_value = sanitize_text_field( wp_unslash( $_POST['woocommerce_wc_checkout_com_cards_settings'][ $optional_key ] ) );
 				} elseif ( isset( $_POST[ $optional_key ] ) && is_string( $_POST[ $optional_key ] ) ) {
-					$optional_value = wp_unslash( $_POST[ $optional_key ] );
+					$optional_value = sanitize_text_field( wp_unslash( $_POST[ $optional_key ] ) );
 				}
 				if ( null !== $optional_value ) {
-					$settings[ $optional_key ] = substr( sanitize_text_field( $optional_value ), 0, 70 );
+					$settings[ $optional_key ] = substr( $optional_value, 0, 70 );
 				}
 			}
 
