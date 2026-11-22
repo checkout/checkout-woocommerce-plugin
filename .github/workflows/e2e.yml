@@ -5,9 +5,9 @@ on:
   workflow_dispatch:
     inputs:
       grep:
-        description: 'Only run tests matching this tag/title (empty = smoke)'
+        description: 'Only run tests matching this tag/title (empty = smoke + QIT activation)'
         required: false
-        default: '@smoke'
+        default: '@smoke|@qit'
 
 concurrency:
   group: e2e-${{ github.ref }}
@@ -69,7 +69,7 @@ jobs:
       - name: Run Playwright
         if: steps.creds.outputs.available == 'true'
         working-directory: e2e-tests
-        run: npx playwright test --grep "${{ github.event.inputs.grep || '@smoke' }}"
+        run: npx playwright test --grep "${{ github.event.inputs.grep || '@smoke|@qit' }}"
 
       - name: Upload report and traces
         if: always() && steps.creds.outputs.available == 'true'
