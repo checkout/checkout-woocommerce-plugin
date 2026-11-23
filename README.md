@@ -44,9 +44,9 @@ Checkout.com Payment Gateway plugin for WooCommerce with Flow integration suppor
    https://your-site.com/?wc-api=wc_checkoutcom_webhook
    ```
 
-### Optional Settings
+### Account Settings
 
-- **Client ID** (`cli_...`) - When set, API requests go to your merchant-specific subdomain (`https://{first 8 characters after cli_}.api.checkout.com`, or `.api.sandbox.checkout.com` in Sandbox). Leave blank to use the global domain.
+- **Client ID** (`cli_...`) - API requests go to your merchant-specific subdomain (MSSD): `https://{prefix}.api.checkout.com`, or `https://{prefix}.api.sandbox.checkout.com` in Sandbox, where the prefix is the first 8 characters after `cli_`. Checkout.com asks all merchants to use the MSSD; requests to a base URL that isn't valid for the account get `403` with `base_url_invalid`. Find the Client ID in the Dashboard under **Settings → Account structure** (Owner or Admin role). Sandbox and Live have different Client IDs. Blank uses the global domain. See [API endpoints](https://www.checkout.com/docs/developer-resources/api/api-endpoints).
 - **Processing Channel ID** (`pc_...`) - Sent with payments. Needed when your account has more than one processing channel. Leave blank to use the account default.
 
 ### Flow Integration Settings
@@ -65,7 +65,7 @@ Checkout.com Payment Gateway plugin for WooCommerce with Flow integration suppor
    - **Environment**: Sandbox (or Live)
    - **Account Type**: NAS (if applicable)
    - **Secret Key** and **Public Key**
-   - **Client ID** and **Processing Channel ID** (optional)
+   - **Client ID** (and **Processing Channel ID**, optional)
    - **Payment Method Title**
 4. Under **Webhook Status**, click **Refresh Status**.
 5. If not configured, click **Register Webhook**.
@@ -123,7 +123,7 @@ Follow this guide to upgrade your WooCommerce plugin to Flow.
 After validating the upgrade:
 - Set **Environment** to **Live**.
 - Set **Secret Key** and **Public Key** to your production keys.
-- If you use them, set **Client ID** and **Processing Channel ID** to your Live values.
+- Set **Client ID** to your Live Client ID (and **Processing Channel ID**, if you use one).
 
 ## Apple Pay Setup Guide
 
@@ -481,7 +481,7 @@ GPL v2 or later
 The full changelog for every release is in [changelog.txt](changelog.txt).
 
 ### Version 5.1.8
-- Optional Client ID setting: API requests go to your merchant-specific Checkout.com subdomain.
+- Client ID setting: API requests go to your merchant-specific Checkout.com subdomain (MSSD).
 - Optional Processing Channel ID setting, sent with payments.
 - Mastercard subscription renewals send the scheme transaction link ID (TLID) from the first payment.
 - Fixes for the WooCommerce QIT security and Plugin Check tests.
