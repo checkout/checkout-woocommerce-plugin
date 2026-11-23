@@ -1,0 +1,12 @@
+{
+    "name": "checkout/qit-local-compat",
+    "description": "PHPCompatibility (develop branch, as QIT uses) for bin/qit/local.sh compat. Not part of the plugin.",
+    "license": "GPL-2.0-or-later",
+    "require": {
+        "phpcompatibility/php-compatibility": "dev-develop",
+        "dealerdirect/phpcodesniffer-composer-installer": "^1.0"
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "config": { "allow-plugins": { "dealerdirect/phpcodesniffer-composer-installer": true } }
+}

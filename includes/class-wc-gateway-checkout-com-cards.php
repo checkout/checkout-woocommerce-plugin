@@ -338,7 +338,7 @@ class WC_Gateway_Checkout_Com_Cards extends WC_Payment_Gateway_CC {
 		];
 
 		echo '<h3>' . esc_html( $this->method_title ) . ' </h3>';
-		echo '<p>' . esc_html( $this->method_description ) . ' </p>';
+		echo '<p>' . wp_kses_post( $this->method_description ) . ' </p>';
 		$this->generate_screen_button_html( 'screen_button', $test );
 
 		if ( 'quick_settings' === $screen ) {

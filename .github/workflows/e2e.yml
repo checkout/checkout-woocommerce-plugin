@@ -5,9 +5,9 @@ on:
   workflow_dispatch:
     inputs:
       grep:
-        description: 'Only run tests matching this tag/title (empty = smoke)'
+        description: 'Only run tests matching this tag/title (empty = smoke + QIT activation)'
         required: false
-        default: '@smoke'
+        default: '@smoke|@qit'
 
 concurrency:
   group: e2e-${{ github.ref }}
@@ -50,12 +50,13 @@ jobs:
 
       - name: Build Blocks assets (build/ is not committed)
         if: steps.creds.outputs.available == 'true'
-        run: npm ci && npm run build
+        run: npm ci --ignore-scripts && npm run build
 
       - name: Install E2E dependencies
         if: steps.creds.outputs.available == 'true'
         working-directory: e2e-tests
-        run: npm ci && npx playwright install --with-deps chromium
+        # Local binaries, not npx: nothing is downloaded or installed on demand.
+        run: npm ci --ignore-scripts && ./node_modules/.bin/playwright install --with-deps chromium
 
       - name: Start pinned test store (wp-env)
         if: steps.creds.outputs.available == 'true'
@@ -69,7 +70,10 @@ jobs:
       - name: Run Playwright
         if: steps.creds.outputs.available == 'true'
         working-directory: e2e-tests
-        run: npx playwright test --grep "${{ github.event.inputs.grep || '@smoke' }}"
+        # Passed through the environment, not pasted into the script, so the input can't inject shell.
+        env:
+          GREP: ${{ github.event.inputs.grep || '@smoke|@qit' }}
+        run: ./node_modules/.bin/playwright test --grep "$GREP"
 
       - name: Upload report and traces
         if: always() && steps.creds.outputs.available == 'true'

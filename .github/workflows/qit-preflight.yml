@@ -1,0 +1,66 @@
+name: QIT preflight
+
+# Local copies of the WooCommerce QIT managed tests that run on every release on
+# WooCommerce.com (see bin/qit/README.md). Unlike code-review.yml, these checks BLOCK:
+# a failure here is a test WooCommerce would fail the release on.
+#
+# No secrets are needed, so this also runs on pull requests from forks.
+# The QIT Activation test runs in e2e.yml (@qit tag), as it needs the sandbox-seeded store.
+
+on:
+  pull_request:
+  push:
+    branches: [master, main]
+  workflow_dispatch:
+
+concurrency:
+  group: qit-preflight-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  static:
+    name: Security, compatibility, validation, malware, audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show tool versions
+        run: |
+          php --version
+          composer --version
+
+      - name: Run the QIT static checks
+        run: bash bin/qit/local.sh
+
+  plugin-check:
+    name: WordPress.org Plugin Check (release zip)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            e2e-tests/package-lock.json
+
+      - name: Build the release zip
+        run: |
+          npm ci --ignore-scripts
+          bash bin/build.sh
+
+      - name: Start the pinned test store (wp-env)
+        working-directory: e2e-tests
+        run: |
+          npm ci --ignore-scripts
+          npm run env:start
+
+      - name: Run Plugin Check on the zip
+        run: bash bin/qit/plugin-check.sh checkout-com-unified-payments-api.zip

@@ -94,13 +94,35 @@ class WC_Checkoutcom_Utility {
 			}
 		}
 
+		return self::request_has_order_key( $order );
+	}
+
+	/**
+	 * Whether the request carries the order's key (order_key / key in POST, key in GET).
+	 *
+	 * @param WC_Order $order Order.
+	 *
+	 * @return bool
+	 */
+	private static function request_has_order_key( WC_Order $order ) {
+		$order_key = (string) $order->get_order_key();
+		if ( '' === $order_key ) {
+			return false;
+		}
+
 		// phpcs:disable WordPress.Security.NonceVerification.Missing, WordPress.Security.NonceVerification.Recommended -- order key check, callers verify their own nonces.
-		foreach ( array( $_POST['order_key'] ?? null, $_POST['key'] ?? null, $_GET['key'] ?? null ) as $key ) {
-			if ( is_string( $key ) && '' !== $key && hash_equals( (string) $order->get_order_key(), sanitize_text_field( wp_unslash( $key ) ) ) ) {
+		$keys = array(
+			isset( $_POST['order_key'] ) ? sanitize_text_field( wp_unslash( $_POST['order_key'] ) ) : '',
+			isset( $_POST['key'] ) ? sanitize_text_field( wp_unslash( $_POST['key'] ) ) : '',
+			isset( $_GET['key'] ) ? sanitize_text_field( wp_unslash( $_GET['key'] ) ) : '',
+		);
+		// phpcs:enable
+
+		foreach ( $keys as $key ) {
+			if ( is_string( $key ) && '' !== $key && hash_equals( $order_key, $key ) ) {
 				return true;
 			}
 		}
-		// phpcs:enable
 
 		return false;
 	}

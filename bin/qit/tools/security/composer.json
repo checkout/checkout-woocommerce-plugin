@@ -1,0 +1,11 @@
+{
+    "name": "checkout/qit-local-security",
+    "description": "PHPCS + WordPress Coding Standards for bin/qit/local.sh security. Not part of the plugin.",
+    "license": "GPL-2.0-or-later",
+    "require": {
+        "squizlabs/php_codesniffer": "^3.13",
+        "wp-coding-standards/wpcs": "^3.1",
+        "dealerdirect/phpcodesniffer-composer-installer": "^1.0"
+    },
+    "config": { "allow-plugins": { "dealerdirect/phpcodesniffer-composer-installer": true } }
+}

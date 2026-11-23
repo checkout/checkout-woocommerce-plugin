@@ -1,0 +1,43 @@
+<?xml version="1.0"?>
+<!--
+	Local copy of the WooCommerce QIT "Security" managed test (PHPCS part).
+
+	QIT runs the WordPress.Security and WordPress.DB sniffs. Calibrated against the QIT report for
+	5.1.7: errors here are the findings QIT fails a release on; the rest are reported as warnings,
+	as QIT does. Run: bin/qit/local.sh security
+-->
+<ruleset name="QIT security (local)">
+	<description>WordPress.Security and WordPress.DB, graded like WooCommerce QIT.</description>
+
+	<file>../..</file>
+	<exclude-pattern>*/vendor/*</exclude-pattern>
+	<exclude-pattern>*/node_modules/*</exclude-pattern>
+	<exclude-pattern>*/e2e-tests/*</exclude-pattern>
+	<exclude-pattern>*/tests/*</exclude-pattern>
+	<exclude-pattern>*/bin/*</exclude-pattern>
+	<exclude-pattern>*/build/*</exclude-pattern>
+	<arg name="extensions" value="php"/>
+
+	<rule ref="WordPress.Security"/>
+	<rule ref="WordPress.DB"/>
+
+	<!-- WooCommerce sanitizers QIT accepts. -->
+	<rule ref="WordPress.Security.ValidatedSanitizedInput">
+		<properties>
+			<property name="customSanitizingFunctions" type="array">
+				<element value="wc_clean"/>
+				<element value="wc_sanitize_order_id"/>
+				<element value="wc_sanitize_textarea"/>
+			</property>
+		</properties>
+	</rule>
+
+	<!-- Reported by QIT as warnings only (they do not fail the test). -->
+	<rule ref="WordPress.Security.NonceVerification.Missing"><type>warning</type></rule>
+	<rule ref="WordPress.Security.NonceVerification.Recommended"><type>warning</type></rule>
+	<rule ref="WordPress.Security.ValidatedSanitizedInput.MissingUnslash"><type>warning</type></rule>
+	<rule ref="WordPress.Security.ValidatedSanitizedInput.InputNotValidated"><type>warning</type></rule>
+	<rule ref="WordPress.Security.SafeRedirect"><type>warning</type></rule>
+	<rule ref="WordPress.DB.DirectDatabaseQuery"><type>warning</type></rule>
+	<rule ref="WordPress.DB.SlowDBQuery"><type>warning</type></rule>
+</ruleset>

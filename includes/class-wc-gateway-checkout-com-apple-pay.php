@@ -2512,34 +2512,8 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			}
 		}
 		
-		// Fallback: use shell command to convert DER to PEM
-		if ( false === $certificate_final && function_exists( 'shell_exec' ) ) {
-			$temp_der = tmpfile();
-			$temp_pem = tmpfile();
-			
-			if ( $temp_der && $temp_pem ) {
-				$temp_der_path = stream_get_meta_data( $temp_der )['uri'];
-				$temp_pem_path = stream_get_meta_data( $temp_pem )['uri'];
-				
-				file_put_contents( $temp_der_path, $certificate_der );
-				
-				// Convert DER to PEM: openssl x509 -inform der -in cert.cer -out cert.pem
-				@shell_exec( sprintf( 'openssl x509 -inform der -in %s -out %s 2>&1', escapeshellarg( $temp_der_path ), escapeshellarg( $temp_pem_path ) ) );
-				
-				if ( file_exists( $temp_pem_path ) && filesize( $temp_pem_path ) > 0 ) {
-					$pem_content = file_get_contents( $temp_pem_path );
-					// Extract base64 from PEM (remove headers and whitespace)
-					$certificate_final = preg_replace( '/-----BEGIN CERTIFICATE-----|-----END CERTIFICATE-----|\s/', '', $pem_content );
-				}
-				
-				// phpcs:disable WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- closing temporary certificate file handles used for the openssl DER->PEM conversion.
-				fclose( $temp_der );
-				fclose( $temp_pem );
-				// phpcs:enable WordPress.WP.AlternativeFunctions.file_system_operations_fclose
-			}
-		}
-		
-		// Final fallback: clean the original base64 (remove any whitespace)
+		// Fallback: the PEM body is the base64 of the DER bytes, so the cleaned upload is the
+		// same value (no shell command needed).
 		if ( false === $certificate_final ) {
 			$certificate_final = preg_replace( '/\s/', '', $certificate_base64_raw );
 		}
@@ -3710,18 +3684,15 @@ class WC_Gateway_Checkout_Com_Apple_Pay extends WC_Payment_Gateway {
 			}
 		}
 
-		// Fallback to shell command if PHP function fails
-		if ( empty( $certificate_pem ) ) {
-			// Create temporary DER file
-			$temp_der = sys_get_temp_dir() . '/' . uniqid( 'cert_' ) . '.der';
-			file_put_contents( $temp_der, $certificate_der );
-			
-			// Convert using openssl command
-			$command = 'openssl x509 -inform DER -in ' . escapeshellarg( $temp_der ) . ' -outform PEM';
-			$certificate_pem = shell_exec( $command );
-			
-			// Clean up temp file
-			wp_delete_file( $temp_der );
+		// Fallback: wrap the DER bytes as PEM (what `openssl x509 -inform DER -outform PEM` does),
+		// then keep it only if OpenSSL parses it as a certificate. What is saved is OpenSSL's own
+		// export of the parsed certificate, never the uploaded bytes.
+		if ( empty( $certificate_pem ) && '' !== $certificate_der && function_exists( 'openssl_x509_read' ) ) {
+			$wrapped = "-----BEGIN CERTIFICATE-----\n" . chunk_split( base64_encode( $certificate_der ), 64, "\n" ) . "-----END CERTIFICATE-----\n";
+			$cert    = openssl_x509_read( $wrapped );
+			if ( false !== $cert ) {
+				openssl_x509_export( $cert, $certificate_pem );
+			}
 		}
 
 		if ( empty( $certificate_pem ) ) {

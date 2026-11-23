@@ -883,7 +883,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		}
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce verified by WooCommerce checkout
-		$payment_session_id = isset( $_POST['cko-flow-payment-session-id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( $_POST['cko-flow-payment-session-id'], 'ps' ) : '';
+		$payment_session_id = isset( $_POST['cko-flow-payment-session-id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-session-id'] ) ), 'ps' ) : '';
 		if ( empty( $payment_session_id ) ) {
 			return;
 		}
@@ -2390,7 +2390,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			exit;
 		}
 
-		$payment_id = isset( $_GET['cko-payment-id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( $_GET['cko-payment-id'], 'pay' ) : '';
+		$payment_id = isset( $_GET['cko-payment-id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( sanitize_text_field( wp_unslash( $_GET['cko-payment-id'] ) ), 'pay' ) : '';
 		if ( empty( $payment_id ) ) {
 			WC_Checkoutcom_Utility::logger( '[ADD PAYMENT METHOD] ERROR: missing cko-payment-id on return.' );
 			wc_add_notice( __( 'Could not add the card. Please try again.', 'checkout-com-unified-payments-api' ), 'error' );
@@ -2546,7 +2546,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] Order ID: ' . $order_id );
 		
 		// Fetch payment details early (before order lookup) so we can use them as fallback if order lookup fails
-		$flow_payment_id_from_post = isset( $_POST['cko-flow-payment-id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( $_POST['cko-flow-payment-id'], 'pay' ) : '';
+		$flow_payment_id_from_post = isset( $_POST['cko-flow-payment-id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-id'] ) ), 'pay' ) : '';
 		$payment_details = null;
 		WC_Checkoutcom_Utility::logger( '[PROCESS PAYMENT] flow_payment_id_from_post: ' . $flow_payment_id_from_post );
 		
@@ -2659,7 +2659,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		
 		// DUPLICATE PREVENTION: Check if this order has already been processed
 		$existing_transaction_id = $order->get_transaction_id();
-		$flow_payment_id = isset( $_POST['cko-flow-payment-id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( $_POST['cko-flow-payment-id'], 'pay' ) : '';
+		$flow_payment_id = isset( $_POST['cko-flow-payment-id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-id'] ) ), 'pay' ) : '';
 		// Track whether the payment id arrived on THIS request (POST/GET) versus being resolved
 		// from the order's own stored meta below. The duplicate-prevention guard must only treat a
 		// request-sourced id as a "duplicate"; comparing an order-meta fallback id against the same
@@ -2668,7 +2668,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 		// Fallback 1: Get payment ID from GET parameter (from handle_3ds_return URL)
 		if ( empty( $flow_payment_id ) && isset( $_GET['cko-payment-id'] ) ) {
-			$flow_payment_id = WC_Checkoutcom_Utility::clean_checkout_id( $_GET['cko-payment-id'], 'pay' );
+			$flow_payment_id = WC_Checkoutcom_Utility::clean_checkout_id( sanitize_text_field( wp_unslash( $_GET['cko-payment-id'] ) ), 'pay' );
 			$flow_payment_id_from_request = ! empty( $flow_payment_id );
 			WC_Checkoutcom_Utility::logger( '[FLOW SAVE CARD] Payment ID retrieved from GET parameter: ' . $flow_payment_id );
 		}
@@ -2708,11 +2708,11 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			if ( ! $dup_verified ) {
 				WC_Checkoutcom_Utility::logger( '[DUPLICATE PREVENTION] Payment verification failed for order ' . $order_id . ': ' . $dup_verification->get_error_message() );
 			}
-			WC_Checkoutcom_Utility::logger( '[FLOW SAVE CARD] [DUPLICATE PREVENTION] Payment ID check - POST: ' . ( isset( $_POST['cko-flow-payment-id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( $_POST['cko-flow-payment-id'], 'pay' ) : 'NOT SET' ) . ', Order meta _cko_flow_payment_id: ' . $order->get_meta( '_cko_flow_payment_id' ) . ', Order meta _cko_payment_id: ' . $order->get_meta( '_cko_payment_id' ) . ', Final flow_payment_id: ' . $flow_payment_id );
+			WC_Checkoutcom_Utility::logger( '[FLOW SAVE CARD] [DUPLICATE PREVENTION] Payment ID check - POST: ' . ( isset( $_POST['cko-flow-payment-id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-id'] ) ), 'pay' ) : 'NOT SET' ) . ', Order meta _cko_flow_payment_id: ' . $order->get_meta( '_cko_flow_payment_id' ) . ', Order meta _cko_payment_id: ' . $order->get_meta( '_cko_payment_id' ) . ', Final flow_payment_id: ' . $flow_payment_id );
 			
 			// MULTI-TAB DETECTION: Check if this is a different payment attempt
 			// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Just reading payment session ID
-			$current_payment_session_id = isset( $_GET['cko-payment-session-id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( $_GET['cko-payment-session-id'], 'ps' ) : '';
+			$current_payment_session_id = isset( $_GET['cko-payment-session-id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( sanitize_text_field( wp_unslash( $_GET['cko-payment-session-id'] ) ), 'ps' ) : '';
 			$order_payment_session_id = $order->get_meta( '_cko_payment_session_id' );
 			$incoming_payment_id = $flow_payment_id;
 			$order_primary_payment_id = $order->get_meta( '_cko_payment_id' );
@@ -3334,7 +3334,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			
 			if ( empty( $existing_order_session_id ) ) {
 				// Order doesn't have payment session ID yet - try to get it
-				$payment_session_id = isset( $_POST['cko-flow-payment-session-id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( $_POST['cko-flow-payment-session-id'], 'ps' ) : '';
+				$payment_session_id = isset( $_POST['cko-flow-payment-session-id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-session-id'] ) ), 'ps' ) : '';
 				if ( empty( $payment_session_id ) && isset( $payment_details['metadata']['cko_payment_session_id'] ) ) {
 					$payment_session_id = $payment_details['metadata']['cko_payment_session_id'];
 					WC_Checkoutcom_Utility::logger( '[3DS RETURN] Payment session ID retrieved from payment_details metadata: ' . substr( $payment_session_id, 0, 20 ) . '...' );
@@ -3795,7 +3795,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			$flow_payment_type = 'card';
 		} else {
 			// Normal Flow payment (new card)
-			$flow_pay_id = isset( $_POST['cko-flow-payment-id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( $_POST['cko-flow-payment-id'], 'pay' ) : '';
+			$flow_pay_id = isset( $_POST['cko-flow-payment-id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-id'] ) ), 'pay' ) : '';
 			$payment_processed_via_fallback = false;
 			
 			// Log detailed information for debugging
@@ -4063,7 +4063,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	
 	// Store payment session ID for 3DS return lookup
 	// Priority: 1) POST data (from form), 2) Already-fetched payment details, 3) Payment metadata (fetch if needed)
-	$payment_session_id = isset( $_POST['cko-flow-payment-session-id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( $_POST['cko-flow-payment-session-id'], 'ps' ) : '';
+	$payment_session_id = isset( $_POST['cko-flow-payment-session-id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-session-id'] ) ), 'ps' ) : '';
 	WC_Checkoutcom_Utility::logger( 'Payment session ID from POST: ' . ( ! empty( $payment_session_id ) ? $payment_session_id : 'EMPTY' ) );
 	
 	$payment_details_for_shipping = null;
@@ -4386,9 +4386,9 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 	public function detect_and_process_3ds_return_on_checkout() {
 		// Check if 3DS return parameters are present FIRST (before checking is_checkout)
 		// This ensures we catch it even if is_checkout() hasn't loaded yet in slow environments
-		$payment_id = isset( $_GET['cko-payment-id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( $_GET['cko-payment-id'], 'pay' ) : '';
-		$session_id = isset( $_GET['cko-session-id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( $_GET['cko-session-id'], 'sid' ) : '';
-		$payment_session_id = isset( $_GET['cko-payment-session-id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( $_GET['cko-payment-session-id'], 'ps' ) : '';
+		$payment_id = isset( $_GET['cko-payment-id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( sanitize_text_field( wp_unslash( $_GET['cko-payment-id'] ) ), 'pay' ) : '';
+		$session_id = isset( $_GET['cko-session-id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( sanitize_text_field( wp_unslash( $_GET['cko-session-id'] ) ), 'sid' ) : '';
+		$payment_session_id = isset( $_GET['cko-payment-session-id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( sanitize_text_field( wp_unslash( $_GET['cko-payment-session-id'] ) ), 'ps' ) : '';
 		
 		// If we have payment ID or session ID, it's a 3DS return
 		if ( empty( $payment_id ) && empty( $session_id ) && empty( $payment_session_id ) ) {
@@ -4455,8 +4455,8 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Request URI: ' . ( isset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : 'N/A' ) );
 		}
 		
-		$payment_id = isset( $_GET['cko-payment-id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( $_GET['cko-payment-id'], 'pay' ) : '';
-		$payment_session_id_from_url = isset( $_GET['cko-payment-session-id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( $_GET['cko-payment-session-id'], 'ps' ) : '';
+		$payment_id = isset( $_GET['cko-payment-id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( sanitize_text_field( wp_unslash( $_GET['cko-payment-id'] ) ), 'pay' ) : '';
+		$payment_session_id_from_url = isset( $_GET['cko-payment-session-id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( sanitize_text_field( wp_unslash( $_GET['cko-payment-session-id'] ) ), 'ps' ) : '';
 		$order_id   = isset( $_GET['order_id'] ) ? absint( wp_unslash( $_GET['order_id'] ) ) : 0;
 		$order_key  = isset( $_GET['key'] ) ? sanitize_text_field( wp_unslash( $_GET['key'] ) ) : '';
 		
@@ -4860,7 +4860,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Order has payment ID but status is ' . $current_order_status . ' - continuing to verify payment status from API. Order ID: ' . $order_id );
 			
 			// Update payment session ID if provided in URL (ensures webhook matching works)
-			$payment_session_id_from_url = isset( $_GET['cko-payment-session-id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( $_GET['cko-payment-session-id'], 'ps' ) : '';
+			$payment_session_id_from_url = isset( $_GET['cko-payment-session-id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( sanitize_text_field( wp_unslash( $_GET['cko-payment-session-id'] ) ), 'ps' ) : '';
 			$order_payment_session_id = $order->get_meta( '_cko_payment_session_id' );
 			if ( ! empty( $payment_session_id_from_url ) && $payment_session_id_from_url !== $order_payment_session_id ) {
 				WC_Checkoutcom_Utility::logger( '[FLOW 3DS API] Updating payment session ID for webhook matching. Old: ' . $order_payment_session_id . ', New: ' . $payment_session_id_from_url );
@@ -5249,7 +5249,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 			// CRITICAL: Check if this is a multi-tab scenario - don't overwrite primary payment ID
 			$existing_flow_payment_id = $order->get_meta( '_cko_flow_payment_id' );
 			$existing_payment_session_id = $order->get_meta( '_cko_payment_session_id' );
-			$current_payment_session_id = isset( $_GET['cko-payment-session-id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( $_GET['cko-payment-session-id'], 'ps' ) : '';
+			$current_payment_session_id = isset( $_GET['cko-payment-session-id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( sanitize_text_field( wp_unslash( $_GET['cko-payment-session-id'] ) ), 'ps' ) : '';
 			
 			// Determine if this is a different payment attempt (multi-tab scenario)
 			$is_different_payment = ! empty( $existing_flow_payment_id ) && $existing_flow_payment_id !== $payment_id;
@@ -7726,7 +7726,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		}
 
 		// phpcs:disable WordPress.Security.NonceVerification.Missing, WordPress.Security.NonceVerification.Recommended -- order key check, callers verify their own nonces.
-		foreach ( array( $_POST['order_key'] ?? null, $_POST['key'] ?? null, $_GET['key'] ?? null ) as $key ) {
+		foreach ( array( isset( $_POST['order_key'] ) ? sanitize_text_field( wp_unslash( $_POST['order_key'] ) ) : null, isset( $_POST['key'] ) ? sanitize_text_field( wp_unslash( $_POST['key'] ) ) : null, isset( $_GET['key'] ) ? sanitize_text_field( wp_unslash( $_GET['key'] ) ) : null ) as $key ) {
 			if ( is_string( $key ) && '' !== $key && hash_equals( (string) $order->get_order_key(), sanitize_text_field( wp_unslash( $key ) ) ) ) {
 				return true;
 			}
@@ -8308,7 +8308,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		
 		// Get payment session ID - CRITICAL for order lookup after 3DS return.
 		// This links the order to the payment session so we can find it when user returns from 3DS.
-		$payment_session_id = isset( $_POST['cko-flow-payment-session-id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( $_POST['cko-flow-payment-session-id'], 'ps' ) : '';
+		$payment_session_id = isset( $_POST['cko-flow-payment-session-id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-session-id'] ) ), 'ps' ) : '';
 		
 		if ( empty( $payment_session_id ) ) {
 			WC_Checkoutcom_Utility::logger( '[CREATE ORDER] ⚠️ WARNING: payment_session_id is EMPTY - order lookup after 3DS return will rely on fallback methods (email+amount)' );
@@ -8769,7 +8769,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		if ( ! $should_prevent_reuse ) {
 			// Try POST first (Classic checkout)
 			$current_payment_session_id = isset( $_POST['cko-flow-payment-session-id'] ) 
-				? WC_Checkoutcom_Utility::clean_checkout_id( $_POST['cko-flow-payment-session-id'], 'ps' ) 
+				? WC_Checkoutcom_Utility::clean_checkout_id( sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-session-id'] ) ), 'ps' ) 
 				: '';
 			
 			// If not in POST, check REST API request body (Blocks checkout)
@@ -8885,7 +8885,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// Try POST (classic checkout)
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Just reading value
 		if ( isset( $_POST['cko-flow-payment-session-id'] ) ) {
-			$current_payment_session_id = WC_Checkoutcom_Utility::clean_checkout_id( $_POST['cko-flow-payment-session-id'], 'ps' );
+			$current_payment_session_id = WC_Checkoutcom_Utility::clean_checkout_id( sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-session-id'] ) ), 'ps' );
 		}
 		
 		// Try REST API body (blocks checkout)
@@ -8966,7 +8966,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// Get current payment session ID from POST or request data
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce verified by WooCommerce
 		$current_payment_session_id = isset( $_POST['cko-flow-payment-session-id'] ) 
-			? WC_Checkoutcom_Utility::clean_checkout_id( $_POST['cko-flow-payment-session-id'], 'ps' ) 
+			? WC_Checkoutcom_Utility::clean_checkout_id( sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-session-id'] ) ), 'ps' ) 
 			: '';
 		
 		$order_payment_session_id = $order->get_meta( '_cko_payment_session_id' );
@@ -9039,7 +9039,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// Get current payment session ID from POST
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Just reading value
 		$current_payment_session_id = isset( $_POST['cko-flow-payment-session-id'] ) 
-			? WC_Checkoutcom_Utility::clean_checkout_id( $_POST['cko-flow-payment-session-id'], 'ps' ) 
+			? WC_Checkoutcom_Utility::clean_checkout_id( sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-session-id'] ) ), 'ps' ) 
 			: '';
 		
 		$order_payment_session_id = $existing_order->get_meta( '_cko_payment_session_id' );
@@ -9237,7 +9237,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// Get current payment session ID from POST
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Just reading value
 		$current_payment_session_id = isset( $_POST['cko-flow-payment-session-id'] ) 
-			? WC_Checkoutcom_Utility::clean_checkout_id( $_POST['cko-flow-payment-session-id'], 'ps' ) 
+			? WC_Checkoutcom_Utility::clean_checkout_id( sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-session-id'] ) ), 'ps' ) 
 			: '';
 		
 		$order_payment_session_id = $existing_order->get_meta( '_cko_payment_session_id' );
@@ -9423,7 +9423,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		// Exception: Order-pay pages can reuse (user explicitly paying for that specific order).
 		$existing_payment_session_id = $order->get_meta( '_cko_payment_session_id' );
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Just reading value for comparison
-		$current_payment_session_id = isset( $_POST['cko-flow-payment-session-id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( $_POST['cko-flow-payment-session-id'], 'ps' ) : '';
+		$current_payment_session_id = isset( $_POST['cko-flow-payment-session-id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( sanitize_text_field( wp_unslash( $_POST['cko-flow-payment-session-id'] ) ), 'ps' ) : '';
 		
 		if ( ! empty( $existing_payment_session_id ) && ! $is_order_pay_page ) {
 			// If current request has a DIFFERENT payment session ID, reject reuse
@@ -9588,7 +9588,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 		
 		// Get order ID and payment session ID from POST
 		$order_id = isset( $_POST['order_id'] ) ? absint( $_POST['order_id'] ) : 0;
-		$payment_session_id = isset( $_POST['payment_session_id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( $_POST['payment_session_id'], 'ps' ) : '';
+		$payment_session_id = isset( $_POST['payment_session_id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( sanitize_text_field( wp_unslash( $_POST['payment_session_id'] ) ), 'ps' ) : '';
 		
 		// Validate required parameters
 		if ( empty( $order_id ) || empty( $payment_session_id ) ) {
@@ -9710,7 +9710,7 @@ class WC_Gateway_Checkout_Com_Flow extends WC_Payment_Gateway {
 
 		// Get parameters from POST
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- payment_session_id is alphanumeric ID from Checkout.com
-		$payment_session_id = isset( $_POST['payment_session_id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( $_POST['payment_session_id'], 'ps' ) : '';
+		$payment_session_id = isset( $_POST['payment_session_id'] ) ? WC_Checkoutcom_Utility::clean_checkout_id( sanitize_text_field( wp_unslash( $_POST['payment_session_id'] ) ), 'ps' ) : '';
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- session_data is opaque token from Checkout.com SDK, must be passed as-is
 		$session_data       = isset( $_POST['session_data'] ) ? wp_unslash( $_POST['session_data'] ) : '';
 		$amount             = isset( $_POST['amount'] ) ? absint( $_POST['amount'] ) : 0;
