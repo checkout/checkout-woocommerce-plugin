@@ -4,7 +4,7 @@ Checkout.com Payment Gateway plugin for WooCommerce with Flow integration suppor
 
 ## Version
 
-**Current Version:** 5.1.7
+**Current Version:** 5.1.8
 
 ## Features
 
@@ -456,7 +456,7 @@ checkout-com-unified-payments-api/
 - WooCommerce 8.0+
 - PHP 7.4+
 - SSL Certificate (required for production)
-- Tested up to WordPress 7.1 and WooCommerce 11.2
+- Tested up to WordPress 7.1 and WooCommerce 11.3
 
 ## Support
 
@@ -472,6 +472,12 @@ GPL v2 or later
 ## Changelog
 
 The full changelog for every release is in [changelog.txt](changelog.txt).
+
+### Version 5.1.8
+- Optional Client ID setting: API requests go to your merchant-specific Checkout.com subdomain.
+- Optional Processing Channel ID setting, sent with payments.
+- Mastercard subscription renewals send the scheme transaction link ID (TLID) from the first payment.
+- Fixes for the WooCommerce QIT security and Plugin Check tests.
 
 ### Version 5.1.7
 - Further security hardening of Flow checkout, card returns, webhooks and express payments. Updating is strongly recommended.
