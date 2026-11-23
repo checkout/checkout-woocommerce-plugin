@@ -188,8 +188,9 @@ support@checkout.com
 2. Set **Checkout Mode** to **Flow** (recommended).
 3. Set **Environment** to **SandBox** while you test, or **Live** to take real payments.
 4. Enter your **Secret Key** and **Public Key** from the Checkout.com Dashboard. Sandbox and Live use different keys.
-5. Click **Save changes**.
-6. Click **Register Webhook**, then **Run Webhook check** to confirm it is working. Webhooks keep your orders up to date when payments are captured, refunded or declined. If you change your store's address, register the webhook again.
+5. Optional: enter your **Client ID** (starts with `cli_`) so API requests go to your merchant-specific Checkout.com subdomain, and your **Processing Channel ID** (starts with `pc_`) if your account has more than one processing channel. Both are in the Checkout.com Dashboard. Leave them blank to use the defaults.
+6. Click **Save changes**.
+7. Click **Register Webhook**, then **Run Webhook check** to confirm it is working. Webhooks keep your orders up to date when payments are captured, refunded or declined. If you change your store's address, register the webhook again.
 
 = Choose your payment methods =
 
@@ -199,7 +200,7 @@ support@checkout.com
 = Go live =
 
 1. Place a test order in Sandbox with a Checkout.com test card.
-2. Switch **Environment** to **Live**, enter your Live keys and click **Register Webhook** again.
+2. Switch **Environment** to **Live**, enter your Live keys (and your Live Client ID and Processing Channel ID, if you use them) and click **Register Webhook** again.
 3. Place one small real order and refund it to check everything works.
 
 == Changelog ==
