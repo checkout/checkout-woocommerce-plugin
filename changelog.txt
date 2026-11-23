@@ -1,5 +1,14 @@
 *** Checkout.com Payment Gateway Changelog ***
 
+2026-11-23 - version 5.1.8
+* Add - Client ID setting: when set, API requests go to the merchant-specific subdomain (https://{prefix}.api[.sandbox].checkout.com, prefix = first 8 characters after cli_). Blank keeps the global domain.
+* Add - Processing Channel ID setting (optional), sent with payment and payment context requests.
+* Add - Mastercard: subscription renewals (MIT) send processing.scheme_transaction_link_id from the first payment. A changed card replaces it.
+* Fix - WooCommerce QIT: request input is sanitized where it is read; "Tested up to" is set in readme.txt only.
+* Tweak - Apple Pay: certificate conversion no longer uses shell commands; an uploaded certificate is saved only when it parses.
+* Dev - QIT preflight checks (bin/qit, qit-preflight.yml) run in CI.
+* Dev - WC tested up to 11.3.
+
 2026-11-10 - version 5.1.7
 * Fix - Security: further hardening of Flow checkout, card returns, webhooks and express payments. Updating is strongly recommended.
 * Tweak - Flow: 3D Secure stays on for card payments. To turn it off, set "Use 3D Secure" to No and tick the new "Confirm turning off 3D Secure (Flow)" option in Card Settings.

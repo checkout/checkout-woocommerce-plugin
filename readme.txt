@@ -2,11 +2,11 @@
 Contributors: checkoutintegration
 Tags: payments, credit card, payment gateway, apple pay, google pay
 Requires at least: 6.0
-Stable tag: 5.1.7
+Stable tag: 5.1.8
 Requires PHP: 7.4
 Tested up to: 7.1
 WC requires at least: 8.0
-WC tested up to: 11.2
+WC tested up to: 11.3
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -188,8 +188,10 @@ support@checkout.com
 2. Set **Checkout Mode** to **Flow** (recommended).
 3. Set **Environment** to **SandBox** while you test, or **Live** to take real payments.
 4. Enter your **Secret Key** and **Public Key** from the Checkout.com Dashboard. Sandbox and Live use different keys.
-5. Click **Save changes**.
-6. Click **Register Webhook**, then **Run Webhook check** to confirm it is working. Webhooks keep your orders up to date when payments are captured, refunded or declined. If you change your store's address, register the webhook again.
+5. Enter your **Client ID** (starts with `cli_`). API requests then go to your merchant-specific Checkout.com subdomain (MSSD), which Checkout.com asks all merchants to use. Find it in the Checkout.com Dashboard under **Settings → Account structure** (Owner or Admin role); Sandbox and Live have different Client IDs. See [API endpoints](https://www.checkout.com/docs/developer-resources/api/api-endpoints). If you leave it blank, the plugin uses the global Checkout.com domain.
+6. Optional: enter your **Processing Channel ID** (starts with `pc_`) if your account has more than one processing channel. Leave it blank to use your account default.
+7. Click **Save changes**.
+8. Click **Register Webhook**, then **Run Webhook check** to confirm it is working. Webhooks keep your orders up to date when payments are captured, refunded or declined. If you change your store's address, register the webhook again.
 
 = Choose your payment methods =
 
@@ -199,10 +201,19 @@ support@checkout.com
 = Go live =
 
 1. Place a test order in Sandbox with a Checkout.com test card.
-2. Switch **Environment** to **Live**, enter your Live keys and click **Register Webhook** again.
+2. Switch **Environment** to **Live**, enter your Live keys and Live Client ID (and Live Processing Channel ID, if you use one) and click **Register Webhook** again.
 3. Place one small real order and refund it to check everything works.
 
 == Changelog ==
+v5.1.8 23rd November 2026
+New
+- Client ID setting: when set, API requests go to your merchant-specific Checkout.com subdomain (MSSD), as Checkout.com recommends. Find it in the Dashboard under Settings → Account structure.
+- Processing Channel ID setting (optional), sent with payments. Needed when your account has more than one processing channel.
+- Mastercard subscription renewals send the scheme transaction link ID (TLID) from the first payment.
+Improvements
+- Request input is sanitized where it is read, and Apple Pay certificate conversion no longer uses shell commands (WooCommerce quality checks).
+- Tested with WooCommerce 11.3.
+
 v5.1.7 10th November 2026
 Security
 - Further security hardening of Flow checkout, card returns, webhooks and express payments. Updating is strongly recommended.
@@ -664,6 +675,9 @@ v4.0.0 3 Sep 2019
 · Checkout.com Woocommerce module for the Unified Payments API
 
 == Upgrade Notice ==
+= 5.1.8 =
+Adds the Client ID setting for your merchant-specific API subdomain, an optional Processing Channel ID setting, and the Mastercard TLID on subscription renewals.
+
 = 5.1.7 =
 Security update - updating is strongly recommended. Clear any page cache after updating.
 
