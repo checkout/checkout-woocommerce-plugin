@@ -20,7 +20,7 @@ SLUG="${QIT_SLUG:-checkout-com-payments-gateway}"
 ZIP="${1:-$ROOT/checkout-com-unified-payments-api.zip}"
 shift || true
 TESTS=("$@")
-if [ ${#TESTS[@]} -eq 0 ]; then
+if [[ ${#TESTS[@]} -eq 0 ]]; then
 	TESTS=(activation woo-e2e woo-api security phpcompatibility phpstan malware validation plugin-check)
 fi
 
@@ -28,7 +28,7 @@ if ! command -v qit > /dev/null 2>&1; then
 	echo 'QIT CLI not found. Install it: composer global require "woocommerce/qit-cli:*" and run: qit connect' >&2
 	exit 2
 fi
-if [ ! -f "$ZIP" ]; then
+if [[ ! -f "$ZIP" ]]; then
 	echo "Zip not found: $ZIP (build one with: bash bin/build.sh)" >&2
 	exit 2
 fi
@@ -45,7 +45,7 @@ for test in "${TESTS[@]}"; do
 	echo
 done
 
-if [ ${#FAILED[@]} -gt 0 ]; then
+if [[ ${#FAILED[@]} -gt 0 ]]; then
 	echo "QIT managed tests FAILED: ${FAILED[*]}"
 	exit 1
 fi

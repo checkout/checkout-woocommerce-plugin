@@ -15,12 +15,12 @@ MOUNT="$(basename "$ROOT")"      # the repo is mounted in the store under its fo
 WP_ENV="$ROOT/e2e-tests/node_modules/.bin/wp-env"
 ZIP="${1:-}"
 
-if [ ! -x "$WP_ENV" ]; then
+if [[ ! -x "$WP_ENV" ]]; then
 	echo "wp-env not found. Run: cd e2e-tests && npm ci && npm run env:start" >&2
 	exit 2
 fi
 
-if [ -z "$ZIP" ]; then
+if [[ -z "$ZIP" ]]; then
 	bash bin/build.sh > /dev/null
 	ZIP="$SLUG.zip"
 fi
@@ -28,7 +28,7 @@ case "$ZIP" in
 	/*) ZIP_REL="${ZIP#"$ROOT"/}" ;;
 	*) ZIP_REL="$ZIP" ;;
 esac
-if [ ! -f "$ROOT/$ZIP_REL" ]; then
+if [[ ! -f "$ROOT/$ZIP_REL" ]]; then
 	echo "Zip not found inside the repo: $ZIP (the store only sees files in the repo folder)" >&2
 	exit 2
 fi
@@ -51,6 +51,10 @@ REPORT="$(wp plugin check "$SLUG" --categories=plugin_repo --format=csv --fields
 ERRORS="$(printf '%s\n' "$REPORT" | grep -c ',ERROR,' || true)"
 WARNINGS="$(printf '%s\n' "$REPORT" | grep -c ',WARNING,' || true)"
 
-printf '%s\n' "$REPORT" | grep ',ERROR,' || true
-echo "Plugin Check ($SLUG from $ZIP_REL): $ERRORS error(s), $WARNINGS warning(s)."
-[ "$ERRORS" -eq 0 ]
+SUMMARY="Plugin Check ($SLUG from $ZIP_REL): $ERRORS error(s), $WARNINGS warning(s)."
+if [[ "$ERRORS" -gt 0 ]]; then
+	printf '%s\n' "$REPORT" | grep ',ERROR,' >&2 || true
+	echo "$SUMMARY" >&2
+	exit 1
+fi
+echo "$SUMMARY"

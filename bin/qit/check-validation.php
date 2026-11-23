@@ -13,6 +13,9 @@ $root      = rtrim( isset( $argv[1] ) ? $argv[1] : dirname( __DIR__, 2 ), '/' );
 $main_file = $root . '/woocommerce-gateway-checkout-com.php';
 $readme    = $root . '/readme.txt';
 
+const H_REQUIRES_WP  = 'requires at least';
+const H_REQUIRES_PHP = 'requires php';
+
 $errors   = array();
 $warnings = array();
 
@@ -49,7 +52,7 @@ $plugin = qit_headers( $main_file, false );
 $read   = is_file( $readme ) ? qit_headers( $readme, true ) : array();
 
 // QIT Validation: these plugin headers should be present (missing ones are warnings).
-foreach ( array( 'requires at least', 'requires php', 'wc requires at least', 'wc tested up to', 'license' ) as $key ) {
+foreach ( array( H_REQUIRES_WP, H_REQUIRES_PHP, 'wc requires at least', 'wc tested up to', 'license' ) as $key ) {
 	if ( empty( $plugin[ $key ] ) ) {
 		$warnings[] = "Plugin header \"$key\" is missing.";
 	}
@@ -66,7 +69,7 @@ if ( isset( $plugin['tested up to'] ) ) {
 }
 
 // Plugin Check: readme headers.
-foreach ( array( 'tested up to', 'stable tag', 'requires at least', 'requires php', 'license' ) as $key ) {
+foreach ( array( 'tested up to', 'stable tag', H_REQUIRES_WP, H_REQUIRES_PHP, 'license' ) as $key ) {
 	if ( $read && empty( $read[ $key ] ) ) {
 		$errors[] = "readme.txt header \"$key\" is missing.";
 	}
@@ -74,7 +77,7 @@ foreach ( array( 'tested up to', 'stable tag', 'requires at least', 'requires ph
 if ( $read && isset( $read['stable tag'], $plugin['version'] ) && $read['stable tag'] !== $plugin['version'] ) {
 	$errors[] = sprintf( 'readme.txt "Stable tag" (%s) does not match the plugin "Version" (%s).', $read['stable tag'], $plugin['version'] );
 }
-foreach ( array( 'requires at least', 'requires php' ) as $key ) {
+foreach ( array( H_REQUIRES_WP, H_REQUIRES_PHP ) as $key ) {
 	if ( isset( $read[ $key ], $plugin[ $key ] ) && $read[ $key ] !== $plugin[ $key ] ) {
 		$warnings[] = sprintf( '"%s" differs: readme.txt %s, plugin header %s.', $key, $read[ $key ], $plugin[ $key ] );
 	}

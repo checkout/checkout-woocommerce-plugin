@@ -53,13 +53,13 @@ jobs:
 
       - name: Build the release zip
         run: |
-          npm ci
+          npm ci --ignore-scripts
           bash bin/build.sh
 
       - name: Start the pinned test store (wp-env)
         working-directory: e2e-tests
         run: |
-          npm ci
+          npm ci --ignore-scripts
           npm run env:start
 
       - name: Run Plugin Check on the zip

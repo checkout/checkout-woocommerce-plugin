@@ -20,7 +20,7 @@ cd "$ROOT"
 
 tools() {
 	local set="$1"
-	if [ ! -x "$TOOLS/$set/vendor/bin/phpcs" ]; then
+	if [[ ! -x "$TOOLS/$set/vendor/bin/phpcs" ]]; then
 		composer install --working-dir="$TOOLS/$set" --no-interaction --no-progress --quiet
 	fi
 	echo "$TOOLS/$set/vendor/bin/phpcs"
@@ -76,7 +76,7 @@ run() {
 	echo
 }
 
-if [ $# -eq 0 ]; then
+if [[ $# -eq 0 ]]; then
 	for check in security compat validation malware audit; do
 		run "$check"
 	done
@@ -89,7 +89,7 @@ else
 	esac
 fi
 
-if [ ${#FAILED[@]} -gt 0 ]; then
+if [[ ${#FAILED[@]} -gt 0 ]]; then
 	echo "QIT local checks FAILED: ${FAILED[*]}"
 	exit 1
 fi
