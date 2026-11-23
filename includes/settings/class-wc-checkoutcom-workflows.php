@@ -75,27 +75,11 @@ class WC_Checkoutcom_Workflows {
 		$core_settings   = function_exists( 'cko_get_raw_option' )
 			? cko_get_raw_option( 'woocommerce_wc_checkout_com_cards_settings' )
 			: get_option( 'woocommerce_wc_checkout_com_cards_settings', array() );
-		$environment     = ( 'sandbox' === ( $core_settings['ckocom_environment'] ?? 'sandbox' ) );
-		$region          = isset( $core_settings['ckocom_region'] ) ? sanitize_text_field( $core_settings['ckocom_region'] ) : '';
-		
-		// Valid region values: 'global', 'ksa', or empty string
-		// Filter out invalid values like '--' or other placeholders
-		$valid_regions = array( 'global', 'ksa' );
-		if ( ! empty( $region ) && ! in_array( $region, $valid_regions, true ) ) {
-			// Invalid region value, default to global (no subdomain)
-			$region = '';
-		}
-		
-		$subdomain_check = ! empty( $region ) && 'global' !== $region;
-
 		$secret_key_raw = $core_settings['ckocom_sk'] ?? '';
 		$this->secret_key = cko_is_nas_account() ? 'Bearer ' . $secret_key_raw : $secret_key_raw;
 
-		if ( $subdomain_check && ! empty( $region ) ) {
-			$this->url = $environment ? 'https://' . $region . '.api.sandbox.checkout.com/workflows' : 'https://' . $region . '.api.checkout.com/workflows';
-		} else {
-			$this->url = $environment ? 'https://api.sandbox.checkout.com/workflows' : 'https://api.checkout.com/workflows';
-		}
+		// Environment host, with the merchant-specific (or region) subdomain when configured.
+		$this->url = cko_get_api_base_url( is_array( $core_settings ) ? $core_settings : null ) . '/workflows';
 
 		$this->checkout = new Checkout_SDK();
 	}

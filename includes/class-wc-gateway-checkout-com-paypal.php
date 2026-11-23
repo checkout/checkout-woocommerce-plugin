@@ -791,6 +791,7 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 		$paymentContextsRequest           = new Checkout\Payments\Contexts\PaymentContextsRequest();
 		$paymentContextsRequest->source   = new Checkout\Payments\Request\Source\Apm\RequestPayPalSource();
 		$paymentContextsRequest->currency = get_woocommerce_currency();
+		cko_apply_processing_channel_id( $paymentContextsRequest );
 
 		$paymentContextsRequest->processing                      = new Checkout\Payments\Contexts\PaymentContextsProcessing();
 		$paymentContextsRequest->processing->shipping_preference = Checkout\Payments\ShippingPreference::$GET_FROM_FILE;
@@ -1001,6 +1002,7 @@ class WC_Gateway_Checkout_Com_PayPal extends WC_Payment_Gateway {
 			$payment_request_param                        = $checkout->get_payment_request();
 			$payment_request_param->payment_context_id    = $payment_context_id;
 			$payment_request_param->processing_channel_id = $processing_channel_id;
+			cko_apply_processing_channel_id( $payment_request_param );
 			$payment_request_param->reference             = $order->get_order_number();
 			$payment_request_param->amount                = $amount_cents;
 

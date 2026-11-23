@@ -147,16 +147,12 @@ class WC_Checkoutcom_Diagnostics {
 
 		$environment = isset( $core_settings['ckocom_environment'] ) ? $core_settings['ckocom_environment'] : 'sandbox';
 		$account_type = isset( $core_settings['ckocom_account_type'] ) ? $core_settings['ckocom_account_type'] : 'ABC';
-		$region = isset( $core_settings['ckocom_region'] ) ? $core_settings['ckocom_region'] : 'global';
 
 		if ( function_exists( 'cko_is_nas_account' ) && cko_is_nas_account() ) {
 			$account_type = 'NAS';
 		}
 
-		$base_url = ( 'sandbox' === $environment ) ? 'https://api.sandbox.checkout.com' : 'https://api.checkout.com';
-		if ( 'global' !== $region && ! empty( $region ) ) {
-			$base_url = str_replace( 'api.', $region . '.api.', $base_url );
-		}
+		$base_url = cko_get_api_base_url( $core_settings );
 
 		$api_url = $base_url . '/applepay/signing-requests';
 		$secret_key_clean = str_replace( 'Bearer ', '', trim( $secret_key_raw ) );

@@ -65,7 +65,13 @@ class Checkout_SDK {
 		}
 		
 		$environment   = 'sandbox' === ( $core_settings['ckocom_environment'] ?? 'sandbox' ) ? Environment::sandbox() : Environment::production();
-		$subdomain     = ! isset( $core_settings['ckocom_region'] ) ? '--' : $core_settings['ckocom_region'];
+		// Merchant-specific subdomain from the Client ID, else the legacy region, else global.
+		// The Client ID belongs to the primary account, so the fallback account never uses it.
+		$subdomain_settings = $core_settings;
+		if ( $use_fallback ) {
+			unset( $subdomain_settings['ckocom_client_id'] );
+		}
+		$subdomain = function_exists( 'cko_get_api_subdomain' ) ? cko_get_api_subdomain( $subdomain_settings ) : '';
 
 		$this->nas_account_type = cko_is_nas_account();
 
@@ -79,7 +85,7 @@ class Checkout_SDK {
 		$builder->secretKey( $secret_key );
 		$builder->environment( $environment );
 
-		if ( '--' !== $subdomain && 'global' !== $subdomain ) {
+		if ( '' !== $subdomain ) {
 			$builder->environmentSubdomain( $subdomain );
 		}
 

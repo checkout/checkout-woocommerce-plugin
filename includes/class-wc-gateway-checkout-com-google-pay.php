@@ -1108,6 +1108,7 @@ class WC_Gateway_Checkout_Com_Google_Pay extends WC_Payment_Gateway {
 			$payment_request_param                        = $checkout->get_payment_request();
 			$payment_request_param->payment_context_id    = $payment_context_id;
 			$payment_request_param->processing_channel_id = $processing_channel_id;
+			cko_apply_processing_channel_id( $payment_request_param );
 			$payment_request_param->reference             = $order->get_order_number();
 			$payment_request_param->amount                = $amount_cents;
 
